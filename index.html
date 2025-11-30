@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSK Cargo LR Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'ssk-blue': '#1e3a8a',
+              'ssk-red': '#dc2626',
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #print-root, #print-root * {
+          visibility: visible;
+        }
+        #print-root {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+        }
+        .printable-area {
+          border: none !important;
+          box-shadow: none !important;
+        }
+        @page {
+          size: A4;
+          margin: 0;
+        }
+        .page-break {
+          page-break-after: always;
+        }
+        .page-break:last-child {
+          page-break-after: auto;
+        }
+      }
+      /* Added for 3D UI feel */
+      input:focus, textarea:focus, select:focus {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.5);
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      }
+    </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
+    "react-hot-toast": "https://aistudiocdn.com/react-hot-toast@^2.6.0",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <div id="print-root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

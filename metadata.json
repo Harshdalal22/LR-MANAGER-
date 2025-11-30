@@ -1,0 +1,5 @@
+{
+  "name": "Copy of  SSK Cargo LR Management",
+  "description": "An application to generate, manage, and share Lorry Receipts (LRs) for a cargo business. Features AI-assisted design, PDF generation, and sharing options.",
+  "requestFramePermissions": []
+}

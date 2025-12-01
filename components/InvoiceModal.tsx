@@ -13,14 +13,24 @@ interface InvoiceModalProps {
 
 declare const html2pdf: any;
 
-const InvoiceContent = forwardRef<HTMLDivElement, { lorryReceipts: LorryReceipt[], companyDetails: CompanyDetails, billNo: string, billDate: string }>(({ lorryReceipts, companyDetails, billNo, billDate }, ref) => {
+interface InvoiceContentProps {
+    lorryReceipts: LorryReceipt[];
+    companyDetails: CompanyDetails;
+    billNo: string;
+    billDate: string;
+    taxType: 'intra' | 'inter';
+}
+
+const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryReceipts, companyDetails, billNo, billDate, taxType }, ref) => {
     const totalAmount = lorryReceipts.reduce((sum, lr) => {
         const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
         return sum + (Number(lr.freight) || 0) + totalCharges;
     }, 0);
-    const totalCgst = totalAmount * 0.025;
-    const totalSgst = totalAmount * 0.025;
-    const totalIgst = 0;
+
+    const totalCgst = taxType === 'intra' ? totalAmount * 0.025 : 0;
+    const totalSgst = taxType === 'intra' ? totalAmount * 0.025 : 0;
+    const totalIgst = taxType === 'inter' ? totalAmount * 0.05 : 0;
+    
     const netAmount = totalAmount + totalCgst + totalSgst + totalIgst;
     const amountInWords = toWords(Math.round(netAmount));
 
@@ -128,15 +138,15 @@ const InvoiceContent = forwardRef<HTMLDivElement, { lorryReceipts: LorryReceipt[
                                         <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalAmount.toFixed(2)}</td>
                                     </tr>
                                     <tr>
-                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST</td>
+                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (2.5%)</td>
                                         <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalCgst.toFixed(2)}</td>
                                     </tr>
                                     <tr>
-                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST</td>
+                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (2.5%)</td>
                                         <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalSgst.toFixed(2)}</td>
                                     </tr>
                                     <tr>
-                                        <td className="p-1 h-[60px] align-top bg-blue-100 text-black">IGST</td>
+                                        <td className="p-1 h-[60px] align-top bg-blue-100 text-black">IGST (5%)</td>
                                         <td className="p-1 text-right align-top bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
                                     </tr>
                                 </tbody>
@@ -173,6 +183,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
     const previewRef = useRef<HTMLDivElement>(null);
     const [billNo, setBillNo] = useState('');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+    const [taxType, setTaxType] = useState<'intra' | 'inter'>('intra');
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -228,7 +239,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl my-8">
                 <div className="p-4 bg-gray-100 rounded-t-lg flex flex-wrap justify-between items-center gap-4 sticky top-0 z-10">
                     <h2 className="text-lg sm:text-xl font-bold text-gray-800">Invoice Preview</h2>
-                     <div className="flex items-center gap-4 bg-white p-2 rounded-md border shadow-sm">
+                     <div className="flex items-center gap-4 bg-white p-2 rounded-md border shadow-sm flex-wrap">
                         <div>
                             <label className="block text-xs font-medium text-gray-600">Bill No.</label>
                             <input 
@@ -246,6 +257,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                                 onChange={(e) => setBillDate(e.target.value)}
                                 className="p-1 border rounded-md text-sm"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600">Tax Type</label>
+                            <select
+                                value={taxType}
+                                onChange={(e) => setTaxType(e.target.value as 'intra' | 'inter')}
+                                className="p-1 border rounded-md text-sm"
+                            >
+                                <option value="intra">CGST & SGST</option>
+                                <option value="inter">IGST</option>
+                            </select>
                         </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -268,7 +290,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                     </div>
                 </div>
                 <div className="p-2 sm:p-4 overflow-x-auto">
-                    <InvoiceContent ref={previewRef} lorryReceipts={lorryReceipts} companyDetails={companyDetails} billNo={billNo} billDate={billDate} />
+                    <InvoiceContent ref={previewRef} lorryReceipts={lorryReceipts} companyDetails={companyDetails} billNo={billNo} billDate={billDate} taxType={taxType} />
                 </div>
             </div>
         </div>

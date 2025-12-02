@@ -17,7 +17,6 @@ declare const html2pdf: any;
 
 // A dedicated component for the LR content to be reused for screen and print.
 export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyDetails: CompanyDetails; showCompanyDetails: boolean }>(({ lr, companyDetails, showCompanyDetails }, ref) => {
-    // FIX: Explicitly typed the `reduce` callback parameters and cast the `Object.values` result to `number[]` to resolve a TypeScript error where the `charge` variable was being inferred as `unknown`, preventing arithmetic operations.
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
@@ -52,11 +51,9 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     <div className="border border-black p-1">
                         <span className="font-bold bg-white px-1 relative -top-3 text-black">Available At :</span>
                         <div className="-mt-2 grid grid-cols-2">
-                            <p className="font-bold">AHMEDABAD</p>
-                            <p className="font-bold">SURAT</p>
-                            <p className="font-bold">VAPI</p>
-                            <p className="font-bold">MUMBAI</p>
-                            <p className="font-bold">PUNE</p>
+                            {(companyDetails.branchLocations || []).map(loc => (
+                                <p key={loc} className="font-bold">{loc.toUpperCase()}</p>
+                            ))}
                         </div>
                     </div>
                     <div className="border border-black p-1 mt-1 caution-notice-section">
@@ -74,7 +71,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                         <p className="font-bold text-center underline">AT OWNERS RISKS</p>
                         {showCompanyDetails && (
                             <>
-                                <p>Pan No. : <span className="font-bold text-black">{companyDetails.pan || 'CMFP S3661A'}</span></p>
+                                <p>Pan No. : <span className="font-bold text-black">{companyDetails.pan}</span></p>
                                 <p>GST No. : <span className="text-black font-bold">{companyDetails.gstn}</span></p>
                             </>
                         )}
@@ -182,7 +179,6 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                         <td className="border-t-2 border-r-2 border-black p-1 text-center align-top font-bold text-black">{lr.chargedWeight}</td>
                         <td className="border-t-2 border-r-2 border-black p-0 align-top bg-blue-50">
                             <div className="grid grid-cols-2 h-full text-center">
-                                {/* FIX: Replaced `as any` casting with direct property access and nullish checks for type safety and to fix display errors. */}
                                 <div className="border-b border-r border-black p-1">Hamail</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.hamail > 0 ? lr.charges.hamail.toFixed(2) : ''}</div>
                                 <div className="border-b border-r border-black p-1">Sur.CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.surCharge > 0 ? lr.charges.surCharge.toFixed(2) : ''}</div>
                                 <div className="border-b border-r border-black p-1">St.CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.stCharge > 0 ? lr.charges.stCharge.toFixed(2) : ''}</div>
@@ -219,7 +215,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                              <div className="flex flex-col justify-between h-full">
                                 <div>
                                     <p>Endorsement Its Is Intended To use Consignee Copy Of the Set For The Purpose Of Borrowing From The Consignee Bank</p>
-                                    <p className="my-2">The Court In Delhi Alone Shall Have Jurisdiction In Respect Of The Claims And Matters Arising Under The Consignment Or Of The Claims And Matter Arising Under The Goods Entrusted For Transport</p>
+                                    {companyDetails.jurisdictionCity && <p className="my-2">The Court In {companyDetails.jurisdictionCity} Alone Shall Have Jurisdiction In Respect Of The Claims And Matters Arising Under The Consignment Or Of The Claims And Matter Arising Under The Goods Entrusted For Transport</p>}
                                     <p className="mt-2 text-[9px]">Value : <span className="font-bold text-black">{Number(lr.invoiceAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
                                      <div className="grid grid-cols-2 text-[9px] mt-1">
                                         {lr.gstPaidBy && <p>GST Paid By: <span className="font-bold text-black">{lr.gstPaidBy}</span></p>}

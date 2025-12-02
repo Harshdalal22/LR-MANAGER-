@@ -128,6 +128,15 @@ const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUplo
                                 <label className="block text-sm font-medium text-gray-700">Contact Numbers (comma-separated)</label>
                                 <input type="text" value={localDetails.contact.join(', ')} onChange={(e) => setLocalDetails({...localDetails, contact: e.target.value.split(',').map(s => s.trim())})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
                             </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Jurisdiction City</label>
+                                <input type="text" value={localDetails.jurisdictionCity} onChange={(e) => setLocalDetails({...localDetails, jurisdictionCity: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Branch Locations (comma-separated)</label>
+                                <input type="text" value={localDetails.branchLocations.join(', ')} onChange={(e) => setLocalDetails({...localDetails, branchLocations: e.target.value.split(',').map(s => s.trim())})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+
                             <h3 className="text-lg font-semibold border-b mt-4 mb-2">Bank Details</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>

@@ -41,9 +41,8 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
 
     return (
         <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[710px] lg:w-full mx-auto border border-gray-600 text-sm">
-            {/* Header - "JAI DADA UDMI RAM" removed as requested */}
             <div className="text-center text-black">
-                <p className="text-xs">SUBJECT TO HARYANA JURISDICTION</p>
+                {companyDetails.jurisdictionCity && <p className="text-xs">SUBJECT TO {companyDetails.jurisdictionCity.toUpperCase()} JURISDICTION</p>}
             </div>
             
             <div className="flex justify-between items-center mt-1 pb-2 border-b border-gray-600">
@@ -54,11 +53,11 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     }
                 </div>
                 <div className="w-1/2 text-center text-black">
-                    <h1 className="text-3xl font-bold text-red-600">SSK CARGO SERVICES Pvt. Ltd.</h1>
+                    <h1 className="text-3xl font-bold text-red-600">{companyDetails.name}</h1>
                     <p className="font-bold text-base">(Fleet Owner & Contractor)</p>
                     <p className="text-xs mt-1">{companyDetails.address}</p>
                     <p className="text-xs">
-                        Mail-{companyDetails.email}, Web-
+                        Mail-{companyDetails.email}, Web-{companyDetails.web}
                     </p>
                 </div>
                 <div className="w-1/4 text-right font-bold text-xs text-black">
@@ -137,25 +136,33 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                                         <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">AMOUNT</td>
                                         <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalAmount.toFixed(2)}</td>
                                     </tr>
-                                    <tr>
-                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (2.5%)</td>
-                                        <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalCgst.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (2.5%)</td>
-                                        <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalSgst.toFixed(2)}</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="p-1 h-[60px] align-top bg-blue-100 text-black">IGST (5%)</td>
-                                        <td className="p-1 text-right align-top bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
-                                    </tr>
+                                    {taxType === 'intra' && (
+                                        <>
+                                            <tr>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (2.5%)</td>
+                                                <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalCgst.toFixed(2)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (2.5%)</td>
+                                                <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalSgst.toFixed(2)}</td>
+                                            </tr>
+                                        </>
+                                    )}
+                                    {taxType === 'inter' && (
+                                         <tr>
+                                            <td className="p-1 border-b border-gray-600 bg-blue-100 text-black">IGST (5%)</td>
+                                            <td className="p-1 text-right border-b border-gray-600 bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
+                                        </tr>
+                                    )}
+                                     <tr style={{ height: '60px' }}><td colSpan={2}></td></tr>
+
                                 </tbody>
                             </table>
                         </td>
                     </tr>
                     <tr>
                         <td colSpan={6} className="border-x border-b border-gray-600 p-1 align-bottom">
-                             <p>Rupees(word): {amountInWords} Rupees</p>
+                             <p>Rupees(word): {amountInWords} Rupees Only</p>
                         </td>
                         <td colSpan={3} className="border-x border-b border-gray-600 p-0">
                              <div className="border-t border-gray-600 py-1 px-1 flex justify-between bg-blue-100 text-black font-bold">

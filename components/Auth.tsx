@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import { signUp, signIn, sendPasswordReset } from '../services/supabaseService';
+import { BookOpenIcon } from './icons';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
 
@@ -41,7 +42,7 @@ const Auth: React.FC = () => {
     const renderHeader = () => {
         switch (view) {
             case 'sign_in': return 'Welcome Back';
-            case 'sign_up': return 'Join SSK Cargo';
+            case 'sign_up': return 'Join Bilty Book';
             case 'forgot_password': return 'Reset Password';
         }
     };
@@ -49,7 +50,7 @@ const Auth: React.FC = () => {
     const renderSubHeader = () => {
         switch (view) {
             case 'sign_in': return 'Enter your credentials to access your dashboard.';
-            case 'sign_up': return 'Create a new account to manage LRs.';
+            case 'sign_up': return 'Create a new account to manage your LRs.';
             case 'forgot_password': return 'Enter your email to receive a reset link.';
         }
     };
@@ -75,6 +76,7 @@ const Auth: React.FC = () => {
                     <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-red-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
 
                     <div className="text-center mb-8 relative z-10">
+                        <BookOpenIcon className="w-16 h-16 mx-auto text-ssk-blue mb-4" />
                         <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-800 mb-2 drop-shadow-sm">
                             {renderHeader()}
                         </h2>

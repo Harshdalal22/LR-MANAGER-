@@ -94,6 +94,8 @@ export interface CompanyDetails {
     gstn: string;
     bankDetails: BankDetails;
     user_id?: string;
+    jurisdictionCity: string;
+    branchLocations: string[];
 }
 
 export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management';

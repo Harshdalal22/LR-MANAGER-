@@ -51,9 +51,9 @@ export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
 };
 
 /**
- * DEFINITIVE FIX for the RLS error.
+ * DEFINITIVE FIX for the RLS error and timestamp issues.
  * This function is hardened to ensure the correct user_id is always associated with the record.
- * It works in tandem with the database's new `DEFAULT auth.uid()` setting.
+ * It also explicitly sets timestamps as a failsafe against trigger failures.
  */
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
     const user = await getCurrentUser();
@@ -65,6 +65,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     const dataToSave = {
       ...restOfLr,
       user_id: user.id, // Authoritatively set the user_id for upserts.
+      updated_at: new Date().toISOString(), // Explicitly set updated_at
     };
 
     const { data, error } = await getSupabase()
@@ -73,7 +74,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         .select()
         .single();
     if (error) {
-        console.error("Supabase save error details:", error);
+        console.error("Supabase save error details:", JSON.stringify(error, null, 2));
         throw new Error(`Database Error: ${error.message}`);
     }
     return data;
@@ -104,7 +105,7 @@ export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceN
     const user = await getCurrentUser();
     const { error } = await getSupabase()
         .from('lorry_receipts')
-        .update({ invoiceNo, invoiceDate })
+        .update({ invoiceNo, invoiceDate, updated_at: new Date().toISOString() })
         .eq('user_id', user.id)
         .in('lrNo', lrNos);
     
@@ -130,11 +131,15 @@ export const getCompanyDetails = async (defaultDetails: CompanyDetails): Promise
 export const saveCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
     const user = await getCurrentUser();
     const { user_id, ...restOfDetails } = details;
-    const dataToSave = { ...restOfDetails, user_id: user.id };
+    const dataToSave = { 
+        ...restOfDetails, 
+        user_id: user.id,
+        updated_at: new Date().toISOString(), // Explicitly set updated_at
+    };
     
     const { data, error } = await getSupabase().from('company_details').upsert(dataToSave).select().single();
     if (error) {
-        console.error("Supabase save company details error:", error);
+        console.error("Supabase save company details error:", JSON.stringify(error, null, 2));
         throw new Error(`Database Error: ${error.message}`);
     }
     return data as CompanyDetails;

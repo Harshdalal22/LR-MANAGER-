@@ -21,7 +21,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
     return (
-        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[710px] lg:w-full mx-auto border-2 border-black">
+        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black">
             {/* Dynamic Header */}
             <div className="flex justify-between items-start pb-4 border-b-4 border-ssk-blue">
                 <div className="w-1/4 flex justify-start">
@@ -254,10 +254,10 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
         if (!element) return;
         
         const opt = {
-            margin:       10, // 10mm margin on all sides
+            margin:       5, // Reduced margin to prevent clipping
             filename:     `LR-${lr.lrNo.replace('/', '_')}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
@@ -276,10 +276,10 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
         
         try {
             const opt = {
-                margin:       10, // 10mm margin on all sides
+                margin:       5, // Reduced margin to prevent clipping
                 filename:     filename,
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 

@@ -40,7 +40,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
 
 
     return (
-        <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[710px] lg:w-full mx-auto border border-gray-600 text-sm">
+        <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[680px] mx-auto border border-gray-600 text-sm">
             <div className="text-center text-black">
                 {companyDetails.jurisdictionCity && <p className="text-xs">SUBJECT TO {companyDetails.jurisdictionCity.toUpperCase()} JURISDICTION</p>}
             </div>
@@ -216,10 +216,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
         const billedTo = lorryReceipts.length > 0 ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) : { name: 'bill' };
         
         const opt = {
-            margin:       10, // 10mm margin on all sides
+            margin:       5, // Reduced margin to prevent clipping
             filename:     `Bill-${billNo}-${billedTo.name?.split(' ')[0]}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
-            html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 

@@ -20,6 +20,10 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
+    const isBillingPartySeparate = lr.billingTo && lr.billingTo.name && 
+                                   (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
+                                   (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
+
     return (
         <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black">
             {/* Dynamic Header */}
@@ -147,6 +151,28 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     </tr>
                 </tbody>
             </table>
+            
+            {/* Conditionally rendered Billing To details */}
+            {isBillingPartySeparate && (
+                <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
+                    <thead>
+                        <tr>
+                            <td className="p-1 font-bold">Billing To</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className="p-1 align-top h-[70px]">
+                                <p className="font-bold text-black">{lr.billingTo.name}</p>
+                                <p className="font-bold text-black">{lr.billingTo.address}, {lr.billingTo.city}</p>
+                                {lr.billingTo.gst && <p className="font-bold text-black">GST: {lr.billingTo.gst}</p>}
+                                {lr.billingTo.pan && <p className="font-bold text-black">PAN: {lr.billingTo.pan}</p>}
+                                {lr.billingTo.contact && <p className="font-bold text-black">Contact: {lr.billingTo.contact}</p>}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            )}
             
             {/* Main Content Table */}
             <table className="w-full border-collapse border-2 border-black text-[8px] mt-1">

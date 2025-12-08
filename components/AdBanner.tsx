@@ -1,13 +1,18 @@
+
 import React, { useEffect } from 'react';
 
 const AdBanner: React.FC = () => {
   useEffect(() => {
-    try {
-      // Push ad to the array to display it
-      ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
-    } catch (e) {
-      console.error("AdSense Error: ", e);
-    }
+    // Add a small delay to ensure the container has rendered and has width before pushing the ad
+    const timer = setTimeout(() => {
+        try {
+            ((window as any).adsbygoogle = (window as any).adsbygoogle || []).push({});
+        } catch (e) {
+            console.error("AdSense Error: ", e);
+        }
+    }, 1000);
+
+    return () => clearTimeout(timer);
   }, []);
 
   return (

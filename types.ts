@@ -1,3 +1,4 @@
+
 export interface PartyDetails {
     name: string;
     address: string;
@@ -98,4 +99,18 @@ export interface CompanyDetails {
     branchLocations: string[];
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management';
+export interface SavedParty extends PartyDetails {
+    id?: string;
+    type: 'Consignor' | 'Consignee' | 'Both';
+    user_id?: string;
+}
+
+export interface SavedTruck {
+    id?: string;
+    truckNo: string;
+    ownerName?: string;
+    contactNumber?: string;
+    user_id?: string;
+}
+
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks';

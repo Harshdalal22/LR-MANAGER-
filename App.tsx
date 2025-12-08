@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { LorryReceipt, CompanyDetails, LRStatus, View } from './types';
+import { LorryReceipt, CompanyDetails, LRStatus, View, SavedParty, SavedTruck } from './types';
 import LRForm from './components/LRForm';
 import LRList from './components/LRList';
 import Header from './components/Header';
@@ -10,6 +11,8 @@ import PODUploadModal from './components/PODUploadModal';
 import VehicleHiring from './components/VehicleHiring';
 import BookingRegister from './components/BookingRegister';
 import DataManagement from './components/DataManagement';
+import PartyManagement from './components/PartyManagement';
+import TruckManagement from './components/TruckManagement';
 import AdBanner from './components/AdBanner';
 import { 
     getLorryReceipts, 
@@ -25,7 +28,13 @@ import {
     uploadCompanyAsset, 
     getPodSignedUrl, 
     deletePOD, 
-    updateLorryReceiptInvoiceDetails 
+    updateLorryReceiptInvoiceDetails,
+    getSavedParties,
+    saveSavedParty,
+    deleteSavedParty,
+    getSavedTrucks,
+    saveSavedTruck,
+    deleteSavedTruck
 } from './services/supabaseService';
 import { Session, Subscription } from '@supabase/supabase-js';
 
@@ -55,6 +64,8 @@ const defaultCompanyDetails: CompanyDetails = {
 const App: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [lorryReceipts, setLorryReceipts] = useState<LorryReceipt[]>([]);
+    const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
+    const [savedTrucks, setSavedTrucks] = useState<SavedTruck[]>([]);
     const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
     const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(defaultCompanyDetails);
     const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -65,32 +76,41 @@ const App: React.FC = () => {
     const handleError = (error: unknown, context: string) => {
         let errorMessage = 'An unknown error occurred.';
 
-        // More robust error message extraction
+        // Robust error parsing
         if (error instanceof Error) {
             errorMessage = error.message;
-        } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as any).message === 'string') {
-            // Handle Supabase error objects which might not be instances of Error
-            errorMessage = (error as any).message;
+        } else if (typeof error === 'object' && error !== null) {
+            const errObj = error as any;
+            // Explicitly check for string properties to avoid [object Object]
+            if (typeof errObj.message === 'string') {
+                errorMessage = errObj.message;
+            } else if (typeof errObj.error_description === 'string') {
+                errorMessage = errObj.error_description;
+            } else if (typeof errObj.details === 'string') {
+                errorMessage = errObj.details;
+            } else {
+                try {
+                    errorMessage = JSON.stringify(error);
+                } catch {
+                    errorMessage = 'Non-serializable error object';
+                }
+            }
         } else if (typeof error === 'string') {
             errorMessage = error;
         }
 
-        console.error(`${context}:`, error); // Log the full error for debugging
+        console.error(`${context}:`, error);
 
-        if (errorMessage.toLowerCase().includes('failed to fetch')) {
+        // Standardize case for checking
+        const lowerMsg = errorMessage.toLowerCase();
+
+        if (lowerMsg.includes('failed to fetch')) {
             toast.error(
                 (t) => (
                     <div className="flex flex-col gap-2">
-                        <p className="font-bold">Connection Failed: Could not connect to the database.</p>
-                        <p>
-                            <span className="font-bold">ACTION REQUIRED:</span> This is likely a CORS issue. You MUST add this application's URL to your Supabase project's "CORS Origins" settings in the API section of your dashboard.
-                        </p>
-                        <button
-                            onClick={() => toast.dismiss(t.id)}
-                            className="mt-2 w-full bg-ssk-red text-white px-3 py-1 rounded-md text-sm font-semibold"
-                        >
-                            Dismiss
-                        </button>
+                        <p className="font-bold">Connection Failed</p>
+                        <p>Could not connect to the database. Check your internet or Supabase status.</p>
+                        <button onClick={() => toast.dismiss(t.id)} className="bg-white text-black px-2 py-1 rounded text-xs border">Dismiss</button>
                     </div>
                 ),
                 { duration: Infinity, id: 'fetch-error' }
@@ -104,25 +124,43 @@ const App: React.FC = () => {
                 (t) => (
                     <div className="flex flex-col gap-2">
                         <p className="font-bold text-red-600">Database Update Required</p>
-                        <p className="text-sm">
-                            The database schema is missing required columns. Please run the provided SQL script in your Supabase SQL Editor.
-                            <br/>
-                            <span className="font-bold">After running the script, go to Supabase Project Settings &gt; API &gt; Schema Cache and click "Reload".</span>
-                        </p>
-                         <button
-                            onClick={() => {
-                                toast.dismiss(t.id);
-                                setTimeout(() => window.location.reload(), 500); // Force reload after dismissing the error, assuming user ran SQL.
-                            }}
-                            className="mt-2 w-full bg-blue-600 text-white px-3 py-1 rounded-md text-sm font-semibold"
-                        >
-                            Okay, I've run the SQL
-                        </button>
+                        <p className="text-sm">The database schema is outdated. Please run the SQL migration.</p>
+                         <button onClick={() => { toast.dismiss(t.id); window.location.reload(); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Reload</button>
                     </div>
-                ),
-                { duration: Infinity, id: 'schema-error' }
+                ), { duration: Infinity, id: 'schema-error' }
+            );
+        } else if (lowerMsg.includes('relation "lorry_receipts" does not exist') || lowerMsg.includes('relation "company_details" does not exist')) {
+            toast.error(
+                (t) => (
+                    <div className="flex flex-col gap-2">
+                        <p className="font-bold text-red-600">Critical: Tables Missing</p>
+                        <p className="text-sm">The core tables are missing. Please run the setup SQL.</p>
+                         <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Dismiss</button>
+                    </div>
+                ), { duration: Infinity, id: 'core-tables-missing' }
+            );
+        } else if (lowerMsg.includes('relation "saved_parties" does not exist') || lowerMsg.includes('relation "public.saved_parties" does not exist')) {
+            toast.error(
+                (t) => (
+                    <div className="flex flex-col gap-2">
+                        <p className="font-bold text-blue-600">Setup Required</p>
+                        <p className="text-sm">The 'saved_parties' table is missing. Please run the SQL to create it.</p>
+                        <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Dismiss</button>
+                    </div>
+                ), { duration: 10000, id: 'party-table-missing' }
+            );
+        } else if (lowerMsg.includes('relation "saved_trucks" does not exist') || lowerMsg.includes('relation "public.saved_trucks" does not exist')) {
+            toast.error(
+                (t) => (
+                    <div className="flex flex-col gap-2">
+                        <p className="font-bold text-blue-600">Setup Required</p>
+                        <p className="text-sm">The 'saved_trucks' table is missing. Please run the SQL to create it.</p>
+                        <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Dismiss</button>
+                    </div>
+                ), { duration: 10000, id: 'truck-table-missing' }
             );
         } else {
+            // Fallback: Display the stringified message to ensure [object Object] isn't shown
             toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
         }
     };
@@ -144,6 +182,8 @@ const App: React.FC = () => {
                     setSession(session);
                     if (!session) {
                         setLorryReceipts([]);
+                        setSavedParties([]);
+                        setSavedTrucks([]);
                         setCompanyDetails(defaultCompanyDetails);
                         setCurrentView('dashboard');
                     }
@@ -167,12 +207,33 @@ const App: React.FC = () => {
         if (!session) return;
         setIsLoading(true);
         try {
+            // 1. Fetch Core Data (Lorry Receipts & Company Details)
             const [lrs, details] = await Promise.all([
                 getLorryReceipts(),
-                getCompanyDetails(defaultCompanyDetails)
+                getCompanyDetails(defaultCompanyDetails),
             ]);
             setLorryReceipts(lrs);
             setCompanyDetails(details);
+
+            // 2. Fetch Optional Data (Parties & Trucks)
+            // We use Promise.allSettled so one failure doesn't break the whole app
+            const [partiesResult, trucksResult] = await Promise.allSettled([
+                getSavedParties(),
+                getSavedTrucks()
+            ]);
+
+            if (partiesResult.status === 'fulfilled') {
+                setSavedParties(partiesResult.value);
+            } else {
+                console.warn("Could not load parties (feature might be disabled or tables missing).");
+            }
+
+            if (trucksResult.status === 'fulfilled') {
+                setSavedTrucks(trucksResult.value);
+            } else {
+                console.warn("Could not load trucks (feature might be disabled or tables missing).");
+            }
+
         } catch (error) {
             handleError(error, "Failed to load initial data");
         } finally {
@@ -190,7 +251,6 @@ const App: React.FC = () => {
     const handleSaveLR = async (lr: LorryReceipt) => {
         const toastId = toast.loading(editingLR ? 'Updating LR...' : 'Saving LR...');
         
-        // Comprehensive data sanitization
         const sanitizedLR = {
             ...lr,
             invoiceDate: lr.invoiceDate || null,
@@ -198,7 +258,6 @@ const App: React.FC = () => {
             ewayBillDate: lr.ewayBillDate || null,
             ewayExDate: lr.ewayExDate || null,
             status: editingLR ? lr.status : 'Booked',
-            // Ensure numeric fields are numbers, defaulting to 0 if null/undefined/NaN
             invoiceAmount: Number(lr.invoiceAmount) || 0,
             chargedWeight: Number(lr.chargedWeight) || 0,
             weight: Number(lr.weight) || 0,
@@ -233,6 +292,65 @@ const App: React.FC = () => {
         }
     };
     
+    // --- Party Management Handlers ---
+    const handleSaveParty = async (party: SavedParty) => {
+        const toastId = toast.loading('Saving party...');
+        try {
+            const saved = await saveSavedParty(party);
+            setSavedParties(prev => {
+                const exists = prev.find(p => p.id === saved.id);
+                if (exists) return prev.map(p => p.id === saved.id ? saved : p);
+                return [...prev, saved].sort((a, b) => a.name.localeCompare(b.name));
+            });
+            toast.success('Party saved successfully!', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to save party");
+        }
+    };
+
+    const handleDeleteParty = async (id: string) => {
+        const toastId = toast.loading('Deleting party...');
+        try {
+            await deleteSavedParty(id);
+            setSavedParties(prev => prev.filter(p => p.id !== id));
+            toast.success('Party deleted successfully!', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to delete party");
+        }
+    };
+
+    // --- Truck Management Handlers ---
+    const handleSaveTruck = async (truck: SavedTruck) => {
+        const toastId = toast.loading('Saving truck...');
+        try {
+            const saved = await saveSavedTruck(truck);
+            setSavedTrucks(prev => {
+                 const exists = prev.find(t => t.id === saved.id);
+                if (exists) return prev.map(t => t.id === saved.id ? saved : t);
+                return [...prev, saved].sort((a, b) => a.truckNo.localeCompare(b.truckNo));
+            });
+            toast.success('Truck saved successfully!', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to save truck");
+        }
+    };
+
+    const handleDeleteTruck = async (id: string) => {
+        const toastId = toast.loading('Deleting truck...');
+        try {
+            await deleteSavedTruck(id);
+            setSavedTrucks(prev => prev.filter(t => t.id !== id));
+            toast.success('Truck deleted successfully!', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to delete truck");
+        }
+    };
+
+
     const handleUpdateLRStatus = async (lrNo: string, status: LRStatus) => {
         const originalLRs = [...lorryReceipts];
         const updatedLRs = lorryReceipts.map(lr => 
@@ -256,14 +374,11 @@ const App: React.FC = () => {
         const toastId = toast.loading('Updating LRs with Invoice Details...');
         try {
             await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
-            
-            // Update local state
             setLorryReceipts(prev => prev.map(lr => 
                 lrNos.includes(lr.lrNo) 
                     ? { ...lr, invoiceNo, invoiceDate } 
                     : lr
             ));
-            
             toast.success('Invoice details saved to LRs!', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
@@ -339,11 +454,9 @@ const App: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this LR? This action cannot be undone.')) {
             const toastId = toast.loading('Deleting LR...');
             try {
-                // First delete associated POD file, if it exists
                 if (lrToDelete.pod_path) {
                     await deletePOD(lrToDelete.pod_path);
                 }
-                // Then delete the LR record
                 await deleteLorryReceipt(lrNo);
                 setLorryReceipts(lorryReceipts.filter(lr => lr.lrNo !== lrNo));
                 toast.success('LR deleted successfully!', { id: toastId });
@@ -419,6 +532,26 @@ const App: React.FC = () => {
                         onCancel={handleCancelForm}
                         companyDetails={companyDetails}
                         lorryReceipts={lorryReceipts}
+                        savedParties={savedParties}
+                        savedTrucks={savedTrucks}
+                    />
+                );
+            case 'parties':
+                return (
+                    <PartyManagement 
+                        savedParties={savedParties}
+                        onSave={handleSaveParty}
+                        onDelete={handleDeleteParty}
+                        onBack={handleBackToDashboard}
+                    />
+                );
+            case 'trucks':
+                return (
+                    <TruckManagement 
+                        savedTrucks={savedTrucks}
+                        onSave={handleSaveTruck}
+                        onDelete={handleDeleteTruck}
+                        onBack={handleBackToDashboard}
                     />
                 );
             case 'vehicle-hiring':
@@ -469,7 +602,7 @@ const App: React.FC = () => {
             />
             <main className="container mx-auto p-4 md:p-6">
                 {renderContent()}
-                <AdBanner /> {/* Ad banner at the bottom of the main content */}
+                <AdBanner />
             </main>
             {uploadingPODFor && (
                 <PODUploadModal 

@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails } from '../types';
+import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon } from './icons';
 import { suggestLRDetails } from '../services/geminiService';
@@ -12,6 +13,8 @@ interface LRFormProps {
     onCancel: () => void;
     companyDetails: CompanyDetails;
     lorryReceipts: LorryReceipt[];
+    savedParties?: SavedParty[];
+    savedTrucks?: SavedTruck[];
 }
 
 const initialPartyState: PartyDetails = { name: '', address: '', city: '', contact: '', pan: '', gst: '' };
@@ -63,7 +66,7 @@ const Fieldset: React.FC<{ legend: string; children: React.ReactNode; className?
 );
 
 
-const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts }) => {
+const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts, savedParties = [], savedTrucks = [] }) => {
     const [formData, setFormData] = useState<LorryReceipt>(initialLRState);
     const [billingPartyType, setBillingPartyType] = useState<'Consignor' | 'Consignee' | 'Other'>('Consignor');
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -112,6 +115,8 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
     const handlePartyChange = (party: 'consignor' | 'consignee' | 'billingTo', e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
+        
+        // Update the specific field
         setFormData(prev => ({
             ...prev,
             [party]: {
@@ -119,6 +124,28 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 [name]: value
             }
         }));
+
+        // If 'name' is changing, try to autofill from savedParties
+        if (name === 'name') {
+            const foundParty = savedParties.find(p => p.name.toLowerCase() === value.toLowerCase());
+            if (foundParty) {
+                // Determine if this saved party is relevant for the current field type (Consignor/Consignee)
+                // Assuming 'Both' applies everywhere. 
+                // We overwrite other fields if empty or if exact match is found
+                 setFormData(prev => ({
+                    ...prev,
+                    [party]: {
+                        ...prev[party],
+                        name: foundParty.name,
+                        address: foundParty.address || prev[party].address,
+                        city: foundParty.city || prev[party].city,
+                        contact: foundParty.contact || prev[party].contact,
+                        pan: foundParty.pan || prev[party].pan,
+                        gst: foundParty.gst || prev[party].gst,
+                    }
+                }));
+            }
+        }
     };
     
     const handleItemChange = (index: number, field: keyof Item, value: string | number) => {
@@ -213,11 +240,29 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         const isDisabled = partyKey === 'billingTo' && billingPartyType !== 'Other';
         const disabledClass = isDisabled ? 'bg-gray-100 cursor-not-allowed' : 'text-gray-900 placeholder-gray-500';
 
+        // Filter saved parties based on type if needed, or just show all
+        const relevantParties = savedParties; 
+
         return (
             <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
                 <h3 className="bg-ssk-red text-white p-2 font-bold text-sm">{title.toUpperCase()}</h3>
                 <div className="p-2 space-y-1 bg-white">
-                    <textarea name="name" value={formData[partyKey].name} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="NAME" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} rows={2} disabled={isDisabled}></textarea>
+                    <input 
+                        list={`list-${partyKey}`} 
+                        name="name" 
+                        value={formData[partyKey].name} 
+                        onChange={(e) => handlePartyChange(partyKey, e)} 
+                        placeholder="NAME" 
+                        className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} 
+                        disabled={isDisabled}
+                        autoComplete="off"
+                    />
+                    <datalist id={`list-${partyKey}`}>
+                        {relevantParties.map(p => (
+                            <option key={p.id} value={p.name} />
+                        ))}
+                    </datalist>
+
                     <textarea name="address" value={formData[partyKey].address} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="ADDRESS" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} rows={3} disabled={isDisabled}></textarea>
                     <input type="text" name="city" value={formData[partyKey].city} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CITY" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
                     <input type="text" name="contact" value={formData[partyKey].contact} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CONTACT" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
@@ -228,7 +273,6 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         );
     }
     
-    // FIX: Explicitly typed the `reduce` callback parameters and cast the `Object.values` result to `number[]` to resolve a TypeScript error where the `charge` variable was being inferred as `unknown`, preventing arithmetic operations.
     const totalCharges = (Object.values(formData.charges) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const inputClass = "w-full p-2 border-gray-300 bg-white rounded-md text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-ssk-blue focus:border-transparent transition-all duration-200";
     const labelClass = "block text-xs font-bold text-gray-600 uppercase mb-1";
@@ -272,7 +316,23 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                 </div>
                             </div>
                         </div>
-                        <div><label className={labelClass}>TRUCK NO*</label><input type="text" name="truckNo" placeholder="TRUCK NO" value={formData.truckNo} onChange={handleChange} className={`${inputClass} border-red-300`} required /></div>
+                        <div>
+                            <label className={labelClass}>TRUCK NO*</label>
+                            <input 
+                                list="trucks-list"
+                                type="text" 
+                                name="truckNo" 
+                                placeholder="TRUCK NO" 
+                                value={formData.truckNo} 
+                                onChange={handleChange} 
+                                className={`${inputClass} border-red-300`} 
+                                required 
+                                autoComplete="off"
+                            />
+                            <datalist id="trucks-list">
+                                {savedTrucks.map(t => <option key={t.id} value={t.truckNo} />)}
+                            </datalist>
+                        </div>
                         <div>
                             <label className={labelClass}>C Note NO*</label>
                             <input 

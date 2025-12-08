@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
 import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon } from './icons';
@@ -130,6 +131,28 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                             <CreateIcon className="w-5 h-5 mr-2" />
                             Create New LR
                         </button>
+                    </div>
+                </div>
+
+                {/* Sub-Section: Quick Access Management */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div onClick={() => setCurrentView('parties')} className="bg-purple-50 p-6 rounded-xl border border-purple-100 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-4 hover:-translate-y-1">
+                        <div className="p-3 bg-purple-100 rounded-full text-purple-600">
+                            <UsersIcon className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">Manage Parties</h3>
+                            <p className="text-sm text-gray-500">Add or Edit Consignors & Consignees</p>
+                        </div>
+                    </div>
+                    <div onClick={() => setCurrentView('trucks')} className="bg-teal-50 p-6 rounded-xl border border-teal-100 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-4 hover:-translate-y-1">
+                        <div className="p-3 bg-teal-100 rounded-full text-teal-600">
+                            <TruckIcon className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">Manage Trucks</h3>
+                            <p className="text-sm text-gray-500">Save Truck details for quick selection</p>
+                        </div>
                     </div>
                 </div>
 

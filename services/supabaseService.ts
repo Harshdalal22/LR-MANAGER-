@@ -1,5 +1,6 @@
+
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
+import { LorryReceipt, CompanyDetails, LRStatus, SavedParty, SavedTruck } from '../types';
 
 const supabaseUrl = 'https://avqevimedgoogcupnojo.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2cWV2aW1lZGdvb2djdXBub2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU0MzksImV4cCI6MjA3OTUwMTQzOX0.SWBCoebfu_yHUk6fGFpiy5ZMzbkZeot5jYjaAjF0esM';
@@ -10,7 +11,13 @@ let supabase: SupabaseClient | null = null;
 const getSupabase = (): SupabaseClient => {
     if (!supabase) {
         try {
-            supabase = createClient(supabaseUrl, supabaseAnonKey);
+            supabase = createClient(supabaseUrl, supabaseAnonKey, {
+                auth: {
+                    persistSession: true,
+                    autoRefreshToken: true,
+                    detectSessionInUrl: true
+                }
+            });
         } catch (error) {
             console.error("Error creating Supabase client:", error);
             throw new Error("Invalid Supabase credentials provided.");
@@ -50,16 +57,9 @@ export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
     return data || [];
 };
 
-/**
- * DEFINITIVE FIX for the RLS error and timestamp issues.
- * This function is hardened to ensure the correct user_id is always associated with the record.
- * It also explicitly sets timestamps as a failsafe against trigger failures.
- */
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
     const user = await getCurrentUser();
     
-    // Create a clean data object. The database's DEFAULT will handle the user_id on insert.
-    // For updates, we explicitly provide it to ensure the RLS policy passes.
     const { user_id, createdBy, ...restOfLr } = lr; 
 
     const dataToSave = {
@@ -144,6 +144,62 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
     }
     return data as CompanyDetails;
 };
+
+// --- Saved Parties Functions ---
+
+export const getSavedParties = async (): Promise<SavedParty[]> => {
+    const user = await getCurrentUser();
+    const { data, error } = await getSupabase().from('saved_parties').select('*').eq('user_id', user.id).order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveSavedParty = async (party: SavedParty): Promise<SavedParty> => {
+    const user = await getCurrentUser();
+    const { id, user_id, ...rest } = party;
+    const dataToSave = { ...rest, user_id: user.id };
+    
+    // If id exists, include it for upsert to work as update. If not, it's a new insert.
+    const payload = id ? { ...dataToSave, id } : dataToSave;
+
+    const { data, error } = await getSupabase().from('saved_parties').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteSavedParty = async (id: string): Promise<void> => {
+    const user = await getCurrentUser();
+    const { error } = await getSupabase().from('saved_parties').delete().eq('user_id', user.id).eq('id', id);
+    if (error) throw error;
+};
+
+// --- Saved Trucks Functions ---
+
+export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
+    const user = await getCurrentUser();
+    const { data, error } = await getSupabase().from('saved_trucks').select('*').eq('user_id', user.id).order('truckNo', { ascending: true });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
+    const user = await getCurrentUser();
+    const { id, user_id, ...rest } = truck;
+    const dataToSave = { ...rest, user_id: user.id };
+    
+     const payload = id ? { ...dataToSave, id } : dataToSave;
+
+    const { data, error } = await getSupabase().from('saved_trucks').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteSavedTruck = async (id: string): Promise<void> => {
+    const user = await getCurrentUser();
+    const { error } = await getSupabase().from('saved_trucks').delete().eq('user_id', user.id).eq('id', id);
+    if (error) throw error;
+};
+
 
 // --- Storage Functions (PODs & Company Assets) ---
 

@@ -118,6 +118,9 @@ const App: React.FC = () => {
         } else if (
             errorMessage.includes("Could not find the 'branchLocations' column") || 
             errorMessage.includes("Could not find the 'jurisdictionCity' column") ||
+            errorMessage.includes("Could not find the 'contactNumber' column") ||
+            errorMessage.includes("Could not find the 'ownerName' column") ||
+            errorMessage.includes("Could not find the 'truckNo' column") ||
             errorMessage.includes('has no field "updated_at"')
         ) {
              toast.error(

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
 import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon } from './icons';
 
@@ -45,6 +45,97 @@ const ManagementCard: React.FC<{ title: string; icon: React.ReactElement<{ class
     </div>
 );
 
+const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateStr: string }[] }> = ({ data }) => {
+    const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+    const values = data.map(d => d.value);
+    const maxVal = Math.max(...values, 1000) * 1.1; // Add 10% headroom
+    const minVal = 0;
+
+    // SVG ViewBox dimensions
+    const width = 300;
+    const height = 150;
+    const paddingX = 10;
+    const paddingY = 20;
+
+    const getX = (index: number) => paddingX + (index / (data.length - 1)) * (width - 2 * paddingX);
+    const getY = (value: number) => height - paddingY - ((value - minVal) / (maxVal - minVal)) * (height - 2 * paddingY);
+
+    const points = data.map((d, i) => `${getX(i)},${getY(d.value)}`).join(' ');
+    // Area closes at the bottom corners
+    const areaPoints = `${getX(0)},${height - paddingY} ${points} ${getX(data.length - 1)},${height - paddingY}`;
+
+    return (
+        <div className="w-full h-full flex flex-col items-center justify-center relative select-none" onMouseLeave={() => setHoveredIndex(null)}>
+            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full overflow-visible">
+                <defs>
+                    <linearGradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stopColor="#2563eb" stopOpacity="0.3" />
+                        <stop offset="90%" stopColor="#2563eb" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+
+                {/* Grid Lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map(ratio => {
+                    const y = getY(maxVal * ratio);
+                    return (
+                        <line key={ratio} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#e5e7eb" strokeWidth="1" strokeDasharray="4 4" />
+                    );
+                })}
+
+                {/* Area Path */}
+                <path d={`M${areaPoints} Z`} fill="url(#chartGradient)" stroke="none" />
+
+                {/* Line Path */}
+                <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+                {/* Interactive Points */}
+                {data.map((d, i) => (
+                    <g key={i} onMouseEnter={() => setHoveredIndex(i)} className="cursor-pointer">
+                        {/* Invisible larger target for easier hovering */}
+                        <circle cx={getX(i)} cy={getY(d.value)} r="8" fill="transparent" />
+                        {/* Visible point */}
+                        <circle 
+                            cx={getX(i)} 
+                            cy={getY(d.value)} 
+                            r={hoveredIndex === i ? 5 : 3} 
+                            fill={hoveredIndex === i ? "#fff" : "#2563eb"} 
+                            stroke="#2563eb" 
+                            strokeWidth="2"
+                            className="transition-all duration-200"
+                        />
+                    </g>
+                ))}
+            </svg>
+
+            {/* Tooltip */}
+            {hoveredIndex !== null && (
+                <div 
+                    className="absolute bg-gray-800/90 text-white text-xs rounded-lg py-1.5 px-3 shadow-xl backdrop-blur-sm pointer-events-none z-10 transform -translate-x-1/2 -translate-y-4 transition-all duration-200"
+                    style={{ 
+                        left: `${((hoveredIndex / (data.length - 1)) * 100)}%`, 
+                        top: '10%' 
+                    }}
+                >
+                    <div className="font-bold whitespace-nowrap mb-0.5">{data[hoveredIndex].dateStr}</div>
+                    <div className="font-mono text-green-300">₹{data[hoveredIndex].value.toLocaleString('en-IN')}</div>
+                    {/* Tiny arrow pointing down */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-800/90"></div>
+                </div>
+            )}
+
+            {/* X-Axis Labels */}
+            <div className="w-full flex justify-between px-2 mt-2">
+                {data.map((d, i) => (
+                    <div key={i} className={`text-[10px] sm:text-xs text-gray-500 font-medium transition-colors duration-200 ${hoveredIndex === i ? 'text-blue-600 font-bold scale-110' : ''}`}>
+                        {d.label}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 
 const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView }) => {
     // --- Metric Calculations ---
@@ -68,7 +159,8 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
         date.setDate(today.getDate() - i);
         return { 
             date, 
-            label: date.toLocaleDateString('en-US', { weekday: 'short' }), 
+            label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+            dateStr: date.toLocaleDateString('en-GB'),
             freight: 0 
         };
     }).reverse();
@@ -82,7 +174,11 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
         }
     });
 
-    const maxFreight = Math.max(...last7DaysData.map(d => d.freight), 1); // Avoid division by zero
+    const chartData = last7DaysData.map(d => ({
+        label: d.label,
+        value: d.freight,
+        dateStr: d.dateStr
+    }));
 
     return (
         <div className="space-y-10">
@@ -234,20 +330,11 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     </div>
 
                     <div className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-xl border border-white/50 flex flex-col">
-                         <h2 className="text-xl font-bold text-gray-800 mb-4">7-Day Freight Overview</h2>
-                         <div className="flex justify-between items-end h-48 space-x-2 flex-grow">
-                            {last7DaysData.map(day => (
-                                <div key={day.label} className="flex-1 flex flex-col items-center justify-end group">
-                                    <div className="text-xs text-gray-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity mb-1" title={`₹${day.freight.toLocaleString('en-IN')}`}>
-                                        {`₹${(day.freight / 1000).toFixed(1)}k`}
-                                    </div>
-                                    <div 
-                                        className="w-full bg-gradient-to-t from-blue-900 to-blue-500 rounded-t-md hover:from-blue-700 hover:to-blue-400 transition-all duration-300 shadow-md" 
-                                        style={{ height: `${(day.freight / maxFreight) * 100}%`, minHeight: '4px' }}
-                                    ></div>
-                                    <div className="text-xs text-gray-600 font-bold mt-2">{day.label}</div>
-                                </div>
-                            ))}
+                         <h2 className="text-xl font-bold text-gray-800 mb-4">7-Day Freight Trends</h2>
+                         <div className="flex-grow flex items-center justify-center">
+                            <div className="w-full h-64">
+                                <FreightTrendChart data={chartData} />
+                            </div>
                          </div>
                     </div>
                 </div>

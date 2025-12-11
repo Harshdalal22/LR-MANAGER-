@@ -43,6 +43,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
     return (
         <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[680px] mx-auto border border-gray-600 text-sm">
             <div className="text-center text-black">
+                <h2 className="font-bold text-xl underline tracking-wider mb-1">TAX INVOICE</h2>
                 {companyDetails.jurisdictionCity && <p className="text-xs">SUBJECT TO {companyDetails.jurisdictionCity.toUpperCase()} JURISDICTION</p>}
             </div>
             
@@ -73,7 +74,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     <p>{billedTo.address}</p>
                 </div>
                 <div className="w-1/3 text-left pl-10">
-                    <p className="font-bold">BILL NO. : {billNo}</p>
+                    <p className="font-bold">INVOICE NO. : {billNo}</p>
                     <p className="font-bold">DATE : {formattedBillDate}</p>
                 </div>
             </div>
@@ -221,7 +222,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
         
         const opt = {
             margin:       5, // Reduced margin to prevent clipping
-            filename:     `Bill-${billNo}-${billedTo.name?.split(' ')[0]}.pdf`,
+            filename:     `Invoice-${billNo}-${billedTo.name?.split(' ')[0]}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
             html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -249,10 +250,10 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
         <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto">
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl my-8">
                 <div className="p-4 bg-gray-100 rounded-t-lg flex flex-wrap justify-between items-center gap-4 sticky top-0 z-10">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">Invoice Preview</h2>
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">Tax Invoice Preview</h2>
                      <div className="flex items-center gap-4 bg-white p-2 rounded-md border shadow-sm flex-wrap">
                         <div>
-                            <label className="block text-xs font-medium text-gray-600">Bill No.</label>
+                            <label className="block text-xs font-medium text-gray-600">Invoice No.</label>
                             <input 
                                 type="text"
                                 value={billNo}
@@ -261,7 +262,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-gray-600">Bill Date</label>
+                            <label className="block text-xs font-medium text-gray-600">Invoice Date</label>
                              <input 
                                 type="date"
                                 value={billDate}

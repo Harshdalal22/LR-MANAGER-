@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
@@ -172,7 +173,7 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                         disabled={selectedLRs.length === 0}
                         className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md transition-transform hover:scale-105"
                     >
-                        Generate Bill ({selectedLRs.length})
+                        Generate Tax Invoice ({selectedLRs.length})
                     </button>
                     <button
                         onClick={onAddNew}

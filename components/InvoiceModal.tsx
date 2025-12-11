@@ -55,7 +55,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     }
                 </div>
                 <div className="w-1/2 text-center text-black">
-                    <h1 className="text-3xl font-bold text-red-600">{companyDetails.name}</h1>
+                    <h1 className="text-3xl font-bold text-red-600 whitespace-nowrap">{companyDetails.name}</h1>
                     <p className="font-bold text-base">(Fleet Owner & Contractor)</p>
                     <p className="text-xs mt-1">{companyDetails.address}</p>
                     <p className="text-xs">

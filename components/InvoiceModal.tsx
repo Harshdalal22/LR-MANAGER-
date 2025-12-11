@@ -1,3 +1,4 @@
+
 import React, { useRef, forwardRef, useState, useEffect } from 'react';
 import { LorryReceipt, CompanyDetails, PartyDetails } from '../types';
 import { DownloadIcon, XIcon, SaveIcon } from './icons';
@@ -27,9 +28,9 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
         return sum + (Number(lr.freight) || 0) + totalCharges;
     }, 0);
 
-    const totalCgst = taxType === 'intra' ? totalAmount * 0.025 : 0;
-    const totalSgst = taxType === 'intra' ? totalAmount * 0.025 : 0;
-    const totalIgst = taxType === 'inter' ? totalAmount * 0.05 : 0;
+    const totalCgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
+    const totalSgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
+    const totalIgst = taxType === 'inter' ? totalAmount * 0.18 : 0;
     
     const netAmount = totalAmount + totalCgst + totalSgst + totalIgst;
     const amountInWords = toWords(Math.round(netAmount));
@@ -120,7 +121,10 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     <tr>
                         <td colSpan={6} className="border border-gray-600 p-1 align-top">
                             <p>GSTIN : {companyDetails.gstn}</p>
-                            <p className="mt-1">PAN No. : {companyDetails.pan}</p>
+                            <p className="mt-1">
+                                <span>PAN No. : {companyDetails.pan}</span>
+                                {companyDetails.sacCode && <span className="ml-4 font-bold">SAC CODE - {companyDetails.sacCode}</span>}
+                            </p>
                             <div className="mt-2">
                                 <p>BANK DETAILS</p>
                                 <p>BANK NAME : {companyDetails.bankDetails.name}</p>
@@ -139,18 +143,18 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                                     {taxType === 'intra' && (
                                         <>
                                             <tr>
-                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (2.5%)</td>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (9%)</td>
                                                 <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalCgst.toFixed(2)}</td>
                                             </tr>
                                             <tr>
-                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (2.5%)</td>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (9%)</td>
                                                 <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalSgst.toFixed(2)}</td>
                                             </tr>
                                         </>
                                     )}
                                     {taxType === 'inter' && (
                                          <tr>
-                                            <td className="p-1 border-b border-gray-600 bg-blue-100 text-black">IGST (5%)</td>
+                                            <td className="p-1 border-b border-gray-600 bg-blue-100 text-black">IGST (18%)</td>
                                             <td className="p-1 text-right border-b border-gray-600 bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
                                         </tr>
                                     )}

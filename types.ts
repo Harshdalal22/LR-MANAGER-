@@ -93,6 +93,7 @@ export interface CompanyDetails {
     contact: string[];
     pan: string;
     gstn: string;
+    sacCode?: string; // Added SAC/HSN Code
     bankDetails: BankDetails;
     user_id?: string;
     jurisdictionCity: string;

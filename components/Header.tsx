@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { CompanyDetails } from '../types';
 import { CogIcon, XIcon, SpinnerIcon } from './icons';
@@ -124,6 +125,10 @@ const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUplo
                                     <input type="text" value={localDetails.gstn} onChange={(e) => setLocalDetails({...localDetails, gstn: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
                                 </div>
                              </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">SAC/HSN Code</label>
+                                <input type="text" value={localDetails.sacCode || ''} onChange={(e) => setLocalDetails({...localDetails, sacCode: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="e.g. 9965" />
+                            </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700">Contact Numbers (comma-separated)</label>
                                 <input type="text" value={localDetails.contact.join(', ')} onChange={(e) => setLocalDetails({...localDetails, contact: e.target.value.split(',').map(s => s.trim())})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />

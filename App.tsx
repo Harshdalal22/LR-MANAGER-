@@ -50,6 +50,7 @@ const defaultCompanyDetails: CompanyDetails = {
     contact: [],
     pan: '',
     gstn: '',
+    sacCode: '',
     bankDetails: {
         name: '',
         branch: '',
@@ -121,6 +122,7 @@ const App: React.FC = () => {
             errorMessage.includes("Could not find the 'contactNumber' column") ||
             errorMessage.includes("Could not find the 'ownerName' column") ||
             errorMessage.includes("Could not find the 'truckNo' column") ||
+            errorMessage.includes("Could not find the 'sacCode' column") ||
             errorMessage.includes('has no field "updated_at"')
         ) {
              toast.error(

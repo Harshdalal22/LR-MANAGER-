@@ -1,6 +1,6 @@
 
 import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, LRStatus, SavedParty, SavedTruck } from '../types';
+import { LorryReceipt, CompanyDetails, LRStatus, SavedParty, SavedTruck, VehicleHiring, BookingRecord } from '../types';
 
 const supabaseUrl = 'https://avqevimedgoogcupnojo.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2cWV2aW1lZGdvb2djdXBub2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU0MzksImV4cCI6MjA3OTUwMTQzOX0.SWBCoebfu_yHUk6fGFpiy5ZMzbkZeot5jYjaAjF0esM';
@@ -186,8 +186,7 @@ export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => 
     const user = await getCurrentUser();
     const { id, user_id, ...rest } = truck;
     const dataToSave = { ...rest, user_id: user.id };
-    
-     const payload = id ? { ...dataToSave, id } : dataToSave;
+    const payload = id ? { ...dataToSave, id } : dataToSave;
 
     const { data, error } = await getSupabase().from('saved_trucks').upsert(payload).select().single();
     if (error) throw error;
@@ -197,6 +196,58 @@ export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => 
 export const deleteSavedTruck = async (id: string): Promise<void> => {
     const user = await getCurrentUser();
     const { error } = await getSupabase().from('saved_trucks').delete().eq('user_id', user.id).eq('id', id);
+    if (error) throw error;
+};
+
+// --- Vehicle Hiring Functions ---
+
+export const getVehicleHirings = async (): Promise<VehicleHiring[]> => {
+    const user = await getCurrentUser();
+    const { data, error } = await getSupabase().from('vehicle_hirings').select('*').eq('user_id', user.id).order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveVehicleHiring = async (record: VehicleHiring): Promise<VehicleHiring> => {
+    const user = await getCurrentUser();
+    const { id, user_id, ...rest } = record;
+    const dataToSave = { ...rest, user_id: user.id };
+    const payload = id ? { ...dataToSave, id } : dataToSave;
+    
+    const { data, error } = await getSupabase().from('vehicle_hirings').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteVehicleHiring = async (id: string): Promise<void> => {
+    const user = await getCurrentUser();
+    const { error } = await getSupabase().from('vehicle_hirings').delete().eq('user_id', user.id).eq('id', id);
+    if (error) throw error;
+};
+
+// --- Booking Register Functions ---
+
+export const getBookingRecords = async (): Promise<BookingRecord[]> => {
+    const user = await getCurrentUser();
+    const { data, error } = await getSupabase().from('booking_registers').select('*').eq('user_id', user.id).order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveBookingRecord = async (record: BookingRecord): Promise<BookingRecord> => {
+    const user = await getCurrentUser();
+    const { id, user_id, ...rest } = record;
+    const dataToSave = { ...rest, user_id: user.id };
+    const payload = id ? { ...dataToSave, id } : dataToSave;
+    
+    const { data, error } = await getSupabase().from('booking_registers').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteBookingRecord = async (id: string): Promise<void> => {
+    const user = await getCurrentUser();
+    const { error } = await getSupabase().from('booking_registers').delete().eq('user_id', user.id).eq('id', id);
     if (error) throw error;
 };
 

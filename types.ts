@@ -114,4 +114,53 @@ export interface SavedTruck {
     user_id?: string;
 }
 
+export interface VehicleHiring {
+    id?: string;
+    bookingId?: string;
+    date: string;
+    grNo: string;
+    billNo: string;
+    lorryNo: string;
+    driverNo: string;
+    ownerName: 'Self' | 'Third Party';
+    fromPlace: string;
+    toPlace: string;
+    freight: number;
+    advance: number;
+    balance: number;
+    otherExpenses: number;
+    totalBalance: number;
+    podStatus: 'Pending' | 'Completed';
+    paymentStatus: 'Pending' | 'Completed';
+    user_id?: string;
+}
+
+export interface PaymentRecord {
+    amount: number;
+    date: string;
+    notes?: string;
+}
+
+export interface BookingRecord {
+    id?: string;
+    bookingId?: string;
+    partyName: string;
+    date: string;
+    grNo: string;
+    billNo: string;
+    lorryNo: string;
+    lorryType: 'Open' | 'Closed';
+    weight: number;
+    fromPlace: string;
+    toPlace: string;
+    freight: number;
+    advance: number;
+    advances?: PaymentRecord[];
+    balance: number;
+    otherExpenses: number;
+    totalBalance: number;
+    paymentStatus: 'Pending' | 'Completed';
+    user_id?: string;
+}
+
 export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks';

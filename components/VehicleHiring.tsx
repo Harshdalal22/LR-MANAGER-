@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, TruckIcon } from './icons';
 import { VehicleHiring } from '../types';
@@ -49,14 +50,39 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         }));
     }, [formData.freight, formData.advance, formData.otherExpenses]);
 
+    const getErrorMessage = (error: any): string => {
+        if (!error) return 'Unknown error';
+        if (typeof error === 'string') return error;
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'object') {
+            if (error.message && typeof error.message === 'string') return error.message;
+            if (error.details && typeof error.details === 'string') return error.details;
+            try {
+                return JSON.stringify(error);
+            } catch {
+                return 'Unserializable error object';
+            }
+        }
+        return String(error);
+    };
+
     const loadData = async () => {
         setIsLoading(true);
         try {
             const data = await getVehicleHirings();
             setRecords(data);
         } catch (error) {
-            console.error(error);
-            toast.error('Failed to load vehicle hiring records. Ensure the table "vehicle_hirings" exists in Supabase.');
+            console.error("Failed to load vehicle hirings:", error);
+            const msg = getErrorMessage(error);
+            const lowerMsg = msg.toLowerCase();
+            if (lowerMsg.includes('relation "vehicle_hirings" does not exist') || lowerMsg.includes('in the schema cache')) {
+                 toast.error(
+                    "Database setup for Vehicle Hiring is missing. Please run the setup script from the Data Management dashboard.", 
+                    { duration: 10000, id: 'vh-table-missing' }
+                );
+            } else {
+                 toast.error(`Failed to load hiring data: ${msg}`);
+            }
         } finally {
             setIsLoading(false);
         }
@@ -75,7 +101,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             setRecords(prev => prev.filter(r => r.id !== id));
             toast.success('Deleted successfully', { id: toastId });
         } catch (error) {
-            toast.error('Failed to delete', { id: toastId });
+            toast.error(`Failed to delete: ${getErrorMessage(error)}`, { id: toastId });
         }
     };
 
@@ -92,14 +118,14 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             toast.success('Saved successfully', { id: toastId });
             setView('list');
         } catch (error) {
-            toast.error('Failed to save', { id: toastId });
+            toast.error(`Failed to save: ${getErrorMessage(error)}`, { id: toastId });
         }
     };
 
     const filteredRecords = records.filter(r => 
         r.lorryNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.grNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.driverNo.toLowerCase().includes(searchTerm.toLowerCase())
+        (r.driverNo || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const totalActive = records.length;
@@ -235,7 +261,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Bill Number</label>
-                                    <input type="text" value={formData.billNo} onChange={e => setFormData({...formData, billNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.billNo || ''} onChange={e => setFormData({...formData, billNo: e.target.value})} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Lorry Number*</label>
@@ -243,7 +269,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Driver Number</label>
-                                    <input type="text" value={formData.driverNo} onChange={e => setFormData({...formData, driverNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.driverNo || ''} onChange={e => setFormData({...formData, driverNo: e.target.value})} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Owner Name</label>

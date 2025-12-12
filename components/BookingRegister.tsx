@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, ListIcon } from './icons';
 import { BookingRecord, PaymentRecord, SavedTruck } from '../types';
@@ -67,10 +68,29 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         }));
     }, [formData.freight, formData.advances, formData.otherExpenses]);
 
+    const getErrorMessage = (error: any): string => {
+        if (!error) return 'Unknown error';
+        if (typeof error === 'string') return error;
+        if (error instanceof Error) return error.message;
+        if (typeof error === 'object') {
+            // Prioritize common error properties
+            if (error.message && typeof error.message === 'string') return error.message;
+            if (error.error_description && typeof error.error_description === 'string') return error.error_description;
+            if (error.details && typeof error.details === 'string') return error.details;
+            
+            // Fallback to JSON stringify for other objects
+            try {
+                return JSON.stringify(error);
+            } catch {
+                return 'Unserializable error object';
+            }
+        }
+        return String(error);
+    };
+
     const loadData = async () => {
         setIsLoading(true);
         try {
-            // Use Promise.allSettled to allow the UI to load even if one request fails (e.g. missing table)
             const [bookingsResult, trucksResult] = await Promise.allSettled([
                 getBookingRecords(),
                 getSavedTrucks()
@@ -83,10 +103,15 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 loadedRecords = bookingsResult.value;
             } else {
                 console.error("Failed to load bookings:", bookingsResult.reason);
-                const msg = (bookingsResult.reason as any)?.message || 'Unknown error';
-                // Only show toast if it's not a "relation does not exist" error (which is expected on fresh install)
-                if (typeof msg === 'string' && !msg.includes('relation "booking_registers" does not exist')) {
-                     toast.error(`Failed to load bookings: ${msg}`);
+                const errorMsg = getErrorMessage(bookingsResult.reason);
+                const lowerErrorMsg = errorMsg.toLowerCase();
+                if (lowerErrorMsg.includes('relation "booking_registers" does not exist') || lowerErrorMsg.includes("in the schema cache")) {
+                    toast.error(
+                        "Database setup for Booking Register is missing. Please run the setup script from the Data Management dashboard.", 
+                        { duration: 10000, id: 'br-table-missing' }
+                    );
+                } else {
+                    toast.error(`Failed to load bookings: ${errorMsg}`);
                 }
             }
 
@@ -94,10 +119,8 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 loadedTrucks = trucksResult.value;
             } else {
                  console.error("Failed to load trucks:", trucksResult.reason);
-                 // Silent failure for trucks is acceptable, just logged
             }
             
-            // Ensure compatibility if DB records don't have advances array yet or have legacy fields
             const sanitizedData = loadedRecords.map(record => ({
                 ...record,
                 advances: Array.isArray(record.advances) 
@@ -109,9 +132,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             setSavedTrucks(loadedTrucks);
         } catch (error) {
             console.error("Critical Error loading booking data:", error);
-            // Safely handle error rendering to prevent [object Object]
-            const msg = error instanceof Error ? error.message : 'An unexpected error occurred';
-            toast.error(msg);
+            toast.error(getErrorMessage(error));
         } finally {
             setIsLoading(false);
         }
@@ -134,7 +155,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             toast.success('Deleted successfully', { id: toastId });
         } catch (error) {
             console.error("Delete error:", error);
-            toast.error('Failed to delete record', { id: toastId });
+            toast.error(`Failed to delete: ${getErrorMessage(error)}`, { id: toastId });
         }
     };
 
@@ -142,7 +163,6 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         e.preventDefault();
         const toastId = toast.loading('Saving...');
         try {
-            // Ensure advances is definitely an array before saving
             const payload = {
                 ...formData,
                 advances: Array.isArray(formData.advances) ? formData.advances : []
@@ -158,8 +178,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             setView('list');
         } catch (error) {
             console.error("Save error:", error);
-            const msg = (error as any)?.message || 'Failed to save record';
-            toast.error(msg, { id: toastId });
+            toast.error(`Failed to save: ${getErrorMessage(error)}`, { id: toastId });
         }
     };
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { LorryReceipt, CompanyDetails, LRStatus, View, SavedParty, SavedTruck } from './types';
@@ -73,38 +74,63 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
 
-    // Centralized error handler for consistent user feedback
     const handleError = (error: unknown, context: string) => {
         let errorMessage = 'An unknown error occurred.';
-
-        // Robust error parsing
+    
+        // More robust error parsing to avoid '[object Object]'
         if (error instanceof Error) {
             errorMessage = error.message;
         } else if (typeof error === 'object' && error !== null) {
             const errObj = error as any;
-            // Explicitly check for string properties to avoid [object Object]
-            if (typeof errObj.message === 'string') {
+            if (typeof errObj.message === 'string' && errObj.message) {
                 errorMessage = errObj.message;
-            } else if (typeof errObj.error_description === 'string') {
+            } else if (typeof errObj.error_description === 'string' && errObj.error_description) {
                 errorMessage = errObj.error_description;
-            } else if (typeof errObj.details === 'string') {
+            } else if (typeof errObj.details === 'string' && errObj.details) {
                 errorMessage = errObj.details;
             } else {
                 try {
-                    errorMessage = JSON.stringify(error);
+                    const str = JSON.stringify(error);
+                    errorMessage = str === '{}' ? 'An unspecified error object was received.' : str;
                 } catch {
-                    errorMessage = 'Non-serializable error object';
+                    errorMessage = 'A non-serializable error object was received.';
                 }
             }
         } else if (typeof error === 'string') {
             errorMessage = error;
         }
-
+    
         console.error(`${context}:`, error);
-
-        // Standardize case for checking
         const lowerMsg = errorMessage.toLowerCase();
-
+    
+        // Consolidated check for missing tables, now including "schema cache" errors.
+        if ((lowerMsg.includes('relation') && lowerMsg.includes('does not exist')) || lowerMsg.includes('in the schema cache')) {
+            let featureName = "A feature";
+            if (lowerMsg.includes('lorry_receipts') || lowerMsg.includes('company_details')) {
+                 featureName = "The core application";
+            } else if (lowerMsg.includes('saved_parties')) {
+                featureName = "'Manage Parties'";
+            } else if (lowerMsg.includes('saved_trucks')) {
+                featureName = "'Manage Trucks'";
+            } else if (lowerMsg.includes('vehicle_hirings')) {
+                featureName = "'Vehicle Hiring'";
+            } else if (lowerMsg.includes('booking_registers')) {
+                featureName = "'Booking Register'";
+            }
+    
+            toast.error(
+                (t) => (
+                    <div className="flex flex-col gap-2">
+                        <p className="font-bold text-red-600">Database Setup Required</p>
+                        <p className="text-sm">{featureName} requires a database update. Please run the SQL script.</p>
+                        <button onClick={() => { toast.dismiss(t.id); setCurrentView('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Go to Setup</button>
+                    </div>
+                ), { duration: 15000, id: `table-missing-${featureName.replace(/\W/g, '')}` }
+            );
+            return; // Early exit to prevent other toasts
+        }
+        
+        // Other specific error handlers
         if (lowerMsg.includes('failed to fetch')) {
             toast.error(
                 (t) => (
@@ -117,6 +143,7 @@ const App: React.FC = () => {
                 { duration: Infinity, id: 'fetch-error' }
             );
         } else if (
+            // The check for outdated schema
             errorMessage.includes("Could not find the 'branchLocations' column") || 
             errorMessage.includes("Could not find the 'jurisdictionCity' column") ||
             errorMessage.includes("Could not find the 'contactNumber' column") ||
@@ -129,43 +156,13 @@ const App: React.FC = () => {
                 (t) => (
                     <div className="flex flex-col gap-2">
                         <p className="font-bold text-red-600">Database Update Required</p>
-                        <p className="text-sm">The database schema is outdated. Please run the SQL migration.</p>
-                         <button onClick={() => { toast.dismiss(t.id); window.location.reload(); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Reload</button>
+                        <p className="text-sm">Your database schema is outdated. Please go to Data Management and run the latest SQL script.</p>
+                         <button onClick={() => { toast.dismiss(t.id); setCurrentView('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Go to Setup</button>
                     </div>
                 ), { duration: Infinity, id: 'schema-error' }
             );
-        } else if (lowerMsg.includes('relation "lorry_receipts" does not exist') || lowerMsg.includes('relation "company_details" does not exist')) {
-            toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold text-red-600">Critical: Tables Missing</p>
-                        <p className="text-sm">The core tables are missing. Please run the setup SQL.</p>
-                         <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Dismiss</button>
-                    </div>
-                ), { duration: Infinity, id: 'core-tables-missing' }
-            );
-        } else if (lowerMsg.includes('relation "saved_parties" does not exist') || lowerMsg.includes('relation "public.saved_parties" does not exist')) {
-            toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold text-blue-600">Setup Required</p>
-                        <p className="text-sm">The 'saved_parties' table is missing. Please run the SQL to create it.</p>
-                        <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Dismiss</button>
-                    </div>
-                ), { duration: 10000, id: 'party-table-missing' }
-            );
-        } else if (lowerMsg.includes('relation "saved_trucks" does not exist') || lowerMsg.includes('relation "public.saved_trucks" does not exist')) {
-            toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold text-blue-600">Setup Required</p>
-                        <p className="text-sm">The 'saved_trucks' table is missing. Please run the SQL to create it.</p>
-                        <button onClick={() => toast.dismiss(t.id)} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Dismiss</button>
-                    </div>
-                ), { duration: 10000, id: 'truck-table-missing' }
-            );
         } else {
-            // Fallback: Display the stringified message to ensure [object Object] isn't shown
+            // Fallback for any other error
             toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
         }
     };
@@ -230,13 +227,13 @@ const App: React.FC = () => {
             if (partiesResult.status === 'fulfilled') {
                 setSavedParties(partiesResult.value);
             } else {
-                console.warn("Could not load parties (feature might be disabled or tables missing).");
+                handleError(partiesResult.reason, "Failed to load saved parties");
             }
 
             if (trucksResult.status === 'fulfilled') {
                 setSavedTrucks(trucksResult.value);
             } else {
-                console.warn("Could not load trucks (feature might be disabled or tables missing).");
+                handleError(trucksResult.reason, "Failed to load saved trucks");
             }
 
         } catch (error) {

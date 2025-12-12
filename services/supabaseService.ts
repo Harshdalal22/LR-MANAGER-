@@ -70,7 +70,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
 
     const { data, error } = await getSupabase()
         .from('lorry_receipts')
-        .upsert(dataToSave, { onConflict: 'lrNo' })
+        .upsert(dataToSave, { onConflict: 'lrNo, user_id' })
         .select()
         .single();
     if (error) {

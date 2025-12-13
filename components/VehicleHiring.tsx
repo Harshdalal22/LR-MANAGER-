@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, TruckIcon } from './icons';
-import { VehicleHiring } from '../types';
+import { VehicleHiring, PaymentRecord } from '../types';
 import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 
@@ -21,6 +20,7 @@ const initialRecord: VehicleHiring = {
     toPlace: '',
     freight: 0,
     advance: 0,
+    advances: [],
     balance: 0,
     otherExpenses: 0,
     totalBalance: 0,
@@ -35,20 +35,45 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
+    // Temp state for new payment entry
+    const [newPayment, setNewPayment] = useState<PaymentRecord>({
+        amount: 0,
+        date: new Date().toISOString().split('T')[0],
+        notes: ''
+    });
+
     useEffect(() => {
         loadData();
     }, []);
 
     // Auto-calculate balances
     useEffect(() => {
-        const balance = (Number(formData.freight) || 0) - (Number(formData.advance) || 0);
+        // Calculate total advance from the array. Ensure advances is an array.
+        const advancesList = Array.isArray(formData.advances) ? formData.advances : [];
+        const totalAdvance = advancesList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+        // If user manually entered advance before, we might want to respect it if list is empty, 
+        // but generally the list should drive the total. 
+        // To be safe, if list is empty but advance has value (legacy), use advance. 
+        // But for this feature, we want list to drive it.
+        // Let's assume if list has items, use list sum.
+        
+        const finalAdvance = advancesList.length > 0 ? totalAdvance : (Number(formData.advance) || 0);
+        
+        const balance = (Number(formData.freight) || 0) - finalAdvance;
         const total = balance + (Number(formData.otherExpenses) || 0);
-        setFormData(prev => ({
-            ...prev,
-            balance: balance,
-            totalBalance: total
-        }));
-    }, [formData.freight, formData.advance, formData.otherExpenses]);
+
+        // Update state only if values changed to avoid infinite loop
+        if (formData.advance !== finalAdvance || formData.balance !== balance || formData.totalBalance !== total) {
+             setFormData(prev => ({
+                ...prev,
+                advance: finalAdvance,
+                balance: balance,
+                totalBalance: total
+            }));
+        }
+       
+    }, [formData.freight, formData.advances, formData.otherExpenses, formData.advance]);
 
     const getErrorMessage = (error: any): string => {
         if (!error) return 'Unknown error';
@@ -70,7 +95,16 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         setIsLoading(true);
         try {
             const data = await getVehicleHirings();
-            setRecords(data);
+            
+            // Sanitize data to ensure advances array exists
+            const sanitizedData = data.map(record => ({
+                ...record,
+                advances: Array.isArray(record.advances) && record.advances.length > 0
+                    ? record.advances
+                    : (record.advance ? [{ amount: record.advance, date: record.date || new Date().toISOString().split('T')[0], notes: 'Legacy Advance' }] : [])
+            }));
+
+            setRecords(sanitizedData);
         } catch (error) {
             console.error("Failed to load vehicle hirings:", error);
             const msg = getErrorMessage(error);
@@ -89,7 +123,10 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
     };
 
     const handleEdit = (record: VehicleHiring) => {
-        setFormData(record);
+        setFormData({
+            ...record,
+            advances: Array.isArray(record.advances) ? record.advances : []
+        });
         setView('form');
     };
 
@@ -109,17 +146,52 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         e.preventDefault();
         const toastId = toast.loading('Saving...');
         try {
-            const saved = await saveVehicleHiring(formData);
+            const payload = {
+                ...formData,
+                advances: Array.isArray(formData.advances) ? formData.advances : []
+            };
+
+            const saved = await saveVehicleHiring(payload);
+            
+            // Update local state with saved record
+            const savedWithAdvances = {
+                ...saved,
+                 advances: Array.isArray(saved.advances) ? saved.advances : []
+            };
+
             if (formData.id) {
-                setRecords(prev => prev.map(r => r.id === saved.id ? saved : r));
+                setRecords(prev => prev.map(r => r.id === saved.id ? savedWithAdvances : r));
             } else {
-                setRecords(prev => [saved, ...prev]);
+                setRecords(prev => [savedWithAdvances, ...prev]);
             }
             toast.success('Saved successfully', { id: toastId });
             setView('list');
         } catch (error) {
             toast.error(`Failed to save: ${getErrorMessage(error)}`, { id: toastId });
         }
+    };
+
+    const handleAddPayment = () => {
+        if (!newPayment.amount || newPayment.amount <= 0) {
+            toast.error('Enter a valid amount');
+            return;
+        }
+        setFormData(prev => ({
+            ...prev,
+            advances: [...(Array.isArray(prev.advances) ? prev.advances : []), newPayment]
+        }));
+        setNewPayment({
+            amount: 0,
+            date: new Date().toISOString().split('T')[0],
+            notes: ''
+        });
+    };
+
+    const handleRemovePayment = (index: number) => {
+        setFormData(prev => ({
+            ...prev,
+            advances: (prev.advances || []).filter((_, i) => i !== index)
+        }));
     };
 
     const filteredRecords = records.filter(r => 
@@ -296,9 +368,10 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Freight Amount</label>
                                     <input type="number" value={formData.freight} onChange={e => setFormData({...formData, freight: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
                                 </div>
+                                {/* Legacy Advance Input - Hidden if using the new array method effectively, or can be kept as readonly sum */}
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-600 mb-1">Advance</label>
-                                    <input type="number" value={formData.advance} onChange={e => setFormData({...formData, advance: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                    <label className="block text-xs font-bold text-gray-600 mb-1">Total Advance</label>
+                                    <input type="number" readOnly value={formData.advance} className="w-full p-2 border rounded bg-gray-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Other Expenses</label>
@@ -322,6 +395,70 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                         <option value="Completed">Completed</option>
                                     </select>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Advance Payments Section */}
+                        <div className="bg-white p-4 rounded-lg border shadow-sm">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-gray-800">Advance Payments</h3>
+                                <div className="text-sm font-bold text-gray-600">Total: ₹{formData.advance}</div>
+                            </div>
+                            
+                            {/* List of Payments */}
+                            {Array.isArray(formData.advances) && formData.advances.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                    {formData.advances.map((payment, index) => (
+                                        <div key={index} className="flex items-center gap-4 bg-gray-50 p-2 rounded border border-gray-100 text-sm">
+                                            <div className="font-bold w-24">₹{payment.amount}</div>
+                                            <div className="text-gray-500 w-32">{payment.date ? new Date(payment.date).toLocaleDateString('en-GB') : '-'}</div>
+                                            <div className="flex-grow text-gray-600 truncate">{payment.notes || '-'}</div>
+                                            <button type="button" onClick={() => handleRemovePayment(index)} className="text-red-500 hover:text-red-700">
+                                                <TrashIcon className="w-4 h-4"/>
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Add New Payment Input Row */}
+                            <div className="flex flex-col md:flex-row gap-3 items-end bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300">
+                                <div className="w-full md:w-32">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Amount (₹)</label>
+                                    <input 
+                                        type="number" 
+                                        placeholder="Amount" 
+                                        value={newPayment.amount || ''} 
+                                        onChange={e => setNewPayment({...newPayment, amount: parseFloat(e.target.value)})} 
+                                        className="w-full p-2 border rounded text-sm" 
+                                    />
+                                </div>
+                                <div className="w-full md:w-40">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={newPayment.date} 
+                                        onChange={e => setNewPayment({...newPayment, date: e.target.value})} 
+                                        className="w-full p-2 border rounded text-sm" 
+                                    />
+                                </div>
+                                <div className="flex-grow w-full">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Notes</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Optional notes (e.g. UPI/Cash)" 
+                                        value={newPayment.notes || ''} 
+                                        onChange={e => setNewPayment({...newPayment, notes: e.target.value})} 
+                                        className="w-full p-2 border rounded text-sm" 
+                                    />
+                                </div>
+                                <button 
+                                    type="button" 
+                                    onClick={handleAddPayment} 
+                                    className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 font-semibold text-sm flex items-center shadow-sm"
+                                >
+                                    <PlusIcon className="w-4 h-4 mr-1"/> Add Payment
+                                </button>
                             </div>
                         </div>
 

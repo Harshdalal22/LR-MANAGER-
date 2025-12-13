@@ -14,9 +14,9 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
 -- 1. Enable UUID Extension
 create extension if not exists "uuid-ossp";
 
--- 2. Create Tables
+-- 2. Create Tables (if they don't exist)
 
--- Lorry Receipts Table (Composite PK for multi-tenancy)
+-- Lorry Receipts Table
 create table if not exists public.lorry_receipts (
   "lrNo" text not null,
   user_id uuid references auth.users not null,
@@ -55,7 +55,7 @@ create table if not exists public.lorry_receipts (
   primary key ("lrNo", user_id)
 );
 
--- Company Details Table (1:1 with User)
+-- Company Details Table
 create table if not exists public.company_details (
   user_id uuid references auth.users not null primary key,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -117,6 +117,7 @@ create table if not exists public.vehicle_hirings (
   "toPlace" text,
   freight numeric default 0,
   advance numeric default 0,
+  advances jsonb default '[]'::jsonb,
   balance numeric default 0,
   "otherExpenses" numeric default 0,
   "totalBalance" numeric default 0,
@@ -149,7 +150,29 @@ create table if not exists public.booking_registers (
   "paymentStatus" text default 'Pending'
 );
 
--- 3. Enable Row Level Security (RLS)
+-- 3. MIGRATIONS (Fix missing columns in existing tables)
+
+-- Add 'advances' to vehicle_hirings if missing
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'vehicle_hirings' and column_name = 'advances') then
+    alter table public.vehicle_hirings add column advances jsonb default '[]'::jsonb;
+  end if;
+end $$;
+
+-- Add 'advances' to booking_registers if missing
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_name = 'booking_registers' and column_name = 'advances') then
+    alter table public.booking_registers add column advances jsonb default '[]'::jsonb;
+  end if;
+end $$;
+
+-- 4. CRITICAL: Reload Schema Cache
+-- This fixes the error: "Could not find the 'advances' column ... in the schema cache"
+NOTIFY pgrst, 'reload config';
+
+-- 5. Enable Row Level Security (RLS)
 alter table public.lorry_receipts enable row level security;
 alter table public.company_details enable row level security;
 alter table public.saved_parties enable row level security;
@@ -157,8 +180,8 @@ alter table public.saved_trucks enable row level security;
 alter table public.vehicle_hirings enable row level security;
 alter table public.booking_registers enable row level security;
 
--- 4. Create Security Policies 
--- We drop policies first to ensure the script is idempotent and doesn't fail if they exist.
+-- 6. Create/Update Security Policies
+-- (Drops existing policies first to prevent errors on re-run)
 
 drop policy if exists "Users can manage their own LRs" on public.lorry_receipts;
 create policy "Users can manage their own LRs" on public.lorry_receipts for all using (auth.uid() = user_id);
@@ -178,19 +201,12 @@ create policy "Users can manage their own Vehicle Hirings" on public.vehicle_hir
 drop policy if exists "Users can manage their own Booking Registers" on public.booking_registers;
 create policy "Users can manage their own Booking Registers" on public.booking_registers for all using (auth.uid() = user_id);
 
--- 5. Create Indexes for Performance
+-- 7. Create Indexes for Performance
 create index if not exists idx_vehicle_hirings_user_id on public.vehicle_hirings(user_id);
 create index if not exists idx_vehicle_hirings_date on public.vehicle_hirings(date);
 create index if not exists idx_booking_registers_user_id on public.booking_registers(user_id);
 create index if not exists idx_booking_registers_date on public.booking_registers(date);
 create index if not exists idx_lorry_receipts_date on public.lorry_receipts(date);
-
--- 6. Storage Buckets (Optional: Run if buckets exist or created via dashboard)
--- create policy "Users can upload own PODs" on storage.objects for insert with check ( bucket_id = 'pods' and auth.uid()::text = (storage.foldername(name))[1] );
--- create policy "Users can view own PODs" on storage.objects for select using ( bucket_id = 'pods' and auth.uid()::text = (storage.foldername(name))[1] );
--- create policy "Users can delete own PODs" on storage.objects for delete using ( bucket_id = 'pods' and auth.uid()::text = (storage.foldername(name))[1] );
--- create policy "Users can upload own Assets" on storage.objects for insert with check ( bucket_id = 'company-assets' and auth.uid()::text = (storage.foldername(name))[1] );
--- create policy "Users can view own Assets" on storage.objects for select using ( bucket_id = 'company-assets' and auth.uid()::text = (storage.foldername(name))[1] );
     `.trim();
 
     const handleCopy = () => {
@@ -209,16 +225,17 @@ create index if not exists idx_lorry_receipts_date on public.lorry_receipts(date
                 <h2 className="text-2xl font-bold text-ssk-blue">Data Management & Setup</h2>
             </div>
 
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6">
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
                 <div className="flex">
                     <div className="flex-shrink-0">
-                         <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
+                         <CheckCircleIcon className="h-5 w-5 text-red-500" />
                     </div>
                     <div className="ml-3">
-                        <p className="text-sm text-blue-700">
-                            <strong>Setup Required:</strong> Copy and run this SQL script in your Supabase SQL Editor to create all necessary tables and policies. This fixes "Failed to load" errors.
+                        <p className="text-sm text-red-700 font-bold">
+                            Fixing "Schema Cache" Errors:
+                        </p>
+                        <p className="text-sm text-red-600 mt-1">
+                            If you see an error about a "missing column in schema cache", you <strong>MUST</strong> run the script below in your Supabase SQL Editor. It reloads the database configuration.
                         </p>
                     </div>
                 </div>
@@ -247,7 +264,7 @@ create index if not exists idx_lorry_receipts_date on public.lorry_receipts(date
                         <li>Go to your <a href="https://supabase.com/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Supabase Dashboard</a>.</li>
                         <li>Navigate to the <strong>SQL Editor</strong> section in the sidebar.</li>
                         <li>Paste the script into the query editor and click <strong>Run</strong>.</li>
-                        <li>Once successful, return here and refresh the page to start using the new features.</li>
+                        <li>Return here and refresh the page. The error should be resolved.</li>
                     </ol>
                 </div>
             </div>

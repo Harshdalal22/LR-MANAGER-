@@ -114,6 +114,12 @@ export interface SavedTruck {
     user_id?: string;
 }
 
+export interface PaymentRecord {
+    amount: number;
+    date: string;
+    notes?: string;
+}
+
 export interface VehicleHiring {
     id?: string;
     bookingId?: string;
@@ -127,18 +133,13 @@ export interface VehicleHiring {
     toPlace: string;
     freight: number;
     advance: number;
+    advances?: PaymentRecord[];
     balance: number;
     otherExpenses: number;
     totalBalance: number;
     podStatus: 'Pending' | 'Completed';
     paymentStatus: 'Pending' | 'Completed';
     user_id?: string;
-}
-
-export interface PaymentRecord {
-    amount: number;
-    date: string;
-    notes?: string;
 }
 
 export interface BookingRecord {

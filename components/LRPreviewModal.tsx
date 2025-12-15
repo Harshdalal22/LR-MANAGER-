@@ -18,6 +18,7 @@ declare const html2pdf: any;
 
 // A dedicated component for the LR content to be reused for screen and print.
 export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyDetails: CompanyDetails; showCompanyDetails: boolean }>(({ lr, companyDetails, showCompanyDetails }, ref) => {
+    // Note: Calculations are kept for logic if needed elsewhere, but display is hardcoded to 0.00
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
@@ -36,7 +37,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
             )}
 
             {/* Dynamic Header */}
-            <div className="flex flex-row justify-between items-center pb-2 border-b-4 border-ssk-blue min-h-[100px]">
+            <div className="flex flex-row justify-between items-stretch pb-2 border-b-4 border-ssk-blue min-h-[100px]">
                 {/* Left: Logo */}
                 <div className="flex-none w-24 flex justify-start items-center">
                     {companyDetails.logoUrl && (
@@ -45,26 +46,27 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 </div>
 
                 {/* Center: Company Details */}
-                <div className="flex-1 px-2 text-center overflow-hidden">
-                    <h1 className="font-extrabold text-ssk-red text-3xl leading-none tracking-tight whitespace-nowrap">
+                <div className="flex-1 px-2 text-center flex flex-col justify-center overflow-hidden">
+                    <h1 className="font-extrabold text-ssk-red text-3xl leading-none tracking-tight whitespace-nowrap overflow-hidden text-ellipsis">
                         {companyDetails.name}
                     </h1>
                     {companyDetails.tagline && (
                         <p className="text-xs font-bold text-ssk-blue mt-1">{companyDetails.tagline}</p>
                     )}
-                    <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal">
+                    <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal leading-tight">
                         {companyDetails.address}
                     </p>
                 </div>
 
                 {/* Right: Contact & Badge */}
-                <div className="flex-none w-auto flex flex-col items-end justify-between self-stretch py-1">
-                    <div className="text-[10px] font-bold text-right leading-tight">
+                {/* Fixed width to ensure it stays in bounds and aligns right */}
+                <div className="flex-none w-[180px] flex flex-col items-end justify-between py-1">
+                    <div className="text-[10px] font-bold text-right leading-tight w-full break-words">
                         <p>{companyDetails.email}</p>
                         {companyDetails.contact.slice(0, 2).map(c => <p key={c}>{c}</p>)}
                     </div>
-                    <div className="mt-2">
-                        <span className="bg-ssk-blue text-white px-3 py-1 rounded text-sm font-bold tracking-wider uppercase block text-center">
+                    <div className="mt-2 self-end">
+                        <span className="bg-ssk-blue text-white px-3 py-1 rounded text-sm font-bold tracking-wider uppercase block text-center min-w-[100px]">
                             {lr.lrType}
                         </span>
                     </div>
@@ -226,50 +228,52 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                                 {lr.items.map((item, idx) => (
                                     <li key={idx}>
                                         <span className="font-bold text-black text-sm uppercase">{item.description}</span>
-                                        {item.weight > 0 && <span className="text-xs text-gray-600 ml-2">({item.weight} kg)</span>}
+                                        {/* Weight display removed as requested */}
                                     </li>
                                 ))}
                              </ul>
                         </td>
-                        <td className="border-r border-black p-2 text-center align-top font-bold">{lr.actualWeightMT}</td>
-                        <td className="border-r-2 border-black p-2 text-center align-top font-bold">{lr.chargedWeight}</td>
+                        {/* Actual Weight column - intentionally empty */}
+                        <td className="border-r border-black p-2 text-center align-top font-bold"></td>
+                        {/* Charged Weight column - intentionally empty */}
+                        <td className="border-r-2 border-black p-2 text-center align-top font-bold"></td>
                         <td colSpan={2} className="p-0 align-top">
                             <div className="flex flex-col h-full text-[9px]">
                                 <div className="flex justify-between border-b border-black p-1">
                                     <span>Freight</span>
-                                    <span className="font-bold">{Number(lr.freight).toFixed(2)}</span>
+                                    <span className="font-bold">0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Hamail</span>
-                                    <span>{lr.charges?.hamail?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Surcharge</span>
-                                    <span>{lr.charges?.surCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Statistical</span>
-                                    <span>{lr.charges?.stCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Collection</span>
-                                    <span>{lr.charges?.collectionCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Door Del.</span>
-                                    <span>{lr.charges?.ddCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Other</span>
-                                    <span>{lr.charges?.otherCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between border-b border-black p-1">
                                     <span>Risk Charges</span>
-                                    <span>{lr.charges?.riskCharge?.toFixed(2) || ''}</span>
+                                    <span>0.00</span>
                                 </div>
                                 <div className="flex justify-between p-1 mt-auto bg-gray-100 font-bold border-t border-black text-sm">
                                     <span>Total</span>
-                                    <span>{totalToPay.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                                    <span>0.00</span>
                                 </div>
                             </div>
                         </td>

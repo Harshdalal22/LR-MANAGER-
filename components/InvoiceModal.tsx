@@ -202,9 +202,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
         if (isOpen && lorryReceipts.length > 0) {
             // Suggest a bill number: try to see if the first LR has one, otherwise generate
              const existingInvoiceNo = lorryReceipts[0].invoiceNo;
+             
+             // Use a unique suffix (MMDD-HHMMSS) to ensure each generated invoice is distinct by default
+             const now = new Date();
+             const timeComponent = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+             const dateComponent = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+             
              const suggestedBillNo = existingInvoiceNo 
                 ? existingInvoiceNo 
-                : `INV-${new Date().getFullYear()}-${String(lorryReceipts.length).padStart(4, '0')}`;
+                : `INV-${dateComponent}-${timeComponent}`;
             
             setBillNo(suggestedBillNo);
             setBillDate(new Date().toISOString().split('T')[0]);

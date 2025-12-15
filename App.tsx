@@ -373,7 +373,7 @@ const App: React.FC = () => {
     };
 
     const handleUpdateInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
-        const toastId = toast.loading('Updating LRs with Invoice Details...');
+        const toastId = toast.loading('Generating Invoice...');
         try {
             await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
             setLorryReceipts(prev => prev.map(lr => 
@@ -381,10 +381,11 @@ const App: React.FC = () => {
                     ? { ...lr, invoiceNo, invoiceDate } 
                     : lr
             ));
-            toast.success('Invoice details saved to LRs!', { id: toastId });
+            toast.success('Invoice Generated Successfully', { id: toastId });
+            setCurrentView('invoices');
         } catch (error) {
             toast.dismiss(toastId);
-            handleError(error, "Failed to update Invoice Details");
+            handleError(error, "Failed to generate Invoice");
         }
     };
     

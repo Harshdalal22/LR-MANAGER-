@@ -17,14 +17,17 @@ interface LRPreviewModalProps {
 declare const html2pdf: any;
 
 // A dedicated component for the LR content to be reused for screen and print.
-export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyDetails: CompanyDetails; showCompanyDetails: boolean }>(({ lr, companyDetails, showCompanyDetails }, ref) => {
-    // Note: Calculations are kept for logic if needed elsewhere, but display is hardcoded to 0.00
+export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyDetails: CompanyDetails; showCompanyDetails: boolean; showAmounts: boolean }>(({ lr, companyDetails, showCompanyDetails, showAmounts }, ref) => {
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
     const isBillingPartySeparate = lr.billingTo && lr.billingTo.name && 
                                    (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
                                    (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
+
+    const formatAmount = (amount: number | undefined) => {
+        return showAmounts ? (Number(amount) || 0).toFixed(2) : "0.00";
+    };
 
     return (
         <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black relative">
@@ -241,39 +244,39 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                             <div className="flex flex-col h-full text-[9px]">
                                 <div className="flex justify-between border-b border-black p-1">
                                     <span>Freight</span>
-                                    <span className="font-bold">0.00</span>
+                                    <span className="font-bold">{formatAmount(lr.freight)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Hamail</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.hamail)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Surcharge</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.surCharge)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Statistical</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.stCharge)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Collection</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.collectionCharge)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Door Del.</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.ddCharge)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-gray-300 p-1">
                                     <span>Other</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.otherCharge)}</span>
                                 </div>
                                 <div className="flex justify-between border-b border-black p-1">
                                     <span>Risk Charges</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(lr.charges.riskCharge)}</span>
                                 </div>
                                 <div className="flex justify-between p-1 mt-auto bg-gray-100 font-bold border-t border-black text-sm">
                                     <span>Total</span>
-                                    <span>0.00</span>
+                                    <span>{formatAmount(totalToPay)}</span>
                                 </div>
                             </div>
                         </td>
@@ -283,11 +286,8 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     <tr>
                         <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
                              <div className="flex flex-col justify-between h-full space-y-2">
-                                <div className="grid grid-cols-2 gap-2 text-[8px]">
-                                    <div>
-                                        <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
-                                        <p className="font-bold">Date: <span className="font-normal">{lr.invoiceDate ? new Date(lr.invoiceDate).toLocaleDateString('en-GB'): ''}</span></p>
-                                    </div>
+                                <div className="grid grid-cols-1 gap-2 text-[8px]">
+                                    {/* Invoice No and Date display removed as per user request */}
                                     <div>
                                         <p className="font-bold">Value: <span className="font-normal">₹{Number(lr.invoiceAmount).toLocaleString('en-IN')}</span></p>
                                         <p className="font-bold">GST Paid By: <span className="font-normal">{lr.gstPaidBy}</span></p>
@@ -319,6 +319,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
     const previewRef = useRef<HTMLDivElement>(null);
     const printRoot = document.getElementById('print-root');
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
+    const [showAmounts, setShowAmounts] = useState(false);
 
     const handleDownloadPDF = () => {
         const element = previewRef.current;
@@ -387,7 +388,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
     return (
         <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto">
             {/* Render a copy of the content specifically for printing, outside the visible modal */}
-            {printRoot && createPortal(<LRContent lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} />, printRoot)}
+            {printRoot && createPortal(<LRContent lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} showAmounts={showAmounts} />, printRoot)}
 
             {/* The visible modal for on-screen preview */}
             <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl my-8">
@@ -406,6 +407,18 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
                                 Include GST/PAN
                             </label>
                         </div>
+                         <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
+                           <input
+                                type="checkbox"
+                                id="showAmounts"
+                                checked={showAmounts}
+                                onChange={(e) => setShowAmounts(e.target.checked)}
+                                className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300 rounded"
+                            />
+                            <label htmlFor="showAmounts" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                                Show Amounts
+                            </label>
+                        </div>
                         {!isReadOnly && onSave && <button onClick={() => onSave(lr)} className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold"><SaveIcon className="w-5 h-5 mr-1"/>Save LR</button>}
                         <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold"><DownloadIcon className="w-5 h-5 mr-1"/>Download PDF</button>
                         <button onClick={handleShareWhatsApp} className="flex items-center bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 font-semibold"><WhatsAppIcon className="w-5 h-5 mr-1"/>WhatsApp</button>
@@ -414,7 +427,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
                 </div>
 
                 <div className="p-2 sm:p-4 overflow-x-auto">
-                    <LRContent ref={previewRef} lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} />
+                    <LRContent ref={previewRef} lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} showAmounts={showAmounts} />
                 </div>
             </div>
         </div>

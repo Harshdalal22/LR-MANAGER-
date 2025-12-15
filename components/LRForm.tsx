@@ -490,7 +490,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                  <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-2xl p-4 h-full overflow-y-auto">
                     <h3 className="text-xl font-bold text-ssk-blue mb-4 text-center">Live Preview</h3>
                     <div className="transform scale-100 origin-top bg-white shadow-lg">
-                        <LRContent lr={formData} companyDetails={companyDetails} showCompanyDetails={true} />
+                        <LRContent lr={formData} companyDetails={companyDetails} showCompanyDetails={true} showAmounts={true} />
                     </div>
                  </div>
             </div>

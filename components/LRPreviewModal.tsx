@@ -46,8 +46,8 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 </div>
 
                 {/* Center: Company Details */}
-                <div className="flex-1 px-2 text-center flex flex-col justify-center">
-                    <h1 className="font-extrabold text-ssk-red text-3xl leading-tight tracking-tight break-words">
+                <div className="flex-1 px-1 text-center flex flex-col justify-center overflow-hidden">
+                    <h1 className="font-extrabold text-ssk-red text-2xl leading-none tracking-tight whitespace-nowrap">
                         {companyDetails.name}
                     </h1>
                     {companyDetails.tagline && (

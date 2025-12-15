@@ -1,3 +1,4 @@
+
 import React, { useRef, forwardRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
@@ -25,24 +26,47 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                                    (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
 
     return (
-        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black">
+        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black relative">
+            
+            {/* Jurisdiction Header */}
+            {companyDetails.jurisdictionCity && (
+                <div className="text-[10px] font-bold text-center w-full pb-1 uppercase tracking-wide">
+                    SUBJECT TO {companyDetails.jurisdictionCity} JURISDICTION
+                </div>
+            )}
+
             {/* Dynamic Header */}
-            <div className="flex justify-between items-start pb-4 border-b-4 border-ssk-blue">
-                <div className="w-1/4 flex justify-start">
-                    {companyDetails.logoUrl && <img src={companyDetails.logoUrl} alt="Company Logo" className="h-24 w-auto object-contain"/>}
+            <div className="flex flex-row justify-between items-center pb-2 border-b-4 border-ssk-blue min-h-[100px]">
+                {/* Left: Logo */}
+                <div className="flex-none w-24 flex justify-start items-center">
+                    {companyDetails.logoUrl && (
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-20 w-full object-contain object-left"/>
+                    )}
                 </div>
-                <div className="w-1/2 text-center pt-2">
-                    <h1 className="font-extrabold text-ssk-red text-4xl leading-tight">{companyDetails.name}</h1>
-                    {companyDetails.tagline && <p className="text-lg font-semibold text-ssk-blue mt-1">{companyDetails.tagline}</p>}
-                    <p className="text-sm mt-2 text-gray-700">{companyDetails.address}</p>
+
+                {/* Center: Company Details */}
+                <div className="flex-1 px-2 text-center overflow-hidden">
+                    <h1 className="font-extrabold text-ssk-red text-3xl leading-none tracking-tight whitespace-nowrap">
+                        {companyDetails.name}
+                    </h1>
+                    {companyDetails.tagline && (
+                        <p className="text-xs font-bold text-ssk-blue mt-1">{companyDetails.tagline}</p>
+                    )}
+                    <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal">
+                        {companyDetails.address}
+                    </p>
                 </div>
-                <div className="w-1/4 text-right flex flex-col items-end justify-between h-24">
-                    <div>
-                      <p className="text-sm font-semibold">{companyDetails.email}</p>
-                      {companyDetails.contact.map(c => <p key={c} className="text-sm font-semibold">{c}</p>)}
+
+                {/* Right: Contact & Badge */}
+                <div className="flex-none w-auto flex flex-col items-end justify-between self-stretch py-1">
+                    <div className="text-[10px] font-bold text-right leading-tight">
+                        <p>{companyDetails.email}</p>
+                        {companyDetails.contact.slice(0, 2).map(c => <p key={c}>{c}</p>)}
                     </div>
-                    <div className="bg-ssk-blue text-white px-4 py-1 rounded-md">
-                        <span className="font-bold text-base tracking-wider">{lr.lrType.toUpperCase()}</span>
+                    <div className="mt-2">
+                        <span className="bg-ssk-blue text-white px-3 py-1 rounded text-sm font-bold tracking-wider uppercase block text-center">
+                            {lr.lrType}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -54,99 +78,105 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 <div className="col-span-4 flex flex-col">
                     <div className="border border-black p-1">
                         <span className="font-bold bg-white px-1 relative -top-3 text-black">Available At :</span>
-                        <div className="-mt-2 grid grid-cols-2">
+                        <div className="-mt-2 grid grid-cols-2 gap-x-2">
                             {(companyDetails.branchLocations || []).map(loc => (
-                                <p key={loc} className="font-bold">{loc.toUpperCase()}</p>
+                                <p key={loc} className="font-bold truncate">{loc.toUpperCase()}</p>
                             ))}
                         </div>
                     </div>
                     <div className="border border-black p-1 mt-1 caution-notice-section">
-                        <p className="font-bold text-center text-red-600 text-base">CAUTION</p>
-                        <p className="text-[7px]">This Consignment Will Not Be Detained Diverted,Re-Routed Or Re-Booked Without Consignee Bank Written Permission Will Be Delivered At the Destination.</p>
+                        <p className="font-bold text-center text-red-600 text-sm">CAUTION</p>
+                        <p className="text-[7px] leading-tight">This Consignment Will Not Be Detained Diverted,Re-Routed Or Re-Booked Without Consignee Bank Written Permission Will Be Delivered At the Destination.</p>
                     </div>
                      <div className="border border-black p-1 mt-1 flex-grow caution-notice-section">
-                        <p className="font-bold text-center text-red-600 text-base">NOTICE</p>
-                        <p className="text-[7px]">This consignment covered in this set of special lorry receipt shall be stored at the destination under the control of the transport operator & shall be delivered to or to the order of the Consignee bank whose name is mentioned in the lorry receipt. And under no circumstances be delivered to anyone without the written authority form the consignee Bank or its order endorsed on the Consignee Copy or on a separated Letter or Authority.</p>
+                        <p className="font-bold text-center text-red-600 text-sm">NOTICE</p>
+                        <p className="text-[7px] leading-tight">This consignment covered in this set of special lorry receipt shall be stored at the destination under the control of the transport operator & shall be delivered to or to the order of the Consignee bank whose name is mentioned in the lorry receipt.</p>
                     </div>
                 </div>
                 {/* Mid Col */}
                 <div className="col-span-4">
                     <div className="border border-black p-1">
-                        <p className="font-bold text-center underline">AT OWNERS RISKS</p>
+                        <p className="font-bold text-center underline mb-1">AT OWNERS RISKS</p>
                         {showCompanyDetails && (
                             <>
-                                <p>Pan No. : <span className="font-bold text-black">{companyDetails.pan}</span></p>
-                                <p>GST No. : <span className="text-black font-bold">{companyDetails.gstn}</span></p>
+                                <p className="flex justify-between"><span>Pan No. :</span> <span className="font-bold text-black">{companyDetails.pan}</span></p>
+                                <p className="flex justify-between"><span>GST No. :</span> <span className="text-black font-bold">{companyDetails.gstn}</span></p>
                             </>
                         )}
                     </div>
-                     <div className="border border-black p-1 mt-1 text-center">
+                     <div className="border border-black p-1 mt-1 text-center h-[90px]">
                         <p className="font-bold underline">INSURANCE</p>
-                        <p className="text-[8px] font-bold">The Customer Has Started That He Has Not Insured The Consignment</p>
-                        <div className="flex justify-between mt-1 text-left">
-                            <span>Policy No _________</span>
-                            <span>Date _________</span>
+                        <p className="text-[7px] font-bold my-1 leading-tight">The Customer Has Started That He Has Not Insured The Consignment</p>
+                        <div className="flex justify-between mt-1 text-left border-b border-gray-300 pb-1">
+                            <span>Policy No: _______</span>
+                            <span>Date: _______</span>
                         </div>
                         <div className="flex justify-between mt-1 text-left">
-                            <span>Amount _________</span>
-                            <span>Risk _________</span>
+                            <span>Amount: _______</span>
+                            <span>Risk: _______</span>
                         </div>
                     </div>
                 </div>
                 {/* Right Col */}
                 <div className="col-span-4 text-center">
                      <div className="border border-black p-1">
-                        <p className="font-bold underline">SCHEDULE OF DEMURRAGE CHARGES</p>
-                        <p className="text-[8px] font-bold">Demmurrage Chargeable After 5 days Arrival Of Goods Rs. 7/per Qtl.Per Day On Weight Charged</p>
+                        <p className="font-bold underline">DEMURRAGE CHARGES</p>
+                        <p className="text-[7px] font-bold leading-tight">Chargeable After 5 days Arrival Of Goods Rs. 7/per Qtl.Per Day On Weight Charged</p>
                     </div>
-                    <div className="border border-black p-1 mt-1 font-bold">Address Of Delivery : <span className="font-bold text-black">{lr.addressOfDelivery}</span></div>
-                    <div className="border border-black p-1 mt-1 font-bold">Vehicle No. : <span className="font-extrabold text-black text-xl">{lr.truckNo}</span></div>
-                    <div className="border-y-2 border-black p-1 mt-1 font-bold">C NOTE No. : <span className="font-bold text-black">{lr.lrNo}</span></div>
+                    <div className="border border-black p-1 mt-1 font-bold text-left truncate">Del Addr: <span className="font-bold text-black">{lr.addressOfDelivery}</span></div>
+                    <div className="border border-black p-1 mt-1 font-bold flex justify-between items-center bg-gray-100">
+                        <span>Vehicle No.:</span> 
+                        <span className="font-extrabold text-black text-lg">{lr.truckNo}</span>
+                    </div>
+                    <div className="border-y-2 border-black p-1 mt-1 font-bold text-lg flex justify-between">
+                        <span>C NOTE No.:</span> 
+                        <span className="font-extrabold text-red-600">{lr.lrNo}</span>
+                    </div>
                     {lr.ewayBillNo && (
-                        <div className="border-b-2 border-black p-1 font-bold text-left">
-                            E-Way Bill: <span className="font-bold text-black">{lr.ewayBillNo}</span>
-                            <br/>
-                            <span className="text-[8px]">
-                                Date: <span className="font-bold text-black">{lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB'): 'N/A'}</span>
-                                &nbsp;|&nbsp;
-                                Expiry: <span className="font-bold text-black">{lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB'): 'N/A'}</span>
-                            </span>
+                        <div className="border-b-2 border-black p-1 font-bold text-left text-[8px]">
+                            E-Way: <span className="font-bold text-black">{lr.ewayBillNo}</span>
+                            <div className="flex justify-between">
+                                <span>Dt: {lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB'): '-'}</span>
+                                <span>Ex: {lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB'): '-'}</span>
+                            </div>
                         </div>
                     )}
-                    <div className="grid grid-cols-5 mt-1">
-                        <div className="col-span-2 border border-black p-1 font-bold">DATE :</div>
-                        <div className="col-span-3 border-y border-r border-black p-1 font-bold text-black">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
-                        <div className="col-span-2 border-x border-b border-black p-1 font-bold flex items-center justify-center">FROM :</div>
-                        <div className="col-span-3 border-r border-b border-black p-2 font-extrabold text-black bg-gray-300 text-lg text-center">{lr.fromPlace}</div>
-                        <div className="col-span-2 border-x border-b border-black p-1 font-bold flex items-center justify-center">TO :</div>
-                        <div className="col-span-3 border-r border-b border-black p-2 font-extrabold text-black bg-gray-300 text-lg text-center">{lr.toPlace}</div>
+                    <div className="grid grid-cols-5 mt-1 border border-black text-[8px]">
+                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">DATE</div>
+                        <div className="col-span-3 border-b border-black p-1 font-bold text-black">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
+                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">FROM</div>
+                        <div className="col-span-3 border-b border-black p-1 font-bold text-black uppercase">{lr.fromPlace}</div>
+                        <div className="col-span-2 border-r border-black p-1 font-bold bg-gray-50">TO</div>
+                        <div className="col-span-3 p-1 font-bold text-black uppercase">{lr.toPlace}</div>
                     </div>
                 </div>
             </div>
             
             {/* Consignor/Consignee details */}
-            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
+            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
                 <thead>
                     <tr>
-                        <td className="border-r-2 border-black p-1 font-bold w-1/2">Consignor</td>
-                        <td className="p-1 font-bold w-1/2">Consignee</td>
+                        <td className="border-r-2 border-black p-1 font-bold w-1/2 bg-gray-100">Consignor Name & Address</td>
+                        <td className="p-1 font-bold w-1/2 bg-gray-100">Consignee Name & Address</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="border-r-2 border-black p-1 align-top h-[70px]">
-                            <p className="font-bold text-black">{lr.consignor.name}</p>
-                            <p className="font-bold text-black">{lr.consignor.address}, {lr.consignor.city}</p>
-                            {lr.consignor.gst && <p className="font-bold text-black">GST: {lr.consignor.gst}</p>}
-                            {lr.consignor.pan && <p className="font-bold text-black">PAN: {lr.consignor.pan}</p>}
-                            {lr.consignor.contact && <p className="font-bold text-black">Contact: {lr.consignor.contact}</p>}
+                        <td className="border-r-2 border-black p-2 align-top h-[70px]">
+                            <p className="font-bold text-black text-xs">{lr.consignor.name}</p>
+                            <p className="text-gray-800">{lr.consignor.address}, {lr.consignor.city}</p>
+                            <div className="mt-1 space-y-0.5">
+                                {lr.consignor.gst && <p className="font-semibold">GST: {lr.consignor.gst}</p>}
+                                {lr.consignor.contact && <p>Ph: {lr.consignor.contact}</p>}
+                            </div>
                         </td>
-                        <td className="p-1 align-top h-[70px]">
-                            <p className="font-bold text-black">{lr.consignee.name}</p>
-                            <p className="font-bold text-black">{lr.consignee.address}, {lr.consignee.city}</p>
-                            {lr.consignee.gst && <p className="font-bold text-black">GST: {lr.consignee.gst}</p>}
-                            {lr.consignee.pan && <p className="font-bold text-black">PAN: {lr.consignee.pan}</p>}
-                            {lr.consignee.contact && <p className="font-bold text-black">Contact: {lr.consignee.contact}</p>}
+                        <td className="p-2 align-top h-[70px]">
+                            <p className="font-bold text-black text-xs">{lr.consignee.name}</p>
+                            <p className="text-gray-800">{lr.consignee.address}, {lr.consignee.city}</p>
+                            <div className="mt-1 space-y-0.5">
+                                {lr.consignee.gst && <p className="font-semibold">GST: {lr.consignee.gst}</p>}
+                                {lr.consignee.contact && <p>Ph: {lr.consignee.contact}</p>}
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -154,20 +184,16 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
             
             {/* Conditionally rendered Billing To details */}
             {isBillingPartySeparate && (
-                <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
+                <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
                     <thead>
                         <tr>
-                            <td className="p-1 font-bold">Billing To</td>
+                            <td className="p-1 font-bold bg-gray-100">Billing Party</td>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td className="p-1 align-top h-[70px]">
-                                <p className="font-bold text-black">{lr.billingTo.name}</p>
-                                <p className="font-bold text-black">{lr.billingTo.address}, {lr.billingTo.city}</p>
-                                {lr.billingTo.gst && <p className="font-bold text-black">GST: {lr.billingTo.gst}</p>}
-                                {lr.billingTo.pan && <p className="font-bold text-black">PAN: {lr.billingTo.pan}</p>}
-                                {lr.billingTo.contact && <p className="font-bold text-black">Contact: {lr.billingTo.contact}</p>}
+                            <td className="p-2 align-top">
+                                <span className="font-bold text-black">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
                             </td>
                         </tr>
                     </tbody>
@@ -175,91 +201,106 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
             )}
             
             {/* Main Content Table */}
-            <table className="w-full border-collapse border-2 border-black text-[8px] mt-1">
+            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
                 <thead>
-                    <tr className="font-bold text-center">
-                        <td className="border-r-2 border-black p-1 w-[8%]">Packages</td>
-                        <td className="border-r-2 border-black p-1">Description</td>
-                        <td className="border-r-2 border-black p-1 w-[12%]" colSpan={2}>Weight</td>
-                        <td className="border-r-2 border-black p-1 w-[15%]">Rate</td>
-                        <td className="border-r-2 border-black p-1 w-[10%]">Amount</td>
-                        <td className="p-1 w-[20%]">Any Other Information Remarks</td>
+                    <tr className="font-bold text-center bg-gray-100">
+                        <td className="border-r-2 border-black p-1 w-[8%]">Pkgs</td>
+                        <td className="border-r-2 border-black p-1">Description (Said to Contain)</td>
+                        <td className="border-r-2 border-black p-1 w-[18%]" colSpan={2}>Weight (Kg/MT)</td>
+                        <td className="border-r-2 border-black p-1 w-[25%]" colSpan={2}>Charges</td>
                     </tr>
-                    <tr className="font-bold text-center">
-                        <td className="border-t-2 border-r-2 border-black"></td>
-                        <td className="border-t-2 border-r-2 border-black"></td>
-                        <td className="border-t-2 border-r border-black p-1">Actual</td>
-                        <td className="border-t-2 border-r-2 border-black p-1">Charged</td>
-                        <td className="border-t-2 border-r-2 border-black"></td>
-                        <td className="border-t-2 border-r-2 border-black"></td>
-                        <td className="border-t-2 border-black"></td>
+                    <tr className="font-bold text-center border-b-2 border-black text-[8px]">
+                        <td className="border-r-2 border-black">No.</td>
+                        <td className="border-r-2 border-black">Particulars</td>
+                        <td className="border-r border-black p-1">Actual</td>
+                        <td className="border-r-2 border-black p-1">Charged</td>
+                        <td className="border-r-2 border-black p-1 w-[15%]">Particulars</td>
+                        <td className="p-1 w-[10%]">Amount</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="border-t-2 border-r-2 border-black p-1 text-center h-40 align-top font-bold text-black">{lr.items.reduce((sum, item) => sum + item.pcs, 0)}</td>
-                        <td className="border-t-2 border-r-2 border-black p-1 align-top">
-                             <p className="font-bold text-black">{lr.items.map(i => i.description).join(', ')}</p>
+                        <td className="border-r-2 border-black p-2 text-center h-48 align-top font-bold text-lg">{lr.items.reduce((sum, item) => sum + item.pcs, 0)}</td>
+                        <td className="border-r-2 border-black p-2 align-top">
+                             <ul className="list-decimal list-inside font-semibold space-y-1">
+                                {lr.items.map((item, idx) => (
+                                    <li key={idx}>
+                                        <span className="font-bold text-black text-sm uppercase">{item.description}</span>
+                                        {item.weight > 0 && <span className="text-xs text-gray-600 ml-2">({item.weight} kg)</span>}
+                                    </li>
+                                ))}
+                             </ul>
                         </td>
-                        <td className="border-t-2 border-r border-black p-1 text-center align-top font-bold text-black">{lr.actualWeightMT}</td>
-                        <td className="border-t-2 border-r-2 border-black p-1 text-center align-top font-bold text-black">{lr.chargedWeight}</td>
-                        <td className="border-t-2 border-r-2 border-black p-0 align-top bg-blue-50">
-                            <div className="grid grid-cols-2 h-full text-center">
-                                <div className="border-b border-r border-black p-1">Hamail</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.hamail > 0 ? lr.charges.hamail.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">Sur.CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.surCharge > 0 ? lr.charges.surCharge.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">St.CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.stCharge > 0 ? lr.charges.stCharge.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">Collection CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.collectionCharge > 0 ? lr.charges.collectionCharge.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">D.Dty CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.ddCharge > 0 ? lr.charges.ddCharge.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">Other CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.otherCharge > 0 ? lr.charges.otherCharge.toFixed(2) : ''}</div>
-                                <div className="border-b border-r border-black p-1">Risk CH.</div><div className="border-b border-black p-1 font-bold text-black">{lr.charges && lr.charges.riskCharge > 0 ? lr.charges.riskCharge.toFixed(2) : ''}</div>
-                                <div className="border-r border-black p-1 font-bold">Total</div><div className="p-1 font-bold text-black">{totalCharges > 0 ? totalCharges.toFixed(2) : ''}</div>
+                        <td className="border-r border-black p-2 text-center align-top font-bold">{lr.actualWeightMT}</td>
+                        <td className="border-r-2 border-black p-2 text-center align-top font-bold">{lr.chargedWeight}</td>
+                        <td colSpan={2} className="p-0 align-top">
+                            <div className="flex flex-col h-full text-[9px]">
+                                <div className="flex justify-between border-b border-black p-1">
+                                    <span>Freight</span>
+                                    <span className="font-bold">{Number(lr.freight).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Hamail</span>
+                                    <span>{lr.charges?.hamail?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Surcharge</span>
+                                    <span>{lr.charges?.surCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Statistical</span>
+                                    <span>{lr.charges?.stCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Collection</span>
+                                    <span>{lr.charges?.collectionCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Door Del.</span>
+                                    <span>{lr.charges?.ddCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Other</span>
+                                    <span>{lr.charges?.otherCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-black p-1">
+                                    <span>Risk Charges</span>
+                                    <span>{lr.charges?.riskCharge?.toFixed(2) || ''}</span>
+                                </div>
+                                <div className="flex justify-between p-1 mt-auto bg-gray-100 font-bold border-t border-black text-sm">
+                                    <span>Total</span>
+                                    <span>{totalToPay.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                                </div>
                             </div>
                         </td>
-                        <td className="border-t-2 border-r-2 border-black p-1 align-top text-center font-bold text-black">{Number(lr.freight).toLocaleString('en-IN', {minimumFractionDigits: 2})}</td>
-                        <td className="border-t-2 border-black p-1 align-top">
-                            
-                        </td>
                     </tr>
+                    
+                    {/* Footer Section inside Table */}
                     <tr>
-                        <td colSpan={3} className="border-t-2 border-r-2 border-black p-1 text-black font-bold">
-                            <div>
-                                <span className="font-bold text-black">Invoice No.: {lr.invoiceNo}</span>
-                                <span className="ml-4 font-bold text-black">Date: {lr.invoiceDate ? new Date(lr.invoiceDate).toLocaleDateString('en-GB'): ''}</span>
-                            </div>
-                             <div>
-                                <span className="font-bold text-black">P.O. No.: {lr.poNo}</span>
-                                <span className="ml-4 font-bold text-black">Date: {lr.poDate ? new Date(lr.poDate).toLocaleDateString('en-GB'): ''}</span>
-                            </div>
-                        </td>
-                        <td className="border-t-2 border-r-2 border-black p-1">Mark</td>
-                        <td className="border-t-2 border-r-2 border-black p-1"></td>
-                        <td className="border-t-2 border-r-2 border-black p-1"></td>
-                        <td className="border-t-2 border-black p-1"></td>
-                    </tr>
-                    <tr className="h-full">
-                        <td colSpan={4} className="border-t-2 border-r-2 border-black p-1 text-[7px] align-top relative">
-                             <div className="flex flex-col justify-between h-full">
-                                <div>
-                                    <p>Endorsement Its Is Intended To use Consignee Copy Of the Set For The Purpose Of Borrowing From The Consignee Bank</p>
-                                    {companyDetails.jurisdictionCity && <p className="my-2">The Court In {companyDetails.jurisdictionCity} Alone Shall Have Jurisdiction In Respect Of The Claims And Matters Arising Under The Consignment Or Of The Claims And Matter Arising Under The Goods Entrusted For Transport</p>}
-                                    <p className="mt-2 text-[9px]">Value : <span className="font-bold text-black">{Number(lr.invoiceAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></p>
-                                     <div className="grid grid-cols-2 text-[9px] mt-1">
-                                        {lr.gstPaidBy && <p>GST Paid By: <span className="font-bold text-black">{lr.gstPaidBy}</span></p>}
-                                        
+                        <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
+                             <div className="flex flex-col justify-between h-full space-y-2">
+                                <div className="grid grid-cols-2 gap-2 text-[8px]">
+                                    <div>
+                                        <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
+                                        <p className="font-bold">Date: <span className="font-normal">{lr.invoiceDate ? new Date(lr.invoiceDate).toLocaleDateString('en-GB'): ''}</span></p>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold">Value: <span className="font-normal">₹{Number(lr.invoiceAmount).toLocaleString('en-IN')}</span></p>
+                                        <p className="font-bold">GST Paid By: <span className="font-normal">{lr.gstPaidBy}</span></p>
                                     </div>
                                 </div>
-                                <div className="border-t-2 border-black mt-1 pt-1 text-[9px]">
-                                    <span className="font-bold">REMARKS:</span> <span className="font-bold text-black">{lr.remark}</span>
+                                <div className="border border-black p-1 text-[8px] bg-gray-50">
+                                    <span className="font-bold block">REMARKS:</span> 
+                                    <span className="font-medium text-black">{lr.remark}</span>
                                 </div>
                             </div>
                         </td>
-                        <td colSpan={3} className="border-t-2 border-black p-1 align-bottom">
-                            <div className="flex justify-end items-end h-full">
-                                <div className="text-right">
-                                    {companyDetails.signatureImageUrl && (
-                                        <img src={companyDetails.signatureImageUrl} alt="Authorized Signatory" className="h-20 w-auto object-contain" />
-                                    )}
-                                </div>
+                        <td colSpan={2} className="border-t-2 border-black p-2 align-bottom">
+                            <div className="flex flex-col items-center justify-end h-full min-h-[60px]">
+                                {companyDetails.signatureImageUrl && (
+                                    <img src={companyDetails.signatureImageUrl} alt="Authorized Signatory" className="h-12 w-auto object-contain mb-1" />
+                                )}
+                                <p className="font-bold text-[8px]">Authorized Signatory</p>
                             </div>
                         </td>
                     </tr>

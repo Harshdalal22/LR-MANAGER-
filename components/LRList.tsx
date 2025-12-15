@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
-import { PencilIcon, TrashIcon, DownloadIcon, SearchIcon, PrintIcon, FilterIcon, DotsVerticalIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon } from './icons';
+import { PencilIcon, TrashIcon, DownloadIcon, SearchIcon, PrintIcon, FilterIcon, DotsVerticalIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon } from './icons';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 
@@ -52,6 +52,7 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
     const [previewingLR, setPreviewingLR] = useState<LorryReceipt | null>(null);
     const [selectedLRs, setSelectedLRs] = useState<string[]>([]);
     const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+    const [viewingInvoiceNo, setViewingInvoiceNo] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [dateRange, setDateRange] = useState({ from: '', to: '' });
     const [isPrinting, setIsPrinting] = useState(false);
@@ -83,7 +84,8 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                 lr.truckNo.toLowerCase().includes(lowerSearchTerm) ||
                 lr.consignor.name.toLowerCase().includes(lowerSearchTerm) ||
                 lr.consignee.name.toLowerCase().includes(lowerSearchTerm) ||
-                lr.status.toLowerCase().includes(lowerSearchTerm);
+                lr.status.toLowerCase().includes(lowerSearchTerm) ||
+                (lr.invoiceNo && lr.invoiceNo.toLowerCase().includes(lowerSearchTerm));
 
             const lrDate = new Date(lr.date);
             const fromDate = dateRange.from ? new Date(dateRange.from) : null;
@@ -120,7 +122,10 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
         setDateRange({ from: '', to: '' });
     }
 
-    const lrsForInvoice = lorryReceipts.filter(lr => selectedLRs.includes(lr.lrNo));
+    const lrsForInvoice = viewingInvoiceNo 
+        ? lorryReceipts.filter(lr => lr.invoiceNo === viewingInvoiceNo)
+        : lorryReceipts.filter(lr => selectedLRs.includes(lr.lrNo));
+    
     const lrsToPrint = lorryReceipts.filter(lr => selectedLRs.includes(lr.lrNo));
     const printRoot = document.getElementById('print-root');
 
@@ -128,6 +133,17 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
         if (lrsToPrint.length > 0) {
             setIsPrinting(true);
         }
+    };
+    
+    const handleViewInvoice = (invoiceNo: string) => {
+        setViewingInvoiceNo(invoiceNo);
+        setIsInvoiceModalOpen(true);
+        setOpenMenuLrNo(null);
+    };
+    
+    const handleGenerateInvoice = () => {
+        setViewingInvoiceNo(null); // Ensure we are not in view mode
+        setIsInvoiceModalOpen(true);
     };
 
     useEffect(() => {
@@ -169,7 +185,7 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                         Print ({selectedLRs.length})
                     </button>
                     <button
-                        onClick={() => setIsInvoiceModalOpen(true)}
+                        onClick={handleGenerateInvoice}
                         disabled={selectedLRs.length === 0}
                         className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md transition-transform hover:scale-105"
                     >
@@ -190,7 +206,7 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                     <div className="relative flex-grow w-full md:w-auto">
                         <input
                             type="text"
-                            placeholder="Search by Truck, Party, or Status..."
+                            placeholder="Search by Truck, Party, Status, or Invoice..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             className="w-full p-2 pl-10 border rounded-lg focus:ring-2 focus:ring-ssk-blue"
@@ -244,7 +260,10 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                                 <td className="w-4 p-4">
                                     <input type="checkbox" checked={selectedLRs.includes(lr.lrNo)} onChange={() => handleSelectLR(lr.lrNo)} className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" />
                                 </td>
-                                <td className="px-6 py-4 font-medium text-blue-600 whitespace-nowrap">{lr.lrNo}</td>
+                                <td className="px-6 py-4 font-medium text-blue-600 whitespace-nowrap">
+                                    {lr.lrNo}
+                                    {lr.invoiceNo && <div className="text-[10px] text-gray-500 mt-1">Inv: {lr.invoiceNo}</div>}
+                                </td>
                                 <td className="px-6 py-4">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
                                 <td className="px-6 py-4">{lr.truckNo}</td>
                                 <td className="px-6 py-4">{lr.consignor.name}</td>
@@ -261,6 +280,13 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
                                             <div className="py-1">
                                                 <button onClick={() => { onEdit(lr.lrNo); setOpenMenuLrNo(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"><PencilIcon className="w-4 h-4 mr-2"/>Edit</button>
                                                 <button onClick={() => { setPreviewingLR(lr); setOpenMenuLrNo(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"><DownloadIcon className="w-4 h-4 mr-2"/>View/Download</button>
+                                                
+                                                {lr.invoiceNo && (
+                                                    <button onClick={() => handleViewInvoice(lr.invoiceNo)} className="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center border-t border-b bg-blue-50/50">
+                                                        <InvoiceIcon className="w-4 h-4 mr-2"/>View Invoice
+                                                    </button>
+                                                )}
+
                                                 <div className="border-t my-1"></div>
                                                 <div className="px-4 pt-2 pb-1 text-xs font-semibold text-gray-500">Update Status</div>
                                                 <button onClick={() => { onUpdateStatus(lr.lrNo, 'In Transit'); setOpenMenuLrNo(null); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"><TruckIcon className="w-4 h-4 mr-2"/>In Transit</button>
@@ -298,10 +324,11 @@ const LRList: React.FC<LRListProps> = ({ lorryReceipts, onEdit, onDelete, onAddN
             {isInvoiceModalOpen && (
                  <InvoiceModal
                     isOpen={isInvoiceModalOpen}
-                    onClose={() => setIsInvoiceModalOpen(false)}
+                    onClose={() => { setIsInvoiceModalOpen(false); setViewingInvoiceNo(null); }}
                     lorryReceipts={lrsForInvoice}
                     companyDetails={companyDetails}
-                    onSaveInvoiceDetails={onUpdateInvoiceDetails}
+                    // Only allow saving if we are NOT viewing an existing invoice
+                    onSaveInvoiceDetails={viewingInvoiceNo ? undefined : onUpdateInvoiceDetails}
                 />
             )}
             {isPrinting && printRoot && createPortal(

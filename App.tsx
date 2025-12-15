@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { LorryReceipt, CompanyDetails, LRStatus, View, SavedParty, SavedTruck } from './types';
@@ -14,6 +13,7 @@ import BookingRegister from './components/BookingRegister';
 import DataManagement from './components/DataManagement';
 import PartyManagement from './components/PartyManagement';
 import TruckManagement from './components/TruckManagement';
+import InvoiceList from './components/InvoiceList';
 import AdBanner from './components/AdBanner';
 import { 
     getLorryReceipts, 
@@ -562,6 +562,14 @@ const App: React.FC = () => {
                 return <BookingRegister onBack={handleBackToDashboard} />;
             case 'data-management':
                 return <DataManagement onBack={handleBackToDashboard} />;
+            case 'invoices':
+                return (
+                    <InvoiceList 
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        onBack={handleBackToDashboard}
+                    />
+                );
             default:
                 return null;
         }

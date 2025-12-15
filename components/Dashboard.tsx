@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
-import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon } from './icons';
+import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon } from './icons';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -194,7 +194,12 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     <div className="h-6 w-1 md:h-8 bg-ssk-blue rounded-full"></div>
                     <h2 className="text-lg md:text-2xl font-bold text-gray-800">Operations & Management</h2>
                 </div>
-                <div className="grid grid-cols-3 gap-3 md:gap-8">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-8">
+                    <ManagementCard 
+                        title="Invoices" 
+                        icon={<InvoiceIcon />} 
+                        onClick={() => setCurrentView('invoices')} 
+                    />
                     <ManagementCard 
                         title="Vehicle Hiring" 
                         icon={<TruckIcon />} 

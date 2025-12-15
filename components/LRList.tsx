@@ -235,7 +235,15 @@ const LRList: React.FC<LRListProps> = ({
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-900">{lr.lrNo}</div>
                                         <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
-                                        {lr.invoiceNo && <div className="text-[10px] text-green-600 font-semibold bg-green-50 px-1 rounded w-fit mt-1">{lr.invoiceNo}</div>}
+                                        {lr.invoiceNo ? (
+                                            <div className="text-[9px] text-green-700 font-bold bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 inline-block whitespace-nowrap">
+                                                GENERATED
+                                            </div>
+                                        ) : (
+                                            <div className="text-[9px] text-gray-500 font-medium bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 mt-1 inline-block whitespace-nowrap">
+                                                NOT GENERATED
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-800 truncate max-w-[150px]" title={lr.consignor.name}>{lr.consignor.name}</div>

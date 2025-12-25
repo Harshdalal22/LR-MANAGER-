@@ -8,6 +8,7 @@ interface InvoiceModalProps {
     isOpen: boolean;
     onClose: () => void;
     lorryReceipts: LorryReceipt[];
+    allLorryReceipts: LorryReceipt[]; // Added to calculate next sequence
     companyDetails: CompanyDetails;
     onSaveInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
 }
@@ -191,7 +192,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
     );
 });
 
-const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryReceipts, companyDetails, onSaveInvoiceDetails }) => {
+const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryReceipts, allLorryReceipts, companyDetails, onSaveInvoiceDetails }) => {
     const previewRef = useRef<HTMLDivElement>(null);
     const [billNo, setBillNo] = useState('');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
@@ -200,22 +201,35 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
 
     useEffect(() => {
         if (isOpen && lorryReceipts.length > 0) {
-            // Suggest a bill number: try to see if the first LR has one, otherwise generate
              const existingInvoiceNo = lorryReceipts[0].invoiceNo;
              
-             // Use a unique suffix (MMDD-HHMMSS) to ensure each generated invoice is distinct by default
-             const now = new Date();
-             const timeComponent = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-             const dateComponent = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-             
-             const suggestedBillNo = existingInvoiceNo 
-                ? existingInvoiceNo 
-                : `INV-${dateComponent}-${timeComponent}`;
+             if (existingInvoiceNo) {
+                 setBillNo(existingInvoiceNo);
+             } else {
+                 // Automated numbering logic
+                 // 1. Get Prefix (First 3 chars of company name)
+                 const prefix = (companyDetails.name || 'INV').substring(0, 3).toUpperCase();
+                 
+                 // 2. Find maximum existing number in all receipts to find the next one
+                 let maxNum = 0;
+                 allLorryReceipts.forEach(lr => {
+                     if (lr.invoiceNo && lr.invoiceNo.startsWith(prefix)) {
+                         const match = lr.invoiceNo.match(/\d+$/);
+                         if (match) {
+                             const num = parseInt(match[0], 10);
+                             if (num > maxNum) maxNum = num;
+                         }
+                     }
+                 });
+                 
+                 // 3. Increment and pad with 4 zeros
+                 const nextNumStr = (maxNum + 1).toString().padStart(4, '0');
+                 setBillNo(`${prefix}-${nextNumStr}`);
+             }
             
-            setBillNo(suggestedBillNo);
             setBillDate(new Date().toISOString().split('T')[0]);
         }
-    }, [isOpen, lorryReceipts]);
+    }, [isOpen, lorryReceipts, allLorryReceipts, companyDetails.name]);
 
 
     if (!isOpen) return null;
@@ -227,7 +241,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
         const billedTo = lorryReceipts.length > 0 ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) : { name: 'bill' };
         
         const opt = {
-            margin:       5, // Reduced margin to prevent clipping
+            margin:       5, 
             filename:     `Invoice-${billNo}-${billedTo.name?.split(' ')[0]}.pdf`,
             image:        { type: 'jpeg', quality: 1.0 },
             html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
@@ -264,7 +278,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                                 type="text"
                                 value={billNo}
                                 onChange={(e) => setBillNo(e.target.value)}
-                                className="p-1 border rounded-md text-sm w-40"
+                                className="p-1 border rounded-md text-sm w-40 font-mono font-bold"
                             />
                         </div>
                         <div>
@@ -296,7 +310,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                                 className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold disabled:bg-gray-400"
                             >
                                 <SaveIcon className="w-5 h-5 mr-1"/>
-                                {isSaving ? 'Saving...' : 'Save & Update LRs'}
+                                {isSaving ? 'Saving...' : 'Save Invoice'}
                             </button>
                         )}
                         <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold">

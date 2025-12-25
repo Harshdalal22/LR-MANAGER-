@@ -332,6 +332,7 @@ const LRList: React.FC<LRListProps> = ({
                     isOpen={showInvoiceModal}
                     onClose={() => setShowInvoiceModal(false)}
                     lorryReceipts={lorryReceipts.filter(lr => selectedLRs.has(lr.lrNo))}
+                    allLorryReceipts={lorryReceipts}
                     companyDetails={companyDetails}
                     onSaveInvoiceDetails={onUpdateInvoiceDetails}
                 />

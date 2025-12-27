@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { LorryReceipt, CompanyDetails } from '../types';
-import { DashboardIcon, SearchIcon, PrintIcon, InvoiceIcon, PlusIcon, XIcon, CheckCircleIcon, FilterIcon } from './icons';
+import { DashboardIcon, SearchIcon, PrintIcon, InvoiceIcon, PlusIcon, XIcon, CheckCircleIcon, FilterIcon, ArrowLeftIcon } from './icons';
 import InvoiceModal from './InvoiceModal';
 
 interface InvoiceListProps {
@@ -103,8 +103,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
             <div className="bg-white/70 backdrop-blur-sm p-4 rounded-xl shadow-lg min-h-[500px]">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                     <div className="flex items-center gap-4 self-start">
-                        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                            <DashboardIcon className="w-6 h-6 text-gray-600"/>
+                        <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                             <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <h2 className="text-2xl font-bold text-ssk-blue">Invoices</h2>
                     </div>

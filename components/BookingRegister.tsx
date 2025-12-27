@@ -1,7 +1,6 @@
 
-
 import React, { useState, useEffect } from 'react';
-import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, ListIcon } from './icons';
+import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, ListIcon, ArrowLeftIcon } from './icons';
 import { BookingRecord, PaymentRecord, SavedTruck } from '../types';
 import { getBookingRecords, saveBookingRecord, deleteBookingRecord, getSavedTrucks } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
@@ -220,8 +219,8 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
              {/* Header */}
              <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                 <div className="flex items-center gap-4 self-start">
-                    <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                        <DashboardIcon className="w-6 h-6 text-gray-600"/>
+                    <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                         <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <h2 className="text-2xl font-bold text-ssk-blue">Booking Register</h2>
                 </div>

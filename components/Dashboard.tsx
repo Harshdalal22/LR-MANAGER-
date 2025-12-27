@@ -11,44 +11,120 @@ interface DashboardProps {
     onEditLR: (lrNo: string) => void;
     setCurrentView: (view: View) => void;
     language: Language;
+    activeSection: 'lr' | 'data' | null;
+    setActiveSection: (section: 'lr' | 'data' | null) => void;
 }
 
 interface StatCardProps {
     icon: React.ReactElement<{ className?: string }>;
     title: string;
     value: string | number;
-    color: string;
+    color: string; // Tailwind color class like 'blue', 'green'
     onClick?: () => void;
     className?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick, className = '' }) => (
-    <div 
-        onClick={onClick}
-        className={`bg-white md:bg-gradient-to-br md:from-white md:to-gray-50 p-4 md:p-6 rounded-xl shadow-sm md:shadow-[0_10px_20px_rgba(0,0,0,0.1)] flex items-center space-x-3 md:space-x-4 border-l-4 ${color} transform active:scale-95 md:hover:-translate-y-1 md:hover:scale-105 transition-all duration-300 cursor-pointer ${className}`}
-    >
-        <div className="text-2xl md:text-3xl drop-shadow-md flex-shrink-0">
-             {React.cloneElement(icon, { className: "w-6 h-6 md:w-8 md:h-8" })}
-        </div>
-        <div className="min-w-0">
-            <p className="text-gray-500 text-xs md:text-sm font-medium truncate">{title}</p>
-            <p className="text-lg md:text-2xl font-bold text-gray-800 truncate">{value}</p>
-        </div>
-    </div>
-);
+// 3D Stat Card Component
+const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick, className = '' }) => {
+    // Map simplified color names to tailwind classes for the 3D effect
+    const colorMap: Record<string, { bg: string, border: string, text: string, shadow: string }> = {
+        blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', shadow: 'shadow-blue-200' },
+        green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600', shadow: 'shadow-green-200' },
+        purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', shadow: 'shadow-purple-200' },
+        orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', shadow: 'shadow-orange-200' },
+        yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600', shadow: 'shadow-yellow-200' },
+        red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', shadow: 'shadow-red-200' },
+    };
 
-const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick: () => void; color?: string }> = ({ title, description, icon, onClick, color = 'bg-blue-50' }) => (
-    <div 
-        onClick={onClick}
-        className="bg-white md:bg-gradient-to-br md:from-white md:to-gray-50 p-4 md:p-8 rounded-xl md:rounded-2xl shadow-sm md:shadow-lg hover:shadow-xl flex flex-col items-center justify-center text-center transform active:scale-95 md:hover:-translate-y-2 transition-all duration-300 cursor-pointer border border-gray-100 group h-full min-h-[140px]"
-    >
-        <div className={`p-3 md:p-4 rounded-full mb-3 md:mb-4 group-hover:bg-opacity-80 transition-colors ${color}`}>
-            {React.cloneElement(icon, { className: "w-8 h-8 md:w-10 md:h-10 text-gray-700" })}
+    const styles = colorMap[color] || colorMap['blue'];
+
+    return (
+        <div 
+            onClick={onClick}
+            className={`
+                relative overflow-hidden
+                bg-white rounded-2xl p-5
+                border-b-4 ${styles.border}
+                shadow-lg ${styles.shadow}
+                transform transition-all duration-200
+                active:scale-95 hover:-translate-y-1
+                flex items-center justify-between
+                ${onClick ? 'cursor-pointer' : ''}
+                ${className}
+            `}
+        >
+            <div className="z-10">
+                <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</p>
+                <p className="text-2xl font-extrabold text-gray-800">{value}</p>
+            </div>
+            <div className={`p-3 rounded-xl ${styles.bg} ${styles.text} shadow-inner`}>
+                {React.cloneElement(icon, { className: "w-8 h-8" })}
+            </div>
+            {/* Decorative background circle */}
+            <div className={`absolute -right-6 -bottom-6 w-24 h-24 rounded-full ${styles.bg} opacity-50 z-0`}></div>
         </div>
-        <h3 className="text-sm md:text-xl font-bold text-gray-800 group-hover:text-ssk-blue transition-colors leading-tight px-1 mb-1">{title}</h3>
-        {description && <p className="text-xs text-gray-500 hidden md:block">{description}</p>}
-    </div>
-);
+    );
+};
+
+// 3D Management Card Component
+const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick: () => void; colorTheme: 'blue' | 'purple' | 'orange' | 'green' | 'teal' | 'gray' }> = ({ title, description, icon, onClick, colorTheme }) => {
+    
+    const themes = {
+        blue: 'from-blue-500 to-blue-600 shadow-blue-200',
+        purple: 'from-purple-500 to-purple-600 shadow-purple-200',
+        orange: 'from-orange-500 to-orange-600 shadow-orange-200',
+        green: 'from-green-500 to-green-600 shadow-green-200',
+        teal: 'from-teal-500 to-teal-600 shadow-teal-200',
+        gray: 'from-gray-600 to-gray-700 shadow-gray-200',
+    };
+
+    const gradient = themes[colorTheme] || themes['blue'];
+
+    return (
+        <div 
+            onClick={onClick}
+            className={`
+                group relative
+                bg-white rounded-2xl p-6
+                shadow-xl hover:shadow-2xl
+                border border-gray-100
+                transform transition-all duration-300
+                hover:-translate-y-2 active:scale-95
+                cursor-pointer
+                flex flex-row sm:flex-col items-center sm:text-center gap-4
+            `}
+        >
+            {/* Icon Container */}
+            <div className={`
+                p-4 rounded-2xl
+                bg-gradient-to-br ${gradient}
+                text-white shadow-lg
+                flex-shrink-0
+            `}>
+                {React.cloneElement(icon, { className: "w-8 h-8" })}
+            </div>
+
+            {/* Text Content */}
+            <div className="flex-grow">
+                <h3 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
+                    {title}
+                </h3>
+                {description && (
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                        {description}
+                    </p>
+                )}
+            </div>
+
+            {/* Mobile Arrow */}
+            <div className="sm:hidden text-gray-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+            </div>
+        </div>
+    );
+};
 
 const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateStr: string }[] }> = ({ data }) => {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -116,23 +192,23 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
             {/* Tooltip */}
             {hoveredIndex !== null && (
                 <div 
-                    className="absolute bg-gray-800/90 text-white text-xs rounded-lg py-1.5 px-3 shadow-xl backdrop-blur-sm pointer-events-none z-10 transform -translate-x-1/2 -translate-y-4 transition-all duration-200"
+                    className="absolute bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-xl z-10 transform -translate-x-1/2 -translate-y-4 transition-all duration-200 pointer-events-none"
                     style={{ 
                         left: `${((hoveredIndex / (data.length - 1)) * 100)}%`, 
                         top: '10%' 
                     }}
                 >
-                    <div className="font-bold whitespace-nowrap mb-0.5">{data[hoveredIndex].dateStr}</div>
-                    <div className="font-mono text-green-300">₹{data[hoveredIndex].value.toLocaleString('en-IN')}</div>
+                    <div className="font-bold whitespace-nowrap mb-1 text-center border-b border-gray-700 pb-1">{data[hoveredIndex].dateStr}</div>
+                    <div className="font-mono text-green-400 font-bold text-center">₹{data[hoveredIndex].value.toLocaleString('en-IN')}</div>
                     {/* Tiny arrow pointing down */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-800/90"></div>
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
                 </div>
             )}
 
             {/* X-Axis Labels */}
             <div className="w-full flex justify-between px-2 mt-2">
                 {data.map((d, i) => (
-                    <div key={i} className={`text-[10px] sm:text-xs text-gray-500 font-medium transition-colors duration-200 ${hoveredIndex === i ? 'text-blue-600 font-bold scale-110' : ''}`}>
+                    <div key={i} className={`text-[9px] sm:text-xs text-gray-500 font-medium transition-colors duration-200 ${hoveredIndex === i ? 'text-blue-600 font-bold' : ''}`}>
                         {d.label}
                     </div>
                 ))}
@@ -142,9 +218,8 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language }) => {
-    const [activeSection, setActiveSection] = useState<'lr' | 'data' | null>(null);
-
+const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language, activeSection, setActiveSection }) => {
+    
     // --- Metric Calculations ---
     const totalLRs = lorryReceipts.length;
     const totalFreight = lorryReceipts.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0);
@@ -190,40 +265,59 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
     // --- RENDER: MAIN SELECTION MENU ---
     if (!activeSection) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 animate-fadeIn py-10">
-                 <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-600 mb-8 text-center drop-shadow-sm">
+            <div className="flex flex-col items-center justify-start md:justify-center min-h-[70vh] gap-6 animate-fadeIn pt-8 pb-20">
+                 <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 mb-4 text-center drop-shadow-sm tracking-tight leading-tight">
                     {t[language].welcome}
                 </h1>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl px-4">
+                
+                {/* Vertical Stack on Mobile, Grid on Desktop */}
+                <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl px-4">
+                    
                     {/* LR Management Card */}
                     <div
                         onClick={() => setActiveSection('lr')}
-                        className="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl border border-blue-50 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center relative overflow-hidden"
+                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(37,99,235,0.15)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.25)] border-2 border-transparent hover:border-blue-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
                     >
-                         <div className="absolute top-0 left-0 w-full h-2 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-                         <div className="bg-blue-100 p-6 rounded-full mb-6 group-hover:bg-blue-600 transition-colors duration-300 shadow-inner">
-                            <DocumentTextIcon className="w-12 h-12 text-blue-600 group-hover:text-white transition-colors" />
-                         </div>
-                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
-                         <p className="text-gray-500 leading-relaxed">{t[language].lrManagementDesc}</p>
-                         <div className="mt-6 text-blue-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                            {t[language].openDashboard} →
+                         {/* 3D gradient blob */}
+                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                         
+                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                             <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-blue-200">
+                                <DocumentTextIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                             </div>
+                             <div className="text-left">
+                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
+                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].lrManagementDesc}</p>
+                             </div>
+                             <div className="ml-auto md:ml-0 md:mt-4">
+                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                </span>
+                             </div>
                          </div>
                     </div>
 
                     {/* Data Management Card */}
                     <div
                         onClick={() => setActiveSection('data')}
-                        className="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl border border-purple-50 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center relative overflow-hidden"
+                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(147,51,234,0.15)] hover:shadow-[0_20px_50px_rgba(147,51,234,0.25)] border-2 border-transparent hover:border-purple-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
                     >
-                         <div className="absolute top-0 left-0 w-full h-2 bg-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
-                         <div className="bg-purple-100 p-6 rounded-full mb-6 group-hover:bg-purple-600 transition-colors duration-300 shadow-inner">
-                            <DashboardIcon className="w-12 h-12 text-purple-600 group-hover:text-white transition-colors" />
-                         </div>
-                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
-                         <p className="text-gray-500 leading-relaxed">{t[language].dataManagementDesc}</p>
-                         <div className="mt-6 text-purple-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                            {t[language].openMenu} →
+                         {/* 3D gradient blob */}
+                         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+
+                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                             <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-purple-200">
+                                <DashboardIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                             </div>
+                             <div className="text-left">
+                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
+                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].dataManagementDesc}</p>
+                             </div>
+                             <div className="ml-auto md:ml-0 md:mt-4">
+                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                </span>
+                             </div>
                          </div>
                     </div>
                 </div>
@@ -234,129 +328,129 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
     return (
         <div className="space-y-6 md:space-y-10 pb-20 md:pb-0">
             {/* Header with Back Button */}
-            <div className="flex flex-col sm:flex-row justify-between items-center pb-2 md:pb-4 border-b">
-                <div className="flex items-center gap-4 self-start sm:self-center">
-                    <button 
-                        onClick={() => setActiveSection(null)} 
-                        className="p-2 bg-white rounded-full hover:bg-gray-100 border shadow-sm transition-all group"
-                        title={t[language].backToHome}
-                    >
-                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
-                    </button>
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 drop-shadow-sm">
-                        {activeSection === 'lr' ? t[language].lrManagementDashboard : t[language].dataManagementOperations}
-                    </h1>
-                </div>
+            <div className="flex flex-row items-center gap-3 pb-2 border-b border-gray-200">
+                <button 
+                    onClick={() => setActiveSection(null)} 
+                    className="p-2 bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 text-gray-600 hover:text-blue-600 transition-all active:scale-95"
+                    title={t[language].backToHome}
+                >
+                    <ArrowLeftIcon className="w-5 h-5" />
+                </button>
+                <h1 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">
+                    {activeSection === 'lr' ? t[language].lrManagementDashboard : t[language].dataManagementOperations}
+                </h1>
             </div>
 
             {/* --- SECTION: LR MANAGEMENT --- */}
             {activeSection === 'lr' && (
-                <div className="animate-slideIn">
-                    {/* Top Action Bar */}
-                     <div className="flex flex-wrap md:flex-row md:items-center justify-between gap-3 mb-6">
-                        <div className="flex items-center gap-2 md:gap-3">
-                            <div className="h-6 w-1 md:h-8 bg-blue-500 rounded-full"></div>
-                            <h2 className="text-lg md:text-xl font-bold text-gray-700">{t[language].overviewActions}</h2>
-                        </div>
-                         <div className="flex items-center gap-2 self-end md:self-auto flex-wrap">
-                             <button onClick={() => setCurrentView('invoices')} className="flex items-center bg-green-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm border border-green-500 text-xs md:text-base">
-                                <InvoiceIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                {t[language].invoices}
-                            </button>
-                            <button onClick={onViewList} className="flex items-center bg-white text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-gray-50 transition-all shadow-sm border border-gray-200 text-xs md:text-base">
-                                <ListIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                {t[language].viewList}
-                            </button>
-                            <button onClick={onAddNew} className="flex items-center bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-sm border border-blue-600 text-xs md:text-base">
-                                <CreateIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                {t[language].createLR}
-                            </button>
-                        </div>
+                <div className="animate-slideIn space-y-6">
+                    {/* Actions Scroll View for Mobile */}
+                     <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                         <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
+                            <InvoiceIcon className="w-5 h-5 mr-2" />
+                            {t[language].invoices}
+                        </button>
+                        <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
+                            <ListIcon className="w-5 h-5 mr-2" />
+                            {t[language].viewList}
+                        </button>
+                        <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
+                            <CreateIcon className="w-5 h-5 mr-2" />
+                            {t[language].createLR}
+                        </button>
                     </div>
 
-                    {/* Stat Cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+                    {/* Stat Cards - Vertical Stack on Mobile */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <StatCard 
-                            icon={<TruckIcon className="text-blue-600"/>} 
+                            icon={<TruckIcon />} 
                             title={t[language].totalLRs} 
                             value={totalLRs} 
-                            color="border-blue-500"
+                            color="blue"
                             onClick={onViewList}
                         />
                         <StatCard 
-                            icon={<CurrencyRupeeIcon className="text-green-600"/>} 
+                            icon={<CurrencyRupeeIcon />} 
                             title={t[language].freightValue} 
                             value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
-                            color="border-green-500"
+                            color="green"
                         />
                         <StatCard 
-                            icon={<UsersIcon className="text-purple-600"/>} 
+                            icon={<UsersIcon />} 
                             title={t[language].consignors} 
                             value={uniqueConsignors} 
-                            color="border-purple-500"
+                            color="purple"
                         />
                         <StatCard 
-                            icon={<UploadIcon className="text-orange-600"/>} 
+                            icon={<UploadIcon />} 
                             title={t[language].pendingPODs} 
                             value={podsPending}
-                            color="border-orange-500"
+                            color="orange"
                         />
                     </div>
                     
-                    {/* Status Overview */}
-                    <div className="mb-8">
-                         <h3 className="text-sm md:text-lg font-bold text-gray-700 mb-2 md:mb-4 ml-1">{t[language].shipmentStatus}</h3>
-                         <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
-                            <StatCard className="p-2 md:p-4" icon={<CreateIcon className="text-blue-500" />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="border-blue-500" />
-                            <StatCard className="p-2 md:p-4" icon={<TruckIcon className="text-yellow-500" />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="border-yellow-500" />
-                            <StatCard className="p-2 md:p-4" icon={<ClockIcon className="text-orange-500" />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="border-orange-500" />
-                            <StatCard className="p-2 md:p-4" icon={<CheckCircleIcon className="text-green-500" />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="border-green-500" />
-                            <StatCard className="p-2 md:p-4" icon={<XIcon className="text-red-500" />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="border-red-500" />
+                    {/* Status Overview Grid */}
+                    <div className="bg-white rounded-3xl p-5 shadow-lg border border-gray-100">
+                         <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
+                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CreateIcon />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="blue" />
+                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<TruckIcon />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="yellow" />
+                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<ClockIcon />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="orange" />
+                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CheckCircleIcon />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="green" />
+                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<XIcon />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="red" />
                          </div>
                     </div>
 
-                    {/* Recent Activity & Chart */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                        <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50">
-                            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">{t[language].recentLRs}</h2>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs md:text-sm">
-                                    <thead className="text-left text-gray-500">
-                                        <tr>
-                                            <th className="p-2">LR No.</th>
-                                            <th className="p-2 hidden sm:table-cell">{t[language].date}</th>
-                                            <th className="p-2">{t[language].truckNo}</th>
-                                            <th className="p-2 hidden sm:table-cell">{t[language].consignee}</th>
-                                            <th className="p-2 text-right">{t[language].freight}</th>
-                                            <th className="p-2 text-center">{t[language].actions}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {recentLRs.map(lr => (
-                                            <tr key={lr.lrNo} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors">
-                                                <td className="p-2 font-medium text-blue-600">{lr.lrNo}</td>
-                                                <td className="p-2 hidden sm:table-cell">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
-                                                <td className="p-2">{lr.truckNo}</td>
-                                                <td className="p-2 hidden sm:table-cell truncate max-w-[100px]">{lr.consignee.name}</td>
-                                                <td className="p-2 text-right font-semibold">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
-                                                <td className="p-2 text-center">
-                                                    <button onClick={() => onEditLR(lr.lrNo)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition-colors" title="Edit">
-                                                        <PencilIcon className="w-4 h-4"/>
-                                                    </button>
-                                                </td>
+                    {/* Chart & Recent Activity */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* Recent Activity Card */}
+                        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                                <h2 className="text-lg font-bold text-gray-800">{t[language].recentLRs}</h2>
+                            </div>
+                            <div className="p-0">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
+                                            <tr>
+                                                <th className="px-6 py-4">LR No</th>
+                                                <th className="px-6 py-4 hidden sm:table-cell">Date</th>
+                                                <th className="px-6 py-4">Truck</th>
+                                                <th className="px-6 py-4 text-right">Freight</th>
+                                                <th className="px-6 py-4 text-center">Action</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {recentLRs.map(lr => (
+                                                <tr key={lr.lrNo} className="hover:bg-blue-50/30 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-blue-600">{lr.lrNo}</td>
+                                                    <td className="px-6 py-4 hidden sm:table-cell text-gray-600">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                                            <span className="font-mono text-gray-700">{lr.truckNo}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <button onClick={() => onEditLR(lr.lrNo)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
+                                                            <PencilIcon className="w-4 h-4"/>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50 flex flex-col">
-                             <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">{t[language].weeklyTrend}</h2>
-                             <div className="flex-grow flex items-center justify-center">
-                                <div className="w-full h-48 md:h-64">
-                                    <FreightTrendChart data={chartData} />
-                                </div>
+                        {/* Chart Card */}
+                        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 flex flex-col">
+                             <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
+                             <div className="flex-grow flex items-center justify-center min-h-[200px]">
+                                <FreightTrendChart data={chartData} />
                              </div>
                         </div>
                     </div>
@@ -366,42 +460,44 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {/* --- SECTION: DATA MANAGEMENT --- */}
             {activeSection === 'data' && (
                 <div className="animate-slideIn">
-                    <p className="text-gray-500 mb-6">{t[language].selectModule}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+                    <p className="text-gray-500 font-medium mb-6">{t[language].selectModule}</p>
+                    
+                    {/* Vertical Stack on Mobile, Grid on Larger Screens */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <ManagementCard 
                             title={t[language].vehicleHiring} 
                             description="Manage truck hiring records and payments"
                             icon={<TruckIcon />} 
                             onClick={() => setCurrentView('vehicle-hiring')}
-                            color="bg-orange-100 text-orange-600"
+                            colorTheme="orange"
                         />
                         <ManagementCard 
                             title={t[language].bookingRegister} 
                             description="Maintain booking records and freight details"
                             icon={<ListIcon />} 
                             onClick={() => setCurrentView('booking-register')}
-                            color="bg-green-100 text-green-600"
+                            colorTheme="green"
                         />
                         <ManagementCard 
                             title={t[language].manageParties} 
                             description="Add or edit consignor and consignee details"
                             icon={<UsersIcon />} 
                             onClick={() => setCurrentView('parties')} 
-                            color="bg-purple-100 text-purple-600"
+                            colorTheme="purple"
                         />
                         <ManagementCard 
                             title={t[language].manageTrucks} 
                             description="Maintain your fleet or hired truck database"
                             icon={<TruckIcon />} 
                             onClick={() => setCurrentView('trucks')} 
-                            color="bg-teal-100 text-teal-600"
+                            colorTheme="teal"
                         />
                         <ManagementCard 
                             title={t[language].dataSetup} 
                             description="Database fixes and system configuration"
                             icon={<CogIcon />} 
                             onClick={() => setCurrentView('data-management')} 
-                            color="bg-gray-200 text-gray-700"
+                            colorTheme="gray"
                         />
                     </div>
                 </div>

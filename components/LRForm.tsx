@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
-import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon } from './icons';
+import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon } from './icons';
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
@@ -286,24 +286,29 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         <div className="flex flex-col xl:flex-row gap-8 items-start">
             {/* Form Section */}
             <div className="w-full xl:w-3/5">
-                <div className="flex items-center flex-wrap gap-2 mb-6 border-b pb-4">
-                    <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
-                        <ListIcon className="w-5 h-5 mr-2" />
-                        {t[language].viewList}
+                <div className="flex items-center gap-4 mb-6 border-b pb-4">
+                    <button onClick={onCancel} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                         <ArrowLeftIcon className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
-                    <button onClick={handleCreateNew} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
-                        <CreateIcon className="w-5 h-5 mr-2" />
-                        {t[language].createLR}
-                    </button>
-                    <button
-                        onClick={handleAiAutofill}
-                        disabled={isAiLoading || !formData.truckNo || !formData.fromPlace || !formData.toPlace}
-                        className="flex items-center bg-purple-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-purple-700 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
-                        title={!formData.truckNo || !formData.fromPlace || !formData.toPlace ? "Please fill Truck No, From, and To fields first" : "Get AI suggestions"}
-                    >
-                        <SparklesIcon className="w-5 h-5 mr-2" />
-                        {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
-                    </button>
+                    <div className="flex items-center flex-wrap gap-2">
+                        <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
+                            <ListIcon className="w-5 h-5 mr-2" />
+                            {t[language].viewList}
+                        </button>
+                        <button onClick={handleCreateNew} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
+                            <CreateIcon className="w-5 h-5 mr-2" />
+                            {t[language].createLR}
+                        </button>
+                        <button
+                            onClick={handleAiAutofill}
+                            disabled={isAiLoading || !formData.truckNo || !formData.fromPlace || !formData.toPlace}
+                            className="flex items-center bg-purple-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-purple-700 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
+                            title={!formData.truckNo || !formData.fromPlace || !formData.toPlace ? "Please fill Truck No, From, and To fields first" : "Get AI suggestions"}
+                        >
+                            <SparklesIcon className="w-5 h-5 mr-2" />
+                            {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
+                        </button>
+                    </div>
                 </div>
             
                 <form onSubmit={handleSubmit}>

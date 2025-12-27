@@ -72,6 +72,8 @@ const App: React.FC = () => {
     const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
     const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(defaultCompanyDetails);
     const [currentView, setCurrentView] = useState<View>('dashboard');
+    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | null>(null);
+    const [viewHistory, setViewHistory] = useState<View[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
@@ -118,7 +120,7 @@ const App: React.FC = () => {
                     <div className="flex flex-col gap-2">
                         <p className="font-bold text-red-600">Database Setup Required</p>
                         <p className="text-sm">{featureName} requires a database update. Please run the SQL script.</p>
-                        <button onClick={() => { toast.dismiss(t.id); setCurrentView('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Go to Setup</button>
+                        <button onClick={() => { toast.dismiss(t.id); navigateTo('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Go to Setup</button>
                     </div>
                 ), { duration: 15000, id: `table-missing-${featureName.replace(/\W/g, '')}` }
             );
@@ -126,6 +128,28 @@ const App: React.FC = () => {
         }
         
         toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
+    };
+
+    // Navigation Helper
+    const navigateTo = (view: View) => {
+        if (view === currentView) return;
+        setViewHistory(prev => [...prev, currentView]);
+        setCurrentView(view);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleBack = () => {
+        if (viewHistory.length > 0) {
+            const newHistory = [...viewHistory];
+            const prevView = newHistory.pop();
+            setViewHistory(newHistory);
+            if (prevView) setCurrentView(prevView);
+        } else {
+            // Default fallback if history is empty
+            if (currentView !== 'dashboard') {
+                setCurrentView('dashboard');
+            }
+        }
     };
 
 
@@ -149,6 +173,8 @@ const App: React.FC = () => {
                         setSavedTrucks([]);
                         setCompanyDetails(defaultCompanyDetails);
                         setCurrentView('dashboard');
+                        setDashboardSection(null);
+                        setViewHistory([]);
                     }
                 });
                 authSubscription = data.subscription;
@@ -298,7 +324,7 @@ const App: React.FC = () => {
                 toast.success('LR generated successfully!', { id: toastId });
             }
             setEditingLR(null);
-            setCurrentView('list');
+            navigateTo('list');
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to save LR");
@@ -334,7 +360,7 @@ const App: React.FC = () => {
                     : lr
             ));
             toast.success('Invoice Generated Successfully', { id: toastId });
-            setCurrentView('invoices');
+            navigateTo('invoices');
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to generate Invoice");
@@ -356,8 +382,7 @@ const App: React.FC = () => {
         const lrToEdit = lorryReceipts.find(lr => lr.lrNo === lrNo);
         if (lrToEdit) {
             setEditingLR(lrToEdit);
-            setCurrentView('form');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            navigateTo('form');
         }
     };
 
@@ -387,11 +412,13 @@ const App: React.FC = () => {
                 return (
                     <Dashboard 
                         lorryReceipts={lorryReceipts}
-                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
-                        onViewList={() => setCurrentView('list')}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onViewList={() => navigateTo('list')}
                         onEditLR={handleEditLR}
-                        setCurrentView={setCurrentView}
+                        setCurrentView={navigateTo}
                         language={language}
+                        activeSection={dashboardSection}
+                        setActiveSection={setDashboardSection}
                     />
                 );
             case 'list':
@@ -401,8 +428,8 @@ const App: React.FC = () => {
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
                         companyDetails={companyDetails}
-                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
-                        onBackToDashboard={() => setCurrentView('dashboard')}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onBackToDashboard={handleBack}
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
                         onViewPOD={async (path) => {
@@ -418,7 +445,7 @@ const App: React.FC = () => {
                      <LRForm 
                         onSave={handleSaveLR}
                         existingLR={editingLR}
-                        onCancel={() => { setEditingLR(null); setCurrentView('list'); }}
+                        onCancel={() => { setEditingLR(null); handleBack(); }}
                         companyDetails={companyDetails}
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}
@@ -432,7 +459,7 @@ const App: React.FC = () => {
                         savedParties={savedParties}
                         onSave={async (p) => { await saveSavedParty(p); await fetchData(); }}
                         onDelete={async (id) => { await deleteSavedParty(id); await fetchData(); }}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={handleBack}
                     />
                 );
             case 'trucks':
@@ -441,18 +468,18 @@ const App: React.FC = () => {
                         savedTrucks={savedTrucks}
                         onSave={async (t) => { await saveSavedTruck(t); await fetchData(); }}
                         onDelete={async (id) => { await deleteSavedTruck(id); await fetchData(); }}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={handleBack}
                     />
                 );
-            case 'vehicle-hiring': return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
-            case 'booking-register': return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
-            case 'data-management': return <DataManagement onBack={() => setCurrentView('dashboard')} />;
+            case 'vehicle-hiring': return <VehicleHiring onBack={handleBack} />;
+            case 'booking-register': return <BookingRegister onBack={handleBack} />;
+            case 'data-management': return <DataManagement onBack={handleBack} />;
             case 'invoices': 
                 return (
                     <InvoiceList 
                         lorryReceipts={lorryReceipts} 
                         companyDetails={companyDetails} 
-                        onBack={() => setCurrentView('dashboard')} 
+                        onBack={handleBack} 
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                     />
                 );

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { SavedTruck } from '../types';
-import { DashboardIcon, PencilIcon, TrashIcon, SearchIcon, TruckIcon, SaveIcon } from './icons';
+import { DashboardIcon, PencilIcon, TrashIcon, SearchIcon, TruckIcon, SaveIcon, ArrowLeftIcon } from './icons';
 import { toast } from 'react-hot-toast';
 
 interface TruckManagementProps {
@@ -120,8 +120,8 @@ const TruckManagement: React.FC<TruckManagementProps> = ({ savedTrucks, onSave, 
             <div className="w-full lg:w-2/3 order-2 lg:order-1">
                  <div className="bg-white/70 backdrop-blur-sm p-6 rounded-xl shadow-lg">
                     <div className="flex items-center gap-4 mb-6">
-                        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                            <DashboardIcon className="w-6 h-6 text-gray-600"/>
+                        <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                             <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <h2 className="text-2xl font-bold text-ssk-blue">Manage Trucks</h2>
                     </div>

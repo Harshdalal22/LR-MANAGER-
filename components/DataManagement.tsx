@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { DashboardIcon, CheckCircleIcon, SearchIcon, PlusIcon, DownloadIcon, UploadIcon, PrintIcon, PencilIcon, TrashIcon, DocumentTextIcon } from './icons';
+import { DashboardIcon, CheckCircleIcon, SearchIcon, PlusIcon, DownloadIcon, UploadIcon, PrintIcon, PencilIcon, TrashIcon, DocumentTextIcon, ArrowLeftIcon } from './icons';
 import { toast } from 'react-hot-toast';
 import { getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks, deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck } from '../services/supabaseService';
 import { VehicleHiring, BookingRecord, SavedParty, SavedTruck } from '../types';
@@ -282,8 +282,8 @@ FOR ALL USING (auth.uid() = user_id);
             <div className="flex flex-col gap-1 mb-6">
                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                            <DashboardIcon className="w-6 h-6 text-gray-600"/>
+                        <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                             <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <h1 className="text-2xl font-bold text-gray-900">Data Management</h1>
                     </div>

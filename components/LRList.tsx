@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
-import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon, PlusIcon } from './icons';
+import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon, PlusIcon, ArrowLeftIcon } from './icons';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 import { Language, t } from '../utils/translations';
@@ -115,8 +115,8 @@ const LRList: React.FC<LRListProps> = ({
             {/* Header Actions */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                 <div className="flex items-center gap-3 self-start md:self-center">
-                    <button onClick={onBackToDashboard} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
-                        <DashboardIcon className="w-6 h-6 text-gray-600"/>
+                    <button onClick={onBackToDashboard} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                        <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <h2 className="text-2xl font-bold text-gray-800">{t[language].viewList}</h2>
                     <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>

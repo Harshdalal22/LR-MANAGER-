@@ -5,6 +5,7 @@ import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
 import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon, PlusIcon } from './icons';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
+import { Language, t } from '../utils/translations';
 
 interface LRListProps {
     lorryReceipts: LorryReceipt[];
@@ -17,6 +18,7 @@ interface LRListProps {
     onOpenPODUploader: (lr: LorryReceipt) => void;
     onViewPOD: (podPath: string) => void;
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
+    language: Language;
 }
 
 const statusColors: { [key in LRStatus]: string } = {
@@ -37,7 +39,8 @@ const LRList: React.FC<LRListProps> = ({
     onUpdateStatus,
     onOpenPODUploader,
     onViewPOD,
-    onUpdateInvoiceDetails
+    onUpdateInvoiceDetails,
+    language
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LRStatus | 'All'>('All');
@@ -115,7 +118,7 @@ const LRList: React.FC<LRListProps> = ({
                     <button onClick={onBackToDashboard} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
                         <DashboardIcon className="w-6 h-6 text-gray-600"/>
                     </button>
-                    <h2 className="text-2xl font-bold text-gray-800">Lorry Receipts</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">{t[language].viewList}</h2>
                     <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>
                 </div>
                 
@@ -123,7 +126,7 @@ const LRList: React.FC<LRListProps> = ({
                      <div className="relative">
                         <input 
                             type="text" 
-                            placeholder="Search LRs..." 
+                            placeholder={t[language].searchPlaceholder} 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -138,7 +141,7 @@ const LRList: React.FC<LRListProps> = ({
                             onChange={(e) => setStatusFilter(e.target.value as LRStatus | 'All')}
                             className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none"
                         >
-                            <option value="All">All Status</option>
+                            <option value="All">{t[language].allStatus}</option>
                             <option value="Booked">Booked</option>
                             <option value="In Transit">In Transit</option>
                             <option value="Out for Delivery">Out for Delivery</option>
@@ -149,7 +152,7 @@ const LRList: React.FC<LRListProps> = ({
 
                     <button onClick={onAddNew} className="bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
                         <PlusIcon className="w-5 h-5" />
-                        <span className="hidden sm:inline">New LR</span>
+                        <span className="hidden sm:inline">{t[language].newLR}</span>
                     </button>
                 </div>
             </div>
@@ -178,14 +181,14 @@ const LRList: React.FC<LRListProps> = ({
                                 onClick={handleGenerateInvoice}
                                 className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-sm font-semibold transition-colors shadow-sm"
                             >
-                                <InvoiceIcon className="w-4 h-4" /> Generate Invoice
+                                <InvoiceIcon className="w-4 h-4" /> {t[language].generateInvoice}
                             </button>
                         )}
                         <button 
                             onClick={handleBulkPrint}
                             className="flex items-center gap-2 bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 text-sm font-semibold transition-colors shadow-sm"
                         >
-                            <PrintIcon className="w-4 h-4" /> Print Selected
+                            <PrintIcon className="w-4 h-4" /> {t[language].printSelected}
                         </button>
                     </div>
                 </div>
@@ -204,14 +207,14 @@ const LRList: React.FC<LRListProps> = ({
                                     className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                                 />
                             </th>
-                            <th className="px-4 py-3">LR No / Date</th>
-                            <th className="px-4 py-3">Consignor</th>
-                            <th className="px-4 py-3">Consignee</th>
-                            <th className="px-4 py-3">Truck / Route</th>
-                            <th className="px-4 py-3 text-right">Amount</th>
-                            <th className="px-4 py-3 text-center">Status</th>
-                            <th className="px-4 py-3 text-center">POD</th>
-                            <th className="px-4 py-3 text-center">Actions</th>
+                            <th className="px-4 py-3">{t[language].lrNoDate}</th>
+                            <th className="px-4 py-3">{t[language].consignor}</th>
+                            <th className="px-4 py-3">{t[language].consignee}</th>
+                            <th className="px-4 py-3">{t[language].truckRoute}</th>
+                            <th className="px-4 py-3 text-right">{t[language].amount}</th>
+                            <th className="px-4 py-3 text-center">{t[language].status}</th>
+                            <th className="px-4 py-3 text-center">{t[language].pod}</th>
+                            <th className="px-4 py-3 text-center">{t[language].actions}</th>
                         </tr>
                     </thead>
                     <tbody>

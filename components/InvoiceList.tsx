@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { LorryReceipt, CompanyDetails } from '../types';
-import { DashboardIcon, SearchIcon, PrintIcon, InvoiceIcon, PlusIcon, XIcon, CheckCircleIcon } from './icons';
+import { DashboardIcon, SearchIcon, PrintIcon, InvoiceIcon, PlusIcon, XIcon, CheckCircleIcon, FilterIcon } from './icons';
 import InvoiceModal from './InvoiceModal';
 
 interface InvoiceListProps {
@@ -18,6 +18,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
     const [selectedLRs, setSelectedLRs] = useState<Set<string>>(new Set());
     const [selectedInvoice, setSelectedInvoice] = useState<{ invoiceNo: string, lrs: LorryReceipt[] } | null>(null);
     const [showGenerationModal, setShowGenerationModal] = useState(false);
+    const [sortOption, setSortOption] = useState<'number-asc' | 'number-desc' | 'date-asc' | 'date-desc'>('number-asc');
 
     // Group officially generated LRs for the main list
     const generatedInvoices = useMemo(() => {
@@ -42,8 +43,21 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
             }, 0);
 
             return { invoiceNo, date, customer, count: lrs.length, totalAmount, lrs };
-        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [lorryReceipts]);
+        }).sort((a, b) => {
+            switch (sortOption) {
+                case 'number-asc':
+                    return a.invoiceNo.localeCompare(b.invoiceNo, undefined, { numeric: true, sensitivity: 'base' });
+                case 'number-desc':
+                    return b.invoiceNo.localeCompare(a.invoiceNo, undefined, { numeric: true, sensitivity: 'base' });
+                case 'date-asc':
+                    return new Date(a.date).getTime() - new Date(b.date).getTime();
+                case 'date-desc':
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                default:
+                    return 0;
+            }
+        });
+    }, [lorryReceipts, sortOption]);
 
     // Unique list of all parties from all LRs
     const allParties = useMemo(() => {
@@ -196,15 +210,31 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                     </div>
                 ) : (
                     <>
-                        <div className="mb-6 relative">
-                            <input
-                                type="text"
-                                placeholder="Search Generated Invoices by No or Customer..."
-                                value={searchTerm}
-                                onChange={e => setSearchTerm(e.target.value)}
-                                className="w-full p-3 pl-10 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500"
-                            />
-                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <div className="mb-6 flex flex-col sm:flex-row gap-4">
+                            <div className="relative flex-grow">
+                                <input
+                                    type="text"
+                                    placeholder="Search Generated Invoices by No or Customer..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full p-3 pl-10 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500"
+                                />
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            </div>
+                            
+                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2 shadow-sm min-w-[220px]">
+                                <FilterIcon className="w-5 h-5 text-gray-500" />
+                                <select 
+                                    value={sortOption} 
+                                    onChange={(e) => setSortOption(e.target.value as any)}
+                                    className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none w-full font-medium"
+                                >
+                                    <option value="number-asc">No. (Ascending)</option>
+                                    <option value="number-desc">No. (Descending)</option>
+                                    <option value="date-asc">Date (Oldest First)</option>
+                                    <option value="date-desc">Date (Newest First)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div className="overflow-x-auto rounded-lg border shadow-sm bg-white">

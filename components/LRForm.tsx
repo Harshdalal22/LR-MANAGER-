@@ -5,6 +5,7 @@ import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon } from './icons';
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
+import { Language, t } from '../utils/translations';
 
 
 interface LRFormProps {
@@ -15,6 +16,7 @@ interface LRFormProps {
     lorryReceipts: LorryReceipt[];
     savedParties?: SavedParty[];
     savedTrucks?: SavedTruck[];
+    language: Language;
 }
 
 const initialPartyState: PartyDetails = { name: '', address: '', city: '', contact: '', pan: '', gst: '' };
@@ -66,7 +68,7 @@ const Fieldset: React.FC<{ legend: string; children: React.ReactNode; className?
 );
 
 
-const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts, savedParties = [], savedTrucks = [] }) => {
+const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts, savedParties = [], savedTrucks = [], language }) => {
     const [formData, setFormData] = useState<LorryReceipt>(initialLRState);
     const [billingPartyType, setBillingPartyType] = useState<'Consignor' | 'Consignee' | 'Other'>('Consignor');
     const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -287,11 +289,11 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 <div className="flex items-center flex-wrap gap-2 mb-6 border-b pb-4">
                     <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
                         <ListIcon className="w-5 h-5 mr-2" />
-                        View LR List
+                        {t[language].viewList}
                     </button>
                     <button onClick={handleCreateNew} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
                         <CreateIcon className="w-5 h-5 mr-2" />
-                        Create New LR
+                        {t[language].createLR}
                     </button>
                     <button
                         onClick={handleAiAutofill}
@@ -300,14 +302,14 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         title={!formData.truckNo || !formData.fromPlace || !formData.toPlace ? "Please fill Truck No, From, and To fields first" : "Get AI suggestions"}
                     >
                         <SparklesIcon className="w-5 h-5 mr-2" />
-                        {isAiLoading ? 'Thinking...' : 'AI Autofill'}
+                        {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
                     </button>
                 </div>
             
                 <form onSubmit={handleSubmit}>
-                    <Fieldset legend="Core Details" className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4">
+                    <Fieldset legend={t[language].coreDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4">
                         <div>
-                            <label className={labelClass}>LR TYPE*</label>
+                            <label className={labelClass}>{t[language].lrType}*</label>
                             <div className="flex items-center space-x-4 h-10">
                                 <div className="flex items-center">
                                     <input id="dummy" type="radio" name="lrType" value="Dummy" checked={formData.lrType === 'Dummy'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
@@ -320,12 +322,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             </div>
                         </div>
                         <div>
-                            <label className={labelClass}>TRUCK NO*</label>
+                            <label className={labelClass}>{t[language].truckNo}*</label>
                             <input 
                                 list="trucks-list"
                                 type="text" 
                                 name="truckNo" 
-                                placeholder="TRUCK NO" 
+                                placeholder={t[language].truckNo} 
                                 value={formData.truckNo} 
                                 onChange={handleChange} 
                                 className={`${inputClass} border-red-300`} 
@@ -337,11 +339,11 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             </datalist>
                         </div>
                         <div>
-                            <label className={labelClass}>C Note NO*</label>
+                            <label className={labelClass}>{t[language].cNoteNo}*</label>
                             <input 
                                 type="text"
                                 name="lrNo"
-                                placeholder="Enter C Note No."
+                                placeholder={t[language].cNoteNo}
                                 value={formData.lrNo}
                                 onChange={handleChange}
                                 className={`${inputClass} border-red-300`}
@@ -349,71 +351,71 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                 disabled={!!existingLR} // Disable for editing existing LR
                             />
                         </div>
-                        <div><label className={labelClass}>DATE*</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={inputClass} required /></div>
-                        <div><label className={labelClass}>FROM PLACE*</label><input type="text" name="fromPlace" placeholder="FROM PLACE" value={formData.fromPlace} onChange={handleChange} className={inputClass} required /></div>
-                        <div><label className={labelClass}>TO PLACE*</label><input type="text" name="toPlace" placeholder="TO PLACE" value={formData.toPlace} onChange={handleChange} className={inputClass} required /></div>
+                        <div><label className={labelClass}>{t[language].date}*</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={inputClass} required /></div>
+                        <div><label className={labelClass}>{t[language].fromPlace}*</label><input type="text" name="fromPlace" placeholder={t[language].fromPlace} value={formData.fromPlace} onChange={handleChange} className={inputClass} required /></div>
+                        <div><label className={labelClass}>{t[language].toPlace}*</label><input type="text" name="toPlace" placeholder={t[language].toPlace} value={formData.toPlace} onChange={handleChange} className={inputClass} required /></div>
                     </Fieldset>
                     
                     {/* Other fieldsets here, unchanged */}
-                    <Fieldset legend="Shipment Details" className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
-                         <div><label className={labelClass}>INVOICE</label><input type="text" name="invoiceNo" placeholder="INVOICE" value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>INVOICE AMOUNT</label><input type="number" name="invoiceAmount" placeholder="INVOICE AMOUNT" value={formData.invoiceAmount} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>INVOICE DATE</label><input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>EWAY BILL NO</label><input type="text" name="ewayBillNo" placeholder="EWAY BILL NO" value={formData.ewayBillNo} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>EWAY BILL DATE</label><input type="date" name="ewayBillDate" value={formData.ewayBillDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>EWAY EX. DATE</label><input type="date" name="ewayExDate" value={formData.ewayExDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>P.O. NO</label><input type="text" name="poNo" placeholder="P.O. NO" value={formData.poNo} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>P.O. DATE</label><input type="date" name="poDate" value={formData.poDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>ADDRESS OF DELIVERY</label><input type="text" name="addressOfDelivery" placeholder="ADDRESS OF DELIVERY" value={formData.addressOfDelivery} onChange={handleChange} className={inputClass} /></div>
+                    <Fieldset legend={t[language].shipmentDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
+                         <div><label className={labelClass}>{t[language].invoice}</label><input type="text" name="invoiceNo" placeholder={t[language].invoice} value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].invoiceAmount}</label><input type="number" name="invoiceAmount" placeholder={t[language].invoiceAmount} value={formData.invoiceAmount} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].invoiceDate}</label><input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayBillNo}</label><input type="text" name="ewayBillNo" placeholder={t[language].ewayBillNo} value={formData.ewayBillNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayBillDate}</label><input type="date" name="ewayBillDate" value={formData.ewayBillDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayExDate}</label><input type="date" name="ewayExDate" value={formData.ewayExDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].poNo}</label><input type="text" name="poNo" placeholder={t[language].poNo} value={formData.poNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].poDate}</label><input type="date" name="poDate" value={formData.poDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].addressOfDelivery}</label><input type="text" name="addressOfDelivery" placeholder={t[language].addressOfDelivery} value={formData.addressOfDelivery} onChange={handleChange} className={inputClass} /></div>
                     </Fieldset>
                     
-                    <Fieldset legend="Billing Details" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Fieldset legend={t[language].billingDetails} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className={labelClass}>BILLING PARTY</label>
+                            <label className={labelClass}>{t[language].billingParty}</label>
                             <div className="flex items-center space-x-4 mt-2">
                                  <div className="flex items-center">
                                     <input id="bill_consignor" type="radio" name="billingPartyType" value="Consignor" checked={billingPartyType === 'Consignor'} onChange={() => setBillingPartyType('Consignor')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
-                                    <label htmlFor="bill_consignor" className="ml-2 block text-sm text-gray-900">Consignor</label>
+                                    <label htmlFor="bill_consignor" className="ml-2 block text-sm text-gray-900">{t[language].consignor}</label>
                                 </div>
                                 <div className="flex items-center">
                                     <input id="bill_consignee" type="radio" name="billingPartyType" value="Consignee" checked={billingPartyType === 'Consignee'} onChange={() => setBillingPartyType('Consignee')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
-                                    <label htmlFor="bill_consignee" className="ml-2 block text-sm text-gray-900">Consignee</label>
+                                    <label htmlFor="bill_consignee" className="ml-2 block text-sm text-gray-900">{t[language].consignee}</label>
                                 </div>
                                  <div className="flex items-center">
                                     <input id="bill_other" type="radio" name="billingPartyType" value="Other" checked={billingPartyType === 'Other'} onChange={() => setBillingPartyType('Other')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
-                                    <label htmlFor="bill_other" className="ml-2 block text-sm text-gray-900">Other</label>
+                                    <label htmlFor="bill_other" className="ml-2 block text-sm text-gray-900">{t[language].other}</label>
                                 </div>
                             </div>
                          </div>
                          <div>
-                            <label className={labelClass}>GST PAID BY</label>
+                            <label className={labelClass}>{t[language].gstPaidBy}</label>
                              <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputClass}>
-                                <option>Transporter</option>
-                                <option>Consignor</option>
-                                <option>Consignee</option>
+                                <option value="Transporter">{t[language].transporter}</option>
+                                <option value="Consignor">{t[language].consignor}</option>
+                                <option value="Consignee">{t[language].consignee}</option>
                             </select>
                          </div>
                     </Fieldset>
 
-                    <Fieldset legend="Party Details" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {renderPartySection('Consignor', 'consignor')}
-                        {renderPartySection('Consignee', 'consignee')}
-                        {billingPartyType === 'Other' && renderPartySection('Billing To', 'billingTo')}
+                    <Fieldset legend={t[language].partyDetails} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {renderPartySection(t[language].consignor, 'consignor')}
+                        {renderPartySection(t[language].consignee, 'consignee')}
+                        {billingPartyType === 'Other' && renderPartySection(t[language].billingParty, 'billingTo')}
                     </Fieldset>
                     
                      <div className="border border-gray-300 p-3 rounded-xl shadow-lg bg-white/50 backdrop-blur-sm mb-6">
                         <div className="flex justify-between items-center mb-2">
-                            <h3 className="font-bold text-base text-gray-800">Item Details</h3>
+                            <h3 className="font-bold text-base text-gray-800">{t[language].itemDetails}</h3>
                             <button type="button" onClick={addItem} className="flex items-center bg-gray-100 text-gray-800 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors shadow-sm border">
                                 <PlusIcon className="w-4 h-4 mr-1" />
-                                Add Row
+                                {t[language].addRow}
                             </button>
                         </div>
                         <div className="grid grid-cols-12 gap-2 bg-gray-100 p-2 rounded-t-md font-bold text-gray-600 text-left text-xs">
                             <div className="col-span-1">#</div>
-                            <div className="col-span-6">DESCRIPTION</div>
-                            <div className="col-span-2">PCS</div>
-                            <div className="col-span-2">WEIGHT</div>
+                            <div className="col-span-6">{t[language].description}</div>
+                            <div className="col-span-2">{t[language].pcs}</div>
+                            <div className="col-span-2">{t[language].weight}</div>
                             <div className="col-span-1"></div>
                         </div>
                         <div className="border-l border-r border-b border-gray-200 rounded-b-md bg-white">
@@ -433,16 +435,16 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         </div>
                     </div>
 
-                    <Fieldset legend="Weight & Rate" className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Fieldset legend={t[language].weightRate} className="grid grid-cols-2 md:grid-cols-4 gap-4">
                          <div>
-                            <label className={labelClass}>TOTAL PKGS WEIGHT</label>
+                            <label className={labelClass}>{t[language].totalPkgsWeight}</label>
                             <input type="number" name="weight" value={formData.weight} readOnly placeholder="Auto-calculated" className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
                         </div>
-                        <div><label className={labelClass}>ACTUAL WEIGHT (MT)</label><input type="number" name="actualWeightMT" value={formData.actualWeightMT} onChange={handleChange} placeholder="WEIGHT (MT)" className={inputClass} /></div>
-                         <div><label className={labelClass}>CHARGED WEIGHT</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>RATE</label><input type="number" name="rate" value={formData.rate} onChange={handleChange} placeholder="RATE" className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].actualWeight}</label><input type="number" name="actualWeightMT" value={formData.actualWeightMT} onChange={handleChange} placeholder="WEIGHT (MT)" className={inputClass} /></div>
+                         <div><label className={labelClass}>{t[language].chargedWeight}</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].rate}</label><input type="number" name="rate" value={formData.rate} onChange={handleChange} placeholder="RATE" className={inputClass} /></div>
                         <div>
-                            <label className={labelClass}>CALCULATION BASIS</label>
+                            <label className={labelClass}>{t[language].calcBasis}</label>
                             <select name="rateOn" value={formData.rateOn} onChange={handleChange} className={inputClass}>
                                 <option value="Ton">By Weight (Per Ton)</option>
                                 <option value="Fixed">Fixed Amount (By Own)</option>
@@ -450,19 +452,19 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         </div>
                     </Fieldset>
                     
-                    <Fieldset legend="Charges Breakdown" className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                        <div><label className={labelClass}>Hamail</label><input type="number" name="hamail" value={formData.charges.hamail} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>Surcharge</label><input type="number" name="surCharge" value={formData.charges.surCharge} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>ST Charge</label><input type="number" name="stCharge" value={formData.charges.stCharge} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>Collection</label><input type="number" name="collectionCharge" value={formData.charges.collectionCharge} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>D.Dty Charge</label><input type="number" name="ddCharge" value={formData.charges.ddCharge} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>Other</label><input type="number" name="otherCharge" value={formData.charges.otherCharge} onChange={handleChargeChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>Risk</label><input type="number" name="riskCharge" value={formData.charges.riskCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                    <Fieldset legend={t[language].chargesBreakdown} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                        <div><label className={labelClass}>{t[language].hamail}</label><input type="number" name="hamail" value={formData.charges.hamail} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].surcharge}</label><input type="number" name="surCharge" value={formData.charges.surCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].stCharge}</label><input type="number" name="stCharge" value={formData.charges.stCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].collection}</label><input type="number" name="collectionCharge" value={formData.charges.collectionCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ddCharge}</label><input type="number" name="ddCharge" value={formData.charges.ddCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].otherCharge}</label><input type="number" name="otherCharge" value={formData.charges.otherCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].risk}</label><input type="number" name="riskCharge" value={formData.charges.riskCharge} onChange={handleChargeChange} className={inputClass} /></div>
                     </Fieldset>
                     
-                    <Fieldset legend="Totals" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Fieldset legend={t[language].totals} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                            <label className={labelClass}>FREIGHT</label>
+                            <label className={labelClass}>{t[language].freight}</label>
                             <input 
                                 type="number" 
                                 name="freight" 
@@ -474,26 +476,26 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             />
                         </div>
                          <div>
-                            <label className={labelClass}>TOTAL OTHER CHARGES</label>
+                            <label className={labelClass}>{t[language].totalOtherCharges}</label>
                             <input type="number" value={totalCharges} readOnly className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
                         </div>
                         <div>
-                            <label className={labelClass}>GRAND TOTAL</label>
+                            <label className={labelClass}>{t[language].grandTotal}</label>
                             <input type="number" value={(Number(formData.freight) || 0) + totalCharges} readOnly className={`${inputClass} bg-green-100 border-green-300 font-bold cursor-not-allowed`} />
                         </div>
                     </Fieldset>
                     
-                    <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6"><label className={labelClass}>REMARK</label><textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter remarks..." className={`${inputClass} h-24`}></textarea></div>
+                    <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6"><label className={labelClass}>{t[language].remark}</label><textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter remarks..." className={`${inputClass} h-24`}></textarea></div>
                     
                     <div className="flex flex-col sm:flex-row sm:justify-center gap-4 pt-6 mt-4 border-t">
                         <button type="submit" className="w-full sm:w-auto bg-ssk-blue text-white px-8 py-2.5 rounded-md hover:bg-blue-800 font-bold text-base shadow-md transition-transform transform hover:scale-105">
-                            {existingLR ? 'UPDATE & SAVE LR' : 'SAVE LR'}
+                            {existingLR ? t[language].updateLR : t[language].saveLR}
                         </button>
                         <button type="button" onClick={() => setShowPreviewModal(true)} className="w-full sm:w-auto bg-gray-600 text-white px-8 py-2.5 rounded-md hover:bg-gray-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
-                           PREVIEW
+                           {t[language].preview}
                         </button>
                         <button type="button" onClick={onCancel} className="w-full sm:w-auto bg-ssk-red text-white px-8 py-2.5 rounded-md hover:bg-red-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
-                            CANCEL
+                            {t[language].cancel}
                         </button>
                     </div>
                 </form>

@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { CompanyDetails } from '../types';
-import { CogIcon, XIcon, SpinnerIcon } from './icons';
+import { CogIcon, XIcon, SpinnerIcon, GlobeIcon } from './icons';
+import { Language, t } from '../utils/translations';
 
 interface HeaderProps {
     companyDetails: CompanyDetails;
@@ -9,9 +10,11 @@ interface HeaderProps {
     onUploadAsset: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
     userEmail?: string;
     onSignOut?: () => void;
+    language: Language;
+    setLanguage: (lang: Language) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUploadAsset, userEmail, onSignOut }) => {
+const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUploadAsset, userEmail, onSignOut, language, setLanguage }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [localDetails, setLocalDetails] = useState(companyDetails);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
@@ -60,6 +63,23 @@ const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUplo
                     <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{companyDetails.name}</h1>
                 </div>
                 <div className="flex items-center gap-4">
+                    
+                    {/* Language Switcher */}
+                    <div className="flex items-center bg-blue-800 rounded-full p-1 border border-blue-600">
+                        <button 
+                            onClick={() => setLanguage('en')}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'en' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                        >
+                            EN
+                        </button>
+                        <button 
+                            onClick={() => setLanguage('hi')}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'hi' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                        >
+                            HI
+                        </button>
+                    </div>
+
                     {userEmail && (
                         <div className="hidden sm:flex items-center gap-4">
                             <span className="text-sm font-medium">{userEmail}</span>
@@ -67,7 +87,7 @@ const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUplo
                                 onClick={onSignOut}
                                 className="bg-ssk-red text-white px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-red-700 transition-colors"
                             >
-                                Sign Out
+                                {t[language].signOut}
                             </button>
                         </div>
                     )}
@@ -87,7 +107,7 @@ const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUplo
                 <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
                     <div className="bg-white text-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-bold">Admin Controls</h2>
+                            <h2 className="text-2xl font-bold">{t[language].settings}</h2>
                             <button onClick={() => setIsSettingsOpen(false)} className="p-1 rounded-full hover:bg-gray-200">
                                 <XIcon className="w-6 h-6" />
                             </button>

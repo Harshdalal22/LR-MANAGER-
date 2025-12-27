@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
 import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon } from './icons';
+import { Language, t } from '../utils/translations';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -9,6 +10,7 @@ interface DashboardProps {
     onViewList: () => void;
     onEditLR: (lrNo: string) => void;
     setCurrentView: (view: View) => void;
+    language: Language;
 }
 
 interface StatCardProps {
@@ -140,7 +142,7 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView }) => {
+const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language }) => {
     const [activeSection, setActiveSection] = useState<'lr' | 'data' | null>(null);
 
     // --- Metric Calculations ---
@@ -190,7 +192,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 animate-fadeIn py-10">
                  <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-600 mb-8 text-center drop-shadow-sm">
-                    Welcome to Bilty Book
+                    {t[language].welcome}
                 </h1>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl px-4">
                     {/* LR Management Card */}
@@ -202,10 +204,10 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                          <div className="bg-blue-100 p-6 rounded-full mb-6 group-hover:bg-blue-600 transition-colors duration-300 shadow-inner">
                             <DocumentTextIcon className="w-12 h-12 text-blue-600 group-hover:text-white transition-colors" />
                          </div>
-                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-700 transition-colors">LR Management</h2>
-                         <p className="text-gray-500 leading-relaxed">Create, track, and manage Lorry Receipts. View freight analytics, generate invoices, and monitor shipment status.</p>
+                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
+                         <p className="text-gray-500 leading-relaxed">{t[language].lrManagementDesc}</p>
                          <div className="mt-6 text-blue-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                            Open Dashboard →
+                            {t[language].openDashboard} →
                          </div>
                     </div>
 
@@ -218,10 +220,10 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                          <div className="bg-purple-100 p-6 rounded-full mb-6 group-hover:bg-purple-600 transition-colors duration-300 shadow-inner">
                             <DashboardIcon className="w-12 h-12 text-purple-600 group-hover:text-white transition-colors" />
                          </div>
-                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-purple-700 transition-colors">Data Management</h2>
-                         <p className="text-gray-500 leading-relaxed">Manage Vehicle Hiring, Booking Registers, Parties, Trucks, and configure System Data & Database.</p>
+                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
+                         <p className="text-gray-500 leading-relaxed">{t[language].dataManagementDesc}</p>
                          <div className="mt-6 text-purple-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-                            Open Menu →
+                            {t[language].openMenu} →
                          </div>
                     </div>
                 </div>
@@ -237,12 +239,12 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     <button 
                         onClick={() => setActiveSection(null)} 
                         className="p-2 bg-white rounded-full hover:bg-gray-100 border shadow-sm transition-all group"
-                        title="Back to Home"
+                        title={t[language].backToHome}
                     >
                         <ArrowLeftIcon className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
                     </button>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 drop-shadow-sm">
-                        {activeSection === 'lr' ? 'LR Management Dashboard' : 'Data Management & Operations'}
+                        {activeSection === 'lr' ? t[language].lrManagementDashboard : t[language].dataManagementOperations}
                     </h1>
                 </div>
             </div>
@@ -254,20 +256,20 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                      <div className="flex flex-wrap md:flex-row md:items-center justify-between gap-3 mb-6">
                         <div className="flex items-center gap-2 md:gap-3">
                             <div className="h-6 w-1 md:h-8 bg-blue-500 rounded-full"></div>
-                            <h2 className="text-lg md:text-xl font-bold text-gray-700">Overview & Actions</h2>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-700">{t[language].overviewActions}</h2>
                         </div>
                          <div className="flex items-center gap-2 self-end md:self-auto flex-wrap">
                              <button onClick={() => setCurrentView('invoices')} className="flex items-center bg-green-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm border border-green-500 text-xs md:text-base">
                                 <InvoiceIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                Invoices
+                                {t[language].invoices}
                             </button>
                             <button onClick={onViewList} className="flex items-center bg-white text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-gray-50 transition-all shadow-sm border border-gray-200 text-xs md:text-base">
                                 <ListIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                View List
+                                {t[language].viewList}
                             </button>
                             <button onClick={onAddNew} className="flex items-center bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-sm border border-blue-600 text-xs md:text-base">
                                 <CreateIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                                Create LR
+                                {t[language].createLR}
                             </button>
                         </div>
                     </div>
@@ -276,26 +278,26 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
                         <StatCard 
                             icon={<TruckIcon className="text-blue-600"/>} 
-                            title="Total LRs" 
+                            title={t[language].totalLRs} 
                             value={totalLRs} 
                             color="border-blue-500"
                             onClick={onViewList}
                         />
                         <StatCard 
                             icon={<CurrencyRupeeIcon className="text-green-600"/>} 
-                            title="Freight Value" 
+                            title={t[language].freightValue} 
                             value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
                             color="border-green-500"
                         />
                         <StatCard 
                             icon={<UsersIcon className="text-purple-600"/>} 
-                            title="Consignors" 
+                            title={t[language].consignors} 
                             value={uniqueConsignors} 
                             color="border-purple-500"
                         />
                         <StatCard 
                             icon={<UploadIcon className="text-orange-600"/>} 
-                            title="Pending PODs" 
+                            title={t[language].pendingPODs} 
                             value={podsPending}
                             color="border-orange-500"
                         />
@@ -303,30 +305,30 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     
                     {/* Status Overview */}
                     <div className="mb-8">
-                         <h3 className="text-sm md:text-lg font-bold text-gray-700 mb-2 md:mb-4 ml-1">Shipment Status</h3>
+                         <h3 className="text-sm md:text-lg font-bold text-gray-700 mb-2 md:mb-4 ml-1">{t[language].shipmentStatus}</h3>
                          <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
-                            <StatCard className="p-2 md:p-4" icon={<CreateIcon className="text-blue-500" />} title="Booked" value={statusCounts['Booked'] || 0} color="border-blue-500" />
-                            <StatCard className="p-2 md:p-4" icon={<TruckIcon className="text-yellow-500" />} title="Transit" value={statusCounts['In Transit'] || 0} color="border-yellow-500" />
-                            <StatCard className="p-2 md:p-4" icon={<ClockIcon className="text-orange-500" />} title="Out For Del" value={statusCounts['Out for Delivery'] || 0} color="border-orange-500" />
-                            <StatCard className="p-2 md:p-4" icon={<CheckCircleIcon className="text-green-500" />} title="Delivered" value={statusCounts['Delivered'] || 0} color="border-green-500" />
-                            <StatCard className="p-2 md:p-4" icon={<XIcon className="text-red-500" />} title="Cancelled" value={statusCounts['Cancelled'] || 0} color="border-red-500" />
+                            <StatCard className="p-2 md:p-4" icon={<CreateIcon className="text-blue-500" />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="border-blue-500" />
+                            <StatCard className="p-2 md:p-4" icon={<TruckIcon className="text-yellow-500" />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="border-yellow-500" />
+                            <StatCard className="p-2 md:p-4" icon={<ClockIcon className="text-orange-500" />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="border-orange-500" />
+                            <StatCard className="p-2 md:p-4" icon={<CheckCircleIcon className="text-green-500" />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="border-green-500" />
+                            <StatCard className="p-2 md:p-4" icon={<XIcon className="text-red-500" />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="border-red-500" />
                          </div>
                     </div>
 
                     {/* Recent Activity & Chart */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
                         <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50">
-                            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Recent Lorry Receipts</h2>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">{t[language].recentLRs}</h2>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs md:text-sm">
                                     <thead className="text-left text-gray-500">
                                         <tr>
                                             <th className="p-2">LR No.</th>
-                                            <th className="p-2 hidden sm:table-cell">Date</th>
-                                            <th className="p-2">Truck No.</th>
-                                            <th className="p-2 hidden sm:table-cell">Consignee</th>
-                                            <th className="p-2 text-right">Freight</th>
-                                            <th className="p-2 text-center">Action</th>
+                                            <th className="p-2 hidden sm:table-cell">{t[language].date}</th>
+                                            <th className="p-2">{t[language].truckNo}</th>
+                                            <th className="p-2 hidden sm:table-cell">{t[language].consignee}</th>
+                                            <th className="p-2 text-right">{t[language].freight}</th>
+                                            <th className="p-2 text-center">{t[language].actions}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -350,7 +352,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                         </div>
 
                         <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50 flex flex-col">
-                             <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Weekly Trend</h2>
+                             <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">{t[language].weeklyTrend}</h2>
                              <div className="flex-grow flex items-center justify-center">
                                 <div className="w-full h-48 md:h-64">
                                     <FreightTrendChart data={chartData} />
@@ -364,38 +366,38 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {/* --- SECTION: DATA MANAGEMENT --- */}
             {activeSection === 'data' && (
                 <div className="animate-slideIn">
-                    <p className="text-gray-500 mb-6">Select a module to manage records or configure system settings.</p>
+                    <p className="text-gray-500 mb-6">{t[language].selectModule}</p>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
                         <ManagementCard 
-                            title="Vehicle Hiring" 
+                            title={t[language].vehicleHiring} 
                             description="Manage truck hiring records and payments"
                             icon={<TruckIcon />} 
                             onClick={() => setCurrentView('vehicle-hiring')}
                             color="bg-orange-100 text-orange-600"
                         />
                         <ManagementCard 
-                            title="Booking Register" 
+                            title={t[language].bookingRegister} 
                             description="Maintain booking records and freight details"
                             icon={<ListIcon />} 
                             onClick={() => setCurrentView('booking-register')}
                             color="bg-green-100 text-green-600"
                         />
                         <ManagementCard 
-                            title="Manage Parties" 
+                            title={t[language].manageParties} 
                             description="Add or edit consignor and consignee details"
                             icon={<UsersIcon />} 
                             onClick={() => setCurrentView('parties')} 
                             color="bg-purple-100 text-purple-600"
                         />
                         <ManagementCard 
-                            title="Manage Trucks" 
+                            title={t[language].manageTrucks} 
                             description="Maintain your fleet or hired truck database"
                             icon={<TruckIcon />} 
                             onClick={() => setCurrentView('trucks')} 
                             color="bg-teal-100 text-teal-600"
                         />
                         <ManagementCard 
-                            title="Data Setup" 
+                            title={t[language].dataSetup} 
                             description="Database fixes and system configuration"
                             icon={<CogIcon />} 
                             onClick={() => setCurrentView('data-management')} 

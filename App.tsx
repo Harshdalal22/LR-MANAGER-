@@ -15,6 +15,7 @@ import PartyManagement from './components/PartyManagement';
 import TruckManagement from './components/TruckManagement';
 import InvoiceList from './components/InvoiceList';
 import AdBanner from './components/AdBanner';
+import { Language } from './utils/translations';
 import { 
     getLorryReceipts, 
     saveLorryReceipt, 
@@ -73,6 +74,7 @@ const App: React.FC = () => {
     const [currentView, setCurrentView] = useState<View>('dashboard');
     const [isLoading, setIsLoading] = useState(true);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
+    const [language, setLanguage] = useState<Language>('en');
 
     const handleError = (error: unknown, context: string) => {
         let errorMessage = 'An unknown error occurred.';
@@ -389,6 +391,7 @@ const App: React.FC = () => {
                         onViewList={() => setCurrentView('list')}
                         onEditLR={handleEditLR}
                         setCurrentView={setCurrentView}
+                        language={language}
                     />
                 );
             case 'list':
@@ -407,6 +410,7 @@ const App: React.FC = () => {
                             window.open(url, '_blank');
                         }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                        language={language}
                     />
                 );
             case 'form':
@@ -419,6 +423,7 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}
                         savedTrucks={savedTrucks}
+                        language={language}
                     />
                 );
             case 'parties':
@@ -484,6 +489,8 @@ const App: React.FC = () => {
                 onUploadAsset={uploadCompanyAsset}
                 userEmail={session.user.email}
                 onSignOut={handleSignOut}
+                language={language}
+                setLanguage={setLanguage}
             />
             <main className="container mx-auto p-4 md:p-6">
                 {renderContent()}

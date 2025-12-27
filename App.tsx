@@ -236,6 +236,58 @@ const App: React.FC = () => {
 
         try {
             const savedLr = await saveLorryReceipt(sanitizedLR);
+
+            // --- Auto-save Truck ---
+            const truckNum = savedLr.truckNo.trim();
+            if (truckNum && !savedTrucks.some(t => t.truckNo.toLowerCase() === truckNum.toLowerCase())) {
+                saveSavedTruck({ truckNo: truckNum })
+                    .then(newTruck => {
+                        setSavedTrucks(prev => {
+                            // Check again to avoid race condition duplicates
+                            if (prev.some(t => t.truckNo.toLowerCase() === newTruck.truckNo.toLowerCase())) return prev;
+                            return [...prev, newTruck];
+                        });
+                    })
+                    .catch(err => console.error("Auto-save truck error", err));
+            }
+
+            // --- Auto-save Parties ---
+            const partiesToCheck = [
+                { ...savedLr.consignor, type: 'Consignor' as const },
+                { ...savedLr.consignee, type: 'Consignee' as const }
+            ];
+
+            // If billing party is different from both, check it too
+            if (savedLr.billingTo?.name && 
+                savedLr.billingTo.name !== savedLr.consignor.name && 
+                savedLr.billingTo.name !== savedLr.consignee.name) {
+                partiesToCheck.push({ ...savedLr.billingTo, type: 'Consignor' as const });
+            }
+
+            // Dedupe locally before processing
+            const uniquePartiesToSave = new Map<string, typeof partiesToCheck[0]>();
+            partiesToCheck.forEach(p => {
+                if (p.name && !uniquePartiesToSave.has(p.name.toLowerCase())) {
+                    uniquePartiesToSave.set(p.name.toLowerCase(), p);
+                }
+            });
+
+            // Save new parties
+            uniquePartiesToSave.forEach(p => {
+                const exists = savedParties.some(sp => sp.name.toLowerCase() === p.name.toLowerCase());
+                if (!exists) {
+                    saveSavedParty(p)
+                        .then(newParty => {
+                             setSavedParties(prev => {
+                                if (prev.some(existing => existing.name.toLowerCase() === newParty.name.toLowerCase())) return prev;
+                                return [...prev, newParty];
+                            });
+                        })
+                        .catch(err => console.error("Auto-save party error", err));
+                }
+            });
+
+
             if (editingLR) {
                 setLorryReceipts(lorryReceipts.map(r => r.lrNo === savedLr.lrNo ? savedLr : r));
                 toast.success('LR updated successfully!', { id: toastId });

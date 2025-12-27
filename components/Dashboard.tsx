@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
-import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon } from './icons';
+import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon } from './icons';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -35,15 +35,16 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick,
     </div>
 );
 
-const ManagementCard: React.FC<{ title: string; icon: React.ReactElement<{ className?: string }>; onClick: () => void }> = ({ title, icon, onClick }) => (
+const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick: () => void; color?: string }> = ({ title, description, icon, onClick, color = 'bg-blue-50' }) => (
     <div 
         onClick={onClick}
-        className="bg-white md:bg-gradient-to-br md:from-white md:to-gray-100 p-3 md:p-8 rounded-xl md:rounded-2xl shadow-sm md:shadow-[0_20px_50px_rgba(30,58,138,0.15)] hover:shadow-md md:hover:shadow-[0_20px_50px_rgba(30,58,138,0.25)] flex flex-col items-center justify-center text-center transform active:scale-95 md:hover:-translate-y-2 transition-all duration-300 cursor-pointer border border-gray-100 group h-full min-h-[110px]"
+        className="bg-white md:bg-gradient-to-br md:from-white md:to-gray-50 p-4 md:p-8 rounded-xl md:rounded-2xl shadow-sm md:shadow-lg hover:shadow-xl flex flex-col items-center justify-center text-center transform active:scale-95 md:hover:-translate-y-2 transition-all duration-300 cursor-pointer border border-gray-100 group h-full min-h-[140px]"
     >
-        <div className="p-2.5 md:p-4 bg-blue-50 rounded-full mb-2 md:mb-4 group-hover:bg-blue-100 transition-colors">
-            {React.cloneElement(icon, { className: "w-6 h-6 md:w-10 md:h-10 text-ssk-blue" })}
+        <div className={`p-3 md:p-4 rounded-full mb-3 md:mb-4 group-hover:bg-opacity-80 transition-colors ${color}`}>
+            {React.cloneElement(icon, { className: "w-8 h-8 md:w-10 md:h-10 text-gray-700" })}
         </div>
-        <h3 className="text-xs md:text-xl font-bold text-gray-800 group-hover:text-ssk-blue transition-colors leading-tight px-1">{title}</h3>
+        <h3 className="text-sm md:text-xl font-bold text-gray-800 group-hover:text-ssk-blue transition-colors leading-tight px-1 mb-1">{title}</h3>
+        {description && <p className="text-xs text-gray-500 hidden md:block">{description}</p>}
     </div>
 );
 
@@ -140,6 +141,8 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 
 
 const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView }) => {
+    const [activeSection, setActiveSection] = useState<'lr' | 'data' | null>(null);
+
     // --- Metric Calculations ---
     const totalLRs = lorryReceipts.length;
     const totalFreight = lorryReceipts.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0);
@@ -182,170 +185,225 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
         dateStr: d.dateStr
     }));
 
-    return (
-        <div className="space-y-6 md:space-y-10 pb-20 md:pb-0">
-            <div className="flex flex-col sm:flex-row justify-between items-center pb-2 md:pb-4 border-b">
-                <h1 className="text-2xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-600 drop-shadow-sm self-start sm:self-center">Dashboard</h1>
-            </div>
-
-            {/* Section 1: Operations & Management - Mobile Optimized Grid */}
-            <section>
-                <div className="flex items-center gap-2 md:gap-3 mb-4 md:mb-6">
-                    <div className="h-6 w-1 md:h-8 bg-ssk-blue rounded-full"></div>
-                    <h2 className="text-lg md:text-2xl font-bold text-gray-800">Operations & Management</h2>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-8">
-                    <ManagementCard 
-                        title="Invoices" 
-                        icon={<InvoiceIcon />} 
-                        onClick={() => setCurrentView('invoices')} 
-                    />
-                    <ManagementCard 
-                        title="Vehicle Hiring" 
-                        icon={<TruckIcon />} 
-                        onClick={() => setCurrentView('vehicle-hiring')} 
-                    />
-                    <ManagementCard 
-                        title="Booking Register" 
-                        icon={<ListIcon />} 
-                        onClick={() => setCurrentView('booking-register')} 
-                    />
-                    <ManagementCard 
-                        title="Data Setup" 
-                        icon={<DashboardIcon />} 
-                        onClick={() => setCurrentView('data-management')} 
-                    />
-                </div>
-            </section>
-
-            {/* Section 2: LR Management & Analytics */}
-            <section>
-                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 md:mb-6 mt-8 md:mt-12">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="h-6 w-1 md:h-8 bg-ssk-red rounded-full"></div>
-                        <h2 className="text-lg md:text-2xl font-bold text-gray-800">LR Management</h2>
-                    </div>
-                     <div className="flex items-center gap-2 self-end md:self-auto">
-                        <button onClick={onViewList} className="flex items-center bg-white text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-gray-50 transition-all shadow-sm md:shadow-md border border-gray-100 text-xs md:text-base">
-                            <ListIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                            View List
-                        </button>
-                        <button onClick={onAddNew} className="flex items-center bg-gradient-to-r from-red-600 to-red-500 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:from-red-700 hover:to-red-600 transition-all shadow-sm md:shadow-md text-xs md:text-base">
-                            <CreateIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
-                            Create LR
-                        </button>
-                    </div>
-                </div>
-
-                {/* Sub-Section: Quick Access Management - Compact on mobile */}
-                <div className="grid grid-cols-2 md:grid-cols-2 gap-3 md:gap-6 mb-6 md:mb-8">
-                    <div onClick={() => setCurrentView('parties')} className="bg-purple-50 p-3 md:p-6 rounded-xl border border-purple-100 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row items-center gap-2 md:gap-4 active:scale-95 md:hover:-translate-y-1">
-                        <div className="p-2 md:p-3 bg-purple-100 rounded-full text-purple-600">
-                            <UsersIcon className="w-6 h-6 md:w-8 md:h-8" />
-                        </div>
-                        <div className="text-center md:text-left">
-                            <h3 className="text-xs md:text-lg font-bold text-gray-800">Parties</h3>
-                            <p className="hidden md:block text-sm text-gray-500">Add or Edit Consignors & Consignees</p>
-                        </div>
-                    </div>
-                    <div onClick={() => setCurrentView('trucks')} className="bg-teal-50 p-3 md:p-6 rounded-xl border border-teal-100 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row items-center gap-2 md:gap-4 active:scale-95 md:hover:-translate-y-1">
-                        <div className="p-2 md:p-3 bg-teal-100 rounded-full text-teal-600">
-                            <TruckIcon className="w-6 h-6 md:w-8 md:h-8" />
-                        </div>
-                        <div className="text-center md:text-left">
-                            <h3 className="text-xs md:text-lg font-bold text-gray-800">Trucks</h3>
-                            <p className="hidden md:block text-sm text-gray-500">Save Truck details for quick selection</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Stat Cards - Grid cols 2 on mobile */}
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
-                    <StatCard 
-                        icon={<TruckIcon className="text-blue-600"/>} 
-                        title="Total LRs" 
-                        value={totalLRs} 
-                        color="border-blue-500"
-                        onClick={onViewList}
-                    />
-                    <StatCard 
-                        icon={<CurrencyRupeeIcon className="text-green-600"/>} 
-                        title="Freight Value" 
-                        value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
-                        color="border-green-500"
-                    />
-                    <StatCard 
-                        icon={<UsersIcon className="text-purple-600"/>} 
-                        title="Consignors" 
-                        value={uniqueConsignors} 
-                        color="border-purple-500"
-                    />
-                    <StatCard 
-                        icon={<UploadIcon className="text-orange-600"/>} 
-                        title="Pending PODs" 
-                        value={podsPending}
-                        color="border-orange-500"
-                    />
-                </div>
-                
-                {/* Status Overview - Grid cols 3 on mobile */}
-                <div className="mb-8">
-                     <h3 className="text-sm md:text-lg font-bold text-gray-700 mb-2 md:mb-4 ml-1">Shipment Status</h3>
-                     <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
-                        <StatCard className="p-2 md:p-4" icon={<CreateIcon className="text-blue-500" />} title="Booked" value={statusCounts['Booked'] || 0} color="border-blue-500" />
-                        <StatCard className="p-2 md:p-4" icon={<TruckIcon className="text-yellow-500" />} title="Transit" value={statusCounts['In Transit'] || 0} color="border-yellow-500" />
-                        <StatCard className="p-2 md:p-4" icon={<ClockIcon className="text-orange-500" />} title="Out For Del" value={statusCounts['Out for Delivery'] || 0} color="border-orange-500" />
-                        <StatCard className="p-2 md:p-4" icon={<CheckCircleIcon className="text-green-500" />} title="Delivered" value={statusCounts['Delivered'] || 0} color="border-green-500" />
-                        <StatCard className="p-2 md:p-4" icon={<XIcon className="text-red-500" />} title="Cancelled" value={statusCounts['Cancelled'] || 0} color="border-red-500" />
-                     </div>
-                </div>
-
-                {/* Recent Activity & Chart */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                    <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50">
-                        <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Recent Lorry Receipts</h2>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs md:text-sm">
-                                <thead className="text-left text-gray-500">
-                                    <tr>
-                                        <th className="p-2">LR No.</th>
-                                        <th className="p-2 hidden sm:table-cell">Date</th>
-                                        <th className="p-2">Truck No.</th>
-                                        <th className="p-2 hidden sm:table-cell">Consignee</th>
-                                        <th className="p-2 text-right">Freight</th>
-                                        <th className="p-2 text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentLRs.map(lr => (
-                                        <tr key={lr.lrNo} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors">
-                                            <td className="p-2 font-medium text-blue-600">{lr.lrNo}</td>
-                                            <td className="p-2 hidden sm:table-cell">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
-                                            <td className="p-2">{lr.truckNo}</td>
-                                            <td className="p-2 hidden sm:table-cell truncate max-w-[100px]">{lr.consignee.name}</td>
-                                            <td className="p-2 text-right font-semibold">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
-                                            <td className="p-2 text-center">
-                                                <button onClick={() => onEditLR(lr.lrNo)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition-colors" title="Edit">
-                                                    <PencilIcon className="w-4 h-4"/>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+    // --- RENDER: MAIN SELECTION MENU ---
+    if (!activeSection) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 animate-fadeIn py-10">
+                 <h1 className="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-600 mb-8 text-center drop-shadow-sm">
+                    Welcome to Bilty Book
+                </h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl px-4">
+                    {/* LR Management Card */}
+                    <div
+                        onClick={() => setActiveSection('lr')}
+                        className="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl border border-blue-50 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center relative overflow-hidden"
+                    >
+                         <div className="absolute top-0 left-0 w-full h-2 bg-blue-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+                         <div className="bg-blue-100 p-6 rounded-full mb-6 group-hover:bg-blue-600 transition-colors duration-300 shadow-inner">
+                            <DocumentTextIcon className="w-12 h-12 text-blue-600 group-hover:text-white transition-colors" />
+                         </div>
+                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-blue-700 transition-colors">LR Management</h2>
+                         <p className="text-gray-500 leading-relaxed">Create, track, and manage Lorry Receipts. View freight analytics, generate invoices, and monitor shipment status.</p>
+                         <div className="mt-6 text-blue-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
+                            Open Dashboard →
+                         </div>
                     </div>
 
-                    <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50 flex flex-col">
-                         <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Weekly Trend</h2>
-                         <div className="flex-grow flex items-center justify-center">
-                            <div className="w-full h-48 md:h-64">
-                                <FreightTrendChart data={chartData} />
-                            </div>
+                    {/* Data Management Card */}
+                    <div
+                        onClick={() => setActiveSection('data')}
+                        className="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl border border-purple-50 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 flex flex-col items-center text-center relative overflow-hidden"
+                    >
+                         <div className="absolute top-0 left-0 w-full h-2 bg-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+                         <div className="bg-purple-100 p-6 rounded-full mb-6 group-hover:bg-purple-600 transition-colors duration-300 shadow-inner">
+                            <DashboardIcon className="w-12 h-12 text-purple-600 group-hover:text-white transition-colors" />
+                         </div>
+                         <h2 className="text-2xl font-bold text-gray-800 mb-3 group-hover:text-purple-700 transition-colors">Data Management</h2>
+                         <p className="text-gray-500 leading-relaxed">Manage Vehicle Hiring, Booking Registers, Parties, Trucks, and configure System Data & Database.</p>
+                         <div className="mt-6 text-purple-600 font-semibold flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
+                            Open Menu →
                          </div>
                     </div>
                 </div>
-            </section>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 md:space-y-10 pb-20 md:pb-0">
+            {/* Header with Back Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-center pb-2 md:pb-4 border-b">
+                <div className="flex items-center gap-4 self-start sm:self-center">
+                    <button 
+                        onClick={() => setActiveSection(null)} 
+                        className="p-2 bg-white rounded-full hover:bg-gray-100 border shadow-sm transition-all group"
+                        title="Back to Home"
+                    >
+                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 group-hover:text-blue-600" />
+                    </button>
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800 drop-shadow-sm">
+                        {activeSection === 'lr' ? 'LR Management Dashboard' : 'Data Management & Operations'}
+                    </h1>
+                </div>
+            </div>
+
+            {/* --- SECTION: LR MANAGEMENT --- */}
+            {activeSection === 'lr' && (
+                <div className="animate-slideIn">
+                    {/* Top Action Bar */}
+                     <div className="flex flex-wrap md:flex-row md:items-center justify-between gap-3 mb-6">
+                        <div className="flex items-center gap-2 md:gap-3">
+                            <div className="h-6 w-1 md:h-8 bg-blue-500 rounded-full"></div>
+                            <h2 className="text-lg md:text-xl font-bold text-gray-700">Overview & Actions</h2>
+                        </div>
+                         <div className="flex items-center gap-2 self-end md:self-auto flex-wrap">
+                             <button onClick={() => setCurrentView('invoices')} className="flex items-center bg-green-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-green-700 transition-all shadow-sm border border-green-500 text-xs md:text-base">
+                                <InvoiceIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
+                                Invoices
+                            </button>
+                            <button onClick={onViewList} className="flex items-center bg-white text-gray-700 px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-gray-50 transition-all shadow-sm border border-gray-200 text-xs md:text-base">
+                                <ListIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
+                                View List
+                            </button>
+                            <button onClick={onAddNew} className="flex items-center bg-blue-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all shadow-sm border border-blue-600 text-xs md:text-base">
+                                <CreateIcon className="w-4 h-4 md:w-5 md:h-5 mr-1.5" />
+                                Create LR
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Stat Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+                        <StatCard 
+                            icon={<TruckIcon className="text-blue-600"/>} 
+                            title="Total LRs" 
+                            value={totalLRs} 
+                            color="border-blue-500"
+                            onClick={onViewList}
+                        />
+                        <StatCard 
+                            icon={<CurrencyRupeeIcon className="text-green-600"/>} 
+                            title="Freight Value" 
+                            value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
+                            color="border-green-500"
+                        />
+                        <StatCard 
+                            icon={<UsersIcon className="text-purple-600"/>} 
+                            title="Consignors" 
+                            value={uniqueConsignors} 
+                            color="border-purple-500"
+                        />
+                        <StatCard 
+                            icon={<UploadIcon className="text-orange-600"/>} 
+                            title="Pending PODs" 
+                            value={podsPending}
+                            color="border-orange-500"
+                        />
+                    </div>
+                    
+                    {/* Status Overview */}
+                    <div className="mb-8">
+                         <h3 className="text-sm md:text-lg font-bold text-gray-700 mb-2 md:mb-4 ml-1">Shipment Status</h3>
+                         <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-4">
+                            <StatCard className="p-2 md:p-4" icon={<CreateIcon className="text-blue-500" />} title="Booked" value={statusCounts['Booked'] || 0} color="border-blue-500" />
+                            <StatCard className="p-2 md:p-4" icon={<TruckIcon className="text-yellow-500" />} title="Transit" value={statusCounts['In Transit'] || 0} color="border-yellow-500" />
+                            <StatCard className="p-2 md:p-4" icon={<ClockIcon className="text-orange-500" />} title="Out For Del" value={statusCounts['Out for Delivery'] || 0} color="border-orange-500" />
+                            <StatCard className="p-2 md:p-4" icon={<CheckCircleIcon className="text-green-500" />} title="Delivered" value={statusCounts['Delivered'] || 0} color="border-green-500" />
+                            <StatCard className="p-2 md:p-4" icon={<XIcon className="text-red-500" />} title="Cancelled" value={statusCounts['Cancelled'] || 0} color="border-red-500" />
+                         </div>
+                    </div>
+
+                    {/* Recent Activity & Chart */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                        <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50">
+                            <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Recent Lorry Receipts</h2>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs md:text-sm">
+                                    <thead className="text-left text-gray-500">
+                                        <tr>
+                                            <th className="p-2">LR No.</th>
+                                            <th className="p-2 hidden sm:table-cell">Date</th>
+                                            <th className="p-2">Truck No.</th>
+                                            <th className="p-2 hidden sm:table-cell">Consignee</th>
+                                            <th className="p-2 text-right">Freight</th>
+                                            <th className="p-2 text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recentLRs.map(lr => (
+                                            <tr key={lr.lrNo} className="border-b last:border-0 hover:bg-blue-50/50 transition-colors">
+                                                <td className="p-2 font-medium text-blue-600">{lr.lrNo}</td>
+                                                <td className="p-2 hidden sm:table-cell">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
+                                                <td className="p-2">{lr.truckNo}</td>
+                                                <td className="p-2 hidden sm:table-cell truncate max-w-[100px]">{lr.consignee.name}</td>
+                                                <td className="p-2 text-right font-semibold">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
+                                                <td className="p-2 text-center">
+                                                    <button onClick={() => onEditLR(lr.lrNo)} className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-full transition-colors" title="Edit">
+                                                        <PencilIcon className="w-4 h-4"/>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 rounded-2xl shadow-xl border border-white/50 flex flex-col">
+                             <h2 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Weekly Trend</h2>
+                             <div className="flex-grow flex items-center justify-center">
+                                <div className="w-full h-48 md:h-64">
+                                    <FreightTrendChart data={chartData} />
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- SECTION: DATA MANAGEMENT --- */}
+            {activeSection === 'data' && (
+                <div className="animate-slideIn">
+                    <p className="text-gray-500 mb-6">Select a module to manage records or configure system settings.</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-8">
+                        <ManagementCard 
+                            title="Vehicle Hiring" 
+                            description="Manage truck hiring records and payments"
+                            icon={<TruckIcon />} 
+                            onClick={() => setCurrentView('vehicle-hiring')}
+                            color="bg-orange-100 text-orange-600"
+                        />
+                        <ManagementCard 
+                            title="Booking Register" 
+                            description="Maintain booking records and freight details"
+                            icon={<ListIcon />} 
+                            onClick={() => setCurrentView('booking-register')}
+                            color="bg-green-100 text-green-600"
+                        />
+                        <ManagementCard 
+                            title="Manage Parties" 
+                            description="Add or edit consignor and consignee details"
+                            icon={<UsersIcon />} 
+                            onClick={() => setCurrentView('parties')} 
+                            color="bg-purple-100 text-purple-600"
+                        />
+                        <ManagementCard 
+                            title="Manage Trucks" 
+                            description="Maintain your fleet or hired truck database"
+                            icon={<TruckIcon />} 
+                            onClick={() => setCurrentView('trucks')} 
+                            color="bg-teal-100 text-teal-600"
+                        />
+                        <ManagementCard 
+                            title="Data Setup" 
+                            description="Database fixes and system configuration"
+                            icon={<CogIcon />} 
+                            onClick={() => setCurrentView('data-management')} 
+                            color="bg-gray-200 text-gray-700"
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

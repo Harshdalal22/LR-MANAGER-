@@ -79,6 +79,8 @@ export interface LorryReceipt {
     // Added for list view consistency
     createdBy?: string;
     user_id?: string;
+    // Fix: Added missing property to satisfy TypeScript in service functions
+    isInvoiceGenerated?: boolean;
 }
 
 export interface CompanyDetails {

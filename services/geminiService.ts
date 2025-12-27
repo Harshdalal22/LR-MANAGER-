@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { LorryReceipt } from '../types';
 import { getRecentLorryReceiptsForAI } from './supabaseService';
@@ -67,8 +68,8 @@ export const suggestLRDetails = async (
         `;
 
         const response = await client.models.generateContent({
-            // FIX: Updated model name to a valid, non-deprecated version as per Gemini API guidelines.
-            model: 'gemini-2.5-flash',
+            // FIX: Updated model to 'gemini-3-flash-preview' for text summarization/suggestion tasks.
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: 'application/json',

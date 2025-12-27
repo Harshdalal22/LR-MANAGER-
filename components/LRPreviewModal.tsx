@@ -225,16 +225,25 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="border-r-2 border-black p-2 text-center h-48 align-top font-bold text-lg">{lr.items.reduce((sum, item) => sum + item.pcs, 0)}</td>
+                        <td className="border-r-2 border-black p-2 text-center h-48 align-top">
+                             {/* Display each item's quantity in a separate line */}
+                             {lr.items.map((item, idx) => (
+                                <div key={idx} className="font-bold text-lg mb-2">{item.pcs}</div>
+                             ))}
+                             {/* Only show total if more than 1 item */}
+                             {lr.items.length > 1 && (
+                                <div className="border-t border-black mt-2 pt-1 font-bold text-sm">
+                                    Total: {lr.items.reduce((sum, item) => sum + item.pcs, 0)}
+                                </div>
+                             )}
+                        </td>
                         <td className="border-r-2 border-black p-2 align-top">
-                             <ul className="list-decimal list-inside font-semibold space-y-1">
-                                {lr.items.map((item, idx) => (
-                                    <li key={idx}>
-                                        <span className="font-bold text-black text-sm uppercase">{item.description}</span>
-                                        {/* Weight display removed as requested */}
-                                    </li>
-                                ))}
-                             </ul>
+                             {/* Display each item's description in a separate line matching Pkgs column */}
+                             {lr.items.map((item, idx) => (
+                                <div key={idx} className="font-bold text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
+                                    {item.description}
+                                </div>
+                             ))}
                         </td>
                         {/* Actual Weight column - intentionally empty */}
                         <td className="border-r border-black p-2 text-center align-top font-bold"></td>

@@ -235,7 +235,7 @@ const LRList: React.FC<LRListProps> = ({
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-900">{lr.lrNo}</div>
                                         <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
-                                        {lr.invoiceNo ? (
+                                        {lr.isInvoiceGenerated ? (
                                             <div className="text-[9px] text-green-700 font-bold bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 inline-block whitespace-nowrap">
                                                 GENERATED
                                             </div>

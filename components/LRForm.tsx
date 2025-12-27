@@ -104,9 +104,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     }, [formData.items]);
 
     useEffect(() => {
-        const calculatedFreight = (Number(formData.actualWeightMT) || 0) * (Number(formData.rate) || 0);
-        setFormData(prev => ({ ...prev, freight: calculatedFreight }));
-    }, [formData.actualWeightMT, formData.rate]);
+        // Only calculate freight automatically if not in "Fixed" mode
+        if (formData.rateOn !== 'Fixed') {
+            const calculatedFreight = (Number(formData.actualWeightMT) || 0) * (Number(formData.rate) || 0);
+            setFormData(prev => ({ ...prev, freight: calculatedFreight }));
+        }
+    }, [formData.actualWeightMT, formData.rate, formData.rateOn]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -439,8 +442,11 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                          <div><label className={labelClass}>CHARGED WEIGHT</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>RATE</label><input type="number" name="rate" value={formData.rate} onChange={handleChange} placeholder="RATE" className={inputClass} /></div>
                         <div>
-                            <label className={labelClass}>RATE ON</label>
-                            <input type="text" name="rateOn" value={formData.rateOn} readOnly className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
+                            <label className={labelClass}>CALCULATION BASIS</label>
+                            <select name="rateOn" value={formData.rateOn} onChange={handleChange} className={inputClass}>
+                                <option value="Ton">By Weight (Per Ton)</option>
+                                <option value="Fixed">Fixed Amount (By Own)</option>
+                            </select>
                         </div>
                     </Fieldset>
                     
@@ -457,7 +463,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     <Fieldset legend="Totals" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className={labelClass}>FREIGHT</label>
-                            <input type="number" name="freight" value={formData.freight} readOnly placeholder="FREIGHT" className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
+                            <input 
+                                type="number" 
+                                name="freight" 
+                                value={formData.freight} 
+                                onChange={handleChange}
+                                placeholder="FREIGHT" 
+                                readOnly={formData.rateOn !== 'Fixed'}
+                                className={`${inputClass} ${formData.rateOn !== 'Fixed' ? 'bg-gray-200 cursor-not-allowed' : 'bg-white border-blue-400'}`} 
+                            />
                         </div>
                          <div>
                             <label className={labelClass}>TOTAL OTHER CHARGES</label>

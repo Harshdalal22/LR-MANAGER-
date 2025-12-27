@@ -77,21 +77,15 @@ const App: React.FC = () => {
     const handleError = (error: unknown, context: string) => {
         let errorMessage = 'An unknown error occurred.';
     
-        // More robust error parsing to avoid '[object Object]'
         if (error instanceof Error) {
             errorMessage = error.message;
         } else if (typeof error === 'object' && error !== null) {
             const errObj = error as any;
-            if (typeof errObj.message === 'string' && errObj.message) {
-                errorMessage = errObj.message;
-            } else if (typeof errObj.error_description === 'string' && errObj.error_description) {
-                errorMessage = errObj.error_description;
-            } else if (typeof errObj.details === 'string' && errObj.details) {
-                errorMessage = errObj.details;
-            } else {
+            errorMessage = errObj.message || errObj.error_description || errObj.details || errObj.hint;
+            
+            if (!errorMessage || errorMessage === '[object Object]') {
                 try {
-                    const str = JSON.stringify(error);
-                    errorMessage = str === '{}' ? 'An unspecified error object was received.' : str;
+                    errorMessage = JSON.stringify(error);
                 } catch {
                     errorMessage = 'A non-serializable error object was received.';
                 }
@@ -103,7 +97,6 @@ const App: React.FC = () => {
         console.error(`${context}:`, error);
         const lowerMsg = errorMessage.toLowerCase();
     
-        // Consolidated check for missing tables, now including "schema cache" errors.
         if ((lowerMsg.includes('relation') && lowerMsg.includes('does not exist')) || lowerMsg.includes('in the schema cache')) {
             let featureName = "A feature";
             if (lowerMsg.includes('lorry_receipts') || lowerMsg.includes('company_details')) {
@@ -127,44 +120,10 @@ const App: React.FC = () => {
                     </div>
                 ), { duration: 15000, id: `table-missing-${featureName.replace(/\W/g, '')}` }
             );
-            return; // Early exit to prevent other toasts
+            return;
         }
         
-        // Other specific error handlers
-        if (lowerMsg.includes('failed to fetch')) {
-            toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold">Connection Failed</p>
-                        <p>Could not connect to the database. Check your internet or Supabase status.</p>
-                        <button onClick={() => toast.dismiss(t.id)} className="bg-white text-black px-2 py-1 rounded text-xs border">Dismiss</button>
-                    </div>
-                ),
-                { duration: Infinity, id: 'fetch-error' }
-            );
-        } else if (
-            // The check for outdated schema
-            errorMessage.includes("Could not find the 'branchLocations' column") || 
-            errorMessage.includes("Could not find the 'jurisdictionCity' column") ||
-            errorMessage.includes("Could not find the 'contactNumber' column") ||
-            errorMessage.includes("Could not find the 'ownerName' column") ||
-            errorMessage.includes("Could not find the 'truckNo' column") ||
-            errorMessage.includes("Could not find the 'sacCode' column") ||
-            errorMessage.includes('has no field "updated_at"')
-        ) {
-             toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold text-red-600">Database Update Required</p>
-                        <p className="text-sm">Your database schema is outdated. Please go to Data Management and run the latest SQL script.</p>
-                         <button onClick={() => { toast.dismiss(t.id); setCurrentView('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm">Go to Setup</button>
-                    </div>
-                ), { duration: Infinity, id: 'schema-error' }
-            );
-        } else {
-            // Fallback for any other error
-            toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
-        }
+        toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
     };
 
 
@@ -209,7 +168,6 @@ const App: React.FC = () => {
         if (!session) return;
         setIsLoading(true);
         try {
-            // 1. Fetch Core Data (Lorry Receipts & Company Details)
             const [lrs, details] = await Promise.all([
                 getLorryReceipts(),
                 getCompanyDetails(defaultCompanyDetails),
@@ -217,8 +175,6 @@ const App: React.FC = () => {
             setLorryReceipts(lrs);
             setCompanyDetails(details);
 
-            // 2. Fetch Optional Data (Parties & Trucks)
-            // We use Promise.allSettled so one failure doesn't break the whole app
             const [partiesResult, trucksResult] = await Promise.allSettled([
                 getSavedParties(),
                 getSavedTrucks()
@@ -266,6 +222,7 @@ const App: React.FC = () => {
             actualWeightMT: Number(lr.actualWeightMT) || 0,
             freight: Number(lr.freight) || 0,
             rate: Number(lr.rate) || 0,
+            isInvoiceGenerated: editingLR ? editingLR.isInvoiceGenerated : false,
             charges: Object.entries(lr.charges).reduce((acc, [key, value]) => {
                 acc[key as keyof typeof lr.charges] = Number(value) || 0;
                 return acc;
@@ -294,65 +251,6 @@ const App: React.FC = () => {
         }
     };
     
-    // --- Party Management Handlers ---
-    const handleSaveParty = async (party: SavedParty) => {
-        const toastId = toast.loading('Saving party...');
-        try {
-            const saved = await saveSavedParty(party);
-            setSavedParties(prev => {
-                const exists = prev.find(p => p.id === saved.id);
-                if (exists) return prev.map(p => p.id === saved.id ? saved : p);
-                return [...prev, saved].sort((a, b) => a.name.localeCompare(b.name));
-            });
-            toast.success('Party saved successfully!', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to save party");
-        }
-    };
-
-    const handleDeleteParty = async (id: string) => {
-        const toastId = toast.loading('Deleting party...');
-        try {
-            await deleteSavedParty(id);
-            setSavedParties(prev => prev.filter(p => p.id !== id));
-            toast.success('Party deleted successfully!', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to delete party");
-        }
-    };
-
-    // --- Truck Management Handlers ---
-    const handleSaveTruck = async (truck: SavedTruck) => {
-        const toastId = toast.loading('Saving truck...');
-        try {
-            const saved = await saveSavedTruck(truck);
-            setSavedTrucks(prev => {
-                 const exists = prev.find(t => t.id === saved.id);
-                if (exists) return prev.map(t => t.id === saved.id ? saved : t);
-                return [...prev, saved].sort((a, b) => a.truckNo.localeCompare(b.truckNo));
-            });
-            toast.success('Truck saved successfully!', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to save truck");
-        }
-    };
-
-    const handleDeleteTruck = async (id: string) => {
-        const toastId = toast.loading('Deleting truck...');
-        try {
-            await deleteSavedTruck(id);
-            setSavedTrucks(prev => prev.filter(t => t.id !== id));
-            toast.success('Truck deleted successfully!', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to delete truck");
-        }
-    };
-
-
     const handleUpdateLRStatus = async (lrNo: string, status: LRStatus) => {
         const originalLRs = [...lorryReceipts];
         const updatedLRs = lorryReceipts.map(lr => 
@@ -378,7 +276,7 @@ const App: React.FC = () => {
             await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
             setLorryReceipts(prev => prev.map(lr => 
                 lrNos.includes(lr.lrNo) 
-                    ? { ...lr, invoiceNo, invoiceDate } 
+                    ? { ...lr, invoiceNo, invoiceDate, isInvoiceGenerated: true } 
                     : lr
             ));
             toast.success('Invoice Generated Successfully', { id: toastId });
@@ -389,57 +287,16 @@ const App: React.FC = () => {
         }
     };
     
-    const handleUploadPOD = async (lr: LorryReceipt, file: File) => {
-        const toastId = toast.loading('Uploading POD...');
+    const handleSignOut = async () => {
+        const toastId = toast.loading('Signing out...');
         try {
-            const updatedLR = await uploadPOD(file, lr.lrNo);
-            setLorryReceipts(lorryReceipts.map(r => r.lrNo === updatedLR.lrNo ? updatedLR : r));
-            toast.success('POD uploaded successfully!', { id: toastId });
-            setUploadingPODFor(null);
+            await signOut();
+            toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
-            handleError(error, "Failed to upload POD");
+            handleError(error, "Sign out failed");
         }
     };
-    
-    const handleViewPOD = async (podPath: string) => {
-        const toastId = toast.loading('Generating secure link...');
-        try {
-            const signedUrl = await getPodSignedUrl(podPath);
-            window.open(signedUrl, '_blank');
-            toast.dismiss(toastId);
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to view POD");
-        }
-    };
-
-    const handleUploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string | null> => {
-        const toastId = toast.loading(`Uploading ${assetType}...`);
-        try {
-            const url = await uploadCompanyAsset(file, assetType);
-            toast.success(`${assetType.charAt(0).toUpperCase() + assetType.slice(1)} uploaded successfully!`, { id: toastId });
-            return url;
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, `Failed to upload ${assetType}`);
-            return null;
-        }
-    };
-
-
-    const handleAddNew = () => {
-        setEditingLR(null);
-        setCurrentView('form');
-    };
-
-    const handleViewList = () => {
-        setCurrentView('list');
-    }
-
-    const handleBackToDashboard = () => {
-        setCurrentView('dashboard');
-    }
 
     const handleEditLR = (lrNo: string) => {
         const lrToEdit = lorryReceipts.find(lr => lr.lrNo === lrNo);
@@ -470,44 +327,14 @@ const App: React.FC = () => {
         }
     };
 
-    const handleCancelForm = () => {
-        setEditingLR(null);
-        setCurrentView('list');
-    };
-    
-    const handleUpdateCompanyDetails = async (details: CompanyDetails): Promise<boolean> => {
-        const toastId = toast.loading('Saving settings...');
-        try {
-            const savedDetails = await saveCompanyDetails(details);
-            setCompanyDetails(savedDetails);
-            toast.success('Settings saved successfully!', { id: toastId });
-            return true;
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Failed to save settings");
-            return false;
-        }
-    };
-    
-    const handleSignOut = async () => {
-        const toastId = toast.loading('Signing out...');
-        try {
-            await signOut();
-            toast.success('Signed out successfully.', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Sign out failed");
-        }
-    };
-
     const renderContent = () => {
         switch (currentView) {
             case 'dashboard':
                 return (
                     <Dashboard 
                         lorryReceipts={lorryReceipts}
-                        onAddNew={handleAddNew}
-                        onViewList={handleViewList}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onViewList={() => setCurrentView('list')}
                         onEditLR={handleEditLR}
                         setCurrentView={setCurrentView}
                     />
@@ -519,11 +346,14 @@ const App: React.FC = () => {
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
                         companyDetails={companyDetails}
-                        onAddNew={handleAddNew}
-                        onBackToDashboard={handleBackToDashboard}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onBackToDashboard={() => setCurrentView('dashboard')}
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
-                        onViewPOD={handleViewPOD}
+                        onViewPOD={async (path) => {
+                            const url = await getPodSignedUrl(path);
+                            window.open(url, '_blank');
+                        }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                     />
                 );
@@ -532,7 +362,7 @@ const App: React.FC = () => {
                      <LRForm 
                         onSave={handleSaveLR}
                         existingLR={editingLR}
-                        onCancel={handleCancelForm}
+                        onCancel={() => { setEditingLR(null); setCurrentView('list'); }}
                         companyDetails={companyDetails}
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}
@@ -543,32 +373,30 @@ const App: React.FC = () => {
                 return (
                     <PartyManagement 
                         savedParties={savedParties}
-                        onSave={handleSaveParty}
-                        onDelete={handleDeleteParty}
-                        onBack={handleBackToDashboard}
+                        onSave={async (p) => { await saveSavedParty(p); await fetchData(); }}
+                        onDelete={async (id) => { await deleteSavedParty(id); await fetchData(); }}
+                        onBack={() => setCurrentView('dashboard')}
                     />
                 );
             case 'trucks':
                 return (
                     <TruckManagement 
                         savedTrucks={savedTrucks}
-                        onSave={handleSaveTruck}
-                        onDelete={handleDeleteTruck}
-                        onBack={handleBackToDashboard}
+                        onSave={async (t) => { await saveSavedTruck(t); await fetchData(); }}
+                        onDelete={async (id) => { await deleteSavedTruck(id); await fetchData(); }}
+                        onBack={() => setCurrentView('dashboard')}
                     />
                 );
-            case 'vehicle-hiring':
-                return <VehicleHiring onBack={handleBackToDashboard} />;
-            case 'booking-register':
-                return <BookingRegister onBack={handleBackToDashboard} />;
-            case 'data-management':
-                return <DataManagement onBack={handleBackToDashboard} />;
-            case 'invoices':
+            case 'vehicle-hiring': return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
+            case 'booking-register': return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
+            case 'data-management': return <DataManagement onBack={() => setCurrentView('dashboard')} />;
+            case 'invoices': 
                 return (
                     <InvoiceList 
-                        lorryReceipts={lorryReceipts}
-                        companyDetails={companyDetails}
-                        onBack={handleBackToDashboard}
+                        lorryReceipts={lorryReceipts} 
+                        companyDetails={companyDetails} 
+                        onBack={() => setCurrentView('dashboard')} 
+                        onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                     />
                 );
             default:
@@ -579,21 +407,15 @@ const App: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-gray-200">
-                <div className="text-center">
-                    <svg className="animate-spin h-10 w-10 text-ssk-blue mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p className="mt-4 text-lg font-semibold text-gray-700">Loading Bilty Book...</p>
-                </div>
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <p className="text-lg font-semibold text-gray-700">Loading Bilty Book...</p>
             </div>
         );
     }
 
     if (!session) {
         return (
-             <div className="bg-gradient-to-br from-slate-50 to-gray-200 min-h-screen font-sans">
+             <div className="bg-slate-50 min-h-screen">
                  <Toaster position="top-center" />
                  <Auth />
             </div>
@@ -602,12 +424,12 @@ const App: React.FC = () => {
 
 
     return (
-        <div className="bg-gradient-to-br from-slate-50 to-gray-200 min-h-screen font-sans">
+        <div className="bg-slate-50 min-h-screen font-sans">
             <Toaster position="top-center" />
             <Header 
                 companyDetails={companyDetails} 
-                onUpdateDetails={handleUpdateCompanyDetails}
-                onUploadAsset={handleUploadCompanyAsset}
+                onUpdateDetails={async (d) => { const s = await saveCompanyDetails(d); setCompanyDetails(s); return true; }}
+                onUploadAsset={uploadCompanyAsset}
                 userEmail={session.user.email}
                 onSignOut={handleSignOut}
             />
@@ -620,7 +442,12 @@ const App: React.FC = () => {
                     isOpen={!!uploadingPODFor}
                     onClose={() => setUploadingPODFor(null)}
                     lr={uploadingPODFor}
-                    onUpload={handleUploadPOD}
+                    onUpload={async (lr, file) => {
+                        const updated = await uploadPOD(file, lr.lrNo);
+                        setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
+                        setUploadingPODFor(null);
+                        toast.success('POD uploaded successfully');
+                    }}
                 />
             )}
         </div>

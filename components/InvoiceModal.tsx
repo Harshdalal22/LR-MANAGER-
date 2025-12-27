@@ -207,24 +207,40 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                  setBillNo(existingInvoiceNo);
              } else {
                  // Automated numbering logic
-                 // 1. Get Prefix (First 3 chars of company name)
-                 const prefix = (companyDetails.name || 'INV').substring(0, 3).toUpperCase();
                  
-                 // 2. Find maximum existing number in all receipts to find the next one
-                 let maxNum = 0;
+                 // 1. Get Prefix: First 3 alphabets of company name (Uppercase)
+                 const companyName = companyDetails.name || '';
+                 // Filter out symbols, spaces, numbers - keep only A-Z
+                 const cleanName = companyName.replace(/[^a-zA-Z]/g, '');
+                 // Take first 3 chars, default to 'INV' if empty
+                 const prefix = (cleanName.substring(0, 3) || 'INV').toUpperCase();
+                 
+                 // 2. Find the highest existing sequence number for THIS prefix
+                 let maxSeq = 0;
+                 
+                 // Regex to match "PREFIX-0001" format.
+                 // We look for anything starting with the prefix, followed by strictly digits (with or without hyphen)
+                 // This ensures "ABC-0001" matches, and finds "1"
+                 const pattern = new RegExp(`^${prefix}[-_]?(\\d+)$`, 'i');
+
                  allLorryReceipts.forEach(lr => {
-                     if (lr.invoiceNo && lr.invoiceNo.startsWith(prefix)) {
-                         const match = lr.invoiceNo.match(/\d+$/);
+                     if (lr.invoiceNo) {
+                         const match = lr.invoiceNo.match(pattern);
                          if (match) {
-                             const num = parseInt(match[0], 10);
-                             if (num > maxNum) maxNum = num;
+                             const num = parseInt(match[1], 10);
+                             if (!isNaN(num) && num > maxSeq) {
+                                 maxSeq = num;
+                             }
                          }
                      }
                  });
                  
-                 // 3. Increment and pad with 4 zeros
-                 const nextNumStr = (maxNum + 1).toString().padStart(4, '0');
-                 setBillNo(`${prefix}-${nextNumStr}`);
+                 // 3. Increment and format as 4-digit number (0001, 0002, ...)
+                 const nextSeq = maxSeq + 1;
+                 const nextSeqStr = nextSeq.toString().padStart(4, '0');
+                 
+                 // Set format: ABC-0001
+                 setBillNo(`${prefix}-${nextSeqStr}`);
              }
             
             setBillDate(new Date().toISOString().split('T')[0]);

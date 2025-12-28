@@ -31,6 +31,7 @@ import {
     getPodSignedUrl, 
     deletePOD, 
     updateLorryReceiptInvoiceDetails,
+    deleteInvoice,
     getSavedParties,
     saveSavedParty,
     deleteSavedParty,
@@ -152,6 +153,19 @@ const App: React.FC = () => {
         }
     };
 
+    // Dynamic Favicon Update: Updates the "logo of website on domain name" based on company logo
+    useEffect(() => {
+        if (companyDetails.logoUrl) {
+            let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+            if (!link) {
+                link = document.createElement('link');
+                link.rel = 'icon';
+                document.getElementsByTagName('head')[0].appendChild(link);
+            }
+            link.href = companyDetails.logoUrl;
+        }
+    }, [companyDetails.logoUrl]);
+
 
     useEffect(() => {
         let authSubscription: Subscription | null = null;
@@ -271,7 +285,6 @@ const App: React.FC = () => {
                 saveSavedTruck({ truckNo: truckNum })
                     .then(newTruck => {
                         setSavedTrucks(prev => {
-                            // Check again to avoid race condition duplicates
                             if (prev.some(t => t.truckNo.toLowerCase() === newTruck.truckNo.toLowerCase())) return prev;
                             return [...prev, newTruck];
                         });
@@ -285,14 +298,12 @@ const App: React.FC = () => {
                 { ...savedLr.consignee, type: 'Consignee' as const }
             ];
 
-            // If billing party is different from both, check it too
             if (savedLr.billingTo?.name && 
                 savedLr.billingTo.name !== savedLr.consignor.name && 
                 savedLr.billingTo.name !== savedLr.consignee.name) {
                 partiesToCheck.push({ ...savedLr.billingTo, type: 'Consignor' as const });
             }
 
-            // Dedupe locally before processing
             const uniquePartiesToSave = new Map<string, typeof partiesToCheck[0]>();
             partiesToCheck.forEach(p => {
                 if (p.name && !uniquePartiesToSave.has(p.name.toLowerCase())) {
@@ -300,7 +311,6 @@ const App: React.FC = () => {
                 }
             });
 
-            // Save new parties
             uniquePartiesToSave.forEach(p => {
                 const exists = savedParties.some(sp => sp.name.toLowerCase() === p.name.toLowerCase());
                 if (!exists) {
@@ -366,11 +376,30 @@ const App: React.FC = () => {
             handleError(error, "Failed to generate Invoice");
         }
     };
+
+    const handleDeleteInvoice = async (invoiceNo: string) => {
+        if(!window.confirm(`Are you sure you want to delete Invoice ${invoiceNo}? Associated LRs will revert to pending status.`)) return;
+
+        const toastId = toast.loading('Deleting Invoice...');
+        try {
+            await deleteInvoice(invoiceNo);
+            setLorryReceipts(prev => prev.map(lr => 
+                lr.invoiceNo === invoiceNo 
+                    ? { ...lr, invoiceNo: '', invoiceDate: null, isInvoiceGenerated: false } 
+                    : lr
+            ));
+            toast.success('Invoice Deleted Successfully', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to delete Invoice");
+        }
+    };
     
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
         try {
             await signOut();
+            setSession(null); // Clear session immediately
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
@@ -481,6 +510,7 @@ const App: React.FC = () => {
                         companyDetails={companyDetails} 
                         onBack={handleBack} 
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                        onDeleteInvoice={handleDeleteInvoice}
                     />
                 );
             default:

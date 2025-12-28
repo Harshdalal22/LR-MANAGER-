@@ -145,6 +145,22 @@ export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceN
     if (error) throw error;
 };
 
+export const deleteInvoice = async (invoiceNo: string): Promise<void> => {
+    const user = await getCurrentUser();
+    const { error } = await getSupabase()
+        .from('lorry_receipts')
+        .update({ 
+            invoiceNo: null, 
+            invoiceDate: null, 
+            is_invoice_generated: false, 
+            updated_at: new Date().toISOString() 
+        })
+        .eq('user_id', user.id)
+        .eq('invoiceNo', invoiceNo);
+    
+    if (error) throw error;
+};
+
 // --- Company Details Functions ---
 export const getCompanyDetails = async (defaultDetails: CompanyDetails): Promise<CompanyDetails> => {
     const user = await getCurrentUser();

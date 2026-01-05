@@ -197,17 +197,20 @@ const App: React.FC = () => {
         if (error instanceof Error) {
             message = error.message;
         } else if (typeof error === 'object' && error !== null) {
-            // Handle Supabase and other error objects
             const anyError = error as any;
-            // Prioritize specific error fields
             const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
             
             if (extractedMessage) {
                 message = extractedMessage;
                 if (anyError.details) message += ` (${anyError.details})`;
                 if (anyError.hint) message += ` Hint: ${anyError.hint}`;
+
+                // Add specific hint for 403 RLS errors
+                if (String(anyError.status) === '403' || message.toLowerCase().includes('rls')) {
+                    message = "Permission Denied. Please run the complete 'Fix SQL Script' from the Data Management section to apply security policies.";
+                }
+
             } else {
-                // If no standard message field is found, try to stringify the object
                 try {
                     message = `${fallbackMessage}: ${JSON.stringify(anyError)}`;
                 } catch {
@@ -218,7 +221,7 @@ const App: React.FC = () => {
             message = error;
         }
         
-        toast.error(message);
+        toast.error(message, { duration: 8000 });
     };
 
     const navigateTo = (view: View) => {
@@ -280,4 +283,3270 @@ const App: React.FC = () => {
 
         setupAuth();
 
-        return ()
+        return () => {
+            authSubscription?.unsubscribe();
+        };
+    }, []);
+
+    const fetchData = async () => {
+        if (!session) return;
+        setIsLoading(true);
+        try {
+            const [lrs, company, parties, trucks] = await Promise.all([
+                getLorryReceipts(),
+                getCompanyDetails(),
+                getSavedParties(),
+                getSavedTrucks()
+            ]);
+            setLorryReceipts(lrs);
+            if (company) setCompanyDetails(company);
+            setSavedParties(parties);
+            setSavedTrucks(trucks);
+        } catch (error) {
+            handleError(error, "Failed to load data");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (session) {
+            fetchData();
+        }
+    }, [session]);
+
+    const handleSaveLR = async (lr: LorryReceipt) => {
+        const toastId = toast.loading('Saving LR...');
+        try {
+            const savedLR = await saveLorryReceipt(lr);
+            setLorryReceipts(prev => {
+                const index = prev.findIndex(item => item.lrNo === savedLR.lrNo);
+                if (index >= 0) {
+                    const newArray = [...prev];
+                    newArray[index] = savedLR;
+                    return newArray;
+                }
+                return [savedLR, ...prev];
+            });
+            toast.success('LR Saved Successfully', { id: toastId });
+            navigateTo('list');
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to save LR");
+        }
+    };
+
+    const handleUpdateLRStatus = async (lrNo: string, status: LRStatus) => {
+        try {
+            await updateLorryReceiptStatus(lrNo, status);
+            setLorryReceipts(prev => prev.map(lr => lr.lrNo === lrNo ? { ...lr, status, status_updated_at: new Date().toISOString() } : lr));
+            toast.success(`Status updated to ${status}`);
+        } catch (error) {
+            handleError(error, "Failed to update status");
+        }
+    };
+
+    const handleUpdateInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
+        const toastId = toast.loading('Updating Invoice details...');
+        try {
+            await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
+            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { ...lr, invoiceNo, invoiceDate, isInvoiceGenerated: true } : lr));
+            toast.success('Invoice details updated', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to update invoice details");
+        }
+    };
+
+    const handleDeleteLR = async (lrNo: string) => {
+        if (!confirm("Are you sure you want to delete this LR?")) return;
+        const toastId = toast.loading('Deleting LR...');
+        try {
+            await deleteLorryReceipt(lrNo);
+            setLorryReceipts(prev => prev.filter(lr => lr.lrNo !== lrNo));
+            toast.success('LR Deleted', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to delete LR");
+        }
+    };
+
+    const handleUpdatePassword = async (password: string) => {
+        const toastId = toast.loading('Updating password...');
+        try {
+            await updateUserPassword(password);
+            toast.success('Password updated successfully!', { id: toastId });
+            setIsPasswordResetting(false);
+            navigateTo('dashboard');
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to update password");
+        }
+    };
+
+    const handleSignOut = async () => {
+        const toastId = toast.loading('Signing out...');
+        try {
+            await signOut();
+            setSession(null);
+            setIsPasswordResetting(false);
+            toast.success('Signed out successfully.', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Sign out failed");
+        }
+    };
+
+    const handleEditLR = (lrNo: string) => {
+        const lr = lorryReceipts.find(l => l.lrNo === lrNo);
+        if (lr) {
+            setEditingLR(lr);
+            setCurrentView('form');
+        }
+    };
+
+    const renderContent = () => {
+        switch (currentView) {
+            case 'dashboard':
+                return (
+                    <Dashboard 
+                        lorryReceipts={lorryReceipts}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onViewList={() => setCurrentView('list')}
+                        onEditLR={handleEditLR}
+                        setCurrentView={setCurrentView}
+                        language={language}
+                        activeSection={dashboardSection}
+                        setActiveSection={setDashboardSection}
+                    />
+                );
+            case 'list':
+                return (
+                    <LRList 
+                        lorryReceipts={lorryReceipts}
+                        onEdit={handleEditLR}
+                        onDelete={handleDeleteLR}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        companyDetails={companyDetails}
+                        onBackToDashboard={() => setCurrentView('dashboard')}
+                        onUpdateStatus={handleUpdateLRStatus}
+                        onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
+                        onViewPOD={async (path) => {
+                           try {
+                               const url = await getPodSignedUrl(path);
+                               window.open(url, '_blank');
+                           } catch(e) { toast.error("Could not load POD"); }
+                        }}
+                        onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                        language={language}
+                    />
+                );
+            case 'form':
+                return (
+                    <LRForm 
+                        onSave={handleSaveLR}
+                        existingLR={editingLR}
+                        onCancel={() => { setEditingLR(null); setCurrentView('dashboard'); }}
+                        companyDetails={companyDetails}
+                        lorryReceipts={lorryReceipts}
+                        savedParties={savedParties}
+                        savedTrucks={savedTrucks}
+                        language={language}
+                    />
+                );
+            case 'vehicle-hiring':
+                return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
+            case 'booking-register':
+                return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
+            case 'data-management':
+                return <DataManagement onBack={() => setCurrentView('dashboard')} />;
+            case 'parties':
+                return (
+                    <PartyManagement 
+                        savedParties={savedParties} 
+                        onSave={async (p) => { 
+                            await saveSavedParty(p); 
+                            setSavedParties(await getSavedParties()); 
+                            toast.success("Party saved");
+                        }} 
+                        onDelete={async (id) => {
+                            await deleteSavedParty(id);
+                            setSavedParties(prev => prev.filter(x => x.id !== id));
+                        }} 
+                        onBack={() => setCurrentView('dashboard')} 
+                    />
+                );
+            case 'trucks':
+                return (
+                    <TruckManagement 
+                        savedTrucks={savedTrucks} 
+                        onSave={async (t) => {
+                             await saveSavedTruck(t);
+                             setSavedTrucks(await getSavedTrucks());
+                             toast.success("Truck saved");
+                        }} 
+                        onDelete={async (id) => {
+                            await deleteSavedTruck(id);
+                            setSavedTrucks(prev => prev.filter(x => x.id !== id));
+                        }} 
+                        onBack={() => setCurrentView('dashboard')} 
+                    />
+                );
+            case 'invoices':
+                return (
+                    <InvoiceList 
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        onBack={() => setCurrentView('dashboard')}
+                        onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                    />
+                );
+            default:
+                return <div>View Not Found</div>;
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <p className="text-lg font-semibold text-gray-700">Loading Bilty Book...</p>
+            </div>
+        );
+    }
+
+    if (!session) {
+        return (
+             <div className="bg-slate-50 min-h-screen">
+                 <Toaster position="top-center" />
+                 <Auth />
+            </div>
+        );
+    }
+
+
+    return (
+        <div className="bg-slate-50 min-h-screen font-sans">
+            <Toaster position="top-center" />
+            <Header 
+                companyDetails={companyDetails} 
+                onUpdateDetails={async (d) => { const s = await saveCompanyDetails(d); setCompanyDetails(s); return true; }}
+                onUploadAsset={uploadCompanyAsset}
+                userEmail={session.user.email}
+                onSignOut={handleSignOut}
+                language={language}
+                setLanguage={setLanguage}
+            />
+            <main className="container mx-auto p-4 md:p-6">
+                {renderContent()}
+                <AdBanner />
+            </main>
+            {uploadingPODFor && (
+                <PODUploadModal 
+                    isOpen={!!uploadingPODFor}
+                    onClose={() => setUploadingPODFor(null)}
+                    lr={uploadingPODFor}
+                    onUpload={async (lr, file) => {
+                        try {
+                            const updated = await uploadPOD(file, lr.lrNo);
+                            setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
+                            setUploadingPODFor(null);
+                            toast.success('POD uploaded successfully');
+                        } catch (e) {
+                            handleError(e, "Failed to upload POD");
+                        }
+                    }}
+                />
+            )}
+            {isPasswordResetting && (
+                <PasswordResetModal 
+                    isOpen={isPasswordResetting}
+                    onSubmit={handleUpdatePassword}
+                    onCancel={() => setIsPasswordResetting(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+export default App;--- START OF FILE types.ts ---
+
+
+export interface PartyDetails {
+    name: string;
+    address: string;
+    city: string;
+    contact: string;
+    pan: string;
+    gst: string;
+}
+
+export interface Item {
+    description: string;
+    pcs: number;
+    weight: number;
+}
+
+export interface BankDetails {
+    name: string;
+    branch: string;
+    accountNo: string;
+    ifscCode: string;
+}
+
+export interface DetailedCharges {
+    hamail: number;
+    surCharge: number;
+    stCharge: number;
+    collectionCharge: number;
+    ddCharge: number;
+    otherCharge: number;
+    riskCharge: number;
+}
+
+export type LRStatus = 'Booked' | 'In Transit' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
+
+export interface LorryReceipt {
+    lrType: 'Original' | 'Dummy';
+    truckNo: string;
+    lrNo: string;
+    date: string;
+    fromPlace: string;
+    toPlace: string;
+
+    invoiceNo: string;
+    invoiceAmount: number;
+    invoiceDate: string | null;
+    poNo: string;
+    poDate: string | null;
+
+    ewayBillNo: string;
+    ewayBillDate: string | null;
+    ewayExDate: string | null;
+    
+    addressOfDelivery: string;
+    chargedWeight: number;
+
+    billingTo: PartyDetails;
+    gstPaidBy: string;
+
+    consignor: PartyDetails;
+    consignee: PartyDetails;
+
+    items: Item[];
+
+    weight: number;
+    actualWeightMT: number;
+
+    freight: number;
+    charges: DetailedCharges;
+    rate: number;
+    rateOn: string;
+
+    remark: string;
+
+    status: LRStatus;
+    status_updated_at?: string;
+    pod_path?: string;
+
+    // Added for list view consistency
+    createdBy?: string;
+    user_id?: string;
+    // Fix: Added missing property to satisfy TypeScript in service functions
+    isInvoiceGenerated?: boolean;
+}
+
+export interface CompanyDetails {
+    name: string;
+    logoUrl: string;
+    signatureImageUrl: string;
+    tagline: string;
+    address: string;
+
+    email: string;
+    web: string;
+    contact: string[];
+    pan: string;
+    gstn: string;
+    sacCode?: string; // Added SAC/HSN Code
+    bankDetails: BankDetails;
+    user_id?: string;
+    jurisdictionCity: string;
+    branchLocations: string[];
+}
+
+export interface SavedParty extends PartyDetails {
+    id?: string;
+    type: 'Consignor' | 'Consignee' | 'Both';
+    user_id?: string;
+}
+
+export interface SavedTruck {
+    id?: string;
+    truckNo: string;
+    ownerName?: string;
+    contactNumber?: string;
+    user_id?: string;
+}
+
+export interface PaymentRecord {
+    amount: number;
+    date: string;
+    notes?: string;
+}
+
+export interface VehicleHiring {
+    id?: string;
+    bookingId?: string;
+    date: string;
+    grNo: string;
+    billNo: string;
+    lorryNo: string;
+    driverNo: string;
+    ownerName: 'Self' | 'Third Party';
+    fromPlace: string;
+    toPlace: string;
+    freight: number;
+    advance: number;
+    advances?: PaymentRecord[];
+    balance: number;
+    otherExpenses: number;
+    totalBalance: number;
+    podStatus: 'Pending' | 'Completed';
+    paymentStatus: 'Pending' | 'Completed';
+    user_id?: string;
+}
+
+export interface BookingRecord {
+    id?: string;
+    bookingId?: string;
+    partyName: string;
+    date: string;
+    grNo: string;
+    billNo: string;
+    lorryNo: string;
+    lorryType: 'Open' | 'Closed';
+    weight: number;
+    fromPlace: string;
+    toPlace: string;
+    freight: number;
+    advance: number;
+    advances?: PaymentRecord[];
+    balance: number;
+    otherExpenses: number;
+    totalBalance: number;
+    paymentStatus: 'Pending' | 'Completed';
+    user_id?: string;
+}
+
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices';--- START OF FILE services/geminiService.ts ---
+
+
+import { GoogleGenAI, Type } from "@google/genai";
+import { LorryReceipt } from '../types';
+import { getRecentLorryReceiptsForAI } from './supabaseService';
+
+// Lazily initialize the AI client to prevent crash on load if API_KEY is not set.
+let ai: GoogleGenAI | null = null;
+
+const getAiClient = (): GoogleGenAI => {
+    if (!process.env.API_KEY) {
+        // This error will be caught by the calling function's try-catch block.
+        throw new Error("API_KEY environment variable is not configured.");
+    }
+    if (!ai) {
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+};
+
+const partyDetailsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING },
+        address: { type: Type.STRING },
+        city: { type: Type.STRING },
+        contact: { type: Type.STRING },
+        pan: { type: Type.STRING },
+        gst: { type: Type.STRING },
+    },
+};
+
+const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        consignor: partyDetailsSchema,
+        consignee: partyDetailsSchema,
+        billingTo: partyDetailsSchema,
+        invoiceNo: { type: Type.STRING, description: "A suggested invoice number, potentially following a pattern from previous LRs." },
+        remark: { type: Type.STRING, description: "A relevant remark for the shipment." },
+    },
+};
+
+export const suggestLRDetails = async (
+    currentLR: LorryReceipt
+): Promise<Partial<LorryReceipt> | null> => {
+    try {
+        const client = getAiClient(); // Get client on demand. This will throw if API key is missing.
+
+        // Fetch recent LRs directly from Supabase for context
+        const examples = await getRecentLorryReceiptsForAI(10);
+
+        const prompt = `
+            You are an intelligent assistant for a logistics company helping fill out a Lorry Receipt (LR) form.
+            Based on the provided list of previous LRs for context and a new, partially filled LR, your task is to predict and suggest values for the *empty* fields in the new LR.
+
+            Context of previous LRs (up to 10 most recent):
+            ${JSON.stringify(examples, null, 2)}
+
+            New, partially filled LR:
+            ${JSON.stringify(currentLR, null, 2)}
+            
+            Please analyze the patterns. For example:
+            - If a specific truck number frequently travels between the same 'from' and 'to' places for the same companies, suggest those consignor and consignee details.
+            - If invoice numbers follow a sequence or pattern, suggest the next logical one.
+            - Suggest common remarks for similar shipments.
+
+            Return your suggestions as a JSON object adhering to the provided schema. Only include fields for which you have a confident suggestion. Do not suggest values for fields that are already filled in the new LR.
+        `;
+
+        const response = await client.models.generateContent({
+            // FIX: Updated model to 'gemini-3-flash-preview' for text summarization/suggestion tasks.
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema,
+            },
+        });
+
+        const text = response.text?.trim();
+        if (text) {
+            return JSON.parse(text) as Partial<LorryReceipt>;
+        }
+        return null;
+
+    } catch (error) {
+        console.error("Error calling Gemini API:", error);
+        // Propagate the error message to be displayed in a toast
+        if (error instanceof Error) {
+            throw new Error(`AI Service Error: ${error.message}`);
+        }
+        throw new Error("An unknown error occurred in the AI service.");
+    }
+};--- START OF FILE components/Header.tsx ---
+
+
+import React, { useState } from 'react';
+import { CompanyDetails } from '../types';
+import { CogIcon, XIcon, SpinnerIcon, GlobeIcon } from './icons';
+import { Language, t } from '../utils/translations';
+
+interface HeaderProps {
+    companyDetails: CompanyDetails;
+    onUpdateDetails: (details: CompanyDetails) => Promise<boolean>;
+    onUploadAsset: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
+    userEmail?: string;
+    onSignOut?: () => void;
+    language: Language;
+    setLanguage: (lang: Language) => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ companyDetails, onUpdateDetails, onUploadAsset, userEmail, onSignOut, language, setLanguage }) => {
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [localDetails, setLocalDetails] = useState(companyDetails);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+
+
+    const handleSaveSettings = async () => {
+        const success = await onUpdateDetails(localDetails);
+        if (success) {
+            setIsSettingsOpen(false);
+        }
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setIsUploadingLogo(true);
+            const url = await onUploadAsset(file, 'logo');
+            if(url) {
+                setLocalDetails(prev => ({ ...prev, logoUrl: url }));
+            }
+            setIsUploadingLogo(false);
+        }
+    };
+    
+    const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setIsUploadingSignature(true);
+            const url = await onUploadAsset(file, 'signature');
+            if (url) {
+                setLocalDetails(prev => ({ ...prev, signatureImageUrl: url }));
+            }
+            setIsUploadingSignature(false);
+        }
+    };
+
+
+    return (
+        <header className="bg-ssk-blue text-white shadow-lg sticky top-0 z-30">
+            <div className="container mx-auto p-4 flex justify-between items-center">
+                <div className="flex items-center space-x-2 sm:space-x-4">
+                    {companyDetails.logoUrl && (
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-10 sm:h-12 w-20 sm:w-24 object-contain bg-white p-1 rounded-sm"/>
+                    )}
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{companyDetails.name}</h1>
+                </div>
+                <div className="flex items-center gap-4">
+                    
+                    {/* Language Switcher */}
+                    <div className="flex items-center bg-blue-800 rounded-full p-1 border border-blue-600">
+                        <button 
+                            onClick={() => setLanguage('en')}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'en' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                        >
+                            EN
+                        </button>
+                        <button 
+                            onClick={() => setLanguage('hi')}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'hi' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                        >
+                            HI
+                        </button>
+                    </div>
+
+                    {userEmail && (
+                        <div className="hidden sm:flex items-center gap-4">
+                            <span className="text-sm font-medium">{userEmail}</span>
+                            <button 
+                                onClick={onSignOut}
+                                className="bg-ssk-red text-white px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-red-700 transition-colors"
+                            >
+                                {t[language].signOut}
+                            </button>
+                        </div>
+                    )}
+                    <button 
+                        onClick={() => {
+                            setLocalDetails(companyDetails);
+                            setIsSettingsOpen(true);
+                        }}
+                        className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                        aria-label="Open Settings"
+                    >
+                        <CogIcon className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+            {isSettingsOpen && (
+                <div className="fixed inset-0 bg-black/60 z-40 flex items-center justify-center p-4">
+                    <div className="bg-white text-gray-800 rounded-lg shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-2xl font-bold">{t[language].settings}</h2>
+                            <button onClick={() => setIsSettingsOpen(false)} className="p-1 rounded-full hover:bg-gray-200">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Company Name</label>
+                                <input type="text" value={localDetails.name} onChange={(e) => setLocalDetails({...localDetails, name: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Tagline</label>
+                                <input type="text" value={localDetails.tagline} onChange={(e) => setLocalDetails({...localDetails, tagline: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Address</label>
+                                <textarea value={localDetails.address} onChange={(e) => setLocalDetails({...localDetails, address: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows={2}></textarea>
+                            </div>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                                    <input type="email" value={localDetails.email} onChange={(e) => setLocalDetails({...localDetails, email: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Website</label>
+                                    <input type="text" value={localDetails.web} onChange={(e) => setLocalDetails({...localDetails, web: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                             </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">PAN No.</label>
+                                    <input type="text" value={localDetails.pan} onChange={(e) => setLocalDetails({...localDetails, pan: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">GSTN</label>
+                                    <input type="text" value={localDetails.gstn} onChange={(e) => setLocalDetails({...localDetails, gstn: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                             </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">SAC/HSN Code</label>
+                                <input type="text" value={localDetails.sacCode || ''} onChange={(e) => setLocalDetails({...localDetails, sacCode: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="e.g. 9965" />
+                            </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700">Contact Numbers (comma-separated)</label>
+                                <input type="text" value={localDetails.contact.join(', ')} onChange={(e) => setLocalDetails({...localDetails, contact: e.target.value.split(',').map(s => s.trim())})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-medium text-gray-700">Jurisdiction City</label>
+                                <input type="text" value={localDetails.jurisdictionCity} onChange={(e) => setLocalDetails({...localDetails, jurisdictionCity: e.target.value})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Branch Locations (comma-separated)</label>
+                                <input type="text" value={localDetails.branchLocations.join(', ')} onChange={(e) => setLocalDetails({...localDetails, branchLocations: e.target.value.split(',').map(s => s.trim())})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+
+                            <h3 className="text-lg font-semibold border-b mt-4 mb-2">Bank Details</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Bank Name</label>
+                                    <input type="text" value={localDetails.bankDetails.name} onChange={(e) => setLocalDetails({...localDetails, bankDetails: {...localDetails.bankDetails, name: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Branch</label>
+                                    <input type="text" value={localDetails.bankDetails.branch} onChange={(e) => setLocalDetails({...localDetails, bankDetails: {...localDetails.bankDetails, branch: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Account Number</label>
+                                    <input type="text" value={localDetails.bankDetails.accountNo} onChange={(e) => setLocalDetails({...localDetails, bankDetails: {...localDetails.bankDetails, accountNo: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">IFSC Code</label>
+                                    <input type="text" value={localDetails.bankDetails.ifscCode} onChange={(e) => setLocalDetails({...localDetails, bankDetails: {...localDetails.bankDetails, ifscCode: e.target.value}})} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                                </div>
+                            </div>
+
+                            <h3 className="text-lg font-semibold border-b mt-4 mb-2">Assets</h3>
+                            <div className="flex items-center gap-4">
+                                <label className="block text-sm font-medium text-gray-700">Upload Logo</label>
+                                {isUploadingLogo && <SpinnerIcon className="w-5 h-5 animate-spin text-ssk-blue" />}
+                            </div>
+                            <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-ssk-blue file:text-white hover:file:bg-ssk-blue/90 disabled:file:bg-gray-400" />
+                            
+                            {localDetails.logoUrl && (
+                                <div>
+                                    <span className="block text-sm font-medium text-gray-700 mt-2">Logo Preview</span>
+                                    <img src={localDetails.logoUrl} alt="Logo Preview" className="mt-2 h-16 w-32 object-contain border p-1 rounded-md bg-gray-100" />
+                                </div>
+                            )}
+                             <div className="flex items-center gap-4 mt-4">
+                                <label className="block text-sm font-medium text-gray-700">Upload Signature</label>
+                                {isUploadingSignature && <SpinnerIcon className="w-5 h-5 animate-spin text-ssk-blue" />}
+                            </div>
+                            <input type="file" accept="image/*" onChange={handleSignatureUpload} disabled={isUploadingSignature} className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-ssk-blue file:text-white hover:file:bg-ssk-blue/90 disabled:file:bg-gray-400" />
+                            
+                            {localDetails.signatureImageUrl && (
+                                <div>
+                                    <span className="block text-sm font-medium text-gray-700 mt-2">Signature Preview</span>
+                                    <img src={localDetails.signatureImageUrl} alt="Signature Preview" className="mt-2 h-16 w-auto object-contain border p-1 rounded-md bg-gray-100" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-6 flex justify-end">
+                             <button onClick={handleSaveSettings} className="bg-ssk-blue text-white px-4 py-2 rounded-md hover:bg-ssk-blue/90 font-semibold">
+                                Save Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </header>
+    );
+};
+
+export default Header;--- START OF FILE components/LRForm.tsx ---
+
+
+import React, { useState, useEffect } from 'react';
+import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
+import LRPreviewModal, { LRContent } from './LRPreviewModal';
+import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon } from './icons';
+import { suggestLRDetails } from '../services/geminiService';
+import { toast } from 'react-hot-toast';
+import { Language, t } from '../utils/translations';
+
+
+interface LRFormProps {
+    onSave: (lr: LorryReceipt) => void;
+    existingLR: LorryReceipt | null;
+    onCancel: () => void;
+    companyDetails: CompanyDetails;
+    lorryReceipts: LorryReceipt[];
+    savedParties?: SavedParty[];
+    savedTrucks?: SavedTruck[];
+    language: Language;
+}
+
+const initialPartyState: PartyDetails = { name: '', address: '', city: '', contact: '', pan: '', gst: '' };
+
+const initialChargesState: DetailedCharges = {
+    hamail: 0, surCharge: 0, stCharge: 0, collectionCharge: 0, ddCharge: 0, otherCharge: 0, riskCharge: 0
+};
+
+// The C Note No (lrNo) is now a manual input, so it starts as an empty string.
+const initialLRState: LorryReceipt = {
+    lrNo: '',
+    lrType: 'Original',
+    truckNo: '',
+    date: new Date().toISOString().split('T')[0],
+    fromPlace: '',
+    toPlace: '',
+    invoiceNo: '',
+    invoiceAmount: 0,
+    invoiceDate: '',
+    poNo: '',
+    poDate: '',
+    ewayBillNo: '',
+    ewayBillDate: '',
+    ewayExDate: '',
+    addressOfDelivery: '',
+    chargedWeight: 0,
+    gstPaidBy: 'Transporter',
+    consignor: { ...initialPartyState },
+    consignee: { ...initialPartyState },
+    billingTo: { ...initialPartyState },
+    items: [{ description: 'corrugated box', pcs: 1, weight: 0 }],
+    weight: 0,
+    actualWeightMT: 0,
+    freight: 0,
+    charges: { ...initialChargesState },
+    rate: 0,
+    rateOn: 'Ton',
+    remark: '',
+    status: 'Booked',
+};
+
+const Fieldset: React.FC<{ legend: string; children: React.ReactNode; className?: string }> = ({ legend, children, className = '' }) => (
+    <fieldset className="border border-gray-300 p-4 rounded-xl mb-6 shadow-lg bg-white/50 backdrop-blur-sm">
+        <legend className="px-2 font-bold text-base text-ssk-blue">{legend}</legend>
+        <div className={className}>
+            {children}
+        </div>
+    </fieldset>
+);
+
+
+const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts, savedParties = [], savedTrucks = [], language }) => {
+    const [formData, setFormData] = useState<LorryReceipt>(initialLRState);
+    const [billingPartyType, setBillingPartyType] = useState<'Consignor' | 'Consignee' | 'Other'>('Consignor');
+    const [showPreviewModal, setShowPreviewModal] = useState(false);
+    const [isAiLoading, setIsAiLoading] = useState(false);
+
+    
+    useEffect(() => {
+        if (existingLR) {
+            setFormData(existingLR);
+            if (JSON.stringify(existingLR.billingTo) === JSON.stringify(existingLR.consignor)) {
+                setBillingPartyType('Consignor');
+            } else if (JSON.stringify(existingLR.billingTo) === JSON.stringify(existingLR.consignee)) {
+                setBillingPartyType('Consignee');
+            } else {
+                setBillingPartyType('Other');
+            }
+        } else {
+            setFormData(initialLRState);
+             setBillingPartyType('Consignor');
+        }
+    }, [existingLR]);
+    
+    useEffect(() => {
+        if (billingPartyType === 'Consignor') {
+             setFormData(prev => ({ ...prev, billingTo: prev.consignor }));
+        } else if (billingPartyType === 'Consignee') {
+            setFormData(prev => ({ ...prev, billingTo: prev.consignee }));
+        }
+    }, [billingPartyType, formData.consignor, formData.consignee]);
+
+
+    useEffect(() => {
+        const totalWeight = formData.items.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
+        setFormData(prev => ({ ...prev, weight: totalWeight }));
+    }, [formData.items]);
+
+    useEffect(() => {
+        // Only calculate freight automatically if not in "Fixed" mode
+        if (formData.rateOn !== 'Fixed') {
+            const calculatedFreight = (Number(formData.actualWeightMT) || 0) * (Number(formData.rate) || 0);
+            setFormData(prev => ({ ...prev, freight: calculatedFreight }));
+        }
+    }, [formData.actualWeightMT, formData.rate, formData.rateOn]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handlePartyChange = (party: 'consignor' | 'consignee' | 'billingTo', e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        
+        // Update the specific field
+        setFormData(prev => ({
+            ...prev,
+            [party]: {
+                ...prev[party],
+                [name]: value
+            }
+        }));
+
+        // If 'name' is changing, try to autofill from savedParties
+        if (name === 'name') {
+            const foundParty = savedParties.find(p => p.name.toLowerCase() === value.toLowerCase());
+            if (foundParty) {
+                // Determine if this saved party is relevant for the current field type (Consignor/Consignee)
+                // Assuming 'Both' applies everywhere. 
+                // We overwrite other fields if empty or if exact match is found
+                 setFormData(prev => ({
+                    ...prev,
+                    [party]: {
+                        ...prev[party],
+                        name: foundParty.name,
+                        address: foundParty.address || prev[party].address,
+                        city: foundParty.city || prev[party].city,
+                        contact: foundParty.contact || prev[party].contact,
+                        pan: foundParty.pan || prev[party].pan,
+                        gst: foundParty.gst || prev[party].gst,
+                    }
+                }));
+            }
+        }
+    };
+    
+    const handleItemChange = (index: number, field: keyof Item, value: string | number) => {
+        const newItems = [...formData.items];
+        (newItems[index] as any)[field] = value;
+        setFormData(prev => ({ ...prev, items: newItems }));
+    };
+
+    const addItem = () => {
+        setFormData(prev => ({ ...prev, items: [...prev.items, { description: '', pcs: 0, weight: 0 }] }));
+    };
+
+    const removeItem = (index: number) => {
+        if (formData.items.length > 1) {
+            const newItems = formData.items.filter((_, i) => i !== index);
+            setFormData(prev => ({ ...prev, items: newItems }));
+        }
+    };
+
+    const handleChargeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            charges: {
+                ...prev.charges,
+                [name]: parseFloat(value) || 0
+            }
+        }));
+    };
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // C Note No (lrNo) is now a required manual field
+        if (!formData.lrNo || !formData.truckNo || !formData.fromPlace || !formData.toPlace || !formData.consignor.name || !formData.consignee.name) {
+            toast.error('Please fill all required fields marked with *.');
+            return;
+        }
+        onSave(formData);
+    };
+
+    const handleCreateNew = () => {
+        if(window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
+            setFormData(initialLRState);
+            setBillingPartyType('Consignor');
+        }
+    }
+
+    const handleAiAutofill = async () => {
+        setIsAiLoading(true);
+        const toastId = toast.loading('AI is thinking...');
+
+        try {
+            const suggestions = await suggestLRDetails(formData);
+            toast.dismiss(toastId);
+
+            if (suggestions && Object.keys(suggestions).length > 0) {
+                setFormData(prev => {
+                    const newFormData = { ...prev };
+                    const isPartyEmpty = (party: PartyDetails) => !party.name && !party.address;
+
+                    if (suggestions.consignor && isPartyEmpty(prev.consignor)) {
+                        newFormData.consignor = { ...initialPartyState, ...suggestions.consignor };
+                    }
+                    if (suggestions.consignee && isPartyEmpty(prev.consignee)) {
+                        newFormData.consignee = { ...initialPartyState, ...suggestions.consignee };
+                    }
+                    if (billingPartyType === 'Other' && suggestions.billingTo && isPartyEmpty(prev.billingTo)) {
+                        newFormData.billingTo = { ...initialPartyState, ...suggestions.billingTo };
+                    }
+                    if (suggestions.invoiceNo && !prev.invoiceNo) {
+                        newFormData.invoiceNo = suggestions.invoiceNo;
+                    }
+                    if (suggestions.remark && !prev.remark) {
+                        newFormData.remark = suggestions.remark;
+                    }
+                    return newFormData;
+                });
+                toast.success('AI suggestions applied!');
+            } else {
+                toast.error('AI could not provide suggestions. Please fill manually.');
+            }
+        } catch (error) {
+            console.error("AI Autofill Error:", error);
+            toast.dismiss(toastId);
+            toast.error(error instanceof Error ? error.message : 'An error occurred while getting AI suggestions.');
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+    
+    const renderPartySection = (title: string, partyKey: 'consignor' | 'consignee' | 'billingTo') => {
+        const isDisabled = partyKey === 'billingTo' && billingPartyType !== 'Other';
+        const disabledClass = isDisabled ? 'bg-gray-100 cursor-not-allowed' : 'text-gray-900 placeholder-gray-500';
+
+        // Filter saved parties based on type if needed, or just show all
+        const relevantParties = savedParties; 
+
+        return (
+            <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
+                <h3 className="bg-ssk-red text-white p-2 font-bold text-sm">{title.toUpperCase()}</h3>
+                <div className="p-2 space-y-1 bg-white">
+                    <input 
+                        list={`list-${partyKey}`} 
+                        name="name" 
+                        value={formData[partyKey].name} 
+                        onChange={(e) => handlePartyChange(partyKey, e)} 
+                        placeholder="NAME" 
+                        className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} 
+                        disabled={isDisabled}
+                        autoComplete="off"
+                    />
+                    <datalist id={`list-${partyKey}`}>
+                        {relevantParties.map(p => (
+                            <option key={p.id} value={p.name} />
+                        ))}
+                    </datalist>
+
+                    <textarea name="address" value={formData[partyKey].address} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="ADDRESS" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} rows={3} disabled={isDisabled}></textarea>
+                    <input type="text" name="city" value={formData[partyKey].city} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CITY" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
+                    <input type="text" name="contact" value={formData[partyKey].contact} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CONTACT" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
+                    <input type="text" name="pan" value={formData[partyKey].pan} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="PAN" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
+                    <input type="text" name="gst" value={formData[partyKey].gst} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="GST" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
+                </div>
+            </div>
+        );
+    }
+    
+    const totalCharges = (Object.values(formData.charges) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
+    const inputClass = "w-full p-2 border-gray-300 bg-white rounded-md text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-ssk-blue focus:border-transparent transition-all duration-200";
+    const labelClass = "block text-xs font-bold text-gray-600 uppercase mb-1";
+
+    return (
+        <div className="flex flex-col xl:flex-row gap-8 items-start">
+            {/* Form Section */}
+            <div className="w-full xl:w-3/5">
+                <div className="flex items-center gap-4 mb-6 border-b pb-4">
+                    <button onClick={onCancel} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                         <ArrowLeftIcon className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                    <div className="flex items-center flex-wrap gap-2">
+                        <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
+                            <ListIcon className="w-5 h-5 mr-2" />
+                            {t[language].viewList}
+                        </button>
+                        <button onClick={handleCreateNew} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
+                            <CreateIcon className="w-5 h-5 mr-2" />
+                            {t[language].createLR}
+                        </button>
+                        <button
+                            onClick={handleAiAutofill}
+                            disabled={isAiLoading || !formData.truckNo || !formData.fromPlace || !formData.toPlace}
+                            className="flex items-center bg-purple-600 text-white px-4 py-2 rounded-md font-semibold hover:bg-purple-700 transition-colors text-sm disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
+                            title={!formData.truckNo || !formData.fromPlace || !formData.toPlace ? "Please fill Truck No, From, and To fields first" : "Get AI suggestions"}
+                        >
+                            <SparklesIcon className="w-5 h-5 mr-2" />
+                            {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
+                        </button>
+                    </div>
+                </div>
+            
+                <form onSubmit={handleSubmit}>
+                    <Fieldset legend={t[language].coreDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4">
+                        <div>
+                            <label className={labelClass}>{t[language].lrType}*</label>
+                            <div className="flex items-center space-x-4 h-10">
+                                <div className="flex items-center">
+                                    <input id="dummy" type="radio" name="lrType" value="Dummy" checked={formData.lrType === 'Dummy'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
+                                    <label htmlFor="dummy" className="ml-2 block text-sm text-gray-900">Dummy</label>
+                                </div>
+                                <div className="flex items-center">
+                                    <input id="original" type="radio" name="lrType" value="Original" checked={formData.lrType === 'Original'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300"/>
+                                    <label htmlFor="original" className="ml-2 block text-sm text-gray-900">Original</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label className={labelClass}>{t[language].truckNo}*</label>
+                            <input 
+                                list="trucks-list"
+                                type="text" 
+                                name="truckNo" 
+                                placeholder={t[language].truckNo} 
+                                value={formData.truckNo} 
+                                onChange={handleChange} 
+                                className={`${inputClass} border-red-300`} 
+                                required 
+                                autoComplete="off"
+                            />
+                            <datalist id="trucks-list">
+                                {savedTrucks.map(t => <option key={t.id} value={t.truckNo} />)}
+                            </datalist>
+                        </div>
+                        <div>
+                            <label className={labelClass}>{t[language].cNoteNo}*</label>
+                            <input 
+                                type="text"
+                                name="lrNo"
+                                placeholder={t[language].cNoteNo}
+                                value={formData.lrNo}
+                                onChange={handleChange}
+                                className={`${inputClass} border-red-300`}
+                                required
+                                disabled={!!existingLR} // Disable for editing existing LR
+                            />
+                        </div>
+                        <div><label className={labelClass}>{t[language].date}*</label><input type="date" name="date" value={formData.date} onChange={handleChange} className={inputClass} required /></div>
+                        <div><label className={labelClass}>{t[language].fromPlace}*</label><input type="text" name="fromPlace" placeholder={t[language].fromPlace} value={formData.fromPlace} onChange={handleChange} className={inputClass} required /></div>
+                        <div><label className={labelClass}>{t[language].toPlace}*</label><input type="text" name="toPlace" placeholder={t[language].toPlace} value={formData.toPlace} onChange={handleChange} className={inputClass} required /></div>
+                    </Fieldset>
+                    
+                    {/* Other fieldsets here, unchanged */}
+                    <Fieldset legend={t[language].shipmentDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
+                         <div><label className={labelClass}>{t[language].invoice}</label><input type="text" name="invoiceNo" placeholder={t[language].invoice} value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].invoiceAmount}</label><input type="number" name="invoiceAmount" placeholder={t[language].invoiceAmount} value={formData.invoiceAmount} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].invoiceDate}</label><input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayBillNo}</label><input type="text" name="ewayBillNo" placeholder={t[language].ewayBillNo} value={formData.ewayBillNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayBillDate}</label><input type="date" name="ewayBillDate" value={formData.ewayBillDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ewayExDate}</label><input type="date" name="ewayExDate" value={formData.ewayExDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].poNo}</label><input type="text" name="poNo" placeholder={t[language].poNo} value={formData.poNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].poDate}</label><input type="date" name="poDate" value={formData.poDate || ''} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].addressOfDelivery}</label><input type="text" name="addressOfDelivery" placeholder={t[language].addressOfDelivery} value={formData.addressOfDelivery} onChange={handleChange} className={inputClass} /></div>
+                    </Fieldset>
+                    
+                    <Fieldset legend={t[language].billingDetails} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className={labelClass}>{t[language].billingParty}</label>
+                            <div className="flex items-center space-x-4 mt-2">
+                                 <div className="flex items-center">
+                                    <input id="bill_consignor" type="radio" name="billingPartyType" value="Consignor" checked={billingPartyType === 'Consignor'} onChange={() => setBillingPartyType('Consignor')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
+                                    <label htmlFor="bill_consignor" className="ml-2 block text-sm text-gray-900">{t[language].consignor}</label>
+                                </div>
+                                <div className="flex items-center">
+                                    <input id="bill_consignee" type="radio" name="billingPartyType" value="Consignee" checked={billingPartyType === 'Consignee'} onChange={() => setBillingPartyType('Consignee')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
+                                    <label htmlFor="bill_consignee" className="ml-2 block text-sm text-gray-900">{t[language].consignee}</label>
+                                </div>
+                                 <div className="flex items-center">
+                                    <input id="bill_other" type="radio" name="billingPartyType" value="Other" checked={billingPartyType === 'Other'} onChange={() => setBillingPartyType('Other')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
+                                    <label htmlFor="bill_other" className="ml-2 block text-sm text-gray-900">{t[language].other}</label>
+                                </div>
+                            </div>
+                         </div>
+                         <div>
+                            <label className={labelClass}>{t[language].gstPaidBy}</label>
+                             <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputClass}>
+                                <option value="Transporter">{t[language].transporter}</option>
+                                <option value="Consignor">{t[language].consignor}</option>
+                                <option value="Consignee">{t[language].consignee}</option>
+                            </select>
+                         </div>
+                    </Fieldset>
+
+                    <Fieldset legend={t[language].partyDetails} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {renderPartySection(t[language].consignor, 'consignor')}
+                        {renderPartySection(t[language].consignee, 'consignee')}
+                        {billingPartyType === 'Other' && renderPartySection(t[language].billingParty, 'billingTo')}
+                    </Fieldset>
+                    
+                     <div className="border border-gray-300 p-3 rounded-xl shadow-lg bg-white/50 backdrop-blur-sm mb-6">
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="font-bold text-base text-gray-800">{t[language].itemDetails}</h3>
+                            <button type="button" onClick={addItem} className="flex items-center bg-gray-100 text-gray-800 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors shadow-sm border">
+                                <PlusIcon className="w-4 h-4 mr-1" />
+                                {t[language].addRow}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-12 gap-2 bg-gray-100 p-2 rounded-t-md font-bold text-gray-600 text-left text-xs">
+                            <div className="col-span-1">#</div>
+                            <div className="col-span-6">{t[language].description}</div>
+                            <div className="col-span-2">{t[language].pcs}</div>
+                            <div className="col-span-2">{t[language].weight}</div>
+                            <div className="col-span-1"></div>
+                        </div>
+                        <div className="border-l border-r border-b border-gray-200 rounded-b-md bg-white">
+                            {formData.items.map((item, index) => (
+                                <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 border-b last:border-b-0">
+                                    <div className="col-span-1 text-gray-500">{index + 1}</div>
+                                    <div className="col-span-6"><input type="text" value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} className="w-full p-1.5 border rounded-md text-sm"/></div>
+                                    <div className="col-span-2"><input type="number" value={item.pcs} onChange={(e) => handleItemChange(index, 'pcs', parseInt(e.target.value) || 0)} className="w-full p-1.5 border rounded-md text-sm" placeholder="PCS" /></div>
+                                    <div className="col-span-2"><input type="number" value={item.weight} onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)} className="w-full p-1.5 border rounded-md text-sm" placeholder="Weight"/></div>
+                                    <div className="col-span-1 text-right">
+                                        {formData.items.length > 1 && (
+                                            <button type="button" onClick={() => removeItem(index)} className="p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-100"><TrashIcon className="w-5 h-5"/></button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <Fieldset legend={t[language].weightRate} className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                         <div>
+                            <label className={labelClass}>{t[language].totalPkgsWeight}</label>
+                            <input type="number" name="weight" value={formData.weight} readOnly placeholder="Auto-calculated" className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
+                        </div>
+                        <div><label className={labelClass}>{t[language].actualWeight}</label><input type="number" name="actualWeightMT" value={formData.actualWeightMT} onChange={handleChange} placeholder="WEIGHT (MT)" className={inputClass} /></div>
+                         <div><label className={labelClass}>{t[language].chargedWeight}</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].rate}</label><input type="number" name="rate" value={formData.rate} onChange={handleChange} placeholder="RATE" className={inputClass} /></div>
+                        <div>
+                            <label className={labelClass}>{t[language].calcBasis}</label>
+                            <select name="rateOn" value={formData.rateOn} onChange={handleChange} className={inputClass}>
+                                <option value="Ton">By Weight (Per Ton)</option>
+                                <option value="Fixed">Fixed Amount (By Own)</option>
+                            </select>
+                        </div>
+                    </Fieldset>
+                    
+                    <Fieldset legend={t[language].chargesBreakdown} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                        <div><label className={labelClass}>{t[language].hamail}</label><input type="number" name="hamail" value={formData.charges.hamail} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].surcharge}</label><input type="number" name="surCharge" value={formData.charges.surCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].stCharge}</label><input type="number" name="stCharge" value={formData.charges.stCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].collection}</label><input type="number" name="collectionCharge" value={formData.charges.collectionCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].ddCharge}</label><input type="number" name="ddCharge" value={formData.charges.ddCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].otherCharge}</label><input type="number" name="otherCharge" value={formData.charges.otherCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].risk}</label><input type="number" name="riskCharge" value={formData.charges.riskCharge} onChange={handleChargeChange} className={inputClass} /></div>
+                    </Fieldset>
+                    
+                    <Fieldset legend={t[language].totals} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label className={labelClass}>{t[language].freight}</label>
+                            <input 
+                                type="number" 
+                                name="freight" 
+                                value={formData.freight} 
+                                onChange={handleChange}
+                                placeholder="FREIGHT" 
+                                readOnly={formData.rateOn !== 'Fixed'}
+                                className={`${inputClass} ${formData.rateOn !== 'Fixed' ? 'bg-gray-200 cursor-not-allowed' : 'bg-white border-blue-400'}`} 
+                            />
+                        </div>
+                         <div>
+                            <label className={labelClass}>{t[language].totalOtherCharges}</label>
+                            <input type="number" value={totalCharges} readOnly className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
+                        </div>
+                        <div>
+                            <label className={labelClass}>{t[language].grandTotal}</label>
+                            <input type="number" value={(Number(formData.freight) || 0) + totalCharges} readOnly className={`${inputClass} bg-green-100 border-green-300 font-bold cursor-not-allowed`} />
+                        </div>
+                    </Fieldset>
+                    
+                    <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6"><label className={labelClass}>{t[language].remark}</label><textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter remarks..." className={`${inputClass} h-24`}></textarea></div>
+                    
+                    <div className="flex flex-col sm:flex-row sm:justify-center gap-4 pt-6 mt-4 border-t">
+                        <button type="submit" className="w-full sm:w-auto bg-ssk-blue text-white px-8 py-2.5 rounded-md hover:bg-blue-800 font-bold text-base shadow-md transition-transform transform hover:scale-105">
+                            {existingLR ? t[language].updateLR : t[language].saveLR}
+                        </button>
+                        <button type="button" onClick={() => setShowPreviewModal(true)} className="w-full sm:w-auto bg-gray-600 text-white px-8 py-2.5 rounded-md hover:bg-gray-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
+                           {t[language].preview}
+                        </button>
+                        <button type="button" onClick={onCancel} className="w-full sm:w-auto bg-ssk-red text-white px-8 py-2.5 rounded-md hover:bg-red-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
+                            {t[language].cancel}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Live Preview Section (Desktop only) */}
+            <div className="hidden xl:block w-2/5 sticky top-28" style={{ height: 'calc(100vh - 8rem)' }}>
+                 <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-2xl p-4 h-full overflow-y-auto">
+                    <h3 className="text-xl font-bold text-ssk-blue mb-4 text-center">Live Preview</h3>
+                    <div className="transform scale-100 origin-top bg-white shadow-lg">
+                        <LRContent lr={formData} companyDetails={companyDetails} showCompanyDetails={true} showAmounts={true} />
+                    </div>
+                 </div>
+            </div>
+            
+            {showPreviewModal && (
+                <LRPreviewModal 
+                    isOpen={showPreviewModal}
+                    onClose={() => setShowPreviewModal(false)}
+                    lr={formData}
+                    companyDetails={companyDetails}
+                    isReadOnly={true}
+                />
+            )}
+        </div>
+    );
+};
+
+export default LRForm;--- START OF FILE components/LRList.tsx ---
+
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
+import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon, PlusIcon, ArrowLeftIcon } from './icons';
+import LRPreviewModal, { LRContent } from './LRPreviewModal';
+import InvoiceModal from './InvoiceModal';
+import { Language, t } from '../utils/translations';
+
+interface LRListProps {
+    lorryReceipts: LorryReceipt[];
+    onEdit: (lrNo: string) => void;
+    onDelete: (lrNo: string) => void;
+    onAddNew: () => void;
+    companyDetails: CompanyDetails;
+    onBackToDashboard: () => void;
+    onUpdateStatus: (lrNo: string, status: LRStatus) => void;
+    onOpenPODUploader: (lr: LorryReceipt) => void;
+    onViewPOD: (podPath: string) => void;
+    onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
+    language: Language;
+}
+
+const statusColors: { [key in LRStatus]: string } = {
+    Booked: 'bg-blue-100 text-blue-800',
+    'In Transit': 'bg-yellow-100 text-yellow-800',
+    'Out for Delivery': 'bg-orange-100 text-orange-800',
+    'Delivered': 'bg-green-100 text-green-800',
+    'Cancelled': 'bg-red-100 text-red-800',
+};
+
+const LRList: React.FC<LRListProps> = ({ 
+    lorryReceipts, 
+    onEdit, 
+    onDelete, 
+    onAddNew, 
+    companyDetails, 
+    onBackToDashboard, 
+    onUpdateStatus,
+    onOpenPODUploader,
+    onViewPOD,
+    onUpdateInvoiceDetails,
+    language
+}) => {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<LRStatus | 'All'>('All');
+    const [selectedLRs, setSelectedLRs] = useState<Set<string>>(new Set());
+    const [previewLR, setPreviewLR] = useState<LorryReceipt | null>(null);
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [isBulkPrinting, setIsBulkPrinting] = useState(false);
+    
+    // Bulk print settings
+    const [bulkPrintShowAmounts, setBulkPrintShowAmounts] = useState(true);
+
+    const filteredLRs = useMemo(() => {
+        return lorryReceipts.filter(lr => {
+            const matchesSearch = 
+                lr.lrNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                lr.consignor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                lr.consignee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                lr.truckNo.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            const matchesStatus = statusFilter === 'All' || lr.status === statusFilter;
+
+            return matchesSearch && matchesStatus;
+        });
+    }, [lorryReceipts, searchTerm, statusFilter]);
+
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked) {
+            setSelectedLRs(new Set(filteredLRs.map(lr => lr.lrNo)));
+        } else {
+            setSelectedLRs(new Set());
+        }
+    };
+
+    const handleSelectLR = (lrNo: string) => {
+        const newSelected = new Set(selectedLRs);
+        if (newSelected.has(lrNo)) {
+            newSelected.delete(lrNo);
+        } else {
+            newSelected.add(lrNo);
+        }
+        setSelectedLRs(newSelected);
+    };
+
+    const handleBulkPrint = () => {
+        if (selectedLRs.size === 0) return;
+        setIsBulkPrinting(true);
+        // Wait for portal to render then print
+        setTimeout(() => {
+            window.print();
+            setIsBulkPrinting(false);
+        }, 500);
+    };
+
+    const handleGenerateInvoice = () => {
+        if (selectedLRs.size === 0) return;
+        setShowInvoiceModal(true);
+    };
+    
+    const getStatusIcon = (status: LRStatus) => {
+        switch (status) {
+            case 'Booked': return <DocumentTextIcon className="w-4 h-4" />;
+            case 'In Transit': return <TruckIcon className="w-4 h-4" />;
+            case 'Out for Delivery': return <ClockIcon className="w-4 h-4" />;
+            case 'Delivered': return <CheckCircleIcon className="w-4 h-4" />;
+            case 'Cancelled': return <XIcon className="w-4 h-4" />;
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl shadow-lg border border-white/50 min-h-[600px] flex flex-col">
+            {/* Header Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                <div className="flex items-center gap-3 self-start md:self-center">
+                    <button onClick={onBackToDashboard} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
+                        <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
+                    </button>
+                    <h2 className="text-2xl font-bold text-gray-800">{t[language].viewList}</h2>
+                    <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                     <div className="relative">
+                        <input 
+                            type="text" 
+                            placeholder={t[language].searchPlaceholder} 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+                    </div>
+                    
+                    <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2">
+                        <FilterIcon className="w-5 h-5 text-gray-500" />
+                        <select 
+                            value={statusFilter} 
+                            onChange={(e) => setStatusFilter(e.target.value as LRStatus | 'All')}
+                            className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none"
+                        >
+                            <option value="All">{t[language].allStatus}</option>
+                            <option value="Booked">Booked</option>
+                            <option value="In Transit">In Transit</option>
+                            <option value="Out for Delivery">Out for Delivery</option>
+                            <option value="Delivered">Delivered</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+
+                    <button onClick={onAddNew} className="bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
+                        <PlusIcon className="w-5 h-5" />
+                        <span className="hidden sm:inline">{t[language].newLR}</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {selectedLRs.size > 0 && (
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-blue-800">{selectedLRs.size} selected</span>
+                        <button onClick={() => setSelectedLRs(new Set())} className="text-xs text-blue-600 hover:underline">Clear</button>
+                    </div>
+                    <div className="flex items-center gap-3">
+                         <div className="flex items-center gap-2 mr-4 bg-white px-2 py-1 rounded border border-blue-200">
+                             <input 
+                                type="checkbox" 
+                                id="bulkPrintAmounts" 
+                                checked={bulkPrintShowAmounts} 
+                                onChange={(e) => setBulkPrintShowAmounts(e.target.checked)}
+                                className="h-4 w-4 text-ssk-blue rounded"
+                             />
+                             <label htmlFor="bulkPrintAmounts" className="text-sm text-gray-700 cursor-pointer select-none">Show Amounts on Print</label>
+                         </div>
+                        
+                        {onUpdateInvoiceDetails && (
+                            <button 
+                                onClick={handleGenerateInvoice}
+                                className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-sm font-semibold transition-colors shadow-sm"
+                            >
+                                <InvoiceIcon className="w-4 h-4" /> {t[language].generateInvoice}
+                            </button>
+                        )}
+                        <button 
+                            onClick={handleBulkPrint}
+                            className="flex items-center gap-2 bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 text-sm font-semibold transition-colors shadow-sm"
+                        >
+                            <PrintIcon className="w-4 h-4" /> {t[language].printSelected}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Table */}
+            <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200 flex-grow">
+                <table className="w-full text-sm text-left text-gray-500">
+                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                        <tr>
+                            <th className="p-4 w-4">
+                                <input 
+                                    type="checkbox" 
+                                    checked={filteredLRs.length > 0 && selectedLRs.size === filteredLRs.length}
+                                    onChange={handleSelectAll}
+                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                            </th>
+                            <th className="px-4 py-3">{t[language].lrNoDate}</th>
+                            <th className="px-4 py-3">{t[language].consignor}</th>
+                            <th className="px-4 py-3">{t[language].consignee}</th>
+                            <th className="px-4 py-3">{t[language].truckRoute}</th>
+                            <th className="px-4 py-3 text-right">{t[language].amount}</th>
+                            <th className="px-4 py-3 text-center">{t[language].status}</th>
+                            <th className="px-4 py-3 text-center">{t[language].pod}</th>
+                            <th className="px-4 py-3 text-center">{t[language].actions}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {filteredLRs.length === 0 ? (
+                            <tr>
+                                <td colSpan={9} className="px-6 py-10 text-center text-gray-500">
+                                    No Lorry Receipts found matching your criteria.
+                                </td>
+                            </tr>
+                        ) : (
+                            filteredLRs.map((lr) => (
+                                <tr key={lr.lrNo} className={`border-b hover:bg-gray-50 transition-colors ${selectedLRs.has(lr.lrNo) ? 'bg-blue-50/50' : ''}`}>
+                                    <td className="p-4">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedLRs.has(lr.lrNo)}
+                                            onChange={() => handleSelectLR(lr.lrNo)}
+                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-gray-900">{lr.lrNo}</div>
+                                        <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
+                                        {lr.isInvoiceGenerated ? (
+                                            <div className="text-[9px] text-green-700 font-bold bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 inline-block whitespace-nowrap">
+                                                GENERATED
+                                            </div>
+                                        ) : (
+                                            <div className="text-[9px] text-gray-500 font-medium bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 mt-1 inline-block whitespace-nowrap">
+                                                NOT GENERATED
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-medium text-gray-800 truncate max-w-[150px]" title={lr.consignor.name}>{lr.consignor.name}</div>
+                                        <div className="text-xs text-gray-500 truncate max-w-[150px]">{lr.consignor.city}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-medium text-gray-800 truncate max-w-[150px]" title={lr.consignee.name}>{lr.consignee.name}</div>
+                                        <div className="text-xs text-gray-500 truncate max-w-[150px]">{lr.consignee.city}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-1 font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded w-fit mb-1">
+                                            <TruckIcon className="w-3 h-3" /> {lr.truckNo}
+                                        </div>
+                                        <div className="text-xs text-gray-500">{lr.fromPlace} &rarr; {lr.toPlace}</div>
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-gray-700">
+                                        ₹{Number(lr.freight).toLocaleString('en-IN')}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="relative group">
+                                            <select
+                                                value={lr.status}
+                                                onChange={(e) => onUpdateStatus(lr.lrNo, e.target.value as LRStatus)}
+                                                className={`appearance-none cursor-pointer text-xs font-bold px-2 py-1 rounded-full border-0 text-center w-full focus:ring-2 focus:ring-blue-500 ${statusColors[lr.status]}`}
+                                            >
+                                                {Object.keys(statusColors).map(s => (
+                                                    <option key={s} value={s}>{s}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        {lr.status === 'Delivered' && (
+                                            <div className="text-[10px] text-gray-400 mt-1">
+                                                {lr.status_updated_at ? new Date(lr.status_updated_at).toLocaleDateString() : '-'}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        {lr.pod_path ? (
+                                             <div className="flex justify-center gap-1">
+                                                <button onClick={() => onViewPOD(lr.pod_path!)} className="text-blue-600 hover:text-blue-800" title="View POD">
+                                                    <DocumentTextIcon className="w-5 h-5" />
+                                                </button>
+                                                 <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-gray-600" title="Re-upload POD">
+                                                    <UploadIcon className="w-4 h-4" />
+                                                </button>
+                                             </div>
+                                        ) : (
+                                            <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-blue-600 transition-colors mx-auto block" title="Upload POD">
+                                                <UploadIcon className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button onClick={() => setPreviewLR(lr)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-blue-600 transition-colors" title="Preview / Print">
+                                                <PrintIcon className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => onEdit(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-green-600 transition-colors" title="Edit">
+                                                <PencilIcon className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => onDelete(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-red-600 transition-colors" title="Delete">
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Modals */}
+            {previewLR && (
+                <LRPreviewModal 
+                    isOpen={!!previewLR}
+                    onClose={() => setPreviewLR(null)}
+                    lr={previewLR}
+                    companyDetails={companyDetails}
+                    isReadOnly={true}
+                />
+            )}
+
+            {showInvoiceModal && selectedLRs.size > 0 && (
+                <InvoiceModal 
+                    isOpen={showInvoiceModal}
+                    onClose={() => setShowInvoiceModal(false)}
+                    lorryReceipts={lorryReceipts.filter(lr => selectedLRs.has(lr.lrNo))}
+                    allLorryReceipts={lorryReceipts}
+                    companyDetails={companyDetails}
+                    onSaveInvoiceDetails={onUpdateInvoiceDetails}
+                />
+            )}
+
+            {/* Hidden Print Portal */}
+            {isBulkPrinting && (
+                createPortal(
+                    <div className="print-only">
+                        {lorryReceipts
+                            .filter(lr => selectedLRs.has(lr.lrNo))
+                            .map((lr, index) => (
+                                <div key={lr.lrNo}>
+                                    <LRContent 
+                                        lr={lr} 
+                                        companyDetails={companyDetails} 
+                                        showCompanyDetails={true} 
+                                        showAmounts={bulkPrintShowAmounts} 
+                                    />
+                                    {index < selectedLRs.size - 1 && <div className="page-break" />}
+                                </div>
+                            ))
+                        }
+                    </div>,
+                    document.getElementById('print-root')!
+                )
+            )}
+        </div>
+    );
+};
+
+export default LRList;--- START OF FILE components/LRPreviewModal.tsx ---
+
+
+import React, { useRef, forwardRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { toast } from 'react-hot-toast';
+import { LorryReceipt, CompanyDetails } from '../types';
+import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PhoneIcon } from './icons';
+
+interface LRPreviewModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    lr: LorryReceipt;
+    companyDetails: CompanyDetails;
+    onSave?: (lr: LorryReceipt) => void;
+    isReadOnly?: boolean;
+}
+
+declare const html2pdf: any;
+
+// A dedicated component for the LR content to be reused for screen and print.
+export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyDetails: CompanyDetails; showCompanyDetails: boolean; showAmounts: boolean }>(({ lr, companyDetails, showCompanyDetails, showAmounts }, ref) => {
+    const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
+    const totalToPay = (Number(lr.freight) || 0) + totalCharges;
+
+    const isBillingPartySeparate = lr.billingTo && lr.billingTo.name && 
+                                   (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
+                                   (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
+
+    const formatAmount = (amount: number | undefined) => {
+        return showAmounts ? (Number(amount) || 0).toFixed(2) : "0.00";
+    };
+
+    return (
+        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black relative">
+            
+            {/* Jurisdiction Header */}
+            {companyDetails.jurisdictionCity && (
+                <div className="text-[10px] font-bold text-center w-full pb-1 uppercase tracking-wide">
+                    SUBJECT TO {companyDetails.jurisdictionCity} JURISDICTION
+                </div>
+            )}
+
+            {/* Dynamic Header */}
+            <div className="flex flex-row justify-between items-stretch pb-2 border-b-4 border-ssk-blue min-h-[100px]">
+                {/* Left: Logo */}
+                <div className="flex-none w-24 flex justify-start items-center">
+                    {companyDetails.logoUrl && (
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-20 w-full object-contain object-left"/>
+                    )}
+                </div>
+
+                {/* Center: Company Details */}
+                <div className="flex-1 px-1 text-center flex flex-col justify-center overflow-hidden">
+                    <h1 className="font-extrabold text-ssk-red text-2xl leading-none tracking-tight whitespace-nowrap">
+                        {companyDetails.name}
+                    </h1>
+                    {companyDetails.tagline && (
+                        <p className="text-xs font-bold text-ssk-blue mt-1">{companyDetails.tagline}</p>
+                    )}
+                    <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal leading-tight">
+                        {companyDetails.address}
+                    </p>
+                </div>
+
+                {/* Right: Contact & Badge */}
+                {/* Fixed width to ensure it stays in bounds and aligns right */}
+                <div className="flex-none w-[180px] flex flex-col items-end justify-between py-1">
+                    <div className="text-[10px] font-bold text-right leading-tight w-full break-words">
+                        <p>{companyDetails.email}</p>
+                        {companyDetails.contact.slice(0, 2).map(c => <p key={c}>{c}</p>)}
+                    </div>
+                    <div className="mt-2 self-end">
+                        <span className="bg-ssk-blue text-white px-3 py-1 rounded text-sm font-bold tracking-wider uppercase block text-center min-w-[100px]">
+                            {lr.lrType}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+
+            {/* Top Body Grid */}
+            <div className="grid grid-cols-12 gap-x-1 text-[9px] mt-1">
+                {/* Left Col */}
+                <div className="col-span-4 flex flex-col">
+                    <div className="border border-black p-1">
+                        <span className="font-bold bg-white px-1 relative -top-3 text-black">Available At :</span>
+                        <div className="-mt-2 grid grid-cols-2 gap-x-2">
+                            {(companyDetails.branchLocations || []).map(loc => (
+                                <p key={loc} className="font-bold truncate">{loc.toUpperCase()}</p>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="border border-black p-1 mt-1 caution-notice-section">
+                        <p className="font-bold text-center text-red-600 text-sm">CAUTION</p>
+                        <p className="text-[7px] leading-tight">This Consignment Will Not Be Detained Diverted,Re-Routed Or Re-Booked Without Consignee Bank Written Permission Will Be Delivered At the Destination.</p>
+                    </div>
+                     <div className="border border-black p-1 mt-1 flex-grow caution-notice-section">
+                        <p className="font-bold text-center text-red-600 text-sm">NOTICE</p>
+                        <p className="text-[7px] leading-tight">This consignment covered in this set of special lorry receipt shall be stored at the destination under the control of the transport operator & shall be delivered to or to the order of the Consignee bank whose name is mentioned in the lorry receipt.</p>
+                    </div>
+                </div>
+                {/* Mid Col */}
+                <div className="col-span-4">
+                    <div className="border border-black p-1">
+                        <p className="font-bold text-center underline mb-1">AT OWNERS RISKS</p>
+                        {showCompanyDetails && (
+                            <>
+                                <p className="flex justify-between"><span>Pan No. :</span> <span className="font-bold text-black">{companyDetails.pan}</span></p>
+                                <p className="flex justify-between"><span>GST No. :</span> <span className="text-black font-bold">{companyDetails.gstn}</span></p>
+                            </>
+                        )}
+                    </div>
+                     <div className="border border-black p-1 mt-1 text-center h-[90px]">
+                        <p className="font-bold underline">INSURANCE</p>
+                        <p className="text-[7px] font-bold my-1 leading-tight">The Customer Has Started That He Has Not Insured The Consignment</p>
+                        <div className="flex justify-between mt-1 text-left border-b border-gray-300 pb-1">
+                            <span>Policy No: _______</span>
+                            <span>Date: _______</span>
+                        </div>
+                        <div className="flex justify-between mt-1 text-left">
+                            <span>Amount: _______</span>
+                            <span>Risk: _______</span>
+                        </div>
+                    </div>
+                </div>
+                {/* Right Col */}
+                <div className="col-span-4 text-center">
+                     <div className="border border-black p-1">
+                        <p className="font-bold underline">DEMURRAGE CHARGES</p>
+                        <p className="text-[7px] font-bold leading-tight">Chargeable After 5 days Arrival Of Goods Rs. 7/per Qtl.Per Day On Weight Charged</p>
+                    </div>
+                    <div className="border border-black p-1 mt-1 font-bold text-left truncate">Del Addr: <span className="font-bold text-black">{lr.addressOfDelivery}</span></div>
+                    <div className="border border-black p-1 mt-1 font-bold flex justify-between items-center bg-gray-100">
+                        <span>Vehicle No.:</span> 
+                        <span className="font-extrabold text-black text-lg">{lr.truckNo}</span>
+                    </div>
+                    <div className="border-y-2 border-black p-1 mt-1 font-bold text-lg flex justify-between">
+                        <span>C NOTE No.:</span> 
+                        <span className="font-extrabold text-red-600">{lr.lrNo}</span>
+                    </div>
+                    {lr.ewayBillNo && (
+                        <div className="border-b-2 border-black p-1 font-bold text-left text-[8px]">
+                            E-Way: <span className="font-bold text-black">{lr.ewayBillNo}</span>
+                            <div className="flex justify-between">
+                                <span>Dt: {lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB'): '-'}</span>
+                                <span>Ex: {lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB'): '-'}</span>
+                            </div>
+                        </div>
+                    )}
+                    <div className="grid grid-cols-5 mt-1 border border-black text-[8px]">
+                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">DATE</div>
+                        <div className="col-span-3 border-b border-black p-1 font-bold text-black">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
+                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">FROM</div>
+                        <div className="col-span-3 border-b border-black p-1 font-bold text-black uppercase">{lr.fromPlace}</div>
+                        <div className="col-span-2 border-r border-black p-1 font-bold bg-gray-50">TO</div>
+                        <div className="col-span-3 p-1 font-bold text-black uppercase">{lr.toPlace}</div>
+                    </div>
+                </div>
+            </div>
+            
+            {/* Consignor/Consignee details */}
+            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
+                <thead>
+                    <tr>
+                        <td className="border-r-2 border-black p-1 font-bold w-1/2 bg-gray-100">Consignor Name & Address</td>
+                        <td className="p-1 font-bold w-1/2 bg-gray-100">Consignee Name & Address</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td className="border-r-2 border-black p-2 align-top h-[70px]">
+                            <p className="font-bold text-black text-xs">{lr.consignor.name}</p>
+                            <p className="text-gray-800">{lr.consignor.address}, {lr.consignor.city}</p>
+                            <div className="mt-1 space-y-0.5">
+                                {lr.consignor.gst && <p className="font-semibold">GST: {lr.consignor.gst}</p>}
+                                {lr.consignor.contact && <p>Ph: {lr.consignor.contact}</p>}
+                            </div>
+                        </td>
+                        <td className="p-2 align-top h-[70px]">
+                            <p className="font-bold text-black text-xs">{lr.consignee.name}</p>
+                            <p className="text-gray-800">{lr.consignee.address}, {lr.consignee.city}</p>
+                            <div className="mt-1 space-y-0.5">
+                                {lr.consignee.gst && <p className="font-semibold">GST: {lr.consignee.gst}</p>}
+                                {lr.consignee.contact && <p>Ph: {lr.consignee.contact}</p>}
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            {/* Conditionally rendered Billing To details */}
+            {isBillingPartySeparate && (
+                <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
+                    <thead>
+                        <tr>
+                            <td className="p-1 font-bold bg-gray-100">Billing Party</td>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className="p-2 align-top">
+                                <span className="font-bold text-black">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            )}
+            
+            {/* Main Content Table */}
+            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
+                <thead>
+                    <tr className="font-bold text-center bg-gray-100">
+                        <td className="border-r-2 border-black p-1 w-[8%]">Pkgs</td>
+                        <td className="border-r-2 border-black p-1">Description (Said to Contain)</td>
+                        <td className="border-r-2 border-black p-1 w-[18%]" colSpan={2}>Weight (Kg/MT)</td>
+                        <td className="border-r-2 border-black p-1 w-[25%]" colSpan={2}>Charges</td>
+                    </tr>
+                    <tr className="font-bold text-center border-b-2 border-black text-[8px]">
+                        <td className="border-r-2 border-black">No.</td>
+                        <td className="border-r-2 border-black">Particulars</td>
+                        <td className="border-r border-black p-1">Actual</td>
+                        <td className="border-r-2 border-black p-1">Charged</td>
+                        <td className="border-r-2 border-black p-1 w-[15%]">Particulars</td>
+                        <td className="p-1 w-[10%]">Amount</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td className="border-r-2 border-black p-2 text-center h-48 align-top">
+                             {/* Display each item's quantity in a separate line */}
+                             {lr.items.map((item, idx) => (
+                                <div key={idx} className="font-bold text-lg mb-2">{item.pcs}</div>
+                             ))}
+                             {/* Only show total if more than 1 item */}
+                             {lr.items.length > 1 && (
+                                <div className="border-t border-black mt-2 pt-1 font-bold text-sm">
+                                    Total: {lr.items.reduce((sum, item) => sum + item.pcs, 0)}
+                                </div>
+                             )}
+                        </td>
+                        <td className="border-r-2 border-black p-2 align-top">
+                             {/* Display each item's description in a separate line matching Pkgs column */}
+                             {lr.items.map((item, idx) => (
+                                <div key={idx} className="font-bold text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
+                                    {item.description}
+                                </div>
+                             ))}
+                        </td>
+                        {/* Actual Weight column - intentionally empty */}
+                        <td className="border-r border-black p-2 text-center align-top font-bold"></td>
+                        {/* Charged Weight column - intentionally empty */}
+                        <td className="border-r-2 border-black p-2 text-center align-top font-bold"></td>
+                        <td colSpan={2} className="p-0 align-top">
+                            <div className="flex flex-col h-full text-[9px]">
+                                <div className="flex justify-between border-b border-black p-1">
+                                    <span>Freight</span>
+                                    <span className="font-bold">{formatAmount(lr.freight)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Hamail</span>
+                                    <span>{formatAmount(lr.charges.hamail)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Surcharge</span>
+                                    <span>{formatAmount(lr.charges.surCharge)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Statistical</span>
+                                    <span>{formatAmount(lr.charges.stCharge)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Collection</span>
+                                    <span>{formatAmount(lr.charges.collectionCharge)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Door Del.</span>
+                                    <span>{formatAmount(lr.charges.ddCharge)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                    <span>Other</span>
+                                    <span>{formatAmount(lr.charges.otherCharge)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-black p-1">
+                                    <span>Risk Charges</span>
+                                    <span>{formatAmount(lr.charges.riskCharge)}</span>
+                                </div>
+                                <div className="flex justify-between p-1 mt-auto bg-gray-100 font-bold border-t border-black text-sm">
+                                    <span>Total</span>
+                                    <span>{formatAmount(totalToPay)}</span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    {/* Footer Section inside Table */}
+                    <tr>
+                        <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
+                             <div className="flex flex-col justify-between h-full space-y-2">
+                                <div className="grid grid-cols-1 gap-2 text-[8px]">
+                                    <div>
+                                        <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
+                                        <p className="font-bold">Value: <span className="font-normal">₹{Number(lr.invoiceAmount).toLocaleString('en-IN')}</span></p>
+                                        <p className="font-bold">GST Paid By: <span className="font-normal">{lr.gstPaidBy}</span></p>
+                                    </div>
+                                </div>
+                                <div className="border border-black p-1 text-[8px] bg-gray-50">
+                                    <span className="font-bold block">REMARKS:</span> 
+                                    <span className="font-medium text-black">{lr.remark}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td colSpan={2} className="border-t-2 border-black p-2 align-bottom">
+                            <div className="flex flex-col items-center justify-end h-full min-h-[60px]">
+                                {companyDetails.signatureImageUrl && (
+                                    <img src={companyDetails.signatureImageUrl} alt="Authorized Signatory" className="h-12 w-auto object-contain mb-1" />
+                                )}
+                                <p className="font-bold text-[8px]">Authorized Signatory</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    );
+});
+
+
+const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, companyDetails, onSave, isReadOnly = false }) => {
+    const previewRef = useRef<HTMLDivElement>(null);
+    const printRoot = document.getElementById('print-root');
+    const [showCompanyDetails, setShowCompanyDetails] = useState(true);
+    const [showAmounts, setShowAmounts] = useState(false);
+
+    const handleDownloadPDF = () => {
+        const element = previewRef.current;
+        if (!element) return;
+        
+        const opt = {
+            margin:       5, // Reduced margin to prevent clipping
+            filename:     `LR-${lr.lrNo.replace('/', '_')}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(element).set(opt).save();
+    };
+    
+    const handleShareWhatsApp = async () => {
+        const element = previewRef.current;
+        if (!element) {
+            toast.error("Preview content not found. Cannot generate PDF.");
+            return;
+        };
+
+        const filename = `LR-${lr.lrNo.replace('/', '_')}.pdf`;
+        const message = `Hi ${lr.consignee?.name}, here is the Lorry Receipt (LR No. ${lr.lrNo}) for your shipment.`;
+        
+        try {
+            const opt = {
+                margin:       5, // Reduced margin to prevent clipping
+                filename:     filename,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+            const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+                await navigator.share({
+                    files: [pdfFile],
+                    title: `Lorry Receipt ${lr.lrNo}`,
+                    text: message,
+                });
+            } else {
+                toast.error('Your browser doesn\'t support sharing files. Please download the PDF and share it manually.', { duration: 5000 });
+            }
+        } catch (error: any) {
+            if (error.name !== 'AbortError') { // AbortError is when the user cancels the share dialog
+                console.error('Error sharing file:', error);
+                toast.error('An error occurred while trying to share the file.');
+            }
+        }
+    };
+
+    const handleShareEmail = () => {
+        const email = lr.consignee?.gst || ''; // Assuming email is in gst field for now
+        const subject = encodeURIComponent(`Lorry Receipt (LR No: ${lr.lrNo}) for your shipment`);
+        const body = encodeURIComponent(`Dear ${lr.consignee?.name},\n\nPlease find the details for your shipment with LR No. ${lr.lrNo}.\n\nWe advise you to download the attached PDF for your records.\n\nThank you,\n${companyDetails.name}`);
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    };
+
+
+    if (!isOpen) return null;
+    
+    return (
+        <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto">
+            {/* Render a copy of the content specifically for printing, outside the visible modal */}
+            {printRoot && createPortal(<LRContent lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} showAmounts={showAmounts} />, printRoot)}
+
+            {/* The visible modal for on-screen preview */}
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl my-8">
+                <div className="p-4 bg-gray-100 rounded-t-lg flex flex-wrap justify-between items-center gap-2 sticky top-0 z-10">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">LR Preview & Actions</h2>
+                    <div className="flex items-center flex-wrap gap-2">
+                        <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
+                           <input
+                                type="checkbox"
+                                id="showCompanyDetails"
+                                checked={showCompanyDetails}
+                                onChange={(e) => setShowCompanyDetails(e.target.checked)}
+                                className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300 rounded"
+                            />
+                            <label htmlFor="showCompanyDetails" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                                Include GST/PAN
+                            </label>
+                        </div>
+                         <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
+                           <input
+                                type="checkbox"
+                                id="showAmounts"
+                                checked={showAmounts}
+                                onChange={(e) => setShowAmounts(e.target.checked)}
+                                className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300 rounded"
+                            />
+                            <label htmlFor="showAmounts" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                                Show Amounts
+                            </label>
+                        </div>
+                        {!isReadOnly && onSave && <button onClick={() => onSave(lr)} className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold"><SaveIcon className="w-5 h-5 mr-1"/>Save LR</button>}
+                        <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold"><DownloadIcon className="w-5 h-5 mr-1"/>Download PDF</button>
+                        <button onClick={handleShareWhatsApp} className="flex items-center bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 font-semibold"><WhatsAppIcon className="w-5 h-5 mr-1"/>WhatsApp</button>
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-300"><XIcon className="w-6 h-6"/></button>
+                    </div>
+                </div>
+
+                <div className="p-2 sm:p-4 overflow-x-auto">
+                    <LRContent ref={previewRef} lr={lr} companyDetails={companyDetails} showCompanyDetails={showCompanyDetails} showAmounts={showAmounts} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default LRPreviewModal;--- START OF FILE components/icons.tsx ---
+
+
+import React from 'react';
+
+type IconProps = {
+  className?: string;
+};
+
+export const GoogleIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className={className}>
+    <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+    <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+    <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+    <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+  </svg>
+);
+
+export const GlobeIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+  </svg>
+);
+
+export const CogIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-1.007 1.11-.952l2.348.468c.55.11.956.591.956 1.157v.612c0 .566-.406 1.047-.956 1.157l-2.348.468c-.55.11-.956.591-.956 1.157v.612c0 .566.406 1.047.956 1.157l2.348.468c.55.11.956.591.956 1.157v.612c0 .566-.406 1.047-.956 1.157l-2.348.468c-.55.11-.956.591-.956 1.157V21a1 1 0 01-1 1h-2a1 1 0 01-1-1v-1.127c0-.566-.406-1.047-.956-1.157L5.5 17.048c-.55-.11-.956-.591-.956-1.157v-.612c0-.566.406 1.047.956-1.157l2.348-.468c.55-.11.956-.591.956-1.157v-.612c0-.566.406 1.047.956-1.157L5.5 9.893c-.55-.11-.956-.591-.956-1.157v-.612c0-.566.406 1.047.956-1.157l2.348-.468c.55-.11.956.591.956-1.157V4.94c0-.566.406-1.047.956-1.157L11.5 3c.55-.11 1.02.355 1.11.94zM12 14.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" />
+  </svg>
+);
+
+export const XIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+export const PlusIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+  </svg>
+);
+
+export const TrashIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.067-2.09 1.02-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+  </svg>
+);
+
+export const SparklesIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.898 20.562L16.25 21.75l-.648-1.188a2.25 2.25 0 01-1.47-1.47L12.964 18l1.188-.648a2.25 2.25 0 011.47-1.47L16.25 15l.648 1.188a2.25 2.25 0 011.47 1.47L19.536 18l-1.188.648a2.25 2.25 0 01-1.47 1.47z" />
+    </svg>
+);
+
+export const DocumentAddIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    </svg>
+);
+
+export const PencilIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+    </svg>
+);
+
+export const ShareIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.186 2.25 2.25 0 00-3.933 2.186z" />
+    </svg>
+);
+
+export const DownloadIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+);
+
+export const WhatsAppIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
+    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.06 22L7.31 20.59C8.75 21.39 10.37 21.82 12.04 21.82C17.5 21.82 21.95 17.37 21.95 11.91C21.95 9.27 20.92 6.8 19.11 4.98C17.3 3.17 14.82 2.13 12.16 2.13L12.04 2M12.04 3.67C16.56 3.67 20.28 7.38 20.28 11.91C20.28 16.44 16.56 20.15 12.04 20.15C10.49 20.15 9 19.74 7.72 19L7.14 18.64L4.24 19.53L5.16 16.71L4.77 16.11C3.93 14.73 3.5 13.17 3.5 11.91C3.5 7.38 7.22 3.67 11.92 3.67H12.04M17.46 14.85C17.18 15.54 16.32 15.99 15.61 16.11C15.06 16.21 14.33 16.24 12.39 15.43C10.03 14.46 8.53 12.71 8.39 12.56C8.24 12.41 7.02 11.04 7.02 9.68C7.02 8.32 7.77 7.64 8.04 7.36C8.32 7.09 8.68 7.03 8.93 7.03C9.04 7.03 9.15 7.03 9.26 7.04C9.53 7.09 9.74 7.55 9.88 7.73C10.02 7.91 10.19 8.24 9.98 8.57C9.77 8.9 9.65 9.04 9.49 9.24C9.33 9.43 9.19 9.58 9.38 9.87C9.56 10.17 10.05 10.82 10.68 11.41C11.53 12.19 12.23 12.5 12.58 12.67C12.93 12.84 13.18 12.8 13.39 12.55C13.65 12.26 14.11 11.66 14.38 11.29C14.65 10.92 14.93 10.84 15.23 10.94C15.54 11.03 16.6 11.56 16.87 11.69C17.14 11.82 17.33 11.91 17.41 12.05C17.48 12.2 17.48 12.71 17.46 14.85Z" />
+  </svg>
+);
+
+export const EmailIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+    </svg>
+);
+
+export const SaveIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const PhoneIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+    </svg>
+);
+
+export const CreateIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const ListIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+);
+
+export const PrintIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6 18.25m0 0a2.25 2.25 0 002.25 2.25h8.5A2.25 2.25 0 0018 18.25m-12 0A2.25 2.25 0 015.25 16H18a2.25 2.25 0 012.25 2.25m-15-1.5l-1.42-1.42a2.25 2.25 0 013.182 0l1.42 1.42M6 18.25l7.5-7.5m-7.5 7.5l-1.42-1.42M18 18.25l-7.5-7.5m7.5 7.5l1.42-1.42M18 18.25a2.25 2.25 0 00-2.25-2.25H9.75A2.25 2.25 0 007.5 18.25m10.5-1.5c-1.12 0-2.163.303-3.094.832M6.75 15.75c-1.12 0-2.163.303-3.094.832m12.188 0c1.12.001 2.163.304 3.094.832M6.75 15.75L3 13.5m0 0l-1.42 1.42a2.25 2.25 0 003.182 0L6 13.5m9 0l-1.42 1.42a2.25 2.25 0 003.182 0L18 13.5m-9 0h9" />
+    </svg>
+);
+
+export const SearchIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+    </svg>
+);
+
+export const DotsVerticalIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+    </svg>
+);
+
+export const FilterIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+    </svg>
+);
+
+export const DashboardIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l3-3m0 0l3 3m-3-3v12m6.75-16.5l3 3m0 0l3-3m-3 3V3m-9.75 9h16.5M3.75 6h16.5" />
+    </svg>
+);
+
+export const CurrencyRupeeIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25H9m6 3H9m3 6l-3-3h1.5a3 3 0 100-6M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const TruckIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path d="M14 17.25a.75.75 0 01-.75.75H5.25a.75.75 0 01-.75-.75V15h9.5v2.25z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375c-.621 0-1.125-.504-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5v-1.875a3.375 3.375 0 013.375-3.375h9.75a3.375 3.375 0 013.375 3.375v1.875m-17.25 4.5h16.5" />
+        <path d="M15.75 12H18v-1.5a.75.75 0 00-.75-.75h-1.5v2.25z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 15h9.512a1.5 1.5 0 011.437 1.036l.5 1.714M4.5 12.75h9" />
+    </svg>
+);
+
+export const UsersIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m-7.5-2.962a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5zM3 13.239a3.75 3.75 0 005.11 3.043 2.99 2.99 0 01-1.62.63c-1.491.144-2.43.913-2.656 2.18m9.546-2.223a5.25 5.25 0 01-4.136-5.185l.07-.884a3.752 3.752 0 01.294-1.585l.006-.011a3.75 3.75 0 013.693-2.483l.08.008a3.75 3.75 0 013.585 3.75l-.001.482a5.25 5.25 0 01-4.043 5.182z" />
+    </svg>
+);
+
+export const CheckCircleIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const ClockIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+);
+
+export const UploadIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+    </svg>
+);
+
+export const DocumentTextIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.5h7.5m-7.5 3h7.5M3 17.25a3 3 0 013-3h12a3 3 0 013 3v2.25a3 3 0 01-3 3H6a3 3 0 01-3-3v-2.25z" />
+    </svg>
+);
+
+export const SpinnerIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3m-9-9h3m12 0h3m-6.75-6.75l-2.122 2.121m10.244 10.243l-2.122-2.121M4.25 4.25l2.121 2.122m10.243 10.242l2.121 2.121" />
+    </svg>
+);
+
+export const BookOpenIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
+);
+
+export const InvoiceIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.125 2.25h-4.5c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125v-9M10.125 2.25h.375a9 9 0 019 9v.375M10.125 2.25A3.375 3.375 0 0113.5 5.625v1.5c0 .621.504 1.125 1.125 1.125h1.5a3.375 3.375 0 013.375 3.375M9 15l2.25 2.25L15 12" />
+    </svg>
+);
+
+export const ArrowLeftIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+    </svg>
+);
+
+export const DatabaseIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+    </svg>
+);
+
+export const ExclamationTriangleIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
+);
+
+export const WrenchIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+  </svg>
+);
+
+export const MapPinIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+  </svg>
+);
+
+export const CreditCardIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
+  </svg>
+);
+
+export const ChatBubbleIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+  </svg>
+);
+
+export const BatteryIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+  </svg>
+);
+
+export const FuelIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
+  </svg>
+);
+
+export const TowTruckIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375c-.621 0-1.125-.504-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125V14.25m-17.25 4.5v-1.875a3.375 3.375 0 013.375-3.375h9.75a3.375 3.375 0 013.375 3.375v1.875m-17.25 4.5h16.5m-16.5-4.5h.008v.008h-.008v-.008zm15 0h.008v.008h-.008v-.008z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9l3 3m0 0l-3 3m3-3H9" /> 
+  </svg>
+);
+
+export const SirenIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
+);
+
+export const ShieldCheckIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+  </svg>
+);--- START OF FILE components/InvoiceModal.tsx ---
+
+
+import React, { useRef, forwardRef, useState, useEffect, useMemo } from 'react';
+import { LorryReceipt, CompanyDetails, PartyDetails } from '../types';
+import { DownloadIcon, XIcon, SaveIcon } from './icons';
+import { toWords } from '../utils/numberToWords';
+
+interface InvoiceModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    lorryReceipts: LorryReceipt[];
+    allLorryReceipts: LorryReceipt[]; // Added to calculate next sequence
+    companyDetails: CompanyDetails;
+    onSaveInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
+}
+
+declare const html2pdf: any;
+
+interface InvoiceContentProps {
+    lorryReceipts: LorryReceipt[];
+    companyDetails: CompanyDetails;
+    billNo: string;
+    billDate: string;
+    taxType: 'intra' | 'inter';
+}
+
+const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryReceipts, companyDetails, billNo, billDate, taxType }, ref) => {
+    // Sort LRs by LR Number ascending for the PDF/Preview
+    const sortedLorryReceipts = useMemo(() => {
+        return [...lorryReceipts].sort((a, b) => 
+            a.lrNo.localeCompare(b.lrNo, undefined, { numeric: true, sensitivity: 'base' })
+        );
+    }, [lorryReceipts]);
+
+    const totalAmount = sortedLorryReceipts.reduce((sum, lr) => {
+        const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
+        return sum + (Number(lr.freight) || 0) + totalCharges;
+    }, 0);
+
+    const totalCgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
+    const totalSgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
+    const totalIgst = taxType === 'inter' ? totalAmount * 0.18 : 0;
+    
+    const netAmount = totalAmount + totalCgst + totalSgst + totalIgst;
+    const amountInWords = toWords(Math.round(netAmount));
+
+    const billedTo: Partial<PartyDetails> = sortedLorryReceipts.length > 0 ? (sortedLorryReceipts[0].billingTo?.name ? sortedLorryReceipts[0].billingTo : sortedLorryReceipts[0].consignor) : { name: 'N/A', address: 'N/A', gst: 'N/A' };
+    
+    const formattedBillDate = billDate ? new Date(billDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+
+    return (
+        <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[680px] mx-auto border border-gray-600 text-sm">
+            <div className="text-center text-black">
+                <h2 className="font-bold text-xl underline tracking-wider mb-1">TAX INVOICE</h2>
+                {companyDetails.jurisdictionCity && <p className="text-xs">SUBJECT TO {companyDetails.jurisdictionCity.toUpperCase()} JURISDICTION</p>}
+            </div>
+            
+            <div className="flex justify-between items-center mt-1 pb-2 border-b border-gray-600">
+                <div className="w-1/4 flex justify-start">
+                     {companyDetails.logoUrl ? 
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain" /> :
+                        <div className="h-16 w-32 border bg-gray-200 flex items-center justify-center text-xs text-center">No Logo</div>
+                    }
+                </div>
+                <div className="w-1/2 text-center text-black">
+                    <h1 className="text-3xl font-bold text-red-600 whitespace-nowrap">{companyDetails.name}</h1>
+                    <p className="font-bold text-base">(Fleet Owner & Contractor)</p>
+                    <p className="text-xs mt-1">{companyDetails.address}</p>
+                    <p className="text-xs">
+                        Mail-{companyDetails.email}, Web-{companyDetails.web}
+                    </p>
+                </div>
+                <div className="w-1/4 text-right font-bold text-xs text-black">
+                    {companyDetails.contact.map(c => <p key={c}>{c}</p>)}
+                </div>
+            </div>
+
+            <div className="flex justify-between items-start mt-2 text-black">
+                <div className="w-2/3">
+                    <p className="font-bold">M/S :</p>
+                    <p className="font-bold">{billedTo.name}</p>
+                    <p>{billedTo.address}</p>
+                </div>
+                <div className="w-1/3 text-left pl-10">
+                    <p className="font-bold">INVOICE NO. : {billNo}</p>
+                    <p className="font-bold">DATE : {formattedBillDate}</p>
+                </div>
+            </div>
+            <p className="font-bold text-black mt-2">GST :- {billedTo.gst}</p>
+
+            {/* Table */}
+            <table className="w-full border-collapse border border-gray-600 mt-2 text-xs text-black">
+                <thead className="font-bold text-center">
+                    <tr>
+                        <th className="border border-gray-600 p-1 w-[5%]">Sr.No</th>
+                        <th className="border border-gray-600 p-1 w-[10%]">Date</th>
+                        <th className="border border-gray-600 p-1 w-[12%]">Truck</th>
+                        <th className="border border-gray-600 p-1 w-[12%]">LR No.</th>
+                        <th className="border border-gray-600 p-1">From</th>
+                        <th className="border border-gray-600 p-1">To</th>
+                        <th className="border border-gray-600 p-1 w-[10%]">Freight</th>
+                        <th className="border border-gray-600 p-1 w-[10%]">Other Charges</th>
+                        <th className="border border-gray-600 p-1 w-[10%]">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {sortedLorryReceipts.map((lr, index) => {
+                        const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
+                        return (
+                            <tr key={lr.lrNo} style={{ height: '24px' }}>
+                                <td className="border border-gray-600 p-1 text-center">{index + 1}</td>
+                                <td className="border border-gray-600 p-1 text-center">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
+                                <td className="border border-gray-600 p-1">{lr.truckNo}</td>
+                                <td className="border border-gray-600 p-1 text-center">{lr.lrNo}</td>
+                                <td className="border border-gray-600 p-1">{lr.fromPlace}</td>
+                                <td className="border border-gray-600 p-1">{lr.toPlace}</td>
+                                <td className="border border-gray-600 p-1 text-right">{Number(lr.freight).toFixed(2)}</td>
+                                <td className="border border-gray-600 p-1 text-right">{totalCharges.toFixed(2)}</td>
+                                <td className="border border-gray-600 p-1 text-right">{(Number(lr.freight) + totalCharges).toFixed(2)}</td>
+                            </tr>
+                        );
+                    })}
+                    {Array.from({ length: Math.max(0, 15 - sortedLorryReceipts.length) }).map((_, i) => (
+                        <tr key={`empty-${i}`} style={{ height: '24px' }}>
+                            {Array.from({ length: 9 }).map((_, j) => <td key={j} className="border border-gray-600"></td>)}
+                        </tr>
+                    ))}
+                </tbody>
+                <tfoot className="text-black font-bold text-xs">
+                    <tr>
+                        <td colSpan={6} className="border border-gray-600 p-1 align-top">
+                            <p>GSTIN : {companyDetails.gstn}</p>
+                            <p className="mt-1">
+                                <span>PAN No. : {companyDetails.pan}</span>
+                                {companyDetails.sacCode && <span className="ml-4 font-bold">SAC CODE - {companyDetails.sacCode}</span>}
+                            </p>
+                            <div className="mt-2">
+                                <p>BANK DETAILS</p>
+                                <p>BANK NAME : {companyDetails.bankDetails.name}</p>
+                                <p>BRANCH : {companyDetails.bankDetails.branch}</p>
+                                <p>A/C NO. : {companyDetails.bankDetails.accountNo}</p>
+                                <p>IFSCCODE : {companyDetails.bankDetails.ifscCode}</p>
+                            </div>
+                        </td>
+                        <td colSpan={3} className="border border-gray-600 p-0 align-top">
+                            <table className="w-full text-xs font-bold">
+                                <tbody>
+                                    <tr>
+                                        <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">AMOUNT</td>
+                                        <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalAmount.toFixed(2)}</td>
+                                    </tr>
+                                    {taxType === 'intra' && (
+                                        <>
+                                            <tr>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (9%)</td>
+                                                <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalCgst.toFixed(2)}</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">SGST (9%)</td>
+                                                <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalSgst.toFixed(2)}</td>
+                                            </tr>
+                                        </>
+                                    )}
+                                    {taxType === 'inter' && (
+                                         <tr>
+                                            <td className="p-1 border-b border-gray-600 bg-blue-100 text-black">IGST (18%)</td>
+                                            <td className="p-1 text-right border-b border-gray-600 bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
+                                        </tr>
+                                    )}
+                                     <tr style={{ height: '60px' }}><td colSpan={2}></td></tr>
+
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colSpan={6} className="border-x border-b border-gray-600 p-1 align-bottom">
+                             <p>Rupees(word): {amountInWords} Rupees Only</p>
+                        </td>
+                        <td colSpan={3} className="border-x border-b border-gray-600 p-0">
+                             <div className="border-t border-gray-600 py-1 px-1 flex justify-between bg-blue-100 text-black font-bold">
+                                <span>NET AMOUNT</span>
+                                <span>{netAmount.toLocaleString('en-IN', {minimumFractionDigits: 2})}</span>
+                             </div>
+                        </td>
+                    </tr>
+                     <tr>
+                        <td colSpan={9} className="p-1 align-bottom text-right h-[100px]">
+                            <div className="inline-block text-center">
+                                {companyDetails.signatureImageUrl && (
+                                    <img src={companyDetails.signatureImageUrl} alt="Signature" className="h-16 object-contain mx-auto" />
+                                 )}
+                            </div>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    );
+});
+
+const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryReceipts, allLorryReceipts, companyDetails, onSaveInvoiceDetails }) => {
+    const previewRef = useRef<HTMLDivElement>(null);
+    const [billNo, setBillNo] = useState('');
+    const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+    const [taxType, setTaxType] = useState<'intra' | 'inter'>('intra');
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (isOpen && lorryReceipts.length > 0) {
+             const existingInvoiceNo = lorryReceipts[0].invoiceNo;
+             
+             if (existingInvoiceNo) {
+                 setBillNo(existingInvoiceNo);
+             } else {
+                 // Automated numbering logic
+                 
+                 // 1. Get Prefix: First 3 alphabets of company name (Uppercase)
+                 const companyName = companyDetails.name || '';
+                 // Filter out symbols, spaces, numbers - keep only A-Z
+                 const cleanName = companyName.replace(/[^a-zA-Z]/g, '');
+                 // Take first 3 chars, default to 'INV' if empty
+                 const prefix = (cleanName.substring(0, 3) || 'INV').toUpperCase();
+                 
+                 // 2. Find the highest existing sequence number for THIS prefix
+                 let maxSeq = 0;
+                 
+                 // Regex to match "PREFIX-0001" format.
+                 // We look for anything starting with the prefix, followed by strictly digits (with or without hyphen)
+                 // This ensures "ABC-0001" matches, and finds "1"
+                 const pattern = new RegExp(`^${prefix}[-_]?(\\d+)$`, 'i');
+
+                 allLorryReceipts.forEach(lr => {
+                     if (lr.invoiceNo) {
+                         const match = lr.invoiceNo.match(pattern);
+                         if (match) {
+                             const num = parseInt(match[1], 10);
+                             if (!isNaN(num) && num > maxSeq) {
+                                 maxSeq = num;
+                             }
+                         }
+                     }
+                 });
+                 
+                 // 3. Increment and format as 4-digit number (0001, 0002, ...)
+                 const nextSeq = maxSeq + 1;
+                 const nextSeqStr = nextSeq.toString().padStart(4, '0');
+                 
+                 // Set format: ABC-0001
+                 setBillNo(`${prefix}-${nextSeqStr}`);
+             }
+            
+            setBillDate(new Date().toISOString().split('T')[0]);
+        }
+    }, [isOpen, lorryReceipts, allLorryReceipts, companyDetails.name]);
+
+
+    if (!isOpen) return null;
+
+    const handleDownloadPDF = () => {
+        const element = previewRef.current;
+        if (!element) return;
+        
+        const billedTo = lorryReceipts.length > 0 ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) : { name: 'bill' };
+        
+        const opt = {
+            margin:       5, 
+            filename:     `Invoice-${billNo}-${billedTo.name?.split(' ')[0]}.pdf`,
+            image:        { type: 'jpeg', quality: 1.0 },
+            html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(element).set(opt).save();
+    };
+
+    const handleSaveDetails = async () => {
+        if (onSaveInvoiceDetails) {
+            setIsSaving(true);
+            try {
+                const lrNos = lorryReceipts.map(lr => lr.lrNo);
+                await onSaveInvoiceDetails(lrNos, billNo, billDate);
+                onClose();
+            } catch (error) {
+                // error handled in parent
+            } finally {
+                setIsSaving(false);
+            }
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto">
+            <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl my-8">
+                <div className="p-4 bg-gray-100 rounded-t-lg flex flex-wrap justify-between items-center gap-4 sticky top-0 z-10">
+                    <h2 className="text-lg sm:text-xl font-bold text-gray-800">Tax Invoice Preview</h2>
+                     <div className="flex items-center gap-4 bg-white p-2 rounded-md border shadow-sm flex-wrap">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600">Invoice No.</label>
+                            <input 
+                                type="text"
+                                value={billNo}
+                                onChange={(e) => setBillNo(e.target.value)}
+                                className="p-1 border rounded-md text-sm w-40 font-mono font-bold"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600">Invoice Date</label>
+                             <input 
+                                type="date"
+                                value={billDate}
+                                onChange={(e) => setBillDate(e.target.value)}
+                                className="p-1 border rounded-md text-sm"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600">Tax Type</label>
+                            <select
+                                value={taxType}
+                                onChange={(e) => setTaxType(e.target.value as 'intra' | 'inter')}
+                                className="p-1 border rounded-md text-sm"
+                            >
+                                <option value="intra">CGST & SGST</option>
+                                <option value="inter">IGST</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        {onSaveInvoiceDetails && (
+                            <button 
+                                onClick={handleSaveDetails} 
+                                disabled={isSaving}
+                                className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold disabled:bg-gray-400"
+                            >
+                                <SaveIcon className="w-5 h-5 mr-1"/>
+                                {isSaving ? 'Saving...' : 'Save Invoice'}
+                            </button>
+                        )}
+                        <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold">
+                            <DownloadIcon className="w-5 h-5 mr-1"/>Download PDF
+                        </button>
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-300">
+                            <XIcon className="w-6 h-6"/>
+                        </button>
+                    </div>
+                </div>
+                <div className="p-2 sm:p-4 overflow-x-auto">
+                    <InvoiceContent ref={previewRef} lorryReceipts={lorryReceipts} companyDetails={companyDetails} billNo={billNo} billDate={billDate} taxType={taxType} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default InvoiceModal;--- START OF FILE utils/numberToWords.ts ---
+
+const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+const numToWords = (num: number): string => {
+    if (num < 20) return ones[num];
+    if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? ' ' + ones[num % 10] : '');
+    if (num < 1000) return ones[Math.floor(num / 100)] + ' Hundred' + (num % 100 !== 0 ? ' ' + numToWords(num % 100) : '');
+    if (num < 100000) return numToWords(Math.floor(num / 1000)) + ' Thousand' + (num % 1000 !== 0 ? ' ' + numToWords(num % 1000) : '');
+    if (num < 10000000) return numToWords(Math.floor(num / 100000)) + ' Lakh' + (num % 100000 !== 0 ? ' ' + numToWords(num % 100000) : '');
+    return 'Number is too large';
+};
+
+export function toWords(num: number): string {
+    if (num === 0) return 'Zero';
+    const words = numToWords(num);
+    // Tidy up spacing and return.
+    return words.replace(/\s\s+/g, ' ').trim();
+}--- START OF FILE services/supabaseService.ts ---
+
+
+import { createClient, Session, Subscription } from '@supabase/supabase-js';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus } from '../types';
+
+/* 
+================================================================================
+ 🛠️ COMPLETE DATABASE FIX SCRIPT (FIXES SCHEMA & 403 PERMISSION ERRORS)
+================================================================================
+ Copy and run this ENTIRE script in your Supabase SQL Editor.
+================================================================================
+
+-- === STEP 1: ADD/FIX COLUMNS & CONSTRAINTS ===
+
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceNo" TEXT;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceAmount" NUMERIC;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "poDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayBillDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayExDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignor JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignee JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "billingTo" JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS items JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS charges JSONB;
+
+-- This might fail if the constraint already exists, which is safe to ignore.
+ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
+
+ALTER TABLE public.lorry_receipts ALTER COLUMN "invoiceDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "poDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayBillDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayExDate" DROP NOT NULL;
+
+-- === STEP 2: APPLY ROW LEVEL SECURITY (RLS) POLICIES TO FIX 403 ERRORS ===
+
+-- This ensures you can only access your own data.
+-- Apply to ALL tables that store user-specific information.
+
+-- Table: lorry_receipts
+ALTER TABLE public.lorry_receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own LRs" ON public.lorry_receipts;
+CREATE POLICY "Users can manage their own LRs" ON public.lorry_receipts FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: company_details
+ALTER TABLE public.company_details ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own company details" ON public.company_details;
+CREATE POLICY "Users can manage their own company details" ON public.company_details FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: saved_parties
+ALTER TABLE public.saved_parties ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own saved parties" ON public.saved_parties;
+CREATE POLICY "Users can manage their own saved parties" ON public.saved_parties FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: saved_trucks
+ALTER TABLE public.saved_trucks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own saved trucks" ON public.saved_trucks;
+CREATE POLICY "Users can manage their own saved trucks" ON public.saved_trucks FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: vehicle_hirings
+ALTER TABLE public.vehicle_hirings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own vehicle hirings" ON public.vehicle_hirings;
+CREATE POLICY "Users can manage their own vehicle hirings" ON public.vehicle_hirings FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: booking_registers
+ALTER TABLE public.booking_registers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own booking records" ON public.booking_registers;
+CREATE POLICY "Users can manage their own booking records" ON public.booking_registers FOR ALL
+USING (auth.uid() = user_id);
+
+
+-- === STEP 3: REFRESH SCHEMA CACHE ===
+NOTIFY pgrst, 'reload config';
+
+================================================================================
+*/
+
+// ⚠️ IMPORTANT: Replace these with YOUR Supabase project details!
+// You can find these in your Supabase Dashboard -> Settings -> API
+const supabaseUrl = 'https://avqevimedgoogcupnojo.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2cWV2aW1lZGdvb2djdXBub2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU0MzksImV4cCI6MjA3OTUwMTQzOX0.SWBCoebfu_yHUk6fGFpiy5ZMzbkZeot5jYjaAjF0esM';
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+const getSupabase = () => supabase;
+
+// --- Auth ---
+
+export const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+};
+
+export const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+};
+
+export const signInWithGoogle = async () => {
+    // We removed the explicit 'redirectTo' option here.
+    // Ensure you have added your Site URL (e.g., https://bolt.new or localhost:5173) 
+    // to Supabase Dashboard -> Authentication -> URL Configuration -> Redirect URLs
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            queryParams: {
+                access_type: 'offline',
+                prompt: 'consent',
+            },
+        }
+    });
+    if (error) throw error;
+    return data;
+};
+
+export const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+};
+
+export const getSession = async (): Promise<Session | null> => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return session;
+};
+
+export const subscribeToAuthState = (callback: (event: string, session: Session | null) => void) => {
+    return supabase.auth.onAuthStateChange(callback);
+};
+
+export const sendPasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (error) throw error;
+};
+
+export const updateUserPassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+};
+
+// --- Lorry Receipts ---
+
+export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
+    const { data, error } = await supabase
+        .from('lorry_receipts')
+        .select('*')
+        .order('date', { ascending: false });
+    if (error) throw error;
+    
+    // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated for frontend
+    return (data || []).map((item: any) => ({
+        ...item,
+        isInvoiceGenerated: item.isInvoiceGenerated ?? item.is_invoice_generated ?? false
+    }));
+};
+
+export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryReceipt[]> => {
+    const { data, error } = await supabase
+        .from('lorry_receipts')
+        .select('*')
+        .order('created_at', { ascending: false }) // Assuming created_at exists, or use date
+        .limit(limit);
+    if (error) throw error;
+    return data || [];
+}
+
+export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    // Destructure to separate frontend-only fields and 'id' if present
+    const { 
+        isInvoiceGenerated, 
+        createdBy, // Exclude frontend-only field
+        // @ts-ignore - 'id' might exist on the object if fetched from DB
+        id, 
+        // @ts-ignore - 'created_at' might exist
+        created_at,
+        ...rest 
+    } = lr;
+
+    // Sanitize Payload: Convert empty string dates to NULL to prevent "invalid input syntax for type date"
+    const sanitizedRest = { ...rest } as any;
+    const dateFields = ['invoiceDate', 'poDate', 'ewayBillDate', 'ewayExDate'];
+    
+    dateFields.forEach(field => {
+        if (sanitizedRest[field] === '') {
+            sanitizedRest[field] = null;
+        }
+    });
+
+    const payload = { 
+        ...sanitizedRest, 
+        user_id: user.id,
+        is_invoice_generated: !!isInvoiceGenerated // Ensure boolean
+    };
+    
+    const { data, error } = await supabase
+        .from('lorry_receipts')
+        .upsert(payload, { onConflict: 'lrNo' })
+        .select()
+        .single();
+    
+    if (error) {
+        console.error("Supabase Save Error:", error);
+        // Throw a clean error message to avoid [object Object] in UI
+        throw new Error(error.message || "Database error occurred while saving LR.");
+    }
+    
+    return {
+        ...data,
+        isInvoiceGenerated: data.is_invoice_generated ?? false
+    };
+};
+
+export const deleteLorryReceipt = async (lrNo: string) => {
+    const { error } = await supabase.from('lorry_receipts').delete().eq('lrNo', lrNo);
+    if (error) throw error;
+};
+
+export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus) => {
+    const { error } = await supabase
+        .from('lorry_receipts')
+        .update({ status, status_updated_at: new Date().toISOString() })
+        .eq('lrNo', lrNo);
+    if (error) throw error;
+};
+
+export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
+    const { error } = await supabase
+        .from('lorry_receipts')
+        .update({ 
+            invoiceNo, 
+            invoiceDate: invoiceDate || null, // Ensure empty string becomes null
+            is_invoice_generated: true // Must be snake_case based on DB fix script
+        })
+        .in('lrNo', lrNos);
+    if (error) throw error;
+}
+
+// --- PODs ---
+
+export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${lrNo}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('pods')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Update LR record
+    const { data, error: updateError } = await supabase
+        .from('lorry_receipts')
+        .update({ pod_path: filePath })
+        .eq('lrNo', lrNo)
+        .select()
+        .single();
+
+    if (updateError) throw updateError;
+    
+    return {
+        ...data,
+        isInvoiceGenerated: data.isInvoiceGenerated ?? data.is_invoice_generated ?? false
+    };
+};
+
+export const getPodSignedUrl = async (path: string): Promise<string> => {
+    const { data, error } = await supabase.storage
+        .from('pods')
+        .createSignedUrl(path, 3600); // 1 hour
+    if (error) throw error;
+    return data.signedUrl;
+};
+
+export const deletePOD = async (path: string) => {
+    const { error } = await supabase.storage.from('pods').remove([path]);
+    if (error) throw error;
+};
+
+// --- Company Details ---
+
+export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
+    const { data, error } = await supabase.from('company_details').select('*').single();
+    // It's possible no details exist yet for new user
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+};
+
+export const saveCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const payload = { ...details, user_id: user.id };
+    
+    // We check if record exists for user
+    const { data: existing } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
+
+    let query = supabase.from('company_details');
+    let result;
+    
+    if (existing) {
+        result = await query.update(payload).eq('id', existing.id).select().single();
+    } else {
+        result = await query.insert(payload).select().single();
+    }
+
+    if (result.error) throw result.error;
+    return result.data;
+};
+
+export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${assetType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('company_assets')
+        .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage.from('company_assets').getPublicUrl(filePath);
+    return publicUrl;
+};
+
+
+// --- Saved Parties & Trucks ---
+
+export const getSavedParties = async (): Promise<SavedParty[]> => {
+    const { data, error } = await supabase.from('saved_parties').select('*');
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveSavedParty = async (party: SavedParty): Promise<SavedParty> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...party, user_id: user.id };
+    const { data, error } = await supabase.from('saved_parties').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteSavedParty = async (id: string) => {
+    const { error } = await supabase.from('saved_parties').delete().eq('id', id);
+    if (error) throw error;
+};
+
+export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
+    const { data, error } = await supabase.from('saved_trucks').select('*');
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...truck, user_id: user.id };
+    const { data, error } = await supabase.from('saved_trucks').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteSavedTruck = async (id: string) => {
+    const { error } = await supabase.from('saved_trucks').delete().eq('id', id);
+    if (error) throw error;
+};
+
+// --- Vehicle Hiring ---
+
+export const getVehicleHirings = async (): Promise<VehicleHiring[]> => {
+    const { data, error } = await supabase.from('vehicle_hirings').select('*').order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveVehicleHiring = async (record: VehicleHiring): Promise<VehicleHiring> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...record, user_id: user.id };
+    const { data, error } = await supabase.from('vehicle_hirings').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteVehicleHiring = async (id: string) => {
+    const { error } = await supabase.from('vehicle_hirings').delete().eq('id', id);
+    if (error) throw error;
+};
+
+// --- Booking Register ---
+
+export const getBookingRecords = async (): Promise<BookingRecord[]> => {
+    const { data, error } = await supabase.from('booking_registers').select('*').order('date', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+export const saveBookingRecord = async (record: BookingRecord): Promise<BookingRecord> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...record, user_id: user.id };
+    const { data, error } = await supabase.from('booking_registers').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteBookingRecord = async (id: string) => {
+    const { error } = await supabase.from('booking_registers').delete().eq('id', id);
+    if (error) throw error;
+};--- START OF FILE components/Dashboard.tsx ---
+
+
+import React, { useState } from 'react';
+import { LorryReceipt, LRStatus, View } from '../types';
+import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon, ExclamationTriangleIcon, PhoneIcon, WrenchIcon, MapPinIcon, CreditCardIcon, ChatBubbleIcon, SirenIcon, TowTruckIcon, FuelIcon, BatteryIcon, ShieldCheckIcon } from './icons';
+import { Language, t } from '../utils/translations';
+
+interface DashboardProps {
+    lorryReceipts: LorryReceipt[];
+    onAddNew: () => void;
+    onViewList: () => void;
+    onEditLR: (lrNo: string) => void;
+    setCurrentView: (view: View) => void;
+    language: Language;
+    activeSection: 'lr' | 'data' | 'emergency' | null;
+    setActiveSection: (section: 'lr' | 'data' | 'emergency' | null) => void;
+}
+
+interface StatCardProps {
+    icon: React.ReactElement<{ className?: string }>;
+    title: string;
+    value: string | number;
+    color: string; // Tailwind color class like 'blue', 'green'
+    onClick?: () => void;
+    className?: string;
+}
+
+// 3D Stat Card Component
+const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick, className = '' }) => {
+    // Map simplified color names to tailwind classes for the 3D effect
+    const colorMap: Record<string, { bg: string, border: string, text: string, shadow: string }> = {
+        blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', shadow: 'shadow-blue-200' },
+        green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600', shadow: 'shadow-green-200' },
+        purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600', shadow: 'shadow-purple-200' },
+        orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-600', shadow: 'shadow-orange-200' },
+        yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600', shadow: 'shadow-yellow-200' },
+        red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', shadow: 'shadow-red-200' },
+    };
+
+    const styles = colorMap[color] || colorMap['blue'];
+
+    return (
+        <div 
+            onClick={onClick}
+            className={`
+                relative overflow-hidden
+                bg-white rounded-2xl p-5
+                border-b-4 ${styles.border}
+                shadow-lg ${styles.shadow}
+                transform transition-all duration-200
+                active:scale-95 hover:-translate-y-1
+                flex items-center justify-between
+                ${onClick ? 'cursor-pointer' : ''}
+                ${className}
+            `}
+        >
+            <div className="z-10">
+                <p className="text-gray-500 text-xs font

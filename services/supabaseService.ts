@@ -1,48 +1,83 @@
 
+
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
 import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus } from '../types';
 
 /* 
 ================================================================================
- 🛠️ DATABASE SETUP / FIX SCRIPT
+ 🛠️ COMPLETE DATABASE FIX SCRIPT (FIXES SCHEMA & 403 PERMISSION ERRORS)
 ================================================================================
- Copy and run the following SQL in your Supabase SQL Editor to fix 
- "Failed to save LR" or missing column errors.
+ Copy and run this ENTIRE script in your Supabase SQL Editor.
 ================================================================================
 
--- 1. Add missing columns for Invoice features
+-- === STEP 1: ADD/FIX COLUMNS & CONSTRAINTS ===
+
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceNo" TEXT;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceAmount" NUMERIC;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceDate" DATE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "poDate" DATE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayBillDate" DATE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayExDate" DATE;
-
--- 2. Add Invoice Generation Status (snake_case)
-ALTER TABLE public.lorry_receipts 
-ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
-
--- 3. Ensure Status & Tracking Columns
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
-
--- 4. Ensure Complex Object Columns are JSONB (Crucial for saving Arrays/Objects)
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignor JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignee JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "billingTo" JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS charges JSONB;
 
--- 5. Ensure lrNo is Unique (Required for Saving/Updating)
-ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
+-- This might fail if the constraint already exists, which is safe to ignore.
+-- ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
 
--- 6. Fix Date Columns (Allow NULLs to prevent "invalid input syntax" errors)
 ALTER TABLE public.lorry_receipts ALTER COLUMN "invoiceDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ALTER COLUMN "poDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayBillDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayExDate" DROP NOT NULL;
 
--- 7. Refresh Schema Cache to apply changes immediately
+-- === STEP 2: APPLY ROW LEVEL SECURITY (RLS) POLICIES TO FIX 403 ERRORS ===
+
+-- This ensures you can only access your own data.
+-- Apply to ALL tables that store user-specific information.
+
+-- Table: lorry_receipts
+ALTER TABLE public.lorry_receipts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own LRs" ON public.lorry_receipts;
+CREATE POLICY "Users can manage their own LRs" ON public.lorry_receipts FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: company_details
+ALTER TABLE public.company_details ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own company details" ON public.company_details;
+CREATE POLICY "Users can manage their own company details" ON public.company_details FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: saved_parties
+ALTER TABLE public.saved_parties ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own saved parties" ON public.saved_parties;
+CREATE POLICY "Users can manage their own saved parties" ON public.saved_parties FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: saved_trucks
+ALTER TABLE public.saved_trucks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own saved trucks" ON public.saved_trucks;
+CREATE POLICY "Users can manage their own saved trucks" ON public.saved_trucks FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: vehicle_hirings
+ALTER TABLE public.vehicle_hirings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own vehicle hirings" ON public.vehicle_hirings;
+CREATE POLICY "Users can manage their own vehicle hirings" ON public.vehicle_hirings FOR ALL
+USING (auth.uid() = user_id);
+
+-- Table: booking_registers
+ALTER TABLE public.booking_registers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own booking records" ON public.booking_registers;
+CREATE POLICY "Users can manage their own booking records" ON public.booking_registers FOR ALL
+USING (auth.uid() = user_id);
+
+
+-- === STEP 3: REFRESH SCHEMA CACHE ===
 NOTIFY pgrst, 'reload config';
 
 ================================================================================
@@ -72,12 +107,13 @@ export const signIn = async (email: string, password: string) => {
 };
 
 export const signInWithGoogle = async () => {
-    // We removed the explicit 'redirectTo' option here.
-    // Ensure you have added your Site URL (e.g., https://bolt.new or localhost:5173) 
+    // Explicitly set redirectTo to ensure correct callback after Google sign-in.
+    // You should also add your Site URL (e.g., your Vercel URL, http://localhost:5173) 
     // to Supabase Dashboard -> Authentication -> URL Configuration -> Redirect URLs
     const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
+            redirectTo: window.location.origin,
             queryParams: {
                 access_type: 'offline',
                 prompt: 'consent',

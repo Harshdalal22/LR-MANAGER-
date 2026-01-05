@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { Session, Subscription } from '@supabase/supabase-js';
@@ -91,17 +92,20 @@ const App: React.FC = () => {
         if (error instanceof Error) {
             message = error.message;
         } else if (typeof error === 'object' && error !== null) {
-            // Handle Supabase and other error objects
             const anyError = error as any;
-            // Prioritize specific error fields
             const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
             
             if (extractedMessage) {
                 message = extractedMessage;
                 if (anyError.details) message += ` (${anyError.details})`;
                 if (anyError.hint) message += ` Hint: ${anyError.hint}`;
+
+                // Add specific hint for 403 RLS errors
+                if (String(anyError.status) === '403' || message.toLowerCase().includes('rls')) {
+                    message = "Permission Denied. Please run the complete 'Fix SQL Script' from the Data Management section to apply security policies.";
+                }
+
             } else {
-                // If no standard message field is found, try to stringify the object
                 try {
                     message = `${fallbackMessage}: ${JSON.stringify(anyError)}`;
                 } catch {
@@ -112,7 +116,7 @@ const App: React.FC = () => {
             message = error;
         }
         
-        toast.error(message);
+        toast.error(message, { duration: 8000 });
     };
 
     const navigateTo = (view: View) => {

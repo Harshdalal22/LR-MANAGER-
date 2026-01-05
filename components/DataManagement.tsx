@@ -29,25 +29,42 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
 -- Run this in your Supabase SQL Editor to fix "Could not find column" errors.
 
 -- 1. Add missing columns for Invoice features
--- We use quotes to preserve camelCase matching the frontend code
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceNo" TEXT;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceAmount" NUMERIC;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "poDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayBillDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayExDate" DATE;
 
--- 2. Add missing column for Invoice Generation Status
--- Note: Database uses snake_case: is_invoice_generated
+-- 2. Add Invoice Generation Status (snake_case)
 ALTER TABLE public.lorry_receipts 
 ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
 
--- 3. Ensure other status columns exist
+-- 3. Ensure Status & Tracking Columns
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
 
--- 4. 🚨 CRITICAL: Refresh Schema Cache
--- This tells the API about the new columns. Without this, you will still see errors.
+-- 4. Ensure Complex Object Columns are JSONB
+-- This prevents errors when saving party details or items
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignor JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignee JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "billingTo" JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS items JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS charges JSONB;
+
+-- 5. Ensure lrNo is Unique (Required for Saving/Updating)
+ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
+
+-- 6. Fix Date Columns (Allow NULLs to prevent "invalid input syntax" errors)
+ALTER TABLE public.lorry_receipts ALTER COLUMN "invoiceDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "poDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayBillDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayExDate" DROP NOT NULL;
+
+-- 7. 🚨 CRITICAL: Refresh Schema Cache
 NOTIFY pgrst, 'reload config';
 
--- 5. Re-Apply Security Policy (Ensure user access)
+-- 8. Re-Apply Security Policy
 ALTER TABLE public.lorry_receipts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own LRs" ON public.lorry_receipts;
 CREATE POLICY "Users can manage their own LRs" ON public.lorry_receipts 

@@ -2,6 +2,52 @@
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
 import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus } from '../types';
 
+/* 
+================================================================================
+ 🛠️ DATABASE SETUP / FIX SCRIPT
+================================================================================
+ Copy and run the following SQL in your Supabase SQL Editor to fix 
+ "Failed to save LR" or missing column errors.
+================================================================================
+
+-- 1. Add missing columns for Invoice features
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceNo" TEXT;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceAmount" NUMERIC;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "poDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayBillDate" DATE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "ewayExDate" DATE;
+
+-- 2. Add Invoice Generation Status (snake_case)
+ALTER TABLE public.lorry_receipts 
+ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
+
+-- 3. Ensure Status & Tracking Columns
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
+
+-- 4. Ensure Complex Object Columns are JSONB (Crucial for saving Arrays/Objects)
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignor JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS consignee JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "billingTo" JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS items JSONB;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS charges JSONB;
+
+-- 5. Ensure lrNo is Unique (Required for Saving/Updating)
+ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
+
+-- 6. Fix Date Columns (Allow NULLs to prevent "invalid input syntax" errors)
+ALTER TABLE public.lorry_receipts ALTER COLUMN "invoiceDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "poDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayBillDate" DROP NOT NULL;
+ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayExDate" DROP NOT NULL;
+
+-- 7. Refresh Schema Cache to apply changes immediately
+NOTIFY pgrst, 'reload config';
+
+================================================================================
+*/
+
 // ⚠️ IMPORTANT: Replace these with YOUR Supabase project details!
 // You can find these in your Supabase Dashboard -> Settings -> API
 const supabaseUrl = 'https://avqevimedgoogcupnojo.supabase.co';
@@ -97,13 +143,31 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    // Handle payload key mapping: remove frontend-only camelCase keys
-    const { isInvoiceGenerated, ...rest } = lr;
+    // Destructure to separate frontend-only fields and 'id' if present
+    const { 
+        isInvoiceGenerated, 
+        createdBy, // Exclude frontend-only field
+        // @ts-ignore - 'id' might exist on the object if fetched from DB
+        id, 
+        // @ts-ignore - 'created_at' might exist
+        created_at,
+        ...rest 
+    } = lr;
+
+    // Sanitize Payload: Convert empty string dates to NULL to prevent "invalid input syntax for type date"
+    const sanitizedRest = { ...rest } as any;
+    const dateFields = ['invoiceDate', 'poDate', 'ewayBillDate', 'ewayExDate'];
+    
+    dateFields.forEach(field => {
+        if (sanitizedRest[field] === '') {
+            sanitizedRest[field] = null;
+        }
+    });
 
     const payload = { 
-        ...rest, 
+        ...sanitizedRest, 
         user_id: user.id,
-        is_invoice_generated: isInvoiceGenerated
+        is_invoice_generated: !!isInvoiceGenerated // Ensure boolean
     };
     
     const { data, error } = await supabase
@@ -112,11 +176,15 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         .select()
         .single();
     
-    if (error) throw error;
+    if (error) {
+        console.error("Supabase Save Error:", error);
+        // Throw a clean error message to avoid [object Object] in UI
+        throw new Error(error.message || "Database error occurred while saving LR.");
+    }
     
     return {
         ...data,
-        isInvoiceGenerated: data.isInvoiceGenerated ?? data.is_invoice_generated ?? false
+        isInvoiceGenerated: data.is_invoice_generated ?? false
     };
 };
 
@@ -138,7 +206,7 @@ export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceN
         .from('lorry_receipts')
         .update({ 
             invoiceNo, 
-            invoiceDate, 
+            invoiceDate: invoiceDate || null, // Ensure empty string becomes null
             is_invoice_generated: true // Must be snake_case based on DB fix script
         })
         .in('lrNo', lrNos);
@@ -204,13 +272,7 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
 
     const payload = { ...details, user_id: user.id };
     
-    // We assume one company detail per user, so maybe we use upsert on user_id if table PK allows.
-    // Or we fetch id first. Let's assume the table has a unique constraint on user_id or similar logic.
-    // If details has an ID, use it. If not, insert.
-    // Actually `CompanyDetails` type doesn't have an ID in `types.ts`. 
-    // We should rely on `user_id` being unique or just upsert.
-    
-    // We will check if record exists for user
+    // We check if record exists for user
     const { data: existing } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
 
     let query = supabase.from('company_details');

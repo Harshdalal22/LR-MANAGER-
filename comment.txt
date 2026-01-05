@@ -1,0 +1,283 @@
+/* 
+--- START OF FILE index.tsx ---
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);--- START OF FILE metadata.json ---
+
+{
+  "name": "Bilty Book",
+  "description": "An application to generate, manage, and share Lorry Receipts (LRs) for a cargo business. Features AI-assisted design, PDF generation, and sharing options.",
+  "requestFramePermissions": []
+}--- START OF FILE index.html ---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bilty Book</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'ssk-blue': '#1e3a8a',
+              'ssk-red': '#dc2626',
+            },
+          },
+        },
+      }
+    </script>
+    <style>
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        #print-root, #print-root * {
+          visibility: visible;
+        }
+        #print-root {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+          height: 100%;
+        }
+        .printable-area {
+          border: none !important;
+          box-shadow: none !important;
+        }
+        @page {
+          size: A4;
+          margin: 0;
+        }
+        .page-break {
+          page-break-after: always;
+        }
+        .page-break:last-child {
+          page-break-after: auto;
+        }
+      }
+      /* Added for 3D UI feel */
+      input:focus, textarea:focus, select:focus {
+        transform: scale(1.02);
+        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.5);
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+      }
+    </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
+    "react-hot-toast": "https://aistudiocdn.com/react-hot-toast@^2.6.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}
+</script>
+  <!-- Google AdSense script loader -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-app-pub-2742543836663851" crossorigin="anonymous"></script>
+</head>
+  <body>
+    <div id="root"></div>
+    <div id="print-root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>--- START OF FILE App.tsx ---
+
+
+import React, { useState, useEffect } from 'react';
+import { Toaster, toast } from 'react-hot-toast';
+import { Session, Subscription } from '@supabase/supabase-js';
+import Auth from './components/Auth';
+import Header from './components/Header';
+import Dashboard from './components/Dashboard';
+import LRList from './components/LRList';
+import LRForm from './components/LRForm';
+import VehicleHiring from './components/VehicleHiring';
+import BookingRegister from './components/BookingRegister';
+import DataManagement from './components/DataManagement';
+import PartyManagement from './components/PartyManagement';
+import TruckManagement from './components/TruckManagement';
+import InvoiceList from './components/InvoiceList';
+import AdBanner from './components/AdBanner';
+import PODUploadModal from './components/PODUploadModal';
+import PasswordResetModal from './components/PasswordResetModal';
+import { 
+    LorryReceipt, 
+    CompanyDetails, 
+    SavedParty, 
+    SavedTruck, 
+    View, 
+    LRStatus
+} from './types';
+import { 
+    getLorryReceipts, 
+    saveLorryReceipt, 
+    deleteLorryReceipt, 
+    getCompanyDetails, 
+    saveCompanyDetails, 
+    subscribeToAuthState, 
+    signOut, 
+    getSession, 
+    updateLorryReceiptStatus, 
+    uploadPOD, 
+    uploadCompanyAsset, 
+    getPodSignedUrl, 
+    updateLorryReceiptInvoiceDetails,
+    getSavedParties,
+    saveSavedParty, 
+    deleteSavedParty, 
+    getSavedTrucks,
+    saveSavedTruck, 
+    deleteSavedTruck,
+    updateUserPassword
+} from './services/supabaseService';
+import { t, Language } from './utils/translations';
+
+const defaultCompanyDetails: CompanyDetails = {
+    name: '',
+    logoUrl: '',
+    signatureImageUrl: '',
+    tagline: '',
+    address: '',
+    email: '',
+    web: '',
+    contact: [],
+    pan: '',
+    gstn: '',
+    bankDetails: {
+        name: '',
+        branch: '',
+        accountNo: '',
+        ifscCode: ''
+    },
+    jurisdictionCity: '',
+    branchLocations: []
+};
+
+const App: React.FC = () => {
+    const [session, setSession] = useState<Session | null>(null);
+    const [lorryReceipts, setLorryReceipts] = useState<LorryReceipt[]>([]);
+    const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
+    const [savedTrucks, setSavedTrucks] = useState<SavedTruck[]>([]);
+    const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
+    const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(defaultCompanyDetails);
+    const [currentView, setCurrentView] = useState<View>('dashboard');
+    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
+    const [viewHistory, setViewHistory] = useState<View[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
+    const [language, setLanguage] = useState<Language>('en');
+    const [isPasswordResetting, setIsPasswordResetting] = useState(false);
+
+    const handleError = (error: unknown, fallbackMessage: string) => {
+        console.error(fallbackMessage, error);
+        let message = fallbackMessage;
+        
+        if (error instanceof Error) {
+            message = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+            // Handle Supabase and other error objects
+            const anyError = error as any;
+            // Prioritize specific error fields
+            const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
+            
+            if (extractedMessage) {
+                message = extractedMessage;
+                if (anyError.details) message += ` (${anyError.details})`;
+                if (anyError.hint) message += ` Hint: ${anyError.hint}`;
+            } else {
+                // If no standard message field is found, try to stringify the object
+                try {
+                    message = `${fallbackMessage}: ${JSON.stringify(anyError)}`;
+                } catch {
+                    message = `${fallbackMessage}: Unknown error object`;
+                }
+            }
+        } else if (typeof error === 'string') {
+            message = error;
+        }
+        
+        toast.error(message);
+    };
+
+    const navigateTo = (view: View) => {
+        setViewHistory(prev => [...prev, currentView]);
+        setCurrentView(view);
+        if (view === 'dashboard') {
+            // keep section
+        }
+    };
+
+    useEffect(() => {
+        // Dynamic favicon
+        if (companyDetails.logoUrl) {
+            const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            (link as HTMLLinkElement).type = 'image/x-icon';
+            (link as HTMLLinkElement).rel = 'shortcut icon';
+            (link as HTMLLinkElement).href = companyDetails.logoUrl;
+            document.getElementsByTagName('head')[0].appendChild(link);
+        }
+    }, [companyDetails.logoUrl]);
+
+    useEffect(() => {
+        let authSubscription: Subscription | null = null;
+
+        const setupAuth = async () => {
+            try {
+                const currentSession = await getSession();
+                setSession(currentSession);
+                
+                if (!currentSession) {
+                    setIsLoading(false);
+                }
+
+                const { data } = subscribeToAuthState((event, session) => {
+                    setSession(session);
+                    
+                    if (event === 'PASSWORD_RECOVERY') {
+                        setIsPasswordResetting(true);
+                    }
+
+                    if (!session) {
+                        setLorryReceipts([]);
+                        setSavedParties([]);
+                        setSavedTrucks([]);
+                        setCompanyDetails(defaultCompanyDetails);
+                        setCurrentView('dashboard');
+                        setDashboardSection(null);
+                        setViewHistory([]);
+                        setIsPasswordResetting(false);
+                    }
+                });
+                authSubscription = data.subscription;
+                
+            } catch (error) {
+                handleError(error, "Failed to initialize authentication");
+                setIsLoading(false);
+            }
+        };
+
+        setupAuth();
+
+        return ()

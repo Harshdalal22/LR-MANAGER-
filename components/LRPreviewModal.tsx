@@ -296,8 +296,8 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                         <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
                              <div className="flex flex-col justify-between h-full space-y-2">
                                 <div className="grid grid-cols-1 gap-2 text-[8px]">
-                                    {/* Invoice No and Date display removed as per user request */}
                                     <div>
+                                        <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
                                         <p className="font-bold">Value: <span className="font-normal">₹{Number(lr.invoiceAmount).toLocaleString('en-IN')}</span></p>
                                         <p className="font-bold">GST Paid By: <span className="font-normal">{lr.gstPaidBy}</span></p>
                                     </div>

@@ -28,20 +28,26 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
 -- 🛠️ DATABASE FIX FOR BILTY BOOK
 -- Run this in your Supabase SQL Editor to fix "Could not find column" errors.
 
--- 1. Add missing column for Invoice Generation
+-- 1. Add missing columns for Invoice features
+-- We use quotes to preserve camelCase matching the frontend code
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceNo" TEXT;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceAmount" NUMERIC;
+ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "invoiceDate" DATE;
+
+-- 2. Add missing column for Invoice Generation Status
 -- Note: Database uses snake_case: is_invoice_generated
 ALTER TABLE public.lorry_receipts 
 ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
 
--- 2. Ensure other status columns exist
+-- 3. Ensure other status columns exist
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
 
--- 3. 🚨 CRITICAL: Refresh Schema Cache
+-- 4. 🚨 CRITICAL: Refresh Schema Cache
 -- This tells the API about the new columns. Without this, you will still see errors.
 NOTIFY pgrst, 'reload config';
 
--- 4. Re-Apply Security Policy (Ensure user access)
+-- 5. Re-Apply Security Policy (Ensure user access)
 ALTER TABLE public.lorry_receipts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own LRs" ON public.lorry_receipts;
 CREATE POLICY "Users can manage their own LRs" ON public.lorry_receipts 
@@ -325,7 +331,7 @@ FOR ALL USING (auth.uid() = user_id);
                                     Database Update Required
                                 </p>
                                 <p className="text-xs text-red-600 mt-1">
-                                    To fix the "isInvoiceGenerated" error, copy and run the script below in your Supabase SQL Editor.
+                                    To fix "Could not find column" errors, copy and run the script below in your Supabase SQL Editor.
                                 </p>
                             </div>
                         </div>

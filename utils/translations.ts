@@ -1,4 +1,5 @@
 
+
 export type Language = 'en' | 'hi';
 
 export const t = {
@@ -38,6 +39,59 @@ export const t = {
     bookingRegister: "Booking Register",
     dataSetup: "Data Setup",
     
+    // Emergency
+    emergency: "Emergency",
+    emergencyDesc: "Quick access to emergency services, helplines, and breakdown assistance.",
+    emergencyServices: "Emergency Services",
+    emergencySubtitle: "Call for help immediately",
+    
+    // New Comprehensive Emergency Translations
+    mechanicTitle: "Emergency Mechanic",
+    mechanicFeatures: [
+        "30-minute response guarantee",
+        "Real-time mechanic assignment",
+        "Professional diagnosis & repair",
+        "Service request with location"
+    ],
+    mechanicAction: "Request Mechanic",
+
+    gpsTitle: "GPS Tracking",
+    gpsFeatures: [
+        "Live location monitoring",
+        "Fuel level & consumption tracking",
+        "Anti-theft blinking sensors",
+        "₹1400/month comprehensive"
+    ],
+    gpsAction: "Get GPS Plan",
+
+    fuelTitle: "Fuel & Maintenance",
+    fuelFeatures: [
+        "Cards with 2% discount",
+        "Prepaid maintenance packages",
+        "Real-time expense tracking",
+        "Credit limit up to ₹15,000"
+    ],
+    fuelAction: "Apply Now",
+
+    supportTitle: "24/7 Support",
+    supportFeatures: [
+        "Guaranteed 2-minute response",
+        "Emergency Hotline: 1800-GAADI",
+        "Direct technician access",
+        "Instant chat solution"
+    ],
+    supportAction: "Chat Now",
+
+    quickActions: "Quick Actions",
+    accidentReport: "Accident Report",
+    towingService: "Towing Service",
+    fuelDelivery: "Fuel Delivery",
+    batteryJump: "Battery Jumpstart",
+    
+    police: "Police",
+    ambulance: "Ambulance",
+    highwayHelpline: "Highway Helpline",
+
     // Form
     coreDetails: "Core Details",
     lrType: "LR TYPE",
@@ -151,6 +205,59 @@ export const t = {
     vehicleHiring: "वाहन हायरिंग",
     bookingRegister: "बुकिंग रजिस्टर",
     dataSetup: "डेटा सेटअप",
+    
+    // Emergency
+    emergency: "आपातकालीन",
+    emergencyDesc: "आपातकालीन सेवाओं, हेल्पलाइनों और ब्रेकडाउन सहायता के लिए त्वरित पहुँच।",
+    emergencyServices: "आपातकालीन सेवाएं",
+    emergencySubtitle: "तत्काल सहायता के लिए कॉल करें",
+
+    // New Comprehensive Emergency Translations - Hindi
+    mechanicTitle: "आपातकालीन मैकेनिक",
+    mechanicFeatures: [
+        "30 मिनट में गारंटीड रिस्पांस",
+        "रीयल-टाइम मैकेनिक असाइनमेंट",
+        "पेशेवर निदान और मरम्मत",
+        "स्थान के साथ सेवा अनुरोध"
+    ],
+    mechanicAction: "मैकेनिक बुलाएं",
+
+    gpsTitle: "जीपीएस ट्रैकिंग",
+    gpsFeatures: [
+        "लाइव लोकेशन मॉनिटरिंग",
+        "ईंधन स्तर और खपत ट्रैकिंग",
+        "चोरी-रोधी ब्लिंकिंग सेंसर",
+        "₹1400/माह का व्यापक प्लान"
+    ],
+    gpsAction: "जीपीएस प्लान लें",
+
+    fuelTitle: "फ्यूल और मेंटेनेंस",
+    fuelFeatures: [
+        "कार्ड पर 2% की छूट",
+        "प्रीपेड रखरखाव पैकेज",
+        "वास्तविक समय व्यय ट्रैकिंग",
+        "₹15,000 तक की क्रेडिट सीमा"
+    ],
+    fuelAction: "अभी आवेदन करें",
+
+    supportTitle: "24/7 सहायता",
+    supportFeatures: [
+        "2 मिनट में गारंटीड रिस्पांस",
+        "आपातकालीन हेल्पलाइन: 1800-GAADI",
+        "सीधे तकनीशियन से संपर्क",
+        "त्वरित चैट समाधान"
+    ],
+    supportAction: "चैट करें",
+
+    quickActions: "त्वरित कार्य (Quick Actions)",
+    accidentReport: "दुर्घटना रिपोर्ट",
+    towingService: "टोइंग सेवा",
+    fuelDelivery: "ईंधन डिलीवरी",
+    batteryJump: "बैटरी जंपस्टार्ट",
+
+    police: "पुलिस",
+    ambulance: "एम्बुलेंस",
+    highwayHelpline: "हाईवे हेल्पलाइन",
 
     // Form
     coreDetails: "मुख्य विवरण",

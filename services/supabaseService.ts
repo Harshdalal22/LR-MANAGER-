@@ -1,368 +1,331 @@
 
-/* 
-  ### DATABASE FIX REQUIRED ###
-  If you encounter the error: "Could not find column isInvoiceGenerated in the schema cache"
-  
-  Run this SQL query in your Supabase SQL Editor:
-  -----------------------------------------------------------------------------------------
-  ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS is_invoice_generated BOOLEAN DEFAULT FALSE;
-  ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP WITH TIME ZONE;
-  ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS pod_path TEXT;
-  
-  -- CRITICAL: This reloads the API cache so it sees the new columns
-  NOTIFY pgrst, 'reload config';
-  -----------------------------------------------------------------------------------------
-*/
+import { createClient, Session, Subscription } from '@supabase/supabase-js';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus } from '../types';
 
-import { createClient, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, LRStatus, SavedParty, SavedTruck, VehicleHiring, BookingRecord } from '../types';
-
+// ⚠️ IMPORTANT: Replace these with YOUR Supabase project details!
+// You can find these in your Supabase Dashboard -> Settings -> API
 const supabaseUrl = 'https://avqevimedgoogcupnojo.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2cWV2aW1lZGdvb2djdXBub2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU0MzksImV4cCI6MjA3OTUwMTQzOX0.SWBCoebfu_yHUk6fGFpiy5ZMzbkZeot5jYjaAjF0esM';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF2cWV2aW1lZGdvb2djdXBub2pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM5MjU0MzksImV4cCI6MjA3OTUwMTQzOX0.SWBCoebfu_yHUk6fGFpiy5ZMzbkZeot5jYjaAjF0esM';
 
-let supabase: SupabaseClient | null = null;
+export const supabase = createClient(supabaseUrl, supabaseKey);
 
-const getSupabase = (): SupabaseClient => {
-    if (!supabase) {
-        try {
-            supabase = createClient(supabaseUrl, supabaseAnonKey, {
-                auth: {
-                    persistSession: true,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: true
-                }
-            });
-        } catch (error) {
-            console.error("Error creating Supabase client:", error);
-            throw new Error("Invalid Supabase credentials provided.");
+const getSupabase = () => supabase;
+
+// --- Auth ---
+
+export const signUp = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+};
+
+export const signIn = async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+};
+
+export const signInWithGoogle = async () => {
+    // We removed the explicit 'redirectTo' option here.
+    // Ensure you have added your Site URL (e.g., https://bolt.new or localhost:5173) 
+    // to Supabase Dashboard -> Authentication -> URL Configuration -> Redirect URLs
+    const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            queryParams: {
+                access_type: 'offline',
+                prompt: 'consent',
+            },
         }
-    }
-    return supabase;
+    });
+    if (error) throw error;
+    return data;
 };
 
-// --- Authentication ---
-export const signUp = (email: string, password: string) => getSupabase().auth.signUp({ email, password }).then(({ error }) => { if (error) throw error; });
-export const signIn = (email: string, password: string) => getSupabase().auth.signInWithPassword({ email, password }).then(({ error }) => { if (error) throw error; });
-export const signOut = () => getSupabase().auth.signOut().then(({ error }) => { if (error) throw error; });
-export const getSession = async (): Promise<Session | null> => (await getSupabase().auth.getSession()).data.session;
-export const subscribeToAuthState = (callback: (event: string, session: Session | null) => void) => getSupabase().auth.onAuthStateChange(callback);
-export const sendPasswordReset = (email: string) => getSupabase().auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }).then(({ error }) => { if (error) throw error; });
-
-const getCurrentUser = async (): Promise<User> => {
-    const session = await getSession();
-    if (!session?.user) throw new Error('User not authenticated. Please sign in again.');
-    return session.user;
+export const signOut = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
 };
 
-// Helper to map DB record to LorryReceipt type
-const mapLR = (item: any): LorryReceipt => ({
-    ...item,
-    // Safely handle the snake_case to camelCase conversion
-    isInvoiceGenerated: item.is_invoice_generated || false
-});
+export const getSession = async (): Promise<Session | null> => {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return session;
+};
 
-// --- Lorry Receipt Functions ---
+export const subscribeToAuthState = (callback: (event: string, session: Session | null) => void) => {
+    return supabase.auth.onAuthStateChange(callback);
+};
+
+export const sendPasswordReset = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (error) throw error;
+};
+
+export const updateUserPassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+};
+
+// --- Lorry Receipts ---
 
 export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase()
+    const { data, error } = await supabase
         .from('lorry_receipts')
         .select('*')
-        .eq('user_id', user.id)
         .order('date', { ascending: false });
     if (error) throw error;
-    return (data || []).map(mapLR);
+    
+    // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated for frontend
+    return (data || []).map((item: any) => ({
+        ...item,
+        isInvoiceGenerated: item.isInvoiceGenerated ?? item.is_invoice_generated ?? false
+    }));
 };
+
+export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryReceipt[]> => {
+    const { data, error } = await supabase
+        .from('lorry_receipts')
+        .select('*')
+        .order('created_at', { ascending: false }) // Assuming created_at exists, or use date
+        .limit(limit);
+    if (error) throw error;
+    return data || [];
+}
 
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
-    const user = await getCurrentUser();
-    
-    // Explicitly separate the camelCase field
-    const { 
-        user_id, 
-        createdBy, 
-        isInvoiceGenerated, 
-        ...restOfLr 
-    } = lr; 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
 
-    // Construct the payload with the correct snake_case column name
-    const dataToSave: any = {
-      ...restOfLr,
-      is_invoice_generated: isInvoiceGenerated || false, // Map to DB column
-      user_id: user.id,
-      updated_at: new Date().toISOString(),
+    // Handle payload key mapping: remove frontend-only camelCase keys
+    const { isInvoiceGenerated, ...rest } = lr;
+
+    const payload = { 
+        ...rest, 
+        user_id: user.id,
+        is_invoice_generated: isInvoiceGenerated
     };
-
-    // Ensure strictly no camelCase keys are sent to Supabase to prevent "Column not found" errors
-    delete dataToSave.isInvoiceGenerated;
-    delete dataToSave.createdBy;
-
-    const { data, error } = await getSupabase()
+    
+    const { data, error } = await supabase
         .from('lorry_receipts')
-        .upsert(dataToSave, { onConflict: 'lrNo, user_id' })
+        .upsert(payload, { onConflict: 'lrNo' })
         .select()
         .single();
-        
-    if (error) {
-        console.error("Supabase Save Error:", error.message);
-        throw new Error(`Database Error: ${error.message}`);
-    }
-    return mapLR(data);
+    
+    if (error) throw error;
+    
+    return {
+        ...data,
+        isInvoiceGenerated: data.isInvoiceGenerated ?? data.is_invoice_generated ?? false
+    };
 };
 
-export const deleteLorryReceipt = async (lrNo: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase().from('lorry_receipts').delete().eq('user_id', user.id).eq('lrNo', lrNo);
+export const deleteLorryReceipt = async (lrNo: string) => {
+    const { error } = await supabase.from('lorry_receipts').delete().eq('lrNo', lrNo);
     if (error) throw error;
 };
 
-export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus): Promise<LorryReceipt> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase()
+export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus) => {
+    const { error } = await supabase
         .from('lorry_receipts')
-        .update({ status: status, status_updated_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .eq('lrNo', lrNo)
-        .select()
-        .single();
+        .update({ status, status_updated_at: new Date().toISOString() })
+        .eq('lrNo', lrNo);
     if (error) throw error;
-    return mapLR(data);
 };
 
-export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string | null): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase()
+export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
+    const { error } = await supabase
         .from('lorry_receipts')
         .update({ 
             invoiceNo, 
             invoiceDate, 
-            is_invoice_generated: true, 
-            updated_at: new Date().toISOString() 
+            is_invoice_generated: true // Must be snake_case based on DB fix script
         })
-        .eq('user_id', user.id)
         .in('lrNo', lrNos);
-    
     if (error) throw error;
-};
+}
 
-export const deleteInvoice = async (invoiceNo: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase()
+// --- PODs ---
+
+export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${lrNo}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('pods')
+        .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Update LR record
+    const { data, error: updateError } = await supabase
         .from('lorry_receipts')
-        .update({ 
-            invoiceNo: null, 
-            invoiceDate: null, 
-            is_invoice_generated: false, 
-            updated_at: new Date().toISOString() 
-        })
-        .eq('user_id', user.id)
-        .eq('invoiceNo', invoiceNo);
+        .update({ pod_path: filePath })
+        .eq('lrNo', lrNo)
+        .select()
+        .single();
+
+    if (updateError) throw updateError;
     
+    return {
+        ...data,
+        isInvoiceGenerated: data.isInvoiceGenerated ?? data.is_invoice_generated ?? false
+    };
+};
+
+export const getPodSignedUrl = async (path: string): Promise<string> => {
+    const { data, error } = await supabase.storage
+        .from('pods')
+        .createSignedUrl(path, 3600); // 1 hour
+    if (error) throw error;
+    return data.signedUrl;
+};
+
+export const deletePOD = async (path: string) => {
+    const { error } = await supabase.storage.from('pods').remove([path]);
     if (error) throw error;
 };
 
-// --- Company Details Functions ---
-export const getCompanyDetails = async (defaultDetails: CompanyDetails): Promise<CompanyDetails> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase().from('company_details').select('*').eq('user_id', user.id).single();
-    if (error && error.code !== 'PGRST116') throw error; 
-    if (!data) {
-        const newUserDetails = { ...defaultDetails, user_id: user.id };
-        return saveCompanyDetails(newUserDetails);
-    }
-    return data as CompanyDetails;
+// --- Company Details ---
+
+export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
+    const { data, error } = await supabase.from('company_details').select('*').single();
+    // It's possible no details exist yet for new user
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
 };
 
 export const saveCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
-    const user = await getCurrentUser();
-    const { user_id, ...restOfDetails } = details;
-    const dataToSave = { 
-        ...restOfDetails, 
-        user_id: user.id,
-        updated_at: new Date().toISOString(),
-    };
-    const { data, error } = await getSupabase().from('company_details').upsert(dataToSave).select().single();
-    if (error) throw new Error(`Database Error: ${error.message}`);
-    return data as CompanyDetails;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const payload = { ...details, user_id: user.id };
+    
+    // We assume one company detail per user, so maybe we use upsert on user_id if table PK allows.
+    // Or we fetch id first. Let's assume the table has a unique constraint on user_id or similar logic.
+    // If details has an ID, use it. If not, insert.
+    // Actually `CompanyDetails` type doesn't have an ID in `types.ts`. 
+    // We should rely on `user_id` being unique or just upsert.
+    
+    // We will check if record exists for user
+    const { data: existing } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
+
+    let query = supabase.from('company_details');
+    let result;
+    
+    if (existing) {
+        result = await query.update(payload).eq('id', existing.id).select().single();
+    } else {
+        result = await query.insert(payload).select().single();
+    }
+
+    if (result.error) throw result.error;
+    return result.data;
 };
 
-// --- Saved Parties Functions ---
+export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const fileExt = file.name.split('.').pop();
+    const filePath = `${user.id}/${assetType}_${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('company_assets')
+        .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage.from('company_assets').getPublicUrl(filePath);
+    return publicUrl;
+};
+
+
+// --- Saved Parties & Trucks ---
+
 export const getSavedParties = async (): Promise<SavedParty[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase().from('saved_parties').select('*').eq('user_id', user.id).order('name', { ascending: true });
+    const { data, error } = await supabase.from('saved_parties').select('*');
     if (error) throw error;
     return data || [];
 };
 
 export const saveSavedParty = async (party: SavedParty): Promise<SavedParty> => {
-    const user = await getCurrentUser();
-    const { id, user_id, ...rest } = party;
-    
-    // LOGIC TO PREVENT DUPLICATES: Check if name exists
-    // If we don't have an ID (it's a new entry), check if the name already exists
-    let targetId = id;
-    if (!targetId && rest.name) {
-        const { data: existing } = await getSupabase()
-            .from('saved_parties')
-            .select('id')
-            .eq('user_id', user.id)
-            .ilike('name', rest.name.trim()) // Case-insensitive matching
-            .maybeSingle();
-        
-        if (existing) {
-            targetId = existing.id;
-        }
-    }
-
-    const dataToSave = { ...rest, user_id: user.id };
-    // If targetId exists (either passed in or found by name), use it to update
-    const payload = targetId ? { ...dataToSave, id: targetId } : dataToSave;
-
-    const { data, error } = await getSupabase().from('saved_parties').upsert(payload).select().single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...party, user_id: user.id };
+    const { data, error } = await supabase.from('saved_parties').upsert(payload).select().single();
     if (error) throw error;
     return data;
 };
 
-export const deleteSavedParty = async (id: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase().from('saved_parties').delete().eq('user_id', user.id).eq('id', id);
+export const deleteSavedParty = async (id: string) => {
+    const { error } = await supabase.from('saved_parties').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Saved Trucks Functions ---
 export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase().from('saved_trucks').select('*').eq('user_id', user.id).order('truckNo', { ascending: true });
+    const { data, error } = await supabase.from('saved_trucks').select('*');
     if (error) throw error;
     return data || [];
 };
 
 export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
-    const user = await getCurrentUser();
-    const { id, user_id, ...rest } = truck;
-
-    // LOGIC TO PREVENT DUPLICATES: Check if truck number exists
-    let targetId = id;
-    if (!targetId && rest.truckNo) {
-        const { data: existing } = await getSupabase()
-            .from('saved_trucks')
-            .select('id')
-            .eq('user_id', user.id)
-            .ilike('truckNo', rest.truckNo.trim())
-            .maybeSingle();
-
-        if (existing) {
-            targetId = existing.id;
-        }
-    }
-
-    const dataToSave = { ...rest, user_id: user.id };
-    const payload = targetId ? { ...dataToSave, id: targetId } : dataToSave;
-    
-    const { data, error } = await getSupabase().from('saved_trucks').upsert(payload).select().single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...truck, user_id: user.id };
+    const { data, error } = await supabase.from('saved_trucks').upsert(payload).select().single();
     if (error) throw error;
     return data;
 };
 
-export const deleteSavedTruck = async (id: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase().from('saved_trucks').delete().eq('user_id', user.id).eq('id', id);
+export const deleteSavedTruck = async (id: string) => {
+    const { error } = await supabase.from('saved_trucks').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Vehicle Hiring Functions ---
+// --- Vehicle Hiring ---
+
 export const getVehicleHirings = async (): Promise<VehicleHiring[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase().from('vehicle_hirings').select('*').eq('user_id', user.id).order('date', { ascending: false });
+    const { data, error } = await supabase.from('vehicle_hirings').select('*').order('date', { ascending: false });
     if (error) throw error;
     return data || [];
 };
 
 export const saveVehicleHiring = async (record: VehicleHiring): Promise<VehicleHiring> => {
-    const user = await getCurrentUser();
-    const { id, user_id, ...rest } = record;
-    const dataToSave = { ...rest, user_id: user.id };
-    const payload = id ? { ...dataToSave, id } : dataToSave;
-    const { data, error } = await getSupabase().from('vehicle_hirings').upsert(payload).select().single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...record, user_id: user.id };
+    const { data, error } = await supabase.from('vehicle_hirings').upsert(payload).select().single();
     if (error) throw error;
     return data;
 };
 
-export const deleteVehicleHiring = async (id: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase().from('vehicle_hirings').delete().eq('user_id', user.id).eq('id', id);
+export const deleteVehicleHiring = async (id: string) => {
+    const { error } = await supabase.from('vehicle_hirings').delete().eq('id', id);
     if (error) throw error;
 };
 
-// --- Booking Register Functions ---
+// --- Booking Register ---
+
 export const getBookingRecords = async (): Promise<BookingRecord[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase().from('booking_registers').select('*').eq('user_id', user.id).order('date', { ascending: false });
+    const { data, error } = await supabase.from('booking_registers').select('*').order('date', { ascending: false });
     if (error) throw error;
     return data || [];
 };
 
 export const saveBookingRecord = async (record: BookingRecord): Promise<BookingRecord> => {
-    const user = await getCurrentUser();
-    const { id, user_id, ...rest } = record;
-    const dataToSave = { ...rest, user_id: user.id };
-    const payload = id ? { ...dataToSave, id } : dataToSave;
-    const { data, error } = await getSupabase().from('booking_registers').upsert(payload).select().single();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    const payload = { ...record, user_id: user.id };
+    const { data, error } = await supabase.from('booking_registers').upsert(payload).select().single();
     if (error) throw error;
     return data;
 };
 
-export const deleteBookingRecord = async (id: string): Promise<void> => {
-    const user = await getCurrentUser();
-    const { error } = await getSupabase().from('booking_registers').delete().eq('user_id', user.id).eq('id', id);
+export const deleteBookingRecord = async (id: string) => {
+    const { error } = await supabase.from('booking_registers').delete().eq('id', id);
     if (error) throw error;
-};
-
-// --- Storage Functions ---
-export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt> => {
-    const user = await getCurrentUser();
-    const filePath = `${user.id}/${lrNo}-${Date.now()}.${file.name.split('.').pop()}`;
-    const { error: uploadError } = await getSupabase().storage.from('pods').upload(filePath, file, { upsert: true });
-    if (uploadError) throw uploadError;
-    const { data, error: dbError } = await getSupabase()
-        .from('lorry_receipts')
-        .update({ pod_path: filePath })
-        .eq('user_id', user.id)
-        .eq('lrNo', lrNo)
-        .select()
-        .single();
-    if (dbError) throw dbError;
-    return mapLR(data);
-};
-
-export const getPodSignedUrl = async (podPath: string): Promise<string> => {
-    const { data, error } = await getSupabase().storage.from('pods').createSignedUrl(podPath, 3600);
-    if (error) throw error;
-    return data.signedUrl;
-};
-
-export const deletePOD = async (podPath: string): Promise<void> => {
-    if (!podPath) return;
-    await getSupabase().storage.from('pods').remove([podPath]);
-};
-
-export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {
-    const user = await getCurrentUser();
-    const filePath = `${user.id}/${assetType}.${file.name.split('.').pop()}`;
-    const { error } = await getSupabase().storage.from('company-assets').upload(filePath, file, { upsert: true });
-    if (error) throw error;
-    const { data } = getSupabase().storage.from('company-assets').getPublicUrl(`${filePath}?t=${new Date().getTime()}`);
-    return data.publicUrl;
-};
-
-export const getRecentLorryReceiptsForAI = async (limit: number = 10): Promise<Partial<LorryReceipt>[]> => {
-    const user = await getCurrentUser();
-    const { data, error } = await getSupabase()
-        .from('lorry_receipts')
-        .select('lrNo, truckNo, fromPlace, toPlace, consignor, consignee, invoiceNo, remark')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-        .limit(limit);
-    if (error) throw error;
-    return (data || []).map(lr => ({ ...lr }));
 };

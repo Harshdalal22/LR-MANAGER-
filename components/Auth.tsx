@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { signUp, signIn, sendPasswordReset } from '../services/supabaseService';
-import { BookOpenIcon } from './icons';
+import { signUp, signIn, sendPasswordReset, signInWithGoogle } from '../services/supabaseService';
+import { BookOpenIcon, GoogleIcon } from './icons';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
 
@@ -35,6 +36,31 @@ const Auth: React.FC = () => {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
             toast.error(errorMessage, { id: toastId });
         } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        setLoading(true);
+        const toastId = toast.loading('Redirecting to Google...');
+        try {
+            await signInWithGoogle();
+            // Redirect happens automatically
+        } catch (error) {
+            console.error("Google Auth Error:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Google Sign In failed.';
+            
+            toast.error(
+                <div>
+                    <span className="font-bold">Login Failed: </span>
+                    {errorMessage}
+                    <br/>
+                    <span className="text-xs mt-1 block opacity-90">
+                        Check that your Google Cloud Project is NOT in "Testing" mode, or your email is added to "Test Users".
+                    </span>
+                </div>, 
+                { id: toastId, duration: 6000 }
+            );
             setLoading(false);
         }
     };
@@ -159,6 +185,29 @@ const Auth: React.FC = () => {
                             </button>
                         </div>
                     </form>
+
+                    {view !== 'forgot_password' && (
+                        <div className="mt-4 relative z-10">
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <div className="w-full border-t border-gray-300"></div>
+                                </div>
+                                <div className="relative flex justify-center text-sm">
+                                    <span className="px-2 bg-white text-gray-500 font-medium">Or continue with</span>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleGoogleSignIn}
+                                disabled={loading}
+                                className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+                            >
+                                <GoogleIcon className="h-5 w-5 mr-2" />
+                                Google
+                            </button>
+                        </div>
+                    )}
 
                     <div className="mt-6 flex items-center justify-center relative z-10">
                         {view === 'sign_in' ? (

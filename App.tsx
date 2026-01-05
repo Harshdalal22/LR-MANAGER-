@@ -1,13 +1,12 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { LorryReceipt, CompanyDetails, LRStatus, View, SavedParty, SavedTruck } from './types';
-import LRForm from './components/LRForm';
-import LRList from './components/LRList';
+import { Session, Subscription } from '@supabase/supabase-js';
+import Auth from './components/Auth';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import Auth from './components/Auth';
-import PODUploadModal from './components/PODUploadModal';
+import LRList from './components/LRList';
+import LRForm from './components/LRForm';
 import VehicleHiring from './components/VehicleHiring';
 import BookingRegister from './components/BookingRegister';
 import DataManagement from './components/DataManagement';
@@ -15,7 +14,16 @@ import PartyManagement from './components/PartyManagement';
 import TruckManagement from './components/TruckManagement';
 import InvoiceList from './components/InvoiceList';
 import AdBanner from './components/AdBanner';
-import { Language } from './utils/translations';
+import PODUploadModal from './components/PODUploadModal';
+import PasswordResetModal from './components/PasswordResetModal';
+import { 
+    LorryReceipt, 
+    CompanyDetails, 
+    SavedParty, 
+    SavedTruck, 
+    View, 
+    LRStatus
+} from './types';
 import { 
     getLorryReceipts, 
     saveLorryReceipt, 
@@ -29,21 +37,19 @@ import {
     uploadPOD, 
     uploadCompanyAsset, 
     getPodSignedUrl, 
-    deletePOD, 
     updateLorryReceiptInvoiceDetails,
-    deleteInvoice,
     getSavedParties,
-    saveSavedParty,
-    deleteSavedParty,
+    saveSavedParty, 
+    deleteSavedParty, 
     getSavedTrucks,
-    saveSavedTruck,
-    deleteSavedTruck
+    saveSavedTruck, 
+    deleteSavedTruck,
+    updateUserPassword
 } from './services/supabaseService';
-import { Session, Subscription } from '@supabase/supabase-js';
-
+import { t, Language } from './utils/translations';
 
 const defaultCompanyDetails: CompanyDetails = {
-    name: 'Your Company Name',
+    name: '',
     logoUrl: '',
     signatureImageUrl: '',
     tagline: '',
@@ -53,7 +59,6 @@ const defaultCompanyDetails: CompanyDetails = {
     contact: [],
     pan: '',
     gstn: '',
-    sacCode: '',
     bankDetails: {
         name: '',
         branch: '',
@@ -64,7 +69,6 @@ const defaultCompanyDetails: CompanyDetails = {
     branchLocations: []
 };
 
-
 const App: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
     const [lorryReceipts, setLorryReceipts] = useState<LorryReceipt[]>([]);
@@ -73,99 +77,62 @@ const App: React.FC = () => {
     const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
     const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(defaultCompanyDetails);
     const [currentView, setCurrentView] = useState<View>('dashboard');
-    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | null>(null);
+    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
     const [viewHistory, setViewHistory] = useState<View[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
+    const [isPasswordResetting, setIsPasswordResetting] = useState(false);
 
-    const handleError = (error: unknown, context: string) => {
-        let errorMessage = 'An unknown error occurred.';
-    
+    const handleError = (error: unknown, fallbackMessage: string) => {
+        console.error(fallbackMessage, error);
+        let message = fallbackMessage;
+        
         if (error instanceof Error) {
-            errorMessage = error.message;
+            message = error.message;
         } else if (typeof error === 'object' && error !== null) {
-            const errObj = error as any;
-            errorMessage = errObj.message || errObj.error_description || errObj.details || errObj.hint;
+            // Handle Supabase and other error objects
+            const anyError = error as any;
+            // Prioritize specific error fields
+            const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
             
-            if (!errorMessage || errorMessage === '[object Object]') {
+            if (extractedMessage) {
+                message = extractedMessage;
+                if (anyError.details) message += ` (${anyError.details})`;
+                if (anyError.hint) message += ` Hint: ${anyError.hint}`;
+            } else {
+                // If no standard message field is found, try to stringify the object
                 try {
-                    errorMessage = JSON.stringify(error);
+                    message = `${fallbackMessage}: ${JSON.stringify(anyError)}`;
                 } catch {
-                    errorMessage = 'A non-serializable error object was received.';
+                    message = `${fallbackMessage}: Unknown error object`;
                 }
             }
         } else if (typeof error === 'string') {
-            errorMessage = error;
-        }
-    
-        console.error(`${context}:`, error);
-        const lowerMsg = errorMessage.toLowerCase();
-    
-        if ((lowerMsg.includes('relation') && lowerMsg.includes('does not exist')) || lowerMsg.includes('in the schema cache')) {
-            let featureName = "A feature";
-            if (lowerMsg.includes('lorry_receipts') || lowerMsg.includes('company_details')) {
-                 featureName = "The core application";
-            } else if (lowerMsg.includes('saved_parties')) {
-                featureName = "'Manage Parties'";
-            } else if (lowerMsg.includes('saved_trucks')) {
-                featureName = "'Manage Trucks'";
-            } else if (lowerMsg.includes('vehicle_hirings')) {
-                featureName = "'Vehicle Hiring'";
-            } else if (lowerMsg.includes('booking_registers')) {
-                featureName = "'Booking Register'";
-            }
-    
-            toast.error(
-                (t) => (
-                    <div className="flex flex-col gap-2">
-                        <p className="font-bold text-red-600">Database Setup Required</p>
-                        <p className="text-sm">{featureName} requires a database update. Please run the SQL script.</p>
-                        <button onClick={() => { toast.dismiss(t.id); navigateTo('data-management'); }} className="bg-blue-600 text-white px-3 py-1 rounded text-sm w-fit">Go to Setup</button>
-                    </div>
-                ), { duration: 15000, id: `table-missing-${featureName.replace(/\W/g, '')}` }
-            );
-            return;
+            message = error;
         }
         
-        toast.error(`${context}: ${errorMessage}`, { duration: 8000 });
+        toast.error(message);
     };
 
-    // Navigation Helper
     const navigateTo = (view: View) => {
-        if (view === currentView) return;
         setViewHistory(prev => [...prev, currentView]);
         setCurrentView(view);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleBack = () => {
-        if (viewHistory.length > 0) {
-            const newHistory = [...viewHistory];
-            const prevView = newHistory.pop();
-            setViewHistory(newHistory);
-            if (prevView) setCurrentView(prevView);
-        } else {
-            // Default fallback if history is empty
-            if (currentView !== 'dashboard') {
-                setCurrentView('dashboard');
-            }
+        if (view === 'dashboard') {
+            // keep section
         }
     };
 
-    // Dynamic Favicon Update: Updates the "logo of website on domain name" based on company logo
     useEffect(() => {
+        // Dynamic favicon
         if (companyDetails.logoUrl) {
-            let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
-            if (!link) {
-                link = document.createElement('link');
-                link.rel = 'icon';
-                document.getElementsByTagName('head')[0].appendChild(link);
-            }
-            link.href = companyDetails.logoUrl;
+            const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+            (link as HTMLLinkElement).type = 'image/x-icon';
+            (link as HTMLLinkElement).rel = 'shortcut icon';
+            (link as HTMLLinkElement).href = companyDetails.logoUrl;
+            document.getElementsByTagName('head')[0].appendChild(link);
         }
     }, [companyDetails.logoUrl]);
-
 
     useEffect(() => {
         let authSubscription: Subscription | null = null;
@@ -179,8 +146,13 @@ const App: React.FC = () => {
                     setIsLoading(false);
                 }
 
-                const { data } = subscribeToAuthState((_event, session) => {
+                const { data } = subscribeToAuthState((event, session) => {
                     setSession(session);
+                    
+                    if (event === 'PASSWORD_RECOVERY') {
+                        setIsPasswordResetting(true);
+                    }
+
                     if (!session) {
                         setLorryReceipts([]);
                         setSavedParties([]);
@@ -189,6 +161,7 @@ const App: React.FC = () => {
                         setCurrentView('dashboard');
                         setDashboardSection(null);
                         setViewHistory([]);
+                        setIsPasswordResetting(false);
                     }
                 });
                 authSubscription = data.subscription;
@@ -206,200 +179,108 @@ const App: React.FC = () => {
         };
     }, []);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = async () => {
         if (!session) return;
         setIsLoading(true);
         try {
-            const [lrs, details] = await Promise.all([
+            const [lrs, company, parties, trucks] = await Promise.all([
                 getLorryReceipts(),
-                getCompanyDetails(defaultCompanyDetails),
-            ]);
-            setLorryReceipts(lrs);
-            setCompanyDetails(details);
-
-            const [partiesResult, trucksResult] = await Promise.allSettled([
+                getCompanyDetails(),
                 getSavedParties(),
                 getSavedTrucks()
             ]);
-
-            if (partiesResult.status === 'fulfilled') {
-                setSavedParties(partiesResult.value);
-            } else {
-                handleError(partiesResult.reason, "Failed to load saved parties");
-            }
-
-            if (trucksResult.status === 'fulfilled') {
-                setSavedTrucks(trucksResult.value);
-            } else {
-                handleError(trucksResult.reason, "Failed to load saved trucks");
-            }
-
+            setLorryReceipts(lrs);
+            if (company) setCompanyDetails(company);
+            setSavedParties(parties);
+            setSavedTrucks(trucks);
         } catch (error) {
-            handleError(error, "Failed to load initial data");
+            handleError(error, "Failed to load data");
         } finally {
             setIsLoading(false);
         }
-    }, [session]);
+    };
 
     useEffect(() => {
         if (session) {
             fetchData();
         }
-    }, [session, fetchData]);
-
+    }, [session]);
 
     const handleSaveLR = async (lr: LorryReceipt) => {
-        const toastId = toast.loading(editingLR ? 'Updating LR...' : 'Saving LR...');
-        
-        const sanitizedLR = {
-            ...lr,
-            invoiceDate: lr.invoiceDate || null,
-            poDate: lr.poDate || null,
-            ewayBillDate: lr.ewayBillDate || null,
-            ewayExDate: lr.ewayExDate || null,
-            status: editingLR ? lr.status : 'Booked',
-            invoiceAmount: Number(lr.invoiceAmount) || 0,
-            chargedWeight: Number(lr.chargedWeight) || 0,
-            weight: Number(lr.weight) || 0,
-            actualWeightMT: Number(lr.actualWeightMT) || 0,
-            freight: Number(lr.freight) || 0,
-            rate: Number(lr.rate) || 0,
-            isInvoiceGenerated: editingLR ? editingLR.isInvoiceGenerated : false,
-            charges: Object.entries(lr.charges).reduce((acc, [key, value]) => {
-                acc[key as keyof typeof lr.charges] = Number(value) || 0;
-                return acc;
-            }, {} as typeof lr.charges),
-            items: lr.items.map(item => ({
-                ...item,
-                pcs: Number(item.pcs) || 0,
-                weight: Number(item.weight) || 0,
-            })),
-        };
-
+        const toastId = toast.loading('Saving LR...');
         try {
-            const savedLr = await saveLorryReceipt(sanitizedLR);
-
-            // --- Auto-save Truck ---
-            const truckNum = savedLr.truckNo.trim();
-            if (truckNum && !savedTrucks.some(t => t.truckNo.toLowerCase() === truckNum.toLowerCase())) {
-                saveSavedTruck({ truckNo: truckNum })
-                    .then(newTruck => {
-                        setSavedTrucks(prev => {
-                            if (prev.some(t => t.truckNo.toLowerCase() === newTruck.truckNo.toLowerCase())) return prev;
-                            return [...prev, newTruck];
-                        });
-                    })
-                    .catch(err => console.error("Auto-save truck error", err));
-            }
-
-            // --- Auto-save Parties ---
-            const partiesToCheck = [
-                { ...savedLr.consignor, type: 'Consignor' as const },
-                { ...savedLr.consignee, type: 'Consignee' as const }
-            ];
-
-            if (savedLr.billingTo?.name && 
-                savedLr.billingTo.name !== savedLr.consignor.name && 
-                savedLr.billingTo.name !== savedLr.consignee.name) {
-                partiesToCheck.push({ ...savedLr.billingTo, type: 'Consignor' as const });
-            }
-
-            const uniquePartiesToSave = new Map<string, typeof partiesToCheck[0]>();
-            partiesToCheck.forEach(p => {
-                if (p.name && !uniquePartiesToSave.has(p.name.toLowerCase())) {
-                    uniquePartiesToSave.set(p.name.toLowerCase(), p);
+            const savedLR = await saveLorryReceipt(lr);
+            setLorryReceipts(prev => {
+                const index = prev.findIndex(item => item.lrNo === savedLR.lrNo);
+                if (index >= 0) {
+                    const newArray = [...prev];
+                    newArray[index] = savedLR;
+                    return newArray;
                 }
+                return [savedLR, ...prev];
             });
-
-            uniquePartiesToSave.forEach(p => {
-                const exists = savedParties.some(sp => sp.name.toLowerCase() === p.name.toLowerCase());
-                if (!exists) {
-                    saveSavedParty(p)
-                        .then(newParty => {
-                             setSavedParties(prev => {
-                                if (prev.some(existing => existing.name.toLowerCase() === newParty.name.toLowerCase())) return prev;
-                                return [...prev, newParty];
-                            });
-                        })
-                        .catch(err => console.error("Auto-save party error", err));
-                }
-            });
-
-
-            if (editingLR) {
-                setLorryReceipts(lorryReceipts.map(r => r.lrNo === savedLr.lrNo ? savedLr : r));
-                toast.success('LR updated successfully!', { id: toastId });
-            } else {
-                setLorryReceipts([savedLr, ...lorryReceipts]);
-                toast.success('LR generated successfully!', { id: toastId });
-            }
-            setEditingLR(null);
+            toast.success('LR Saved Successfully', { id: toastId });
             navigateTo('list');
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to save LR");
         }
     };
-    
-    const handleUpdateLRStatus = async (lrNo: string, status: LRStatus) => {
-        const originalLRs = [...lorryReceipts];
-        const updatedLRs = lorryReceipts.map(lr => 
-            lr.lrNo === lrNo ? { ...lr, status } : lr
-        );
-        setLorryReceipts(updatedLRs);
 
-        const toastId = toast.loading(`Updating status to ${status}...`);
+    const handleUpdateLRStatus = async (lrNo: string, status: LRStatus) => {
         try {
-            const updatedLR = await updateLorryReceiptStatus(lrNo, status);
-            setLorryReceipts(lrs => lrs.map(lr => lr.lrNo === lrNo ? updatedLR : lr));
-            toast.success('Status updated successfully!', { id: toastId });
+            await updateLorryReceiptStatus(lrNo, status);
+            setLorryReceipts(prev => prev.map(lr => lr.lrNo === lrNo ? { ...lr, status, status_updated_at: new Date().toISOString() } : lr));
+            toast.success(`Status updated to ${status}`);
         } catch (error) {
-            setLorryReceipts(originalLRs);
-            toast.dismiss(toastId);
             handleError(error, "Failed to update status");
         }
     };
 
     const handleUpdateInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
-        const toastId = toast.loading('Generating Invoice...');
+        const toastId = toast.loading('Updating Invoice details...');
         try {
             await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
-            setLorryReceipts(prev => prev.map(lr => 
-                lrNos.includes(lr.lrNo) 
-                    ? { ...lr, invoiceNo, invoiceDate, isInvoiceGenerated: true } 
-                    : lr
-            ));
-            toast.success('Invoice Generated Successfully', { id: toastId });
-            navigateTo('invoices');
+            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { ...lr, invoiceNo, invoiceDate, isInvoiceGenerated: true } : lr));
+            toast.success('Invoice details updated', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
-            handleError(error, "Failed to generate Invoice");
+            handleError(error, "Failed to update invoice details");
         }
     };
 
-    const handleDeleteInvoice = async (invoiceNo: string) => {
-        if(!window.confirm(`Are you sure you want to delete Invoice ${invoiceNo}? Associated LRs will revert to pending status.`)) return;
-
-        const toastId = toast.loading('Deleting Invoice...');
+    const handleDeleteLR = async (lrNo: string) => {
+        if (!confirm("Are you sure you want to delete this LR?")) return;
+        const toastId = toast.loading('Deleting LR...');
         try {
-            await deleteInvoice(invoiceNo);
-            setLorryReceipts(prev => prev.map(lr => 
-                lr.invoiceNo === invoiceNo 
-                    ? { ...lr, invoiceNo: '', invoiceDate: null, isInvoiceGenerated: false } 
-                    : lr
-            ));
-            toast.success('Invoice Deleted Successfully', { id: toastId });
+            await deleteLorryReceipt(lrNo);
+            setLorryReceipts(prev => prev.filter(lr => lr.lrNo !== lrNo));
+            toast.success('LR Deleted', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
-            handleError(error, "Failed to delete Invoice");
+            handleError(error, "Failed to delete LR");
         }
     };
-    
+
+    const handleUpdatePassword = async (password: string) => {
+        const toastId = toast.loading('Updating password...');
+        try {
+            await updateUserPassword(password);
+            toast.success('Password updated successfully!', { id: toastId });
+            setIsPasswordResetting(false);
+            navigateTo('dashboard');
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to update password");
+        }
+    };
+
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
         try {
             await signOut();
-            setSession(null); // Clear session immediately
+            setSession(null);
+            setIsPasswordResetting(false);
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
@@ -408,30 +289,10 @@ const App: React.FC = () => {
     };
 
     const handleEditLR = (lrNo: string) => {
-        const lrToEdit = lorryReceipts.find(lr => lr.lrNo === lrNo);
-        if (lrToEdit) {
-            setEditingLR(lrToEdit);
-            navigateTo('form');
-        }
-    };
-
-    const handleDeleteLR = async (lrNo: string) => {
-        const lrToDelete = lorryReceipts.find(lr => lr.lrNo === lrNo);
-        if (!lrToDelete) return;
-
-        if (window.confirm('Are you sure you want to delete this LR? This action cannot be undone.')) {
-            const toastId = toast.loading('Deleting LR...');
-            try {
-                if (lrToDelete.pod_path) {
-                    await deletePOD(lrToDelete.pod_path);
-                }
-                await deleteLorryReceipt(lrNo);
-                setLorryReceipts(lorryReceipts.filter(lr => lr.lrNo !== lrNo));
-                toast.success('LR deleted successfully!', { id: toastId });
-            } catch (error) {
-                toast.dismiss(toastId);
-                handleError(error, "Failed to delete LR");
-            }
+        const lr = lorryReceipts.find(l => l.lrNo === lrNo);
+        if (lr) {
+            setEditingLR(lr);
+            setCurrentView('form');
         }
     };
 
@@ -441,10 +302,10 @@ const App: React.FC = () => {
                 return (
                     <Dashboard 
                         lorryReceipts={lorryReceipts}
-                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
-                        onViewList={() => navigateTo('list')}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onViewList={() => setCurrentView('list')}
                         onEditLR={handleEditLR}
-                        setCurrentView={navigateTo}
+                        setCurrentView={setCurrentView}
                         language={language}
                         activeSection={dashboardSection}
                         setActiveSection={setDashboardSection}
@@ -456,14 +317,16 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
                         companyDetails={companyDetails}
-                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
-                        onBackToDashboard={handleBack}
+                        onBackToDashboard={() => setCurrentView('dashboard')}
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
                         onViewPOD={async (path) => {
-                            const url = await getPodSignedUrl(path);
-                            window.open(url, '_blank');
+                           try {
+                               const url = await getPodSignedUrl(path);
+                               window.open(url, '_blank');
+                           } catch(e) { toast.error("Could not load POD"); }
                         }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
@@ -471,10 +334,10 @@ const App: React.FC = () => {
                 );
             case 'form':
                 return (
-                     <LRForm 
+                    <LRForm 
                         onSave={handleSaveLR}
                         existingLR={editingLR}
-                        onCancel={() => { setEditingLR(null); handleBack(); }}
+                        onCancel={() => { setEditingLR(null); setCurrentView('dashboard'); }}
                         companyDetails={companyDetails}
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}
@@ -482,42 +345,57 @@ const App: React.FC = () => {
                         language={language}
                     />
                 );
+            case 'vehicle-hiring':
+                return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
+            case 'booking-register':
+                return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
+            case 'data-management':
+                return <DataManagement onBack={() => setCurrentView('dashboard')} />;
             case 'parties':
                 return (
                     <PartyManagement 
-                        savedParties={savedParties}
-                        onSave={async (p) => { await saveSavedParty(p); await fetchData(); }}
-                        onDelete={async (id) => { await deleteSavedParty(id); await fetchData(); }}
-                        onBack={handleBack}
+                        savedParties={savedParties} 
+                        onSave={async (p) => { 
+                            await saveSavedParty(p); 
+                            setSavedParties(await getSavedParties()); 
+                            toast.success("Party saved");
+                        }} 
+                        onDelete={async (id) => {
+                            await deleteSavedParty(id);
+                            setSavedParties(prev => prev.filter(x => x.id !== id));
+                        }} 
+                        onBack={() => setCurrentView('dashboard')} 
                     />
                 );
             case 'trucks':
                 return (
                     <TruckManagement 
-                        savedTrucks={savedTrucks}
-                        onSave={async (t) => { await saveSavedTruck(t); await fetchData(); }}
-                        onDelete={async (id) => { await deleteSavedTruck(id); await fetchData(); }}
-                        onBack={handleBack}
+                        savedTrucks={savedTrucks} 
+                        onSave={async (t) => {
+                             await saveSavedTruck(t);
+                             setSavedTrucks(await getSavedTrucks());
+                             toast.success("Truck saved");
+                        }} 
+                        onDelete={async (id) => {
+                            await deleteSavedTruck(id);
+                            setSavedTrucks(prev => prev.filter(x => x.id !== id));
+                        }} 
+                        onBack={() => setCurrentView('dashboard')} 
                     />
                 );
-            case 'vehicle-hiring': return <VehicleHiring onBack={handleBack} />;
-            case 'booking-register': return <BookingRegister onBack={handleBack} />;
-            case 'data-management': return <DataManagement onBack={handleBack} />;
-            case 'invoices': 
+            case 'invoices':
                 return (
                     <InvoiceList 
-                        lorryReceipts={lorryReceipts} 
-                        companyDetails={companyDetails} 
-                        onBack={handleBack} 
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        onBack={() => setCurrentView('dashboard')}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
-                        onDeleteInvoice={handleDeleteInvoice}
                     />
                 );
             default:
-                return null;
+                return <div>View Not Found</div>;
         }
-    }
-
+    };
 
     if (isLoading) {
         return (
@@ -559,11 +437,22 @@ const App: React.FC = () => {
                     onClose={() => setUploadingPODFor(null)}
                     lr={uploadingPODFor}
                     onUpload={async (lr, file) => {
-                        const updated = await uploadPOD(file, lr.lrNo);
-                        setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
-                        setUploadingPODFor(null);
-                        toast.success('POD uploaded successfully');
+                        try {
+                            const updated = await uploadPOD(file, lr.lrNo);
+                            setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
+                            setUploadingPODFor(null);
+                            toast.success('POD uploaded successfully');
+                        } catch (e) {
+                            handleError(e, "Failed to upload POD");
+                        }
                     }}
+                />
+            )}
+            {isPasswordResetting && (
+                <PasswordResetModal 
+                    isOpen={isPasswordResetting}
+                    onSubmit={handleUpdatePassword}
+                    onCancel={() => setIsPasswordResetting(false)}
                 />
             )}
         </div>

@@ -1,5 +1,5 @@
 
-import React, { useRef, forwardRef, useState, useEffect } from 'react';
+import React, { useRef, forwardRef, useState, useEffect, useMemo } from 'react';
 import { LorryReceipt, CompanyDetails, PartyDetails } from '../types';
 import { DownloadIcon, XIcon, SaveIcon } from './icons';
 import { toWords } from '../utils/numberToWords';
@@ -24,7 +24,14 @@ interface InvoiceContentProps {
 }
 
 const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryReceipts, companyDetails, billNo, billDate, taxType }, ref) => {
-    const totalAmount = lorryReceipts.reduce((sum, lr) => {
+    // Sort LRs by LR Number ascending for the PDF/Preview
+    const sortedLorryReceipts = useMemo(() => {
+        return [...lorryReceipts].sort((a, b) => 
+            a.lrNo.localeCompare(b.lrNo, undefined, { numeric: true, sensitivity: 'base' })
+        );
+    }, [lorryReceipts]);
+
+    const totalAmount = sortedLorryReceipts.reduce((sum, lr) => {
         const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
         return sum + (Number(lr.freight) || 0) + totalCharges;
     }, 0);
@@ -36,7 +43,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
     const netAmount = totalAmount + totalCgst + totalSgst + totalIgst;
     const amountInWords = toWords(Math.round(netAmount));
 
-    const billedTo: Partial<PartyDetails> = lorryReceipts.length > 0 ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) : { name: 'N/A', address: 'N/A', gst: 'N/A' };
+    const billedTo: Partial<PartyDetails> = sortedLorryReceipts.length > 0 ? (sortedLorryReceipts[0].billingTo?.name ? sortedLorryReceipts[0].billingTo : sortedLorryReceipts[0].consignor) : { name: 'N/A', address: 'N/A', gst: 'N/A' };
     
     const formattedBillDate = billDate ? new Date(billDate).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
 
@@ -97,7 +104,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     </tr>
                 </thead>
                 <tbody>
-                    {lorryReceipts.map((lr, index) => {
+                    {sortedLorryReceipts.map((lr, index) => {
                         const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
                         return (
                             <tr key={lr.lrNo} style={{ height: '24px' }}>
@@ -113,7 +120,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                             </tr>
                         );
                     })}
-                    {Array.from({ length: Math.max(0, 15 - lorryReceipts.length) }).map((_, i) => (
+                    {Array.from({ length: Math.max(0, 15 - sortedLorryReceipts.length) }).map((_, i) => (
                         <tr key={`empty-${i}`} style={{ height: '24px' }}>
                             {Array.from({ length: 9 }).map((_, j) => <td key={j} className="border border-gray-600"></td>)}
                         </tr>

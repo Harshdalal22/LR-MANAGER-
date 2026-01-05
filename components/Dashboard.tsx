@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
-import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon } from './icons';
+import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon, ExclamationTriangleIcon, PhoneIcon, WrenchIcon, MapPinIcon, CreditCardIcon, ChatBubbleIcon, SirenIcon, TowTruckIcon, FuelIcon, BatteryIcon, ShieldCheckIcon } from './icons';
 import { Language, t } from '../utils/translations';
 
 interface DashboardProps {
@@ -11,8 +11,8 @@ interface DashboardProps {
     onEditLR: (lrNo: string) => void;
     setCurrentView: (view: View) => void;
     language: Language;
-    activeSection: 'lr' | 'data' | null;
-    setActiveSection: (section: 'lr' | 'data' | null) => void;
+    activeSection: 'lr' | 'data' | 'emergency' | null;
+    setActiveSection: (section: 'lr' | 'data' | 'emergency' | null) => void;
 }
 
 interface StatCardProps {
@@ -67,7 +67,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick,
 };
 
 // 3D Management Card Component
-const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick: () => void; colorTheme: 'blue' | 'purple' | 'orange' | 'green' | 'teal' | 'gray' }> = ({ title, description, icon, onClick, colorTheme }) => {
+const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick?: () => void; href?: string; colorTheme: 'blue' | 'purple' | 'orange' | 'green' | 'teal' | 'gray' | 'red' }> = ({ title, description, icon, onClick, href, colorTheme }) => {
     
     const themes = {
         blue: 'from-blue-500 to-blue-600 shadow-blue-200',
@@ -76,13 +76,18 @@ const ManagementCard: React.FC<{ title: string; description?: string; icon: Reac
         green: 'from-green-500 to-green-600 shadow-green-200',
         teal: 'from-teal-500 to-teal-600 shadow-teal-200',
         gray: 'from-gray-600 to-gray-700 shadow-gray-200',
+        red: 'from-red-500 to-red-600 shadow-red-200',
     };
 
     const gradient = themes[colorTheme] || themes['blue'];
+    const Wrapper = href ? 'a' : 'div';
 
     return (
-        <div 
+        <Wrapper
             onClick={onClick}
+            href={href}
+            target={href ? "_blank" : undefined}
+            rel={href ? "noreferrer" : undefined}
             className={`
                 group relative
                 bg-white rounded-2xl p-6
@@ -92,6 +97,7 @@ const ManagementCard: React.FC<{ title: string; description?: string; icon: Reac
                 hover:-translate-y-2 active:scale-95
                 cursor-pointer
                 flex flex-row sm:flex-col items-center sm:text-center gap-4
+                block no-underline
             `}
         >
             {/* Icon Container */}
@@ -122,9 +128,67 @@ const ManagementCard: React.FC<{ title: string; description?: string; icon: Reac
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
             </div>
+        </Wrapper>
+    );
+};
+
+// Comprehensive Emergency Service Card
+const EmergencyServiceCard: React.FC<{ 
+    title: string; 
+    features: string[]; 
+    icon: React.ReactElement<{ className?: string }>; 
+    colorTheme: 'blue' | 'orange' | 'green' | 'red'; 
+    actionText: string;
+    onAction: () => void;
+}> = ({ title, features, icon, colorTheme, actionText, onAction }) => {
+    const themeStyles = {
+        blue: { gradient: 'from-blue-600 to-indigo-600', bg: 'bg-blue-50', text: 'text-blue-800', btn: 'bg-blue-600 hover:bg-blue-700' },
+        orange: { gradient: 'from-orange-500 to-red-500', bg: 'bg-orange-50', text: 'text-orange-800', btn: 'bg-orange-600 hover:bg-orange-700' },
+        green: { gradient: 'from-emerald-500 to-green-600', bg: 'bg-green-50', text: 'text-green-800', btn: 'bg-green-600 hover:bg-green-700' },
+        red: { gradient: 'from-red-600 to-pink-600', bg: 'bg-red-50', text: 'text-red-800', btn: 'bg-red-600 hover:bg-red-700' },
+    };
+    
+    const style = themeStyles[colorTheme];
+
+    return (
+        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden flex flex-col h-full transform transition-all hover:scale-[1.02]">
+            <div className={`h-24 bg-gradient-to-r ${style.gradient} relative`}>
+                <div className="absolute -bottom-8 left-6 p-4 bg-white rounded-2xl shadow-md">
+                    {React.cloneElement(icon, { className: `w-8 h-8 ${style.text}` })}
+                </div>
+            </div>
+            <div className="pt-10 px-6 pb-6 flex-grow flex flex-col">
+                <h3 className="text-xl font-black text-gray-800 mb-4">{title}</h3>
+                <ul className="space-y-2 mb-6 flex-grow">
+                    {features.map((feature, idx) => (
+                        <li key={idx} className="flex items-start text-sm text-gray-600 font-medium">
+                            <span className={`mr-2 mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0 ${style.btn}`}></span>
+                            {feature}
+                        </li>
+                    ))}
+                </ul>
+                <button 
+                    onClick={onAction}
+                    className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-md transition-colors ${style.btn}`}
+                >
+                    {actionText}
+                </button>
+            </div>
         </div>
     );
 };
+
+const QuickActionButton: React.FC<{ icon: React.ReactElement; label: string; color: string; onClick: () => void }> = ({ icon, label, color, onClick }) => (
+    <button 
+        onClick={onClick}
+        className={`flex flex-col items-center justify-center p-4 rounded-2xl bg-white border border-gray-100 shadow-md active:scale-95 transition-all ${color}`}
+    >
+        <div className="mb-2 transform scale-110">
+            {icon}
+        </div>
+        <span className="text-xs font-bold text-center leading-tight">{label}</span>
+    </button>
+);
 
 const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateStr: string }[] }> = ({ data }) => {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -271,7 +335,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                 </h1>
                 
                 {/* Vertical Stack on Mobile, Grid on Desktop */}
-                <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl px-4">
+                <div className="flex flex-col md:flex-row gap-6 w-full max-w-6xl px-4">
                     
                     {/* LR Management Card */}
                     <div
@@ -320,6 +384,31 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                              </div>
                          </div>
                     </div>
+
+                     {/* Emergency Card */}
+                     <div
+                        onClick={() => setActiveSection('emergency')}
+                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(220,38,38,0.15)] hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)] border-2 border-transparent hover:border-red-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+                    >
+                         {/* 3D gradient blob */}
+                         <div className="absolute top-0 right-0 w-32 h-32 bg-red-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+
+                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                             <div className="bg-gradient-to-br from-red-500 to-red-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-red-200">
+                                <ExclamationTriangleIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                             </div>
+                             <div className="text-left">
+                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-red-700 transition-colors">{t[language].emergency}</h2>
+                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].emergencyDesc}</p>
+                             </div>
+                             <div className="ml-auto md:ml-0 md:mt-4">
+                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                </span>
+                             </div>
+                         </div>
+                    </div>
+
                 </div>
             </div>
         );
@@ -337,7 +426,9 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                     <ArrowLeftIcon className="w-5 h-5" />
                 </button>
                 <h1 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">
-                    {activeSection === 'lr' ? t[language].lrManagementDashboard : t[language].dataManagementOperations}
+                    {activeSection === 'lr' ? t[language].lrManagementDashboard : 
+                     activeSection === 'data' ? t[language].dataManagementOperations : 
+                     t[language].emergencyServices}
                 </h1>
             </div>
 
@@ -497,6 +588,105 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                             description="Database fixes and system configuration"
                             icon={<CogIcon />} 
                             onClick={() => setCurrentView('data-management')} 
+                            colorTheme="gray"
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* --- SECTION: EMERGENCY (REVAMPED) --- */}
+            {activeSection === 'emergency' && (
+                <div className="animate-slideIn">
+                    <p className="text-gray-500 font-medium mb-6">{t[language].emergencySubtitle}</p>
+                    
+                    {/* Quick Actions Grid (Mobile-First Sticky/Prominent) */}
+                    <div className="mb-8">
+                        <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">{t[language].quickActions}</h4>
+                        <div className="grid grid-cols-4 gap-2 md:gap-4">
+                            <QuickActionButton 
+                                icon={<SirenIcon className="w-6 h-6 md:w-8 md:h-8 text-red-600" />} 
+                                label={t[language].accidentReport} 
+                                color="hover:bg-red-50 hover:border-red-200 text-red-700" 
+                                onClick={() => alert("Opening Accident Report...")}
+                            />
+                            <QuickActionButton 
+                                icon={<TowTruckIcon className="w-6 h-6 md:w-8 md:h-8 text-orange-600" />} 
+                                label={t[language].towingService} 
+                                color="hover:bg-orange-50 hover:border-orange-200 text-orange-700"
+                                onClick={() => alert("Requesting Towing...")}
+                            />
+                            <QuickActionButton 
+                                icon={<FuelIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600" />} 
+                                label={t[language].fuelDelivery} 
+                                color="hover:bg-green-50 hover:border-green-200 text-green-700"
+                                onClick={() => alert("Requesting Fuel...")}
+                            />
+                            <QuickActionButton 
+                                icon={<BatteryIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-600" />} 
+                                label={t[language].batteryJump} 
+                                color="hover:bg-yellow-50 hover:border-yellow-200 text-yellow-700"
+                                onClick={() => alert("Requesting Battery Service...")}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Main 4 Comprehensive Sections */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <EmergencyServiceCard 
+                            title={t[language].mechanicTitle}
+                            features={t[language].mechanicFeatures}
+                            icon={<WrenchIcon />}
+                            colorTheme="orange"
+                            actionText={t[language].mechanicAction}
+                            onAction={() => alert("Mechanic flow initiated")}
+                        />
+                        <EmergencyServiceCard 
+                            title={t[language].gpsTitle}
+                            features={t[language].gpsFeatures}
+                            icon={<MapPinIcon />}
+                            colorTheme="blue"
+                            actionText={t[language].gpsAction}
+                            onAction={() => alert("GPS subscription flow")}
+                        />
+                        <EmergencyServiceCard 
+                            title={t[language].fuelTitle}
+                            features={t[language].fuelFeatures}
+                            icon={<CreditCardIcon />}
+                            colorTheme="green"
+                            actionText={t[language].fuelAction}
+                            onAction={() => alert("Fuel card application")}
+                        />
+                        <EmergencyServiceCard 
+                            title={t[language].supportTitle}
+                            features={t[language].supportFeatures}
+                            icon={<ChatBubbleIcon />}
+                            colorTheme="red"
+                            actionText={t[language].supportAction}
+                            onAction={() => alert("Opening chat...")}
+                        />
+                    </div>
+
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Emergency Helplines</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <ManagementCard 
+                            title={t[language].police} 
+                            description="Dial 100 or 112"
+                            icon={<ShieldCheckIcon />} 
+                            href="tel:100"
+                            colorTheme="gray"
+                        />
+                        <ManagementCard 
+                            title={t[language].ambulance} 
+                            description="Dial 108 or 102"
+                            icon={<ExclamationTriangleIcon />} 
+                            href="tel:108"
+                            colorTheme="gray"
+                        />
+                        <ManagementCard 
+                            title={t[language].highwayHelpline} 
+                            description="Dial 1033"
+                            icon={<TruckIcon />} 
+                            href="tel:1033"
                             colorTheme="gray"
                         />
                     </div>

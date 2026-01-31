@@ -38,6 +38,8 @@ const Header: React.FC<HeaderProps> = ({
     const [confirmAdminPasskey, setConfirmAdminPasskey] = useState('');
     const [confirmManagerPasskey, setConfirmManagerPasskey] = useState('');
 
+    const [isSaving, setIsSaving] = useState(false);
+
     // Sync localDetails with companyDetails when modal opens or companyDetails changes
     useEffect(() => {
         setLocalDetails(companyDetails);
@@ -58,11 +60,24 @@ const Header: React.FC<HeaderProps> = ({
             }
         }
 
-        const success = await onUpdateDetails(localDetails);
-        if (success) {
-            setIsSettingsOpen(false);
-            setConfirmAdminPasskey('');
-            setConfirmManagerPasskey('');
+        setIsSaving(true);
+        const toastId = toast.loading("Saving settings...");
+
+        try {
+            const success = await onUpdateDetails(localDetails);
+            if (success) {
+                toast.success("Settings saved successfully!", { id: toastId });
+                setIsSettingsOpen(false);
+                setConfirmAdminPasskey('');
+                setConfirmManagerPasskey('');
+            } else {
+                toast.error("Failed to save settings.", { id: toastId });
+            }
+        } catch (error) {
+            console.error("Save error:", error);
+            toast.error("Error saving settings. Please check database schema.", { id: toastId });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -338,11 +353,15 @@ const Header: React.FC<HeaderProps> = ({
                             </div>
                         </div>
                         <div className="mt-8 flex justify-end gap-3 border-t pt-4">
-                            <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-md">
+                            <button onClick={() => setIsSettingsOpen(false)} className="px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-md" disabled={isSaving}>
                                 Cancel
                             </button>
-                            <button onClick={handleSaveSettings} className="bg-ssk-blue text-white px-6 py-2 rounded-md hover:bg-blue-800 font-bold shadow-md">
-                                Save All Changes
+                            <button
+                                onClick={handleSaveSettings}
+                                className="bg-ssk-blue text-white px-6 py-2 rounded-md hover:bg-blue-800 font-bold shadow-md flex items-center justify-center min-w-[140px]"
+                                disabled={isSaving}
+                            >
+                                {isSaving ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Save All Changes'}
                             </button>
                         </div>
                     </div>

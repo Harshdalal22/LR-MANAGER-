@@ -356,6 +356,29 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
             code: result.error.code
         });
 
+        // Fallback: Try saving without RBAC fields if schema error (missing columns)
+        if (result.error.message?.includes('column') || result.error.code === '42703' || result.error.code === 'PGRST204') {
+            console.warn("⚠️ Attempting fallback save without RBAC fields...");
+
+            const fallbackPayload = { ...payload };
+            delete (fallbackPayload as any).rbac_enabled;
+            delete (fallbackPayload as any).admin_passkey;
+            delete (fallbackPayload as any).manager_passkey;
+
+            let fallbackResult;
+            if (existing) {
+                fallbackResult = await query.update(fallbackPayload).eq('id', existing.id).select().single();
+            } else {
+                fallbackResult = await query.insert(fallbackPayload).select().single();
+            }
+
+            if (!fallbackResult.error) {
+                // Fallback succeeded!
+                console.log('✅ Fallback save successful (Basic details only)');
+                throw new Error("Basic settings SAVED ✅. However, RBAC settings failed (Run SQL Script in Supabase to fix).");
+            }
+        }
+
         // Provide helpful error message
         if (result.error.message?.includes('column') || result.error.code === '42703') {
             throw new Error(`Database schema error: ${result.error.message}. Please run the SQL migration script in Supabase SQL Editor.`);

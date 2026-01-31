@@ -73,9 +73,10 @@ const Header: React.FC<HeaderProps> = ({
             } else {
                 toast.error("Failed to save settings.", { id: toastId });
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Save error:", error);
-            toast.error("Error saving settings. Please check database schema.", { id: toastId });
+            const message = error?.message || "Error saving settings.";
+            toast.error(message, { id: toastId, duration: 5000 });
         } finally {
             setIsSaving(false);
         }

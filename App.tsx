@@ -320,8 +320,17 @@ const App: React.FC = () => {
     const handleRoleChange = (role: 'Admin' | 'Manager', passkey?: string) => {
         if (role === 'Admin' && companyDetails.rbacEnabled) {
             if (companyDetails.adminPasskey && passkey !== companyDetails.adminPasskey) {
-                toast.error("Invalid Passkey");
+                toast.error("Invalid Admin Passkey");
                 return false;
+            }
+        }
+        if (role === 'Manager' && companyDetails.rbacEnabled) {
+            // If already Admin, allow switching to Manager without passkey
+            if (currentRole !== 'Admin') {
+                if (companyDetails.managerPasskey && passkey !== companyDetails.managerPasskey) {
+                    toast.error("Invalid Manager Passkey");
+                    return false;
+                }
             }
         }
         setCurrentRole(role);
@@ -333,6 +342,36 @@ const App: React.FC = () => {
             setCurrentView('dashboard');
         }
         return true;
+    };
+
+    const handleRoleSelection = (role: 'Admin' | 'Manager', passkey: string) => {
+        // Verify passkey
+        if (role === 'Admin') {
+            if (!companyDetails.adminPasskey || passkey !== companyDetails.adminPasskey) {
+                setRoleSelectionError('Invalid Admin passkey');
+                toast.error('Invalid Admin passkey');
+                return;
+            }
+        } else if (role === 'Manager') {
+            if (!companyDetails.managerPasskey || passkey !== companyDetails.managerPasskey) {
+                setRoleSelectionError('Invalid Manager passkey');
+                toast.error('Invalid Manager passkey');
+                return;
+            }
+        }
+
+        // Set role and mark as selected
+        setCurrentRole(role);
+        setShowRoleSelection(false);
+        setRoleSelectionError('');
+        sessionStorage.setItem('roleSelected', 'true');
+        toast.success(`Logged in as ${role}`);
+    };
+
+    const handleCancelRoleSelection = async () => {
+        // Sign out if user cancels role selection
+        await handleSignOut();
+        setShowRoleSelection(false);
     };
 
     const renderContent = () => {
@@ -520,6 +559,12 @@ const App: React.FC = () => {
                     isOpen={isPasswordResetting}
                     onSubmit={handleUpdatePassword}
                     onCancel={() => setIsPasswordResetting(false)}
+                />
+            )}
+            {showRoleSelection && (
+                <RoleSelection
+                    onRoleSelect={handleRoleSelection}
+                    onCancel={handleCancelRoleSelection}
                 />
             )}
         </div>

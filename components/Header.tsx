@@ -4,6 +4,8 @@ import { CompanyDetails } from '../types';
 import { CogIcon, XIcon, SpinnerIcon, GlobeIcon } from './icons';
 import { Language, t } from '../utils/translations';
 
+import { toast } from 'react-hot-toast';
+
 interface HeaderProps {
     companyDetails: CompanyDetails;
     onUpdateDetails: (details: CompanyDetails) => Promise<boolean>;
@@ -33,17 +35,34 @@ const Header: React.FC<HeaderProps> = ({
     const [isUploadingSignature, setIsUploadingSignature] = useState(false);
     const [passkeyInput, setPasskeyInput] = useState('');
     const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+    const [confirmAdminPasskey, setConfirmAdminPasskey] = useState('');
+    const [confirmManagerPasskey, setConfirmManagerPasskey] = useState('');
 
     // Sync localDetails with companyDetails when modal opens or companyDetails changes
     useEffect(() => {
         setLocalDetails(companyDetails);
+        setConfirmAdminPasskey('');
+        setConfirmManagerPasskey('');
     }, [companyDetails, isSettingsOpen]);
 
 
     const handleSaveSettings = async () => {
+        if (localDetails.rbacEnabled) {
+            if (confirmAdminPasskey && localDetails.adminPasskey !== confirmAdminPasskey) {
+                toast.error("Admin Passkeys do not match!");
+                return;
+            }
+            if (confirmManagerPasskey && localDetails.managerPasskey !== confirmManagerPasskey) {
+                toast.error("Manager Passkeys do not match!");
+                return;
+            }
+        }
+
         const success = await onUpdateDetails(localDetails);
         if (success) {
             setIsSettingsOpen(false);
+            setConfirmAdminPasskey('');
+            setConfirmManagerPasskey('');
         }
     };
 
@@ -243,28 +262,51 @@ const Header: React.FC<HeaderProps> = ({
                                         </div>
                                         {localDetails.rbacEnabled && (
                                             <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-sm font-bold text-gray-700">Admin Passkey</label>
-                                                    <input
-                                                        type="password"
-                                                        placeholder="Create a passkey for Admin access"
-                                                        value={localDetails.adminPasskey || ''}
-                                                        onChange={(e) => setLocalDetails({ ...localDetails, adminPasskey: e.target.value })}
-                                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                                                    />
-                                                    <p className="text-[10px] text-gray-500 mt-1 italic">Required for Admin login and role switching.</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700">Admin Passkey</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="Create Admin Passkey"
+                                                            value={localDetails.adminPasskey || ''}
+                                                            onChange={(e) => setLocalDetails({ ...localDetails, adminPasskey: e.target.value })}
+                                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700">Confirm Admin Passkey</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="Confirm Admin Passkey"
+                                                            value={confirmAdminPasskey}
+                                                            onChange={(e) => setConfirmAdminPasskey(e.target.value)}
+                                                            className={`mt-1 block w-full border rounded-md shadow-sm p-2 bg-white ${confirmAdminPasskey && localDetails.adminPasskey !== confirmAdminPasskey ? 'border-red-500' : 'border-gray-300'}`}
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <label className="block text-sm font-bold text-gray-700">Manager Passkey</label>
-                                                    <input
-                                                        type="password"
-                                                        placeholder="Create a passkey for Manager access"
-                                                        value={localDetails.managerPasskey || ''}
-                                                        onChange={(e) => setLocalDetails({ ...localDetails, managerPasskey: e.target.value })}
-                                                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
-                                                    />
-                                                    <p className="text-[10px] text-gray-500 mt-1 italic">Required for Manager login.</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700">Manager Passkey</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="Create Manager Passkey"
+                                                            value={localDetails.managerPasskey || ''}
+                                                            onChange={(e) => setLocalDetails({ ...localDetails, managerPasskey: e.target.value })}
+                                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700">Confirm Manager Passkey</label>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="Confirm Manager Passkey"
+                                                            value={confirmManagerPasskey}
+                                                            onChange={(e) => setConfirmManagerPasskey(e.target.value)}
+                                                            className={`mt-1 block w-full border rounded-md shadow-sm p-2 bg-white ${confirmManagerPasskey && localDetails.managerPasskey !== confirmManagerPasskey ? 'border-red-500' : 'border-gray-300'}`}
+                                                        />
+                                                    </div>
                                                 </div>
+                                                <p className="text-xs text-gray-500 italic">Passkeys are required for independent role access.</p>
                                             </div>
                                         )}
                                     </div>

@@ -335,23 +335,13 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         manager_passkey: payload.manager_passkey ? '***' : undefined
     });
 
-    // We check if record exists for user
-    const { data: existing, error: existingError } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
-
-    if (existingError && existingError.code !== 'PGRST116') {
-        console.error('❌ Error checking existing record:', existingError);
-    }
-
-    let query = supabase.from('company_details');
-    let result;
-
-    if (existing) {
-        console.log('📝 Updating existing record with id:', existing.id);
-        result = await query.update(payload).eq('id', existing.id).select().single();
-    } else {
-        console.log('➕ Inserting new record');
-        result = await query.insert(payload).select().single();
-    }
+    // Use upsert to handle both insert and update scenarios and avoid Primary Key violations
+    // We specify onConflict: 'user_id' to ensure we update if the user already has a record
+    let result = await supabase
+        .from('company_details')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select()
+        .single();
 
     if (result.error) {
         console.error('❌ Supabase error details:', {
@@ -370,12 +360,11 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
             delete (fallbackPayload as any).admin_passkey;
             delete (fallbackPayload as any).manager_passkey;
 
-            let fallbackResult;
-            if (existing) {
-                fallbackResult = await query.update(fallbackPayload).eq('id', existing.id).select().single();
-            } else {
-                fallbackResult = await query.insert(fallbackPayload).select().single();
-            }
+            const fallbackResult = await supabase
+                .from('company_details')
+                .upsert(fallbackPayload, { onConflict: 'user_id' })
+                .select()
+                .single();
 
             if (!fallbackResult.error) {
                 // Fallback succeeded!

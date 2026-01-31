@@ -324,19 +324,47 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         manager_passkey: details.managerPasskey
     };
 
+    console.log('💾 Saving company details with payload:', {
+        ...payload,
+        admin_passkey: payload.admin_passkey ? '***' : undefined,
+        manager_passkey: payload.manager_passkey ? '***' : undefined
+    });
+
     // We check if record exists for user
-    const { data: existing } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
+    const { data: existing, error: existingError } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
+
+    if (existingError && existingError.code !== 'PGRST116') {
+        console.error('❌ Error checking existing record:', existingError);
+    }
 
     let query = supabase.from('company_details');
     let result;
 
     if (existing) {
+        console.log('📝 Updating existing record with id:', existing.id);
         result = await query.update(payload).eq('id', existing.id).select().single();
     } else {
+        console.log('➕ Inserting new record');
         result = await query.insert(payload).select().single();
     }
 
-    if (result.error) throw result.error;
+    if (result.error) {
+        console.error('❌ Supabase error details:', {
+            message: result.error.message,
+            details: result.error.details,
+            hint: result.error.hint,
+            code: result.error.code
+        });
+
+        // Provide helpful error message
+        if (result.error.message?.includes('column') || result.error.code === '42703') {
+            throw new Error(`Database schema error: ${result.error.message}. Please run the SQL migration script in Supabase SQL Editor.`);
+        }
+
+        throw result.error;
+    }
+
+    console.log('✅ Successfully saved company details');
 
     // Map snake_case back to camelCase for return
     return {

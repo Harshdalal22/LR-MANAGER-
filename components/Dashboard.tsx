@@ -13,6 +13,8 @@ interface DashboardProps {
     language: Language;
     activeSection: 'lr' | 'data' | 'emergency' | null;
     setActiveSection: (section: 'lr' | 'data' | 'emergency' | null) => void;
+    currentRole: 'Admin' | 'Manager';
+    rbacEnabled?: boolean;
 }
 
 interface StatCardProps {
@@ -39,7 +41,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick,
     const styles = colorMap[color] || colorMap['blue'];
 
     return (
-        <div 
+        <div
             onClick={onClick}
             className={`
                 relative overflow-hidden
@@ -68,7 +70,7 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick,
 
 // 3D Management Card Component
 const ManagementCard: React.FC<{ title: string; description?: string; icon: React.ReactElement<{ className?: string }>; onClick?: () => void; href?: string; colorTheme: 'blue' | 'purple' | 'orange' | 'green' | 'teal' | 'gray' | 'red' }> = ({ title, description, icon, onClick, href, colorTheme }) => {
-    
+
     const themes = {
         blue: 'from-blue-500 to-blue-600 shadow-blue-200',
         purple: 'from-purple-500 to-purple-600 shadow-purple-200',
@@ -133,11 +135,11 @@ const ManagementCard: React.FC<{ title: string; description?: string; icon: Reac
 };
 
 // Comprehensive Emergency Service Card
-const EmergencyServiceCard: React.FC<{ 
-    title: string; 
-    features: string[]; 
-    icon: React.ReactElement<{ className?: string }>; 
-    colorTheme: 'blue' | 'orange' | 'green' | 'red'; 
+const EmergencyServiceCard: React.FC<{
+    title: string;
+    features: string[];
+    icon: React.ReactElement<{ className?: string }>;
+    colorTheme: 'blue' | 'orange' | 'green' | 'red';
     actionText: string;
     onAction: () => void;
 }> = ({ title, features, icon, colorTheme, actionText, onAction }) => {
@@ -147,7 +149,7 @@ const EmergencyServiceCard: React.FC<{
         green: { gradient: 'from-emerald-500 to-green-600', bg: 'bg-green-50', text: 'text-green-800', btn: 'bg-green-600 hover:bg-green-700' },
         red: { gradient: 'from-red-600 to-pink-600', bg: 'bg-red-50', text: 'text-red-800', btn: 'bg-red-600 hover:bg-red-700' },
     };
-    
+
     const style = themeStyles[colorTheme];
 
     return (
@@ -167,7 +169,7 @@ const EmergencyServiceCard: React.FC<{
                         </li>
                     ))}
                 </ul>
-                <button 
+                <button
                     onClick={onAction}
                     className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-md transition-colors ${style.btn}`}
                 >
@@ -179,7 +181,7 @@ const EmergencyServiceCard: React.FC<{
 };
 
 const QuickActionButton: React.FC<{ icon: React.ReactElement; label: string; color: string; onClick: () => void }> = ({ icon, label, color, onClick }) => (
-    <button 
+    <button
         onClick={onClick}
         className={`flex flex-col items-center justify-center p-4 rounded-2xl bg-white border border-gray-100 shadow-md active:scale-95 transition-all ${color}`}
     >
@@ -240,12 +242,12 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
                         {/* Invisible larger target for easier hovering */}
                         <circle cx={getX(i)} cy={getY(d.value)} r="8" fill="transparent" />
                         {/* Visible point */}
-                        <circle 
-                            cx={getX(i)} 
-                            cy={getY(d.value)} 
-                            r={hoveredIndex === i ? 5 : 3} 
-                            fill={hoveredIndex === i ? "#fff" : "#2563eb"} 
-                            stroke="#2563eb" 
+                        <circle
+                            cx={getX(i)}
+                            cy={getY(d.value)}
+                            r={hoveredIndex === i ? 5 : 3}
+                            fill={hoveredIndex === i ? "#fff" : "#2563eb"}
+                            stroke="#2563eb"
                             strokeWidth="2"
                             className="transition-all duration-200"
                         />
@@ -255,11 +257,11 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 
             {/* Tooltip */}
             {hoveredIndex !== null && (
-                <div 
+                <div
                     className="absolute bg-gray-900 text-white text-xs rounded-lg py-2 px-3 shadow-xl z-10 transform -translate-x-1/2 -translate-y-4 transition-all duration-200 pointer-events-none"
-                    style={{ 
-                        left: `${((hoveredIndex / (data.length - 1)) * 100)}%`, 
-                        top: '10%' 
+                    style={{
+                        left: `${((hoveredIndex / (data.length - 1)) * 100)}%`,
+                        top: '10%'
                     }}
                 >
                     <div className="font-bold whitespace-nowrap mb-1 text-center border-b border-gray-700 pb-1">{data[hoveredIndex].dateStr}</div>
@@ -282,8 +284,8 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language, activeSection, setActiveSection }) => {
-    
+const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language, activeSection, setActiveSection, currentRole, rbacEnabled }) => {
+
     // --- Metric Calculations ---
     const totalLRs = lorryReceipts.length;
     const totalFreight = lorryReceipts.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0);
@@ -303,11 +305,11 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
     const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(today);
         date.setDate(today.getDate() - i);
-        return { 
-            date, 
+        return {
+            date,
             label: date.toLocaleDateString('en-US', { weekday: 'short' }),
             dateStr: date.toLocaleDateString('en-GB'),
-            freight: 0 
+            freight: 0
         };
     }).reverse();
 
@@ -330,84 +332,86 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
     if (!activeSection) {
         return (
             <div className="flex flex-col items-center justify-start md:justify-center min-h-[70vh] gap-6 animate-fadeIn pt-8 pb-20">
-                 <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 mb-4 text-center drop-shadow-sm tracking-tight leading-tight">
+                <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 mb-4 text-center drop-shadow-sm tracking-tight leading-tight">
                     {t[language].welcome}
                 </h1>
-                
+
                 {/* Vertical Stack on Mobile, Grid on Desktop */}
                 <div className="flex flex-col md:flex-row gap-6 w-full max-w-6xl px-4">
-                    
+
                     {/* LR Management Card */}
                     <div
                         onClick={() => setActiveSection('lr')}
                         className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(37,99,235,0.15)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.25)] border-2 border-transparent hover:border-blue-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
                     >
-                         {/* 3D gradient blob */}
-                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
-                         
-                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                             <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-blue-200">
+                        {/* 3D gradient blob */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+
+                        <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-blue-200">
                                 <DocumentTextIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
-                             </div>
-                             <div className="text-left">
-                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
-                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].lrManagementDesc}</p>
-                             </div>
-                             <div className="ml-auto md:ml-0 md:mt-4">
+                            </div>
+                            <div className="text-left">
+                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
+                                <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].lrManagementDesc}</p>
+                            </div>
+                            <div className="ml-auto md:ml-0 md:mt-4">
                                 <span className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </span>
-                             </div>
-                         </div>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Data Management Card */}
+                    {/* Data Management Card - Restricted for Managers to specific sub-items */}
                     <div
                         onClick={() => setActiveSection('data')}
                         className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(147,51,234,0.15)] hover:shadow-[0_20px_50px_rgba(147,51,234,0.25)] border-2 border-transparent hover:border-purple-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
                     >
-                         {/* 3D gradient blob */}
-                         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                        {/* 3D gradient blob */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
 
-                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                             <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-purple-200">
+                        <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-purple-200">
                                 <DashboardIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
-                             </div>
-                             <div className="text-left">
-                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
-                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].dataManagementDesc}</p>
-                             </div>
-                             <div className="ml-auto md:ml-0 md:mt-4">
+                            </div>
+                            <div className="text-left">
+                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
+                                <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs ">{rbacEnabled && currentRole === 'Manager' ? "Manage Parties and Trucks" : t[language].dataManagementDesc}</p>
+                            </div>
+                            <div className="ml-auto md:ml-0 md:mt-4">
                                 <span className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </span>
-                             </div>
-                         </div>
+                            </div>
+                        </div>
                     </div>
 
-                     {/* Emergency Card */}
-                     <div
-                        onClick={() => setActiveSection('emergency')}
-                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(220,38,38,0.15)] hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)] border-2 border-transparent hover:border-red-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
-                    >
-                         {/* 3D gradient blob */}
-                         <div className="absolute top-0 right-0 w-32 h-32 bg-red-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                    {/* Emergency Card - Hidden for Managers */}
+                    {(!rbacEnabled || currentRole === 'Admin') && (
+                        <div
+                            onClick={() => setActiveSection('emergency')}
+                            className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(220,38,38,0.15)] hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)] border-2 border-transparent hover:border-red-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+                        >
+                            {/* 3D gradient blob */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-red-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
 
-                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                             <div className="bg-gradient-to-br from-red-500 to-red-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-red-200">
-                                <ExclamationTriangleIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
-                             </div>
-                             <div className="text-left">
-                                 <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-red-700 transition-colors">{t[language].emergency}</h2>
-                                 <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].emergencyDesc}</p>
-                             </div>
-                             <div className="ml-auto md:ml-0 md:mt-4">
-                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                                </span>
-                             </div>
-                         </div>
-                    </div>
+                            <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
+                                <div className="bg-gradient-to-br from-red-500 to-red-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-red-200">
+                                    <ExclamationTriangleIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                                </div>
+                                <div className="text-left">
+                                    <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-red-700 transition-colors">{t[language].emergency}</h2>
+                                    <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].emergencyDesc}</p>
+                                </div>
+                                <div className="ml-auto md:ml-0 md:mt-4">
+                                    <span className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </div>
@@ -418,17 +422,17 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
         <div className="space-y-6 md:space-y-10 pb-20 md:pb-0">
             {/* Header with Back Button */}
             <div className="flex flex-row items-center gap-3 pb-2 border-b border-gray-200">
-                <button 
-                    onClick={() => setActiveSection(null)} 
+                <button
+                    onClick={() => setActiveSection(null)}
                     className="p-2 bg-white rounded-xl shadow-md hover:shadow-lg border border-gray-100 text-gray-600 hover:text-blue-600 transition-all active:scale-95"
                     title={t[language].backToHome}
                 >
                     <ArrowLeftIcon className="w-5 h-5" />
                 </button>
                 <h1 className="text-xl md:text-3xl font-black text-gray-800 tracking-tight">
-                    {activeSection === 'lr' ? t[language].lrManagementDashboard : 
-                     activeSection === 'data' ? t[language].dataManagementOperations : 
-                     t[language].emergencyServices}
+                    {activeSection === 'lr' ? t[language].lrManagementDashboard :
+                        activeSection === 'data' ? t[language].dataManagementOperations :
+                            t[language].emergencyServices}
                 </h1>
             </div>
 
@@ -436,8 +440,8 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {activeSection === 'lr' && (
                 <div className="animate-slideIn space-y-6">
                     {/* Actions Scroll View for Mobile */}
-                     <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                         <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
+                    <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
+                        <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
                             <InvoiceIcon className="w-5 h-5 mr-2" />
                             {t[language].invoices}
                         </button>
@@ -453,48 +457,48 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
 
                     {/* Stat Cards - Vertical Stack on Mobile */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard 
-                            icon={<TruckIcon />} 
-                            title={t[language].totalLRs} 
-                            value={totalLRs} 
+                        <StatCard
+                            icon={<TruckIcon />}
+                            title={t[language].totalLRs}
+                            value={totalLRs}
                             color="blue"
                             onClick={onViewList}
                         />
-                        <StatCard 
-                            icon={<CurrencyRupeeIcon />} 
-                            title={t[language].freightValue} 
+                        <StatCard
+                            icon={<CurrencyRupeeIcon />}
+                            title={t[language].freightValue}
                             value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
                             color="green"
                         />
-                        <StatCard 
-                            icon={<UsersIcon />} 
-                            title={t[language].consignors} 
-                            value={uniqueConsignors} 
+                        <StatCard
+                            icon={<UsersIcon />}
+                            title={t[language].consignors}
+                            value={uniqueConsignors}
                             color="purple"
                         />
-                        <StatCard 
-                            icon={<UploadIcon />} 
-                            title={t[language].pendingPODs} 
+                        <StatCard
+                            icon={<UploadIcon />}
+                            title={t[language].pendingPODs}
                             value={podsPending}
                             color="orange"
                         />
                     </div>
-                    
+
                     {/* Status Overview Grid */}
                     <div className="bg-white rounded-3xl p-5 shadow-lg border border-gray-100">
-                         <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
-                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                        <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                             <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CreateIcon />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="blue" />
                             <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<TruckIcon />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="yellow" />
                             <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<ClockIcon />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="orange" />
                             <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CheckCircleIcon />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="green" />
                             <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<XIcon />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="red" />
-                         </div>
+                        </div>
                     </div>
 
                     {/* Chart & Recent Activity */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        
+
                         {/* Recent Activity Card */}
                         <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
                             <div className="p-6 border-b border-gray-100 bg-gray-50/50">
@@ -526,7 +530,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                                                     <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
                                                     <td className="px-6 py-4 text-center">
                                                         <button onClick={() => onEditLR(lr.lrNo)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
-                                                            <PencilIcon className="w-4 h-4"/>
+                                                            <PencilIcon className="w-4 h-4" />
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -539,10 +543,10 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
 
                         {/* Chart Card */}
                         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 flex flex-col">
-                             <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
-                             <div className="flex-grow flex items-center justify-center min-h-[200px]">
+                            <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
+                            <div className="flex-grow flex items-center justify-center min-h-[200px]">
                                 <FreightTrendChart data={chartData} />
-                             </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -552,44 +556,50 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {activeSection === 'data' && (
                 <div className="animate-slideIn">
                     <p className="text-gray-500 font-medium mb-6">{t[language].selectModule}</p>
-                    
+
                     {/* Vertical Stack on Mobile, Grid on Larger Screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <ManagementCard 
-                            title={t[language].vehicleHiring} 
-                            description="Manage truck hiring records and payments"
-                            icon={<TruckIcon />} 
-                            onClick={() => setCurrentView('vehicle-hiring')}
-                            colorTheme="orange"
-                        />
-                        <ManagementCard 
-                            title={t[language].bookingRegister} 
-                            description="Maintain booking records and freight details"
-                            icon={<ListIcon />} 
-                            onClick={() => setCurrentView('booking-register')}
-                            colorTheme="green"
-                        />
-                        <ManagementCard 
-                            title={t[language].manageParties} 
+                        {(!rbacEnabled || currentRole === 'Admin') && (
+                            <ManagementCard
+                                title={t[language].vehicleHiring}
+                                description="Manage truck hiring records and payments"
+                                icon={<TruckIcon />}
+                                onClick={() => setCurrentView('vehicle-hiring')}
+                                colorTheme="orange"
+                            />
+                        )}
+                        {(!rbacEnabled || currentRole === 'Admin') && (
+                            <ManagementCard
+                                title={t[language].bookingRegister}
+                                description="Maintain booking records and freight details"
+                                icon={<ListIcon />}
+                                onClick={() => setCurrentView('booking-register')}
+                                colorTheme="green"
+                            />
+                        )}
+                        <ManagementCard
+                            title={t[language].manageParties}
                             description="Add or edit consignor and consignee details"
-                            icon={<UsersIcon />} 
-                            onClick={() => setCurrentView('parties')} 
+                            icon={<UsersIcon />}
+                            onClick={() => setCurrentView('parties')}
                             colorTheme="purple"
                         />
-                        <ManagementCard 
-                            title={t[language].manageTrucks} 
+                        <ManagementCard
+                            title={t[language].manageTrucks}
                             description="Maintain your fleet or hired truck database"
-                            icon={<TruckIcon />} 
-                            onClick={() => setCurrentView('trucks')} 
+                            icon={<TruckIcon />}
+                            onClick={() => setCurrentView('trucks')}
                             colorTheme="teal"
                         />
-                        <ManagementCard 
-                            title={t[language].dataSetup} 
-                            description="Database fixes and system configuration"
-                            icon={<CogIcon />} 
-                            onClick={() => setCurrentView('data-management')} 
-                            colorTheme="gray"
-                        />
+                        {(!rbacEnabled || currentRole === 'Admin') && (
+                            <ManagementCard
+                                title={t[language].dataSetup}
+                                description="Database fixes and system configuration"
+                                icon={<CogIcon />}
+                                onClick={() => setCurrentView('data-management')}
+                                colorTheme="gray"
+                            />
+                        )}
                     </div>
                 </div>
             )}
@@ -598,32 +608,32 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {activeSection === 'emergency' && (
                 <div className="animate-slideIn">
                     <p className="text-gray-500 font-medium mb-6">{t[language].emergencySubtitle}</p>
-                    
+
                     {/* Quick Actions Grid (Mobile-First Sticky/Prominent) */}
                     <div className="mb-8">
                         <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">{t[language].quickActions}</h4>
                         <div className="grid grid-cols-4 gap-2 md:gap-4">
-                            <QuickActionButton 
-                                icon={<SirenIcon className="w-6 h-6 md:w-8 md:h-8 text-red-600" />} 
-                                label={t[language].accidentReport} 
-                                color="hover:bg-red-50 hover:border-red-200 text-red-700" 
+                            <QuickActionButton
+                                icon={<SirenIcon className="w-6 h-6 md:w-8 md:h-8 text-red-600" />}
+                                label={t[language].accidentReport}
+                                color="hover:bg-red-50 hover:border-red-200 text-red-700"
                                 onClick={() => alert("Opening Accident Report...")}
                             />
-                            <QuickActionButton 
-                                icon={<TowTruckIcon className="w-6 h-6 md:w-8 md:h-8 text-orange-600" />} 
-                                label={t[language].towingService} 
+                            <QuickActionButton
+                                icon={<TowTruckIcon className="w-6 h-6 md:w-8 md:h-8 text-orange-600" />}
+                                label={t[language].towingService}
                                 color="hover:bg-orange-50 hover:border-orange-200 text-orange-700"
                                 onClick={() => alert("Requesting Towing...")}
                             />
-                            <QuickActionButton 
-                                icon={<FuelIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600" />} 
-                                label={t[language].fuelDelivery} 
+                            <QuickActionButton
+                                icon={<FuelIcon className="w-6 h-6 md:w-8 md:h-8 text-green-600" />}
+                                label={t[language].fuelDelivery}
                                 color="hover:bg-green-50 hover:border-green-200 text-green-700"
                                 onClick={() => alert("Requesting Fuel...")}
                             />
-                            <QuickActionButton 
-                                icon={<BatteryIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-600" />} 
-                                label={t[language].batteryJump} 
+                            <QuickActionButton
+                                icon={<BatteryIcon className="w-6 h-6 md:w-8 md:h-8 text-yellow-600" />}
+                                label={t[language].batteryJump}
                                 color="hover:bg-yellow-50 hover:border-yellow-200 text-yellow-700"
                                 onClick={() => alert("Requesting Battery Service...")}
                             />
@@ -632,7 +642,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
 
                     {/* Main 4 Comprehensive Sections */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                        <EmergencyServiceCard 
+                        <EmergencyServiceCard
                             title={t[language].mechanicTitle}
                             features={t[language].mechanicFeatures}
                             icon={<WrenchIcon />}
@@ -640,7 +650,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                             actionText={t[language].mechanicAction}
                             onAction={() => alert("Mechanic flow initiated")}
                         />
-                        <EmergencyServiceCard 
+                        <EmergencyServiceCard
                             title={t[language].gpsTitle}
                             features={t[language].gpsFeatures}
                             icon={<MapPinIcon />}
@@ -648,7 +658,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                             actionText={t[language].gpsAction}
                             onAction={() => alert("GPS subscription flow")}
                         />
-                        <EmergencyServiceCard 
+                        <EmergencyServiceCard
                             title={t[language].fuelTitle}
                             features={t[language].fuelFeatures}
                             icon={<CreditCardIcon />}
@@ -656,7 +666,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
                             actionText={t[language].fuelAction}
                             onAction={() => alert("Fuel card application")}
                         />
-                        <EmergencyServiceCard 
+                        <EmergencyServiceCard
                             title={t[language].supportTitle}
                             features={t[language].supportFeatures}
                             icon={<ChatBubbleIcon />}
@@ -668,24 +678,24 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
 
                     <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Emergency Helplines</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <ManagementCard 
-                            title={t[language].police} 
+                        <ManagementCard
+                            title={t[language].police}
                             description="Dial 100 or 112"
-                            icon={<ShieldCheckIcon />} 
+                            icon={<ShieldCheckIcon />}
                             href="tel:100"
                             colorTheme="gray"
                         />
-                        <ManagementCard 
-                            title={t[language].ambulance} 
+                        <ManagementCard
+                            title={t[language].ambulance}
                             description="Dial 108 or 102"
-                            icon={<ExclamationTriangleIcon />} 
+                            icon={<ExclamationTriangleIcon />}
                             href="tel:108"
                             colorTheme="gray"
                         />
-                        <ManagementCard 
-                            title={t[language].highwayHelpline} 
+                        <ManagementCard
+                            title={t[language].highwayHelpline}
                             description="Dial 1033"
-                            icon={<TruckIcon />} 
+                            icon={<TruckIcon />}
                             href="tel:1033"
                             colorTheme="gray"
                         />

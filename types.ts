@@ -32,6 +32,8 @@ export interface DetailedCharges {
 }
 
 export type LRStatus = 'Booked' | 'In Transit' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
+export type UserRole = 'Admin' | 'Manager';
+
 
 export interface LorryReceipt {
     lrType: 'Original' | 'Dummy';
@@ -50,7 +52,7 @@ export interface LorryReceipt {
     ewayBillNo: string;
     ewayBillDate: string | null;
     ewayExDate: string | null;
-    
+
     addressOfDelivery: string;
     chargedWeight: number;
 
@@ -100,6 +102,9 @@ export interface CompanyDetails {
     user_id?: string;
     jurisdictionCity: string;
     branchLocations: string[];
+    rbacEnabled?: boolean;
+    adminPasskey?: string;
+    managerPasskey?: string;
 }
 
 export interface SavedParty extends PartyDetails {

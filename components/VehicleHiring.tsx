@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, TruckIcon, ArrowLeftIcon } from './icons';
-import { VehicleHiring, PaymentRecord } from '../types';
+import { VehicleHiring as VehicleHiringType, PaymentRecord } from '../types';
 import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 
@@ -9,7 +9,7 @@ interface VehicleHiringProps {
     onBack: () => void;
 }
 
-const initialRecord: VehicleHiring = {
+const initialRecord: VehicleHiringType = {
     date: new Date().toISOString().split('T')[0],
     grNo: '',
     billNo: '',
@@ -29,9 +29,9 @@ const initialRecord: VehicleHiring = {
 };
 
 const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
-    const [records, setRecords] = useState<VehicleHiring[]>([]);
+    const [records, setRecords] = useState<VehicleHiringType[]>([]);
     const [view, setView] = useState<'list' | 'form'>('list');
-    const [formData, setFormData] = useState<VehicleHiring>(initialRecord);
+    const [formData, setFormData] = useState<VehicleHiringType>(initialRecord);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -122,7 +122,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         }
     };
 
-    const handleEdit = (record: VehicleHiring) => {
+    const handleEdit = (record: VehicleHiringType) => {
         setFormData({
             ...record,
             advances: Array.isArray(record.advances) ? record.advances : []

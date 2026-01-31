@@ -17,33 +17,34 @@ import InvoiceList from './components/InvoiceList';
 import AdBanner from './components/AdBanner';
 import PODUploadModal from './components/PODUploadModal';
 import PasswordResetModal from './components/PasswordResetModal';
-import { 
-    LorryReceipt, 
-    CompanyDetails, 
-    SavedParty, 
-    SavedTruck, 
-    View, 
+import RoleSelection from './components/RoleSelection';
+import {
+    LorryReceipt,
+    CompanyDetails,
+    SavedParty,
+    SavedTruck,
+    View,
     LRStatus
 } from './types';
-import { 
-    getLorryReceipts, 
-    saveLorryReceipt, 
-    deleteLorryReceipt, 
-    getCompanyDetails, 
-    saveCompanyDetails, 
-    subscribeToAuthState, 
-    signOut, 
-    getSession, 
-    updateLorryReceiptStatus, 
-    uploadPOD, 
-    uploadCompanyAsset, 
-    getPodSignedUrl, 
+import {
+    getLorryReceipts,
+    saveLorryReceipt,
+    deleteLorryReceipt,
+    getCompanyDetails,
+    saveCompanyDetails,
+    subscribeToAuthState,
+    signOut,
+    getSession,
+    updateLorryReceiptStatus,
+    uploadPOD,
+    uploadCompanyAsset,
+    getPodSignedUrl,
     updateLorryReceiptInvoiceDetails,
     getSavedParties,
-    saveSavedParty, 
-    deleteSavedParty, 
+    saveSavedParty,
+    deleteSavedParty,
     getSavedTrucks,
-    saveSavedTruck, 
+    saveSavedTruck,
     deleteSavedTruck,
     updateUserPassword
 } from './services/supabaseService';
@@ -84,17 +85,20 @@ const App: React.FC = () => {
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
     const [isPasswordResetting, setIsPasswordResetting] = useState(false);
+    const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager'>('Admin');
+    const [showRoleSelection, setShowRoleSelection] = useState(false);
+    const [roleSelectionError, setRoleSelectionError] = useState('');
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
         let message = fallbackMessage;
-        
+
         if (error instanceof Error) {
             message = error.message;
         } else if (typeof error === 'object' && error !== null) {
             const anyError = error as any;
             const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
-            
+
             if (extractedMessage) {
                 message = extractedMessage;
                 if (anyError.details) message += ` (${anyError.details})`;
@@ -115,7 +119,7 @@ const App: React.FC = () => {
         } else if (typeof error === 'string') {
             message = error;
         }
-        
+
         toast.error(message, { duration: 8000 });
     };
 
@@ -145,14 +149,14 @@ const App: React.FC = () => {
             try {
                 const currentSession = await getSession();
                 setSession(currentSession);
-                
+
                 if (!currentSession) {
                     setIsLoading(false);
                 }
 
                 const { data } = subscribeToAuthState((event, session) => {
                     setSession(session);
-                    
+
                     if (event === 'PASSWORD_RECOVERY') {
                         setIsPasswordResetting(true);
                     }
@@ -169,7 +173,7 @@ const App: React.FC = () => {
                     }
                 });
                 authSubscription = data.subscription;
-                
+
             } catch (error) {
                 handleError(error, "Failed to initialize authentication");
                 setIsLoading(false);
@@ -209,6 +213,17 @@ const App: React.FC = () => {
             fetchData();
         }
     }, [session]);
+
+    // Show role selection after login if RBAC is enabled
+    useEffect(() => {
+        if (session && companyDetails.rbacEnabled && !showRoleSelection && currentRole === 'Admin') {
+            // Check if we need to show role selection (only on fresh login)
+            const hasSelectedRole = sessionStorage.getItem('roleSelected');
+            if (!hasSelectedRole) {
+                setShowRoleSelection(true);
+            }
+        }
+    }, [session, companyDetails.rbacEnabled]);
 
     const handleSaveLR = async (lr: LorryReceipt) => {
         const toastId = toast.loading('Saving LR...');
@@ -285,6 +300,8 @@ const App: React.FC = () => {
             await signOut();
             setSession(null);
             setIsPasswordResetting(false);
+            sessionStorage.removeItem('roleSelected');
+            setCurrentRole('Admin');
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
@@ -300,11 +317,53 @@ const App: React.FC = () => {
         }
     };
 
+    const handleRoleChange = (role: 'Admin' | 'Manager', passkey?: string) => {
+        if (role === 'Admin' && companyDetails.rbacEnabled) {
+            if (companyDetails.adminPasskey && passkey !== companyDetails.adminPasskey) {
+                toast.error("Invalid Passkey");
+                return false;
+            }
+        }
+        setCurrentRole(role);
+        toast.success(`Switched to ${role} mode`);
+
+        // If switching to Manager while in restricted view, go to dashboard
+        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+        if (role === 'Manager' && companyDetails.rbacEnabled && restrictedViews.includes(currentView)) {
+            setCurrentView('dashboard');
+        }
+        return true;
+    };
+
     const renderContent = () => {
+        // RBAC Restriction logic
+        const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
+        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+
+        if (isManager && restrictedViews.includes(currentView)) {
+            return (
+                <div className="bg-white p-10 rounded-3xl shadow-xl text-center max-w-lg mx-auto border border-gray-100 animate-fadeIn">
+                    <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m11 3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-2xl font-black text-gray-800 mb-2">Access Restricted</h2>
+                    <p className="text-gray-500 mb-8 font-medium">Managers do not have permission to access this module. Please switch to Admin mode if you have the passkey.</p>
+                    <button
+                        onClick={() => setCurrentView('dashboard')}
+                        className="w-full py-4 bg-ssk-blue text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform"
+                    >
+                        Back to Dashboard
+                    </button>
+                </div>
+            );
+        }
+
         switch (currentView) {
             case 'dashboard':
                 return (
-                    <Dashboard 
+                    <Dashboard
                         lorryReceipts={lorryReceipts}
                         onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
                         onViewList={() => setCurrentView('list')}
@@ -313,11 +372,13 @@ const App: React.FC = () => {
                         language={language}
                         activeSection={dashboardSection}
                         setActiveSection={setDashboardSection}
+                        currentRole={currentRole}
+                        rbacEnabled={companyDetails.rbacEnabled}
                     />
                 );
             case 'list':
                 return (
-                    <LRList 
+                    <LRList
                         lorryReceipts={lorryReceipts}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
@@ -327,10 +388,10 @@ const App: React.FC = () => {
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
                         onViewPOD={async (path) => {
-                           try {
-                               const url = await getPodSignedUrl(path);
-                               window.open(url, '_blank');
-                           } catch(e) { toast.error("Could not load POD"); }
+                            try {
+                                const url = await getPodSignedUrl(path);
+                                window.open(url, '_blank');
+                            } catch (e) { toast.error("Could not load POD"); }
                         }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
@@ -338,7 +399,7 @@ const App: React.FC = () => {
                 );
             case 'form':
                 return (
-                    <LRForm 
+                    <LRForm
                         onSave={handleSaveLR}
                         existingLR={editingLR}
                         onCancel={() => { setEditingLR(null); setCurrentView('dashboard'); }}
@@ -357,39 +418,39 @@ const App: React.FC = () => {
                 return <DataManagement onBack={() => setCurrentView('dashboard')} />;
             case 'parties':
                 return (
-                    <PartyManagement 
-                        savedParties={savedParties} 
-                        onSave={async (p) => { 
-                            await saveSavedParty(p); 
-                            setSavedParties(await getSavedParties()); 
+                    <PartyManagement
+                        savedParties={savedParties}
+                        onSave={async (p) => {
+                            await saveSavedParty(p);
+                            setSavedParties(await getSavedParties());
                             toast.success("Party saved");
-                        }} 
+                        }}
                         onDelete={async (id) => {
                             await deleteSavedParty(id);
                             setSavedParties(prev => prev.filter(x => x.id !== id));
-                        }} 
-                        onBack={() => setCurrentView('dashboard')} 
+                        }}
+                        onBack={() => setCurrentView('dashboard')}
                     />
                 );
             case 'trucks':
                 return (
-                    <TruckManagement 
-                        savedTrucks={savedTrucks} 
+                    <TruckManagement
+                        savedTrucks={savedTrucks}
                         onSave={async (t) => {
-                             await saveSavedTruck(t);
-                             setSavedTrucks(await getSavedTrucks());
-                             toast.success("Truck saved");
-                        }} 
+                            await saveSavedTruck(t);
+                            setSavedTrucks(await getSavedTrucks());
+                            toast.success("Truck saved");
+                        }}
                         onDelete={async (id) => {
                             await deleteSavedTruck(id);
                             setSavedTrucks(prev => prev.filter(x => x.id !== id));
-                        }} 
-                        onBack={() => setCurrentView('dashboard')} 
+                        }}
+                        onBack={() => setCurrentView('dashboard')}
                     />
                 );
             case 'invoices':
                 return (
-                    <InvoiceList 
+                    <InvoiceList
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
                         onBack={() => setCurrentView('dashboard')}
@@ -411,9 +472,9 @@ const App: React.FC = () => {
 
     if (!session) {
         return (
-             <div className="bg-slate-50 min-h-screen">
-                 <Toaster position="top-center" />
-                 <Auth />
+            <div className="bg-slate-50 min-h-screen">
+                <Toaster position="top-center" />
+                <Auth />
             </div>
         );
     }
@@ -422,21 +483,23 @@ const App: React.FC = () => {
     return (
         <div className="bg-slate-50 min-h-screen font-sans">
             <Toaster position="top-center" />
-            <Header 
-                companyDetails={companyDetails} 
+            <Header
+                companyDetails={companyDetails}
                 onUpdateDetails={async (d) => { const s = await saveCompanyDetails(d); setCompanyDetails(s); return true; }}
                 onUploadAsset={uploadCompanyAsset}
                 userEmail={session.user.email}
                 onSignOut={handleSignOut}
                 language={language}
                 setLanguage={setLanguage}
+                currentRole={currentRole}
+                onRoleChange={handleRoleChange}
             />
             <main className="container mx-auto p-4 md:p-6">
                 {renderContent()}
                 <AdBanner />
             </main>
             {uploadingPODFor && (
-                <PODUploadModal 
+                <PODUploadModal
                     isOpen={!!uploadingPODFor}
                     onClose={() => setUploadingPODFor(null)}
                     lr={uploadingPODFor}
@@ -453,7 +516,7 @@ const App: React.FC = () => {
                 />
             )}
             {isPasswordResetting && (
-                <PasswordResetModal 
+                <PasswordResetModal
                     isOpen={isPasswordResetting}
                     onSubmit={handleUpdatePassword}
                     onCancel={() => setIsPasswordResetting(false)}

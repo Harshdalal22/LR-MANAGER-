@@ -1,0 +1,52 @@
+// Add these functions after handleEditLR in App.tsx
+
+const handleRoleChange = (role: 'Admin' | 'Manager', passkey?: string) => {
+    if (role === 'Admin' && companyDetails.rbacEnabled) {
+        if (companyDetails.adminPasskey && passkey !== companyDetails.adminPasskey) {
+            toast.error("Invalid Admin Passkey");
+            return false;
+        }
+    }
+    if (role === 'Manager' && companyDetails.rbacEnabled) {
+        if (companyDetails.managerPasskey && passkey !== companyDetails.managerPasskey) {
+            toast.error("Invalid Manager Passkey");
+            return false;
+        }
+    }
+    setCurrentRole(role);
+    toast.success(`Switched to ${role} mode`);
+    
+    // If switching to Manager while in restricted view, go to dashboard
+    const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+    if (role === 'Manager' && companyDetails.rbacEnabled && restrictedViews.includes(currentView)) {
+        setCurrentView('dashboard');
+    }
+    return true;
+};
+
+const handleRoleSelection = (role: 'Admin' | 'Manager', passkey: string) => {
+    // Verify passkey
+    if (role === 'Admin') {
+        if (!companyDetails.adminPasskey || passkey !== companyDetails.adminPasskey) {
+            toast.error('Invalid Admin passkey');
+            return;
+        }
+    } else if (role === 'Manager') {
+        if (!companyDetails.managerPasskey || passkey !== companyDetails.managerPasskey) {
+            toast.error('Invalid Manager passkey');
+            return;
+        }
+    }
+
+    // Set role and mark as selected
+    setCurrentRole(role);
+    setShowRoleSelection(false);
+    sessionStorage.setItem('roleSelected', 'true');
+    toast.success(`Logged in as ${role}`);
+};
+
+const handleCancelRoleSelection = async () => {
+    // Sign out if user cancels role selection
+    await handleSignOut();
+    setShowRoleSelection(false);
+};

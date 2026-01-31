@@ -1,0 +1,53 @@
+# .dockerignore - Files to exclude from Docker build
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development files
+.git/
+.gitignore
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build artifacts (will be generated during build)
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+role-handlers-temp.txt
+comment.txt
+
+# Documentation
+RBAC_IMPLEMENTATION_GUIDE.md
+supabase-rbac-migration.sql
+supabase-rbac-test-data.sql

@@ -316,13 +316,18 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
     if (!user) throw new Error("User not authenticated");
 
     // Map camelCase to snake_case for database
-    const payload = {
+    const payload: any = {
         ...details,
         user_id: user.id,
         rbac_enabled: details.rbacEnabled,
         admin_passkey: details.adminPasskey,
         manager_passkey: details.managerPasskey
     };
+
+    // Remove camelCase fields to prevent "Column not found" errors
+    delete payload.rbacEnabled;
+    delete payload.adminPasskey;
+    delete payload.managerPasskey;
 
     console.log('💾 Saving company details with payload:', {
         ...payload,

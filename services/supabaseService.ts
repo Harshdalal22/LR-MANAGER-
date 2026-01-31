@@ -157,7 +157,7 @@ export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
         .select('*')
         .order('date', { ascending: false });
     if (error) throw error;
-    
+
     // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated for frontend
     return (data || []).map((item: any) => ({
         ...item,
@@ -180,44 +180,44 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     if (!user) throw new Error("User not authenticated");
 
     // Destructure to separate frontend-only fields and 'id' if present
-    const { 
-        isInvoiceGenerated, 
+    const {
+        isInvoiceGenerated,
         createdBy, // Exclude frontend-only field
         // @ts-ignore - 'id' might exist on the object if fetched from DB
-        id, 
+        id,
         // @ts-ignore - 'created_at' might exist
         created_at,
-        ...rest 
+        ...rest
     } = lr;
 
     // Sanitize Payload: Convert empty string dates to NULL to prevent "invalid input syntax for type date"
     const sanitizedRest = { ...rest } as any;
     const dateFields = ['invoiceDate', 'poDate', 'ewayBillDate', 'ewayExDate'];
-    
+
     dateFields.forEach(field => {
         if (sanitizedRest[field] === '') {
             sanitizedRest[field] = null;
         }
     });
 
-    const payload = { 
-        ...sanitizedRest, 
+    const payload = {
+        ...sanitizedRest,
         user_id: user.id,
         is_invoice_generated: !!isInvoiceGenerated // Ensure boolean
     };
-    
+
     const { data, error } = await supabase
         .from('lorry_receipts')
         .upsert(payload, { onConflict: 'lrNo' })
         .select()
         .single();
-    
+
     if (error) {
         console.error("Supabase Save Error:", error);
         // Throw a clean error message to avoid [object Object] in UI
         throw new Error(error.message || "Database error occurred while saving LR.");
     }
-    
+
     return {
         ...data,
         isInvoiceGenerated: data.is_invoice_generated ?? false
@@ -240,8 +240,8 @@ export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus) =
 export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
     const { error } = await supabase
         .from('lorry_receipts')
-        .update({ 
-            invoiceNo, 
+        .update({
+            invoiceNo,
             invoiceDate: invoiceDate || null, // Ensure empty string becomes null
             is_invoice_generated: true // Must be snake_case based on DB fix script
         })
@@ -273,7 +273,7 @@ export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt>
         .single();
 
     if (updateError) throw updateError;
-    
+
     return {
         ...data,
         isInvoiceGenerated: data.isInvoiceGenerated ?? data.is_invoice_generated ?? false
@@ -299,21 +299,37 @@ export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
     const { data, error } = await supabase.from('company_details').select('*').single();
     // It's possible no details exist yet for new user
     if (error && error.code !== 'PGRST116') throw error;
-    return data;
+
+    if (!data) return null;
+
+    // Map snake_case to camelCase for RBAC fields
+    return {
+        ...data,
+        rbacEnabled: data.rbac_enabled,
+        adminPasskey: data.admin_passkey,
+        managerPasskey: data.manager_passkey
+    };
 };
 
 export const saveCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
 
-    const payload = { ...details, user_id: user.id };
-    
+    // Map camelCase to snake_case for database
+    const payload = {
+        ...details,
+        user_id: user.id,
+        rbac_enabled: details.rbacEnabled,
+        admin_passkey: details.adminPasskey,
+        manager_passkey: details.managerPasskey
+    };
+
     // We check if record exists for user
     const { data: existing } = await supabase.from('company_details').select('id').eq('user_id', user.id).single();
 
     let query = supabase.from('company_details');
     let result;
-    
+
     if (existing) {
         result = await query.update(payload).eq('id', existing.id).select().single();
     } else {
@@ -321,7 +337,14 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
     }
 
     if (result.error) throw result.error;
-    return result.data;
+
+    // Map snake_case back to camelCase for return
+    return {
+        ...result.data,
+        rbacEnabled: result.data.rbac_enabled,
+        adminPasskey: result.data.admin_passkey,
+        managerPasskey: result.data.manager_passkey
+    };
 };
 
 export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {

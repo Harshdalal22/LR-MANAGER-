@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CompanyDetails } from '../types';
 import { CogIcon, XIcon, SpinnerIcon, GlobeIcon } from './icons';
 import { Language, t } from '../utils/translations';
@@ -33,6 +33,11 @@ const Header: React.FC<HeaderProps> = ({
     const [isUploadingSignature, setIsUploadingSignature] = useState(false);
     const [passkeyInput, setPasskeyInput] = useState('');
     const [isPasskeyModalOpen, setIsPasskeyModalOpen] = useState(false);
+
+    // Sync localDetails with companyDetails when modal opens or companyDetails changes
+    useEffect(() => {
+        setLocalDetails(companyDetails);
+    }, [companyDetails, isSettingsOpen]);
 
 
     const handleSaveSettings = async () => {

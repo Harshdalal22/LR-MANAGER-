@@ -21,9 +21,9 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
-    const isBillingPartySeparate = lr.billingTo && lr.billingTo.name && 
-                                   (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
-                                   (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
+    const isBillingPartySeparate = lr.billingTo && lr.billingTo.name &&
+        (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
+        (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
 
     const formatAmount = (amount: number | undefined) => {
         return showAmounts ? (Number(amount) || 0).toFixed(2) : "0.00";
@@ -31,7 +31,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
 
     return (
         <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black relative">
-            
+
             {/* Jurisdiction Header */}
             {companyDetails.jurisdictionCity && (
                 <div className="text-[10px] font-bold text-center w-full pb-1 uppercase tracking-wide">
@@ -44,7 +44,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 {/* Left: Logo */}
                 <div className="flex-none w-24 flex justify-start items-center">
                     {companyDetails.logoUrl && (
-                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-20 w-full object-contain object-left"/>
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-20 w-full object-contain object-left" />
                     )}
                 </div>
 
@@ -93,7 +93,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                         <p className="font-bold text-center text-red-600 text-sm">CAUTION</p>
                         <p className="text-[7px] leading-tight">This Consignment Will Not Be Detained Diverted,Re-Routed Or Re-Booked Without Consignee Bank Written Permission Will Be Delivered At the Destination.</p>
                     </div>
-                     <div className="border border-black p-1 mt-1 flex-grow caution-notice-section">
+                    <div className="border border-black p-1 mt-1 flex-grow caution-notice-section">
                         <p className="font-bold text-center text-red-600 text-sm">NOTICE</p>
                         <p className="text-[7px] leading-tight">This consignment covered in this set of special lorry receipt shall be stored at the destination under the control of the transport operator & shall be delivered to or to the order of the Consignee bank whose name is mentioned in the lorry receipt.</p>
                     </div>
@@ -109,7 +109,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                             </>
                         )}
                     </div>
-                     <div className="border border-black p-1 mt-1 text-center h-[90px]">
+                    <div className="border border-black p-1 mt-1 text-center h-[90px]">
                         <p className="font-bold underline">INSURANCE</p>
                         <p className="text-[7px] font-bold my-1 leading-tight">The Customer Has Started That He Has Not Insured The Consignment</p>
                         <div className="flex justify-between mt-1 text-left border-b border-gray-300 pb-1">
@@ -124,25 +124,25 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 </div>
                 {/* Right Col */}
                 <div className="col-span-4 text-center">
-                     <div className="border border-black p-1">
+                    <div className="border border-black p-1">
                         <p className="font-bold underline">DEMURRAGE CHARGES</p>
                         <p className="text-[7px] font-bold leading-tight">Chargeable After 5 days Arrival Of Goods Rs. 7/per Qtl.Per Day On Weight Charged</p>
                     </div>
                     <div className="border border-black p-1 mt-1 font-bold text-left truncate">Del Addr: <span className="font-bold text-black">{lr.addressOfDelivery}</span></div>
                     <div className="border border-black p-1 mt-1 font-bold flex justify-between items-center bg-gray-100">
-                        <span>Vehicle No.:</span> 
+                        <span>Vehicle No.:</span>
                         <span className="font-extrabold text-black text-lg">{lr.truckNo}</span>
                     </div>
                     <div className="border-y-2 border-black p-1 mt-1 font-bold text-lg flex justify-between">
-                        <span>C NOTE No.:</span> 
+                        <span>C NOTE No.:</span>
                         <span className="font-extrabold text-red-600">{lr.lrNo}</span>
                     </div>
                     {lr.ewayBillNo && (
                         <div className="border-b-2 border-black p-1 font-bold text-left text-[8px]">
                             E-Way: <span className="font-bold text-black">{lr.ewayBillNo}</span>
                             <div className="flex justify-between">
-                                <span>Dt: {lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB'): '-'}</span>
-                                <span>Ex: {lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB'): '-'}</span>
+                                <span>Dt: {lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB') : '-'}</span>
+                                <span>Ex: {lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB') : '-'}</span>
                             </div>
                         </div>
                     )}
@@ -156,7 +156,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     </div>
                 </div>
             </div>
-            
+
             {/* Consignor/Consignee details */}
             <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
                 <thead>
@@ -186,7 +186,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     </tr>
                 </tbody>
             </table>
-            
+
             {/* Conditionally rendered Billing To details */}
             {isBillingPartySeparate && (
                 <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
@@ -204,7 +204,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                     </tbody>
                 </table>
             )}
-            
+
             {/* Main Content Table */}
             <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
                 <thead>
@@ -226,29 +226,33 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                 <tbody>
                     <tr>
                         <td className="border-r-2 border-black p-2 text-center h-48 align-top">
-                             {/* Display each item's quantity in a separate line */}
-                             {lr.items.map((item, idx) => (
+                            {/* Display each item's quantity in a separate line */}
+                            {lr.items.map((item, idx) => (
                                 <div key={idx} className="font-bold text-lg mb-2">{item.pcs}</div>
-                             ))}
-                             {/* Only show total if more than 1 item */}
-                             {lr.items.length > 1 && (
+                            ))}
+                            {/* Only show total if more than 1 item */}
+                            {lr.items.length > 1 && (
                                 <div className="border-t border-black mt-2 pt-1 font-bold text-sm">
                                     Total: {lr.items.reduce((sum, item) => sum + item.pcs, 0)}
                                 </div>
-                             )}
+                            )}
                         </td>
                         <td className="border-r-2 border-black p-2 align-top">
-                             {/* Display each item's description in a separate line matching Pkgs column */}
-                             {lr.items.map((item, idx) => (
+                            {/* Display each item's description in a separate line matching Pkgs column */}
+                            {lr.items.map((item, idx) => (
                                 <div key={idx} className="font-bold text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
                                     {item.description}
                                 </div>
-                             ))}
+                            ))}
                         </td>
-                        {/* Actual Weight column - intentionally empty */}
-                        <td className="border-r border-black p-2 text-center align-top font-bold"></td>
-                        {/* Charged Weight column - intentionally empty */}
-                        <td className="border-r-2 border-black p-2 text-center align-top font-bold"></td>
+                        {/* Actual Weight column */}
+                        <td className="border-r border-black p-2 text-center align-top font-bold">
+                            {Number(lr.actualWeightMT) > 0 ? lr.actualWeightMT : (Number(lr.weight) > 0 ? lr.weight : '')}
+                        </td>
+                        {/* Charged Weight column */}
+                        <td className="border-r-2 border-black p-2 text-center align-top font-bold">
+                            {Number(lr.chargedWeight) > 0 ? lr.chargedWeight : ''}
+                        </td>
                         <td colSpan={2} className="p-0 align-top">
                             <div className="flex flex-col h-full text-[9px]">
                                 <div className="flex justify-between border-b border-black p-1">
@@ -290,11 +294,11 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                             </div>
                         </td>
                     </tr>
-                    
+
                     {/* Footer Section inside Table */}
                     <tr>
                         <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
-                             <div className="flex flex-col justify-between h-full space-y-2">
+                            <div className="flex flex-col justify-between h-full space-y-2">
                                 <div className="grid grid-cols-1 gap-2 text-[8px]">
                                     <div>
                                         <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
@@ -303,7 +307,7 @@ export const LRContent = forwardRef<HTMLDivElement, { lr: LorryReceipt; companyD
                                     </div>
                                 </div>
                                 <div className="border border-black p-1 text-[8px] bg-gray-50">
-                                    <span className="font-bold block">REMARKS:</span> 
+                                    <span className="font-bold block">REMARKS:</span>
                                     <span className="font-medium text-black">{lr.remark}</span>
                                 </div>
                             </div>
@@ -333,18 +337,18 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
     const handleDownloadPDF = () => {
         const element = previewRef.current;
         if (!element) return;
-        
+
         const opt = {
-            margin:       5, // Reduced margin to prevent clipping
-            filename:     `LR-${lr.lrNo.replace('/', '_')}.pdf`,
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            margin: 5, // Reduced margin to prevent clipping
+            filename: `LR-${lr.lrNo.replace('/', '_')}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
         };
 
         html2pdf().from(element).set(opt).save();
     };
-    
+
     const handleShareWhatsApp = async () => {
         const element = previewRef.current;
         if (!element) {
@@ -354,14 +358,14 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
 
         const filename = `LR-${lr.lrNo.replace('/', '_')}.pdf`;
         const message = `Hi ${lr.consignee?.name}, here is the Lorry Receipt (LR No. ${lr.lrNo}) for your shipment.`;
-        
+
         try {
             const opt = {
-                margin:       5, // Reduced margin to prevent clipping
-                filename:     filename,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                margin: 5, // Reduced margin to prevent clipping
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
             const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
@@ -393,7 +397,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
 
 
     if (!isOpen) return null;
-    
+
     return (
         <div className="fixed inset-0 bg-black/70 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto">
             {/* Render a copy of the content specifically for printing, outside the visible modal */}
@@ -405,7 +409,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
                     <h2 className="text-lg sm:text-xl font-bold text-gray-800">LR Preview & Actions</h2>
                     <div className="flex items-center flex-wrap gap-2">
                         <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
-                           <input
+                            <input
                                 type="checkbox"
                                 id="showCompanyDetails"
                                 checked={showCompanyDetails}
@@ -416,8 +420,8 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
                                 Include GST/PAN
                             </label>
                         </div>
-                         <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
-                           <input
+                        <div className="flex items-center space-x-2 mr-4 bg-white p-2 rounded-md border">
+                            <input
                                 type="checkbox"
                                 id="showAmounts"
                                 checked={showAmounts}
@@ -428,10 +432,10 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({ isOpen, onClose, lr, co
                                 Show Amounts
                             </label>
                         </div>
-                        {!isReadOnly && onSave && <button onClick={() => onSave(lr)} className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold"><SaveIcon className="w-5 h-5 mr-1"/>Save LR</button>}
-                        <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold"><DownloadIcon className="w-5 h-5 mr-1"/>Download PDF</button>
-                        <button onClick={handleShareWhatsApp} className="flex items-center bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 font-semibold"><WhatsAppIcon className="w-5 h-5 mr-1"/>WhatsApp</button>
-                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-300"><XIcon className="w-6 h-6"/></button>
+                        {!isReadOnly && onSave && <button onClick={() => onSave(lr)} className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold"><SaveIcon className="w-5 h-5 mr-1" />Save LR</button>}
+                        <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold"><DownloadIcon className="w-5 h-5 mr-1" />Download PDF</button>
+                        <button onClick={handleShareWhatsApp} className="flex items-center bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 font-semibold"><WhatsAppIcon className="w-5 h-5 mr-1" />WhatsApp</button>
+                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-300"><XIcon className="w-6 h-6" /></button>
                     </div>
                 </div>
 

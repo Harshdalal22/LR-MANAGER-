@@ -302,12 +302,14 @@ export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
 
     if (!data) return null;
 
-    // Map snake_case to camelCase for RBAC fields
+    // Map snake_case to camelCase for RBAC fields and Asset URLs
     return {
         ...data,
         rbacEnabled: data.rbac_enabled,
         adminPasskey: data.admin_passkey,
-        managerPasskey: data.manager_passkey
+        managerPasskey: data.manager_passkey,
+        logoUrl: data.logo_url,
+        signatureImageUrl: data.signature_image_url
     };
 };
 
@@ -321,13 +323,17 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         user_id: user.id,
         rbac_enabled: details.rbacEnabled,
         admin_passkey: details.adminPasskey,
-        manager_passkey: details.managerPasskey
+        manager_passkey: details.managerPasskey,
+        logo_url: details.logoUrl,
+        signature_image_url: details.signatureImageUrl
     };
 
     // Remove camelCase fields to prevent "Column not found" errors
     delete payload.rbacEnabled;
     delete payload.adminPasskey;
     delete payload.managerPasskey;
+    delete payload.logoUrl;
+    delete payload.signatureImageUrl;
 
     console.log('💾 Saving company details with payload:', {
         ...payload,
@@ -388,7 +394,9 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         ...result.data,
         rbacEnabled: result.data.rbac_enabled,
         adminPasskey: result.data.admin_passkey,
-        managerPasskey: result.data.manager_passkey
+        managerPasskey: result.data.manager_passkey,
+        logoUrl: result.data.logo_url,
+        signatureImageUrl: result.data.signature_image_url
     };
 };
 

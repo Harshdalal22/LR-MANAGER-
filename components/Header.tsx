@@ -86,11 +86,27 @@ const Header: React.FC<HeaderProps> = ({
         const file = e.target.files?.[0];
         if (file) {
             setIsUploadingLogo(true);
-            const url = await onUploadAsset(file, 'logo');
-            if (url) {
-                setLocalDetails(prev => ({ ...prev, logoUrl: url }));
+            try {
+                const url = await onUploadAsset(file, 'logo');
+                if (url) {
+                    // Update local state
+                    const updatedDetails = { ...localDetails, logoUrl: url };
+                    setLocalDetails(updatedDetails);
+
+                    // Immediately save to database
+                    const success = await onUpdateDetails(updatedDetails);
+                    if (success) {
+                        toast.success("Logo uploaded and saved successfully!");
+                    } else {
+                        toast.error("Logo uploaded but failed to save to database");
+                    }
+                }
+            } catch (error: any) {
+                console.error("Logo upload error:", error);
+                toast.error(error?.message || "Failed to upload logo");
+            } finally {
+                setIsUploadingLogo(false);
             }
-            setIsUploadingLogo(false);
         }
     };
 
@@ -98,11 +114,27 @@ const Header: React.FC<HeaderProps> = ({
         const file = e.target.files?.[0];
         if (file) {
             setIsUploadingSignature(true);
-            const url = await onUploadAsset(file, 'signature');
-            if (url) {
-                setLocalDetails(prev => ({ ...prev, signatureImageUrl: url }));
+            try {
+                const url = await onUploadAsset(file, 'signature');
+                if (url) {
+                    // Update local state
+                    const updatedDetails = { ...localDetails, signatureImageUrl: url };
+                    setLocalDetails(updatedDetails);
+
+                    // Immediately save to database
+                    const success = await onUpdateDetails(updatedDetails);
+                    if (success) {
+                        toast.success("Signature uploaded and saved successfully!");
+                    } else {
+                        toast.error("Signature uploaded but failed to save to database");
+                    }
+                }
+            } catch (error: any) {
+                console.error("Signature upload error:", error);
+                toast.error(error?.message || "Failed to upload signature");
+            } finally {
+                setIsUploadingSignature(false);
             }
-            setIsUploadingSignature(false);
         }
     };
 

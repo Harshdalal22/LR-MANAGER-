@@ -34,6 +34,7 @@ import {
     saveCompanyDetails,
     subscribeToAuthState,
     signOut,
+    signIn,
     getSession,
     updateLorryReceiptStatus,
     uploadPOD,
@@ -88,6 +89,9 @@ const App: React.FC = () => {
     const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager'>('Admin');
     const [showRoleSelection, setShowRoleSelection] = useState(false);
     const [roleSelectionError, setRoleSelectionError] = useState('');
+    const [isVerifyPasswordModalOpen, setIsVerifyPasswordModalOpen] = useState(false);
+    const [passwordForVerification, setPasswordForVerification] = useState('');
+    const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
@@ -408,6 +412,47 @@ const App: React.FC = () => {
         setShowRoleSelection(false);
     };
 
+    const handleForgotPasskeyTrigger = () => {
+        setIsVerifyPasswordModalOpen(true);
+    };
+
+    const handleVerifyPassword = async () => {
+        if (!session?.user?.email) return;
+        setIsVerifyingPassword(true);
+        const toastId = toast.loading('Verifying identity...');
+
+        try {
+            // We use signIn to verify the password. This refreshes the session but proves ownership.
+            const { error } = await signIn(session.user.email, passwordForVerification);
+
+            if (error) {
+                toast.error("Incorrect password. Please try again.", { id: toastId });
+                setIsVerifyingPassword(false);
+                return;
+            }
+
+            // Success! Unlock Admin
+            toast.success("Identity Verified! Admin access granted.", { id: toastId });
+            setCurrentRole('Admin');
+
+            // Close all blocking modals
+            setIsVerifyPasswordModalOpen(false);
+            setShowRoleSelection(false);
+            setPasswordForVerification('');
+
+            // Optional: Show a hint to update settings
+            toast('You can view/reset your passkeys in Settings.', {
+                icon: '🔑',
+                duration: 6000
+            });
+
+        } catch (e) {
+            handleError(e, "Verification failed");
+        } finally {
+            setIsVerifyingPassword(false);
+        }
+    };
+
     const renderContent = () => {
         // RBAC Restriction logic
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
@@ -566,6 +611,7 @@ const App: React.FC = () => {
                 setLanguage={setLanguage}
                 currentRole={currentRole}
                 onRoleChange={handleRoleChange}
+                onForgotPasskey={handleForgotPasskeyTrigger}
             />
             <main className="container mx-auto p-4 md:p-6">
                 {renderContent()}
@@ -599,7 +645,53 @@ const App: React.FC = () => {
                 <RoleSelection
                     onRoleSelect={handleRoleSelection}
                     onCancel={handleCancelRoleSelection}
+                    onForgotPasskey={handleForgotPasskeyTrigger}
                 />
+            )}
+            {isVerifyPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white text-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm font-sans animate-fadeIn">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-2xl">🔒</span>
+                            </div>
+                            <h3 className="text-xl font-bold mb-2 text-gray-800">Verify Identity</h3>
+                            <p className="text-sm text-gray-500">
+                                To reset your Admin Passkey, please enter your main account password.
+                            </p>
+                        </div>
+
+                        <input
+                            type="password"
+                            autoFocus
+                            placeholder="Account Password"
+                            value={passwordForVerification}
+                            onChange={(e) => setPasswordForVerification(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleVerifyPassword()}
+                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-0 mb-6 text-center text-lg"
+                        />
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setIsVerifyPasswordModalOpen(false);
+                                    setPasswordForVerification('');
+                                }}
+                                className="flex-1 px-4 py-2 border rounded-lg font-semibold hover:bg-gray-50 text-gray-600"
+                                disabled={isVerifyingPassword}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleVerifyPassword}
+                                disabled={!passwordForVerification || isVerifyingPassword}
+                                className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold shadow-lg transition-transform ${isVerifyingPassword ? 'opacity-75 cursor-not-allowed' : 'active:scale-95'}`}
+                            >
+                                {isVerifyingPassword ? 'Verifying...' : 'Verify'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

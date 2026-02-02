@@ -4,9 +4,10 @@ import { UserRole } from '../types';
 interface RoleSelectionProps {
     onRoleSelect: (role: UserRole, passkey: string) => void;
     onCancel: () => void;
+    onForgotPasskey?: () => void;
 }
 
-const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel }) => {
+const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel, onForgotPasskey }) => {
     const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
     const [passkey, setPasskey] = useState('');
     const [error, setError] = useState('');
@@ -41,8 +42,8 @@ const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel })
                     <button
                         onClick={() => { setSelectedRole('Admin'); setError(''); }}
                         className={`w-full p-5 rounded-2xl border-2 transition-all text-left ${selectedRole === 'Admin'
-                                ? 'border-red-500 bg-red-50 shadow-lg shadow-red-100'
-                                : 'border-gray-200 bg-white hover:border-red-300 hover:bg-red-50/50'
+                            ? 'border-red-500 bg-red-50 shadow-lg shadow-red-100'
+                            : 'border-gray-200 bg-white hover:border-red-300 hover:bg-red-50/50'
                             }`}
                     >
                         <div className="flex items-center gap-4">
@@ -69,8 +70,8 @@ const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel })
                     <button
                         onClick={() => { setSelectedRole('Manager'); setError(''); }}
                         className={`w-full p-5 rounded-2xl border-2 transition-all text-left ${selectedRole === 'Manager'
-                                ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
-                                : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50'
+                            ? 'border-blue-500 bg-blue-50 shadow-lg shadow-blue-100'
+                            : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50'
                             }`}
                     >
                         <div className="flex items-center gap-4">
@@ -95,12 +96,22 @@ const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel })
                     </button>
                 </div>
 
-                {/* Passkey Input */}
                 {selectedRole && (
                     <div className="mb-6 animate-slideIn">
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                            {selectedRole} Passkey
-                        </label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-bold text-gray-700">
+                                {selectedRole} Passkey
+                            </label>
+                            {selectedRole === 'Admin' && (
+                                <button
+                                    onClick={() => onForgotPasskey && onForgotPasskey()}
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold hover:underline"
+                                    type="button"
+                                >
+                                    Forgot Passkey?
+                                </button>
+                            )}
+                        </div>
                         <input
                             type="password"
                             autoFocus
@@ -132,8 +143,8 @@ const RoleSelection: React.FC<RoleSelectionProps> = ({ onRoleSelect, onCancel })
                         onClick={handleSubmit}
                         disabled={!selectedRole || !passkey}
                         className={`flex-1 py-3 px-4 rounded-xl font-bold text-white shadow-lg transition-all ${selectedRole && passkey
-                                ? 'bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-xl active:scale-95'
-                                : 'bg-gray-300 cursor-not-allowed'
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-500 hover:shadow-xl active:scale-95'
+                            : 'bg-gray-300 cursor-not-allowed'
                             }`}
                     >
                         Continue

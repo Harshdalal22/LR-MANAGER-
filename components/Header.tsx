@@ -16,6 +16,7 @@ interface HeaderProps {
     setLanguage: (lang: Language) => void;
     currentRole: 'Admin' | 'Manager';
     onRoleChange: (role: 'Admin' | 'Manager', passkey?: string) => boolean;
+    onForgotPasskey?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -27,7 +28,8 @@ const Header: React.FC<HeaderProps> = ({
     language,
     setLanguage,
     currentRole,
-    onRoleChange
+    onRoleChange,
+    onForgotPasskey
 }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [localDetails, setLocalDetails] = useState(companyDetails);
@@ -406,7 +408,18 @@ const Header: React.FC<HeaderProps> = ({
                 <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white text-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm font-sans">
                         <h3 className="text-xl font-bold mb-2 text-ssk-blue">Admin Access Required</h3>
-                        <p className="text-sm text-gray-500 mb-6">Please enter the passkey set in settings to unlock Admin features.</p>
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm text-gray-500">Please enter the passkey.</p>
+                            <button
+                                onClick={() => {
+                                    setIsPasskeyModalOpen(false);
+                                    onForgotPasskey && onForgotPasskey();
+                                }}
+                                className="text-xs text-blue-600 hover:text-blue-800 font-semibold hover:underline"
+                            >
+                                Forgot Passkey?
+                            </button>
+                        </div>
                         <input
                             type="password"
                             autoFocus

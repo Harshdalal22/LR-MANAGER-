@@ -80,6 +80,20 @@ USING (auth.uid() = user_id);
 -- === STEP 3: REFRESH SCHEMA CACHE ===
 NOTIFY pgrst, 'reload config';
 
+-- === STEP 4: ADD MISSING ASSET COLUMNS ===
+ALTER TABLE public.company_details ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE public.company_details ADD COLUMN IF NOT EXISTS signature_image_url TEXT;
+
+-- === STEP 5: CREATE STORAGE BUCKETS ===
+INSERT INTO storage.buckets (id, name, public) VALUES ('company_assets', 'company_assets', true) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('pods', 'pods', true) ON CONFLICT (id) DO NOTHING;
+
+-- === STEP 6: STORAGE POLICIES ===
+-- (See DataManagement.tsx for the full granular policies script)
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY; -- Skipped to prevent permissions error
+CREATE POLICY "Public Assets" ON storage.objects FOR SELECT TO public USING (bucket_id = 'company_assets');
+CREATE POLICY "Auth Uploads" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id IN ('company_assets', 'pods'));
+
 ================================================================================
 */
 

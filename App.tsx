@@ -229,6 +229,40 @@ const App: React.FC = () => {
         const toastId = toast.loading('Saving LR...');
         try {
             const savedLR = await saveLorryReceipt(lr);
+
+            // --- Auto-Save Parties & Truck ---
+            const promises = [];
+
+            // 1. Auto-save Consignor
+            if (lr.consignor.name && !savedParties.some(p => p.name.toLowerCase() === lr.consignor.name.toLowerCase() && (p.type === 'Consignor' || p.type === 'Both'))) {
+                const newConsignor: SavedParty = { ...lr.consignor, type: 'Consignor' };
+                promises.push(saveSavedParty(newConsignor).then(p => setSavedParties(prev => [...prev, p])));
+            }
+
+            // 2. Auto-save Consignee
+            if (lr.consignee.name && !savedParties.some(p => p.name.toLowerCase() === lr.consignee.name.toLowerCase() && (p.type === 'Consignee' || p.type === 'Both'))) {
+                // Check if we just added this name as Consignor (edge case: same name for both)
+                const existing = savedParties.find(p => p.name.toLowerCase() === lr.consignee.name.toLowerCase());
+
+                if (!existing) {
+                    const newConsignee: SavedParty = { ...lr.consignee, type: 'Consignee' };
+                    promises.push(saveSavedParty(newConsignee).then(p => setSavedParties(prev => [...prev, p])));
+                } else if (existing.type === 'Consignor') {
+                    // Upgrade to 'Both' if it exists as Consignor
+                    const updatedParty = { ...existing, type: 'Both' as const };
+                    promises.push(saveSavedParty(updatedParty).then(p => setSavedParties(prev => prev.map(x => x.id === p.id ? p : x))));
+                }
+            }
+
+            // 3. Auto-save Truck
+            if (lr.truckNo && !savedTrucks.some(t => t.truckNo.replace(/\s/g, '').toLowerCase() === lr.truckNo.replace(/\s/g, '').toLowerCase())) {
+                const newTruck: SavedTruck = { truckNo: lr.truckNo, ownerName: '', contactNumber: '' };
+                promises.push(saveSavedTruck(newTruck).then(t => setSavedTrucks(prev => [...prev, t])));
+            }
+
+            // Run side effects in background (don't block UI)
+            Promise.all(promises).catch(err => console.error("Auto-save error:", err));
+
             setLorryReceipts(prev => {
                 const index = prev.findIndex(item => item.lrNo === savedLR.lrNo);
                 if (index >= 0) {

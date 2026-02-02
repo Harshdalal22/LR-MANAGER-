@@ -15,7 +15,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState<Tab>('database-setup');
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Data States
     const [hirings, setHirings] = useState<VehicleHiring[]>([]);
     const [bookings, setBookings] = useState<BookingRecord[]>([]);
@@ -100,10 +100,54 @@ USING (auth.uid() = user_id);
 
 -- === STEP 3: REFRESH SCHEMA CACHE ===
 NOTIFY pgrst, 'reload config';
+
+-- === STEP 4: ADD MISSING ASSET COLUMNS ===
+ALTER TABLE public.company_details ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE public.company_details ADD COLUMN IF NOT EXISTS signature_image_url TEXT;
+
+-- === STEP 5: CREATE STORAGE BUCKETS ===
+
+-- Create 'company_assets' bucket if not exists
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('company_assets', 'company_assets', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- Create 'pods' bucket if not exists (for Proof of Delivery)
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('pods', 'pods', true) 
+ON CONFLICT (id) DO NOTHING;
+
+-- === STEP 6: STORAGE POLICIES (Fixes "Permission denied" on upload) ===
+
+-- 1. Policies for 'company_assets'
+DROP POLICY IF EXISTS "Give users access to own folder 1" ON storage.objects;
+CREATE POLICY "Give users access to own folder 1" ON storage.objects
+FOR INSERT TO authenticated WITH CHECK (bucket_id = 'company_assets');
+
+DROP POLICY IF EXISTS "Give users access to own folder 2" ON storage.objects;
+CREATE POLICY "Give users access to own folder 2" ON storage.objects
+FOR UPDATE TO authenticated USING (bucket_id = 'company_assets');
+
+DROP POLICY IF EXISTS "Give public access to company_assets" ON storage.objects;
+CREATE POLICY "Give public access to company_assets" ON storage.objects
+FOR SELECT TO public USING (bucket_id = 'company_assets');
+
+-- 2. Policies for 'pods'
+DROP POLICY IF EXISTS "Give users access to pods insert" ON storage.objects;
+CREATE POLICY "Give users access to pods insert" ON storage.objects
+FOR INSERT TO authenticated WITH CHECK (bucket_id = 'pods');
+
+DROP POLICY IF EXISTS "Give users access to pods select" ON storage.objects;
+CREATE POLICY "Give users access to pods select" ON storage.objects
+FOR SELECT TO authenticated USING (bucket_id = 'pods');
+
+DROP POLICY IF EXISTS "Give users access to pods delete" ON storage.objects;
+CREATE POLICY "Give users access to pods delete" ON storage.objects
+FOR DELETE TO authenticated USING (bucket_id = 'pods');
     `.trim();
 
     useEffect(() => {
-        if(activeTab !== 'database-setup') {
+        if (activeTab !== 'database-setup') {
             fetchData();
         }
     }, [activeTab]);
@@ -140,7 +184,7 @@ NOTIFY pgrst, 'reload config';
         toast.success('SQL Script copied! Run it in your Supabase Dashboard.');
         setTimeout(() => setCopied(false), 3000);
     };
-    
+
     const handleDelete = async (id: string, type: 'hiring' | 'booking' | 'party' | 'truck') => {
         if (!confirm('Are you sure you want to delete this record?')) return;
         try {
@@ -167,8 +211,8 @@ NOTIFY pgrst, 'reload config';
         if (isLoading) return <div className="p-8 text-center text-gray-500">Loading data...</div>;
 
         if (activeTab === 'vehicle-hiring') {
-            const filtered = hirings.filter(h => 
-                h.lorryNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            const filtered = hirings.filter(h =>
+                h.lorryNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 h.grNo.toLowerCase().includes(searchTerm.toLowerCase())
             );
             return (
@@ -197,7 +241,7 @@ NOTIFY pgrst, 'reload config';
                                     <td className="px-3 py-2 border-r text-right">₹{r.freight}</td>
                                     <td className="px-3 py-2 border-r text-right font-bold text-red-600">₹{r.totalBalance}</td>
                                     <td className="px-3 py-2 text-center">
-                                         <button onClick={() => r.id && handleDelete(r.id, 'hiring')} className="p-1 hover:bg-gray-100 rounded text-red-500">
+                                        <button onClick={() => r.id && handleDelete(r.id, 'hiring')} className="p-1 hover:bg-gray-100 rounded text-red-500">
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </td>
@@ -210,8 +254,8 @@ NOTIFY pgrst, 'reload config';
         }
 
         if (activeTab === 'booking-register') {
-            const filtered = bookings.filter(b => 
-                b.partyName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            const filtered = bookings.filter(b =>
+                b.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 b.grNo.toLowerCase().includes(searchTerm.toLowerCase())
             );
             return (
@@ -238,7 +282,7 @@ NOTIFY pgrst, 'reload config';
                                     <td className="px-3 py-2 border-r text-xs">{r.fromPlace} - {r.toPlace}</td>
                                     <td className="px-3 py-2 border-r text-right">₹{r.freight}</td>
                                     <td className="px-3 py-2 text-center">
-                                         <button onClick={() => r.id && handleDelete(r.id, 'booking')} className="p-1 hover:bg-gray-100 rounded text-red-500">
+                                        <button onClick={() => r.id && handleDelete(r.id, 'booking')} className="p-1 hover:bg-gray-100 rounded text-red-500">
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </td>
@@ -249,7 +293,7 @@ NOTIFY pgrst, 'reload config';
                 </div>
             );
         }
-        
+
         if (activeTab === 'customer-details') {
             const filtered = parties.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
             return (
@@ -265,7 +309,7 @@ NOTIFY pgrst, 'reload config';
                             </tr>
                         </thead>
                         <tbody>
-                             {filtered.length === 0 ? (
+                            {filtered.length === 0 ? (
                                 <tr><td colSpan={5} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
                             ) : filtered.map(p => (
                                 <tr key={p.id} className="bg-white border-b hover:bg-gray-50">
@@ -274,7 +318,7 @@ NOTIFY pgrst, 'reload config';
                                     <td className="px-3 py-2 border-r">{p.city}</td>
                                     <td className="px-3 py-2 border-r">{p.gst}</td>
                                     <td className="px-3 py-2 text-center">
-                                         <button onClick={() => p.id && handleDelete(p.id, 'party')} className="p-1 hover:bg-gray-100 rounded text-red-500">
+                                        <button onClick={() => p.id && handleDelete(p.id, 'party')} className="p-1 hover:bg-gray-100 rounded text-red-500">
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </td>
@@ -290,7 +334,7 @@ NOTIFY pgrst, 'reload config';
             const filtered = trucks.filter(t => t.truckNo.toLowerCase().includes(searchTerm.toLowerCase()));
             return (
                 <div className="overflow-x-auto">
-                     <table className="w-full text-xs text-left text-gray-700">
+                    <table className="w-full text-xs text-left text-gray-700">
                         <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
                             <tr>
                                 <th className="px-3 py-3 border-r">Truck No</th>
@@ -299,7 +343,7 @@ NOTIFY pgrst, 'reload config';
                                 <th className="px-3 py-3 text-center">Actions</th>
                             </tr>
                         </thead>
-                         <tbody>
+                        <tbody>
                             {filtered.length === 0 ? (
                                 <tr><td colSpan={4} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
                             ) : filtered.map(t => (
@@ -308,14 +352,14 @@ NOTIFY pgrst, 'reload config';
                                     <td className="px-3 py-2 border-r">{t.ownerName}</td>
                                     <td className="px-3 py-2 border-r">{t.contactNumber}</td>
                                     <td className="px-3 py-2 text-center">
-                                         <button onClick={() => t.id && handleDelete(t.id, 'truck')} className="p-1 hover:bg-gray-100 rounded text-red-500">
+                                        <button onClick={() => t.id && handleDelete(t.id, 'truck')} className="p-1 hover:bg-gray-100 rounded text-red-500">
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
-                     </table>
+                    </table>
                 </div>
             );
         }
@@ -324,7 +368,7 @@ NOTIFY pgrst, 'reload config';
     };
 
     const getRecordCount = () => {
-        switch(activeTab) {
+        switch (activeTab) {
             case 'vehicle-hiring': return hirings.length;
             case 'booking-register': return bookings.length;
             case 'customer-details': return parties.length;
@@ -336,15 +380,15 @@ NOTIFY pgrst, 'reload config';
     return (
         <div className="bg-white/90 backdrop-blur-sm p-4 sm:p-6 rounded-xl shadow-lg min-h-[600px] border border-gray-200">
             <div className="flex flex-col gap-1 mb-6">
-                 <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
-                             <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
+                            <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <h1 className="text-2xl font-bold text-gray-900">Data Management</h1>
                     </div>
-                 </div>
-                 <p className="text-sm text-gray-500 ml-11">View, manage, and fix database schema errors</p>
+                </div>
+                <p className="text-sm text-gray-500 ml-11">View, manage, and fix database schema errors</p>
             </div>
 
             <div className="flex flex-wrap gap-2 border-b border-gray-200 mb-6 bg-gray-50/50 p-1 rounded-t-lg">
@@ -358,11 +402,10 @@ NOTIFY pgrst, 'reload config';
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as Tab)}
-                        className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors border-b-2 ${
-                            activeTab === tab.id
-                                ? 'bg-white border-blue-600 text-blue-700 shadow-sm'
-                                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                        }`}
+                        className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors border-b-2 ${activeTab === tab.id
+                            ? 'bg-white border-blue-600 text-blue-700 shadow-sm'
+                            : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                            }`}
                     >
                         {tab.label}
                     </button>
@@ -390,15 +433,15 @@ NOTIFY pgrst, 'reload config';
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-gray-800">Complete Fix Script</h3>
-                            <button 
+                            <button
                                 onClick={handleCopy}
                                 className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${copied ? 'bg-green-100 text-green-700' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
                             >
-                                {copied ? <CheckCircleIcon className="w-5 h-5"/> : null}
+                                {copied ? <CheckCircleIcon className="w-5 h-5" /> : null}
                                 {copied ? 'Copied!' : 'Copy Fix Script'}
                             </button>
                         </div>
-                        
+
                         <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-[400px] border border-gray-700 shadow-inner group relative">
                             <pre className="text-green-400 font-mono text-xs whitespace-pre-wrap">{sqlScript}</pre>
                         </div>

@@ -17,6 +17,7 @@ interface HeaderProps {
     currentRole: 'Admin' | 'Manager';
     onRoleChange: (role: 'Admin' | 'Manager', passkey?: string) => boolean;
     onForgotPasskey?: () => void;
+    settingsTrigger?: number;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -29,7 +30,8 @@ const Header: React.FC<HeaderProps> = ({
     setLanguage,
     currentRole,
     onRoleChange,
-    onForgotPasskey
+    onForgotPasskey,
+    settingsTrigger
 }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [localDetails, setLocalDetails] = useState(companyDetails);
@@ -41,6 +43,13 @@ const Header: React.FC<HeaderProps> = ({
     const [confirmManagerPasskey, setConfirmManagerPasskey] = useState('');
 
     const [isSaving, setIsSaving] = useState(false);
+
+    // Watch for external trigger to open settings
+    useEffect(() => {
+        if (settingsTrigger && settingsTrigger > 0) {
+            setIsSettingsOpen(true);
+        }
+    }, [settingsTrigger]);
 
     // Sync localDetails with companyDetails when modal opens or companyDetails changes
     useEffect(() => {

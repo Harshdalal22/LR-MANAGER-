@@ -91,41 +91,15 @@ const App: React.FC = () => {
     const [roleSelectionError, setRoleSelectionError] = useState('');
     const [isVerifyPasswordModalOpen, setIsVerifyPasswordModalOpen] = useState(false);
     const [passwordForVerification, setPasswordForVerification] = useState('');
+    const [headerSettingsTrigger, setHeaderSettingsTrigger] = useState(0);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
-        let message = fallbackMessage;
-
-        if (error instanceof Error) {
-            message = error.message;
-        } else if (typeof error === 'object' && error !== null) {
-            const anyError = error as any;
-            const extractedMessage = anyError.message || anyError.error_description || anyError.statusText;
-
-            if (extractedMessage) {
-                message = extractedMessage;
-                if (anyError.details) message += ` (${anyError.details})`;
-                if (anyError.hint) message += ` Hint: ${anyError.hint}`;
-
-                // Add specific hint for 403 RLS errors
-                if (String(anyError.status) === '403' || message.toLowerCase().includes('rls')) {
-                    message = "Permission Denied. Please run the complete 'Fix SQL Script' from the Data Management section to apply security policies.";
-                }
-
-            } else {
-                try {
-                    message = `${fallbackMessage}: ${JSON.stringify(anyError)}`;
-                } catch {
-                    message = `${fallbackMessage}: Unknown error object`;
-                }
-            }
-        } else if (typeof error === 'string') {
-            message = error;
-        }
-
-        toast.error(message, { duration: 8000 });
+        toast.error(`${fallbackMessage}: ${error instanceof Error ? error.message : String(error)}`);
     };
+
+
 
     const navigateTo = (view: View) => {
         setViewHistory(prev => [...prev, currentView]);

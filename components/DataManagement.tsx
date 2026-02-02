@@ -1,9 +1,14 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DashboardIcon, CheckCircleIcon, SearchIcon, PlusIcon, DownloadIcon, UploadIcon, PrintIcon, PencilIcon, TrashIcon, DocumentTextIcon, ArrowLeftIcon } from './icons';
 import { toast } from 'react-hot-toast';
-import { getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks, deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck } from '../services/supabaseService';
+import {
+    getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks,
+    deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck,
+    saveVehicleHiring, saveBookingRecord, saveSavedParty, saveSavedTruck
+} from '../services/supabaseService';
 import { VehicleHiring, BookingRecord, SavedParty, SavedTruck } from '../types';
+import * as XLSX from 'xlsx';
 
 interface DataManagementProps {
     onBack: () => void;
@@ -15,6 +20,8 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
     const [activeTab, setActiveTab] = useState<Tab>('database-setup');
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Data States
     const [hirings, setHirings] = useState<VehicleHiring[]>([]);
@@ -204,6 +211,202 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             toast.success('Deleted successfully');
         } catch (error) {
             toast.error('Failed to delete');
+        }
+    };
+
+    const handleExport = () => {
+        let data: any[] = [];
+        let filename = '';
+
+        switch (activeTab) {
+            case 'vehicle-hiring':
+                data = hirings.map(h => ({
+                    Date: h.date,
+                    'GR Number': h.grNo,
+                    'Lorry Number': h.lorryNo,
+                    'From': h.fromPlace,
+                    'To': h.toPlace,
+                    'Freight': h.freight,
+                    'Other Expenses': h.otherExpenses,
+                    'Advance': h.advance,
+                    'Total Balance': h.totalBalance,
+                    'Owner Name': h.ownerName
+                }));
+                filename = 'Vehicle_Hiring_Data';
+                break;
+            case 'booking-register':
+                data = bookings.map(b => ({
+                    Date: b.date,
+                    'Party Name': b.partyName,
+                    'GR Number': b.grNo,
+                    'From': b.fromPlace,
+                    'To': b.toPlace,
+                    'Weight': b.weight,
+                    'Freight': b.freight,
+                    'Other Expenses': b.otherExpenses
+                }));
+                filename = 'Booking_Register_Data';
+                break;
+            case 'customer-details':
+                data = parties.map(p => ({
+                    'Party Name': p.name,
+                    'Type': p.type,
+                    'Address': p.address,
+                    'City': p.city,
+                    'GSTIN': p.gst,
+                    'Contact': p.contact
+                }));
+                filename = 'Customer_Details';
+                break;
+            case 'vehicle-fleet':
+                data = trucks.map(t => ({
+                    'Truck Number': t.truckNo,
+                    'Owner Name': t.ownerName,
+                    'Contact Number': t.contactNumber
+                }));
+                filename = 'Vehicle_Fleet_Data';
+                break;
+            default:
+                return;
+        }
+
+        if (data.length === 0) {
+            toast.error("No data to export");
+            return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+        XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast.success("Excel exported successfully!");
+    };
+
+    const handleImportClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = ''; // Reset
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        const toastId = toast.loading("Reading file...");
+
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            if (jsonData.length === 0) {
+                toast.error("File is empty", { id: toastId });
+                setIsImporting(false);
+                return;
+            }
+
+            let successCount = 0;
+
+            if (activeTab === 'vehicle-hiring') {
+                for (const row of jsonData) {
+                    const hiring: VehicleHiring = {
+                        date: row['Date'] || new Date().toISOString().split('T')[0],
+                        lorryNo: row['Lorry Number'] || row['Truck Number'] || '',
+                        grNo: row['GR Number'] || '',
+                        billNo: row['Bill Number'] || '',
+                        driverNo: row['Driver Number'] || '',
+                        ownerName: row['Owner Name'] === 'Self' ? 'Self' : 'Third Party',
+                        fromPlace: row['From'] || '',
+                        toPlace: row['To'] || '',
+                        freight: Number(row['Freight']) || 0,
+                        otherExpenses: Number(row['Other Expenses']) || 0,
+                        advance: Number(row['Advance']) || 0,
+                        balance: 0,
+                        totalBalance: Number(row['Total Balance']) || 0,
+                        podStatus: 'Pending',
+                        paymentStatus: 'Pending'
+                    };
+
+                    // Simple calc
+                    hiring.balance = hiring.freight + hiring.otherExpenses - hiring.advance;
+                    if (!hiring.totalBalance) hiring.totalBalance = hiring.balance;
+
+                    if (hiring.lorryNo) {
+                        await saveVehicleHiring(hiring);
+                        successCount++;
+                    }
+                }
+            } else if (activeTab === 'booking-register') {
+                for (const row of jsonData) {
+                    const booking: BookingRecord = {
+                        date: row['Date'] || new Date().toISOString().split('T')[0],
+                        partyName: row['Party Name'] || '',
+                        grNo: row['GR Number'] || '',
+                        billNo: row['Bill Number'] || '',
+                        lorryNo: row['Lorry Number'] || '',
+                        lorryType: 'Open', // Default
+                        weight: Number(row['Weight']) || 0,
+                        fromPlace: row['From'] || '',
+                        toPlace: row['To'] || '',
+                        freight: Number(row['Freight']) || 0,
+                        advance: Number(row['Advance']) || 0,
+                        otherExpenses: Number(row['Other Expenses']) || 0,
+                        balance: 0,
+                        totalBalance: 0,
+                        paymentStatus: 'Pending'
+                    };
+
+                    booking.balance = booking.freight + booking.otherExpenses - booking.advance;
+                    booking.totalBalance = booking.balance;
+
+                    if (booking.partyName) {
+                        await saveBookingRecord(booking);
+                        successCount++;
+                    }
+                }
+            } else if (activeTab === 'customer-details') {
+                for (const row of jsonData) {
+                    const party: SavedParty = {
+                        name: row['Party Name'] || row['Name'] || '',
+                        type: (row['Type'] === 'Consignor' || row['Type'] === 'Consignee') ? row['Type'] : 'Both',
+                        address: row['Address'] || '',
+                        city: row['City'] || '',
+                        gst: row['GSTIN'] || row['GST'] || '',
+                        contact: row['Contact'] || row['Mobile'] || '',
+                        pan: row['PAN'] || ''
+                    };
+                    if (party.name) {
+                        await saveSavedParty(party);
+                        successCount++;
+                    }
+                }
+            } else if (activeTab === 'vehicle-fleet') {
+                for (const row of jsonData) {
+                    const truck: SavedTruck = {
+                        truckNo: row['Truck Number'] || row['Truck No'] || '',
+                        ownerName: row['Owner Name'] || '',
+                        contactNumber: row['Contact Number'] || row['Mobile'] || ''
+                    };
+                    if (truck.truckNo) {
+                        await saveSavedTruck(truck);
+                        successCount++;
+                    }
+                }
+            }
+
+            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
+            await fetchData(); // Refresh data
+
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to import file. Check format.", { id: toastId });
+        } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
 
@@ -449,15 +652,37 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 </div>
             ) : (
                 <>
-                    <div className="relative mb-6">
-                        <input
-                            type="text"
-                            placeholder={`Search ${activeTab.replace(/-/g, ' ')}...`}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full p-3 pl-10 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <div className="relative mb-6 flex gap-2">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder={`Search ${activeTab.replace(/-/g, ' ')}...`}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full p-3 pl-10 bg-white border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            />
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        </div>
+
+                        {/* Import/Export Buttons */}
+                        <div className="flex gap-2">
+                            <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx, .xls" />
+                            <button
+                                onClick={handleImportClick}
+                                disabled={isImporting}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold shadow-sm flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isImporting ? <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div> : <UploadIcon className="w-4 h-4" />}
+                                Import Excel
+                            </button>
+                            <button
+                                onClick={handleExport}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold shadow-sm flex items-center gap-2"
+                            >
+                                <DownloadIcon className="w-4 h-4" />
+                                Export Excel
+                            </button>
+                        </div>
                     </div>
 
                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm">

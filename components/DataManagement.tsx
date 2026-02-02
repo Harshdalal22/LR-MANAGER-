@@ -223,14 +223,18 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 data = hirings.map(h => ({
                     Date: h.date,
                     'GR Number': h.grNo,
+                    'Bill Number': h.billNo,
                     'Lorry Number': h.lorryNo,
+                    'Driver Number': h.driverNo || '',
+                    'Owner Name': h.ownerName,
                     'From': h.fromPlace,
                     'To': h.toPlace,
                     'Freight': h.freight,
                     'Other Expenses': h.otherExpenses,
                     'Advance': h.advance,
                     'Total Balance': h.totalBalance,
-                    'Owner Name': h.ownerName
+                    'POD Status': h.podStatus,
+                    'Payment Status': h.paymentStatus
                 }));
                 filename = 'Vehicle_Hiring_Data';
                 break;
@@ -239,11 +243,17 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     Date: b.date,
                     'Party Name': b.partyName,
                     'GR Number': b.grNo,
+                    'Bill Number': b.billNo,
+                    'Lorry Number': b.lorryNo,
+                    'Lorry Type': b.lorryType,
                     'From': b.fromPlace,
                     'To': b.toPlace,
                     'Weight': b.weight,
                     'Freight': b.freight,
-                    'Other Expenses': b.otherExpenses
+                    'Other Expenses': b.otherExpenses,
+                    'Advance': b.advance,
+                    'Total Balance': b.totalBalance,
+                    'Payment Status': b.paymentStatus
                 }));
                 filename = 'Booking_Register_Data';
                 break;
@@ -254,7 +264,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     'Address': p.address,
                     'City': p.city,
                     'GSTIN': p.gst,
-                    'Contact': p.contact
+                    'Contact': p.contact,
+                    'PAN': p.pan || ''
                 }));
                 filename = 'Customer_Details';
                 break;
@@ -327,8 +338,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         advance: Number(row['Advance']) || 0,
                         balance: 0,
                         totalBalance: Number(row['Total Balance']) || 0,
-                        podStatus: 'Pending',
-                        paymentStatus: 'Pending'
+                        podStatus: (row['POD Status'] === 'Completed' ? 'Completed' : 'Pending'),
+                        paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
                     };
 
                     // Simple calc
@@ -348,7 +359,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         grNo: row['GR Number'] || '',
                         billNo: row['Bill Number'] || '',
                         lorryNo: row['Lorry Number'] || '',
-                        lorryType: 'Open', // Default
+                        lorryType: (row['Lorry Type'] === 'Closed' ? 'Closed' : 'Open'), // Default
                         weight: Number(row['Weight']) || 0,
                         fromPlace: row['From'] || '',
                         toPlace: row['To'] || '',
@@ -356,12 +367,12 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         advance: Number(row['Advance']) || 0,
                         otherExpenses: Number(row['Other Expenses']) || 0,
                         balance: 0,
-                        totalBalance: 0,
-                        paymentStatus: 'Pending'
+                        totalBalance: Number(row['Total Balance']) || 0,
+                        paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
                     };
 
                     booking.balance = booking.freight + booking.otherExpenses - booking.advance;
-                    booking.totalBalance = booking.balance;
+                    if (!booking.totalBalance) booking.totalBalance = booking.balance;
 
                     if (booking.partyName) {
                         await saveBookingRecord(booking);

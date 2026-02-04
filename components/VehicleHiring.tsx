@@ -275,27 +275,45 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
 
             let successCount = 0;
 
+            // Helper to find value by flexible key matching
+            const getValue = (row: any, keys: string[]) => {
+                const rowKeys = Object.keys(row);
+                for (const key of keys) {
+                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                    if (foundKey) return row[foundKey];
+                }
+                return undefined;
+            };
+
             for (const row of jsonData) {
                 const hiring: VehicleHiringType = {
-                    date: row['Date'] || new Date().toISOString().split('T')[0],
-                    lorryNo: row['Lorry Number'] || row['Truck Number'] || '',
-                    grNo: row['GR Number'] || '',
-                    billNo: row['Bill Number'] || '',
-                    driverNo: row['Driver Number'] || '',
-                    ownerName: row['Owner Name'] === 'Self' ? 'Self' : 'Third Party',
-                    fromPlace: row['From'] || '',
-                    toPlace: row['To'] || '',
-                    freight: Number(row['Freight']) || 0,
-                    otherExpenses: Number(row['Other Expenses']) || 0,
-                    advance: Number(row['Advance']) || 0,
+                    date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
+                    lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']) || '',
+                    grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
+                    billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || '',
+                    driverNo: getValue(row, ['Driver Number', 'Driver No', 'Driver Phone', 'Driver Mobile']) || '',
+                    ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
+                    fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
+                    toPlace: getValue(row, ['To', 'Destination']) || '',
+                    freight: Number(getValue(row, ['Freight', 'Freight Amount', 'Total Freight'])) || 0,
+                    otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges', 'Misc Charges'])) || 0,
+                    advance: Number(getValue(row, ['Advance', 'Total Advance', 'Advance Amount'])) || 0,
                     balance: 0,
-                    totalBalance: Number(row['Total Balance']) || 0,
-                    podStatus: (row['POD Status'] === 'Completed' ? 'Completed' : 'Pending'),
-                    paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                    totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
+                    podStatus: (getValue(row, ['POD Status', 'POD']) === 'Completed' ? 'Completed' : 'Pending'),
+                    paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
                 };
 
-                hiring.balance = hiring.freight + hiring.otherExpenses - hiring.advance;
-                if (!hiring.totalBalance) hiring.totalBalance = hiring.balance;
+                // Auto-calculate balance if not explicitly provided or if we want to ensure consistency
+                const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
+
+                // If totalBalance wasn't in the file, or if we prefer calculation:
+                if (!hiring.totalBalance || hiring.totalBalance === 0) {
+                    hiring.totalBalance = calculatedBalance;
+                    hiring.balance = hiring.totalBalance - hiring.otherExpenses; // Back-calculate pure freight balance
+                } else {
+                    hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                }
 
                 if (hiring.lorryNo) {
                     await saveVehicleHiring(hiring);

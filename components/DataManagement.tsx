@@ -354,29 +354,44 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
 
             let successCount = 0;
 
+            // Helper to find value by flexible key matching
+            const getValue = (row: any, keys: string[]) => {
+                const rowKeys = Object.keys(row);
+                for (const key of keys) {
+                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                    if (foundKey) return row[foundKey];
+                }
+                return undefined;
+            };
+
             if (activeTab === 'vehicle-hiring') {
                 for (const row of jsonData) {
                     const hiring: VehicleHiring = {
-                        date: row['Date'] || new Date().toISOString().split('T')[0],
-                        lorryNo: row['Lorry Number'] || row['Truck Number'] || '',
-                        grNo: row['GR Number'] || '',
-                        billNo: row['Bill Number'] || '',
-                        driverNo: row['Driver Number'] || '',
-                        ownerName: row['Owner Name'] === 'Self' ? 'Self' : 'Third Party',
-                        fromPlace: row['From'] || '',
-                        toPlace: row['To'] || '',
-                        freight: Number(row['Freight']) || 0,
-                        otherExpenses: Number(row['Other Expenses']) || 0,
-                        advance: Number(row['Advance']) || 0,
+                        date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
+                        lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']) || '',
+                        grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
+                        billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || '',
+                        driverNo: getValue(row, ['Driver Number', 'Driver No', 'Driver Phone']) || '',
+                        ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
+                        fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
+                        toPlace: getValue(row, ['To', 'Destination']) || '',
+                        freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
+                        advance: Number(getValue(row, ['Advance', 'Avg Advance'])) || 0,
                         balance: 0,
-                        totalBalance: Number(row['Total Balance']) || 0,
-                        podStatus: (row['POD Status'] === 'Completed' ? 'Completed' : 'Pending'),
-                        paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
+                        podStatus: (getValue(row, ['POD Status', 'POD']) === 'Completed' ? 'Completed' : 'Pending'),
+                        paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
                     };
 
                     // Simple calc
-                    hiring.balance = hiring.freight + hiring.otherExpenses - hiring.advance;
-                    if (!hiring.totalBalance) hiring.totalBalance = hiring.balance;
+                    const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
+                    if (!hiring.totalBalance || hiring.totalBalance === 0) {
+                        hiring.totalBalance = calculatedBalance;
+                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                    } else {
+                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                    }
 
                     if (hiring.lorryNo) {
                         await saveVehicleHiring(hiring);
@@ -386,25 +401,30 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             } else if (activeTab === 'booking-register') {
                 for (const row of jsonData) {
                     const booking: BookingRecord = {
-                        date: row['Date'] || new Date().toISOString().split('T')[0],
-                        partyName: row['Party Name'] || '',
-                        grNo: row['GR Number'] || '',
-                        billNo: row['Bill Number'] || '',
-                        lorryNo: row['Lorry Number'] || '',
-                        lorryType: (row['Lorry Type'] === 'Closed' ? 'Closed' : 'Open'), // Default
-                        weight: Number(row['Weight']) || 0,
-                        fromPlace: row['From'] || '',
-                        toPlace: row['To'] || '',
-                        freight: Number(row['Freight']) || 0,
-                        advance: Number(row['Advance']) || 0,
-                        otherExpenses: Number(row['Other Expenses']) || 0,
+                        date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
+                        partyName: getValue(row, ['Party Name', 'Party', 'Customer']) || '',
+                        grNo: getValue(row, ['GR Number', 'GR No', 'LR Number']) || '',
+                        billNo: getValue(row, ['Bill Number', 'Bill No']) || '',
+                        lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck No']) || '',
+                        lorryType: (getValue(row, ['Lorry Type', 'Type']) === 'Closed' ? 'Closed' : 'Open'),
+                        weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
+                        fromPlace: getValue(row, ['From', 'Source']) || '',
+                        toPlace: getValue(row, ['To', 'Destination']) || '',
+                        freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                        advance: Number(getValue(row, ['Advance', 'Advance Amount'])) || 0,
+                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
                         balance: 0,
-                        totalBalance: Number(row['Total Balance']) || 0,
-                        paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
+                        paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
                     };
 
-                    booking.balance = booking.freight + booking.otherExpenses - booking.advance;
-                    if (!booking.totalBalance) booking.totalBalance = booking.balance;
+                    const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
+                    if (!booking.totalBalance || booking.totalBalance === 0) {
+                        booking.totalBalance = calculatedBalance;
+                        booking.balance = booking.totalBalance - booking.otherExpenses;
+                    } else {
+                        booking.balance = booking.totalBalance - booking.otherExpenses;
+                    }
 
                     if (booking.partyName) {
                         await saveBookingRecord(booking);
@@ -414,13 +434,13 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             } else if (activeTab === 'customer-details') {
                 for (const row of jsonData) {
                     const party: SavedParty = {
-                        name: row['Party Name'] || row['Name'] || '',
-                        type: (row['Type'] === 'Consignor' || row['Type'] === 'Consignee') ? row['Type'] : 'Both',
-                        address: row['Address'] || '',
-                        city: row['City'] || '',
-                        gst: row['GSTIN'] || row['GST'] || '',
-                        contact: row['Contact'] || row['Mobile'] || '',
-                        pan: row['PAN'] || ''
+                        name: getValue(row, ['Party Name', 'Name', 'Customer Name']) || '',
+                        type: (getValue(row, ['Type']) === 'Consignor' || getValue(row, ['Type']) === 'Consignee') ? getValue(row, ['Type']) : 'Both',
+                        address: getValue(row, ['Address', 'Location']) || '',
+                        city: getValue(row, ['City', 'Place']) || '',
+                        gst: getValue(row, ['GSTIN', 'GST', 'GST No']) || '',
+                        contact: getValue(row, ['Contact', 'Mobile', 'Phone', 'Cell']) || '',
+                        pan: getValue(row, ['PAN', 'PAN No']) || ''
                     };
                     if (party.name) {
                         await saveSavedParty(party);
@@ -430,9 +450,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             } else if (activeTab === 'vehicle-fleet') {
                 for (const row of jsonData) {
                     const truck: SavedTruck = {
-                        truckNo: row['Truck Number'] || row['Truck No'] || '',
-                        ownerName: row['Owner Name'] || '',
-                        contactNumber: row['Contact Number'] || row['Mobile'] || ''
+                        truckNo: getValue(row, ['Truck Number', 'Truck No', 'Vehicle No', 'Lorry Number']) || '',
+                        ownerName: getValue(row, ['Owner Name', 'Owner']) || '',
+                        contactNumber: getValue(row, ['Contact Number', 'Mobile', 'Phone']) || ''
                     };
                     if (truck.truckNo) {
                         await saveSavedTruck(truck);

@@ -285,27 +285,44 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
 
             let successCount = 0;
 
+            // Helper to find value by flexible key matching
+            const getValue = (row: any, keys: string[]) => {
+                const rowKeys = Object.keys(row);
+                for (const key of keys) {
+                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                    if (foundKey) return row[foundKey];
+                }
+                return undefined;
+            };
+
             for (const row of jsonData) {
                 const booking: BookingRecord = {
-                    date: row['Date'] || new Date().toISOString().split('T')[0],
-                    partyName: row['Party Name'] || '',
-                    grNo: row['GR Number'] || '',
-                    billNo: row['Bill Number'] || '',
-                    lorryNo: row['Lorry Number'] || '',
-                    lorryType: (row['Lorry Type'] === 'Closed' ? 'Closed' : 'Open'),
-                    weight: Number(row['Weight']) || 0,
-                    fromPlace: row['From'] || '',
-                    toPlace: row['To'] || '',
-                    freight: Number(row['Freight']) || 0,
-                    advance: Number(row['Advance']) || 0,
-                    otherExpenses: Number(row['Other Expenses']) || 0,
+                    date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
+                    partyName: getValue(row, ['Party Name', 'Party', 'Customer Name', 'Customer']) || '',
+                    grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
+                    billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No', 'Bill']) || '',
+                    lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck No', 'Vehicle No']) || '',
+                    lorryType: (getValue(row, ['Lorry Type', 'Type']) === 'Closed' ? 'Closed' : 'Open'),
+                    weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
+                    fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
+                    toPlace: getValue(row, ['To', 'Destination']) || '',
+                    freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                    advance: Number(getValue(row, ['Advance', 'Advance Amount', 'Less Advance'])) || 0,
+                    otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
                     balance: 0,
-                    totalBalance: Number(row['Total Balance']) || 0,
-                    paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                    totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
+                    paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
                 };
 
-                booking.balance = booking.freight + booking.otherExpenses - booking.advance;
-                if (!booking.totalBalance) booking.totalBalance = booking.balance;
+                // Auto-calculate logic
+                const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
+
+                if (!booking.totalBalance || booking.totalBalance === 0) {
+                    booking.totalBalance = calculatedBalance;
+                    booking.balance = booking.totalBalance - booking.otherExpenses;
+                } else {
+                    booking.balance = booking.totalBalance - booking.otherExpenses;
+                }
 
                 if (booking.partyName) {
                     await saveBookingRecord(booking);

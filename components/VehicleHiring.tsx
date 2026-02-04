@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
-import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, TruckIcon, ArrowLeftIcon } from './icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, TruckIcon, ArrowLeftIcon, DownloadIcon, UploadIcon } from './icons';
 import { VehicleHiring as VehicleHiringType, PaymentRecord } from '../types';
 import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 interface VehicleHiringProps {
     onBack: () => void;
@@ -34,6 +35,8 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
     const [formData, setFormData] = useState<VehicleHiringType>(initialRecord);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Temp state for new payment entry
     const [newPayment, setNewPayment] = useState<PaymentRecord>({
@@ -57,22 +60,22 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         // To be safe, if list is empty but advance has value (legacy), use advance. 
         // But for this feature, we want list to drive it.
         // Let's assume if list has items, use list sum.
-        
+
         const finalAdvance = advancesList.length > 0 ? totalAdvance : (Number(formData.advance) || 0);
-        
+
         const balance = (Number(formData.freight) || 0) - finalAdvance;
         const total = balance + (Number(formData.otherExpenses) || 0);
 
         // Update state only if values changed to avoid infinite loop
         if (formData.advance !== finalAdvance || formData.balance !== balance || formData.totalBalance !== total) {
-             setFormData(prev => ({
+            setFormData(prev => ({
                 ...prev,
                 advance: finalAdvance,
                 balance: balance,
                 totalBalance: total
             }));
         }
-       
+
     }, [formData.freight, formData.advances, formData.otherExpenses, formData.advance]);
 
     const getErrorMessage = (error: any): string => {
@@ -95,7 +98,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         setIsLoading(true);
         try {
             const data = await getVehicleHirings();
-            
+
             // Sanitize data to ensure advances array exists
             const sanitizedData = data.map(record => ({
                 ...record,
@@ -110,12 +113,12 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             const msg = getErrorMessage(error);
             const lowerMsg = msg.toLowerCase();
             if (lowerMsg.includes('relation "vehicle_hirings" does not exist') || lowerMsg.includes('in the schema cache')) {
-                 toast.error(
-                    "Database setup for Vehicle Hiring is missing. Please run the setup script from the Data Management dashboard.", 
+                toast.error(
+                    "Database setup for Vehicle Hiring is missing. Please run the setup script from the Data Management dashboard.",
                     { duration: 10000, id: 'vh-table-missing' }
                 );
             } else {
-                 toast.error(`Failed to load hiring data: ${msg}`);
+                toast.error(`Failed to load hiring data: ${msg}`);
             }
         } finally {
             setIsLoading(false);
@@ -152,11 +155,11 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             };
 
             const saved = await saveVehicleHiring(payload);
-            
+
             // Update local state with saved record
             const savedWithAdvances = {
                 ...saved,
-                 advances: Array.isArray(saved.advances) ? saved.advances : []
+                advances: Array.isArray(saved.advances) ? saved.advances : []
             };
 
             if (formData.id) {
@@ -194,7 +197,125 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         }));
     };
 
-    const filteredRecords = records.filter(r => 
+    const handleExport = () => {
+        if (records.length === 0) {
+            toast.error("No data to export");
+            return;
+        }
+
+        const data = records.map(h => ({
+            Date: h.date,
+            'GR Number': h.grNo,
+            'Bill Number': h.billNo,
+            'Lorry Number': h.lorryNo,
+            'Driver Number': h.driverNo || '',
+            'Owner Name': h.ownerName,
+            'From': h.fromPlace,
+            'To': h.toPlace,
+            'Freight': h.freight,
+            'Other Expenses': h.otherExpenses,
+            'Advance': h.advance,
+            'Total Balance': h.totalBalance,
+            'POD Status': h.podStatus,
+            'Payment Status': h.paymentStatus
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        // Auto-size columns
+        const colWidths: any[] = [];
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            let maxWidth = 10;
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                const cell = ws[cellAddress];
+                if (cell && cell.v) {
+                    const cellLength = cell.v.toString().length;
+                    maxWidth = Math.max(maxWidth, cellLength);
+                }
+            }
+            colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+        }
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Vehicle Hiring");
+        XLSX.writeFile(wb, `Vehicle_Hiring_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast.success("Excel exported successfully!");
+    };
+
+    const handleImportClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        const toastId = toast.loading("Reading file...");
+
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            if (jsonData.length === 0) {
+                toast.error("File is empty", { id: toastId });
+                setIsImporting(false);
+                return;
+            }
+
+            let successCount = 0;
+
+            for (const row of jsonData) {
+                const hiring: VehicleHiringType = {
+                    date: row['Date'] || new Date().toISOString().split('T')[0],
+                    lorryNo: row['Lorry Number'] || row['Truck Number'] || '',
+                    grNo: row['GR Number'] || '',
+                    billNo: row['Bill Number'] || '',
+                    driverNo: row['Driver Number'] || '',
+                    ownerName: row['Owner Name'] === 'Self' ? 'Self' : 'Third Party',
+                    fromPlace: row['From'] || '',
+                    toPlace: row['To'] || '',
+                    freight: Number(row['Freight']) || 0,
+                    otherExpenses: Number(row['Other Expenses']) || 0,
+                    advance: Number(row['Advance']) || 0,
+                    balance: 0,
+                    totalBalance: Number(row['Total Balance']) || 0,
+                    podStatus: (row['POD Status'] === 'Completed' ? 'Completed' : 'Pending'),
+                    paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                };
+
+                hiring.balance = hiring.freight + hiring.otherExpenses - hiring.advance;
+                if (!hiring.totalBalance) hiring.totalBalance = hiring.balance;
+
+                if (hiring.lorryNo) {
+                    await saveVehicleHiring(hiring);
+                    successCount++;
+                }
+            }
+
+            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
+            await loadData();
+
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to import file. Check format.", { id: toastId });
+        } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const filteredRecords = records.filter(r =>
         r.lorryNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.grNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r.driverNo || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -215,12 +336,30 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                     <h2 className="text-2xl font-bold text-ssk-blue">Vehicle Hiring Details</h2>
                 </div>
                 {view === 'list' && (
-                    <button 
-                        onClick={() => { setFormData(initialRecord); setView('form'); }}
-                        className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-md"
-                    >
-                        <PlusIcon className="w-5 h-5" /> Add Hiring
-                    </button>
+                    <div className="flex gap-2">
+                        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx, .xls" />
+                        <button
+                            onClick={handleImportClick}
+                            disabled={isImporting}
+                            className="bg-white border-2 border-blue-600 text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                        >
+                            {isImporting ? <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div> : <UploadIcon className="w-5 h-5" />}
+                            Import
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2 shadow-md"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            Export CSV
+                        </button>
+                        <button
+                            onClick={() => { setFormData(initialRecord); setView('form'); }}
+                            className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-md"
+                        >
+                            <PlusIcon className="w-5 h-5" /> Add Row
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -321,42 +460,42 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Date*</label>
-                                    <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Booking ID</label>
-                                    <input type="text" placeholder="Auto / Optional" value={formData.bookingId || ''} onChange={e => setFormData({...formData, bookingId: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" placeholder="Auto / Optional" value={formData.bookingId || ''} onChange={e => setFormData({ ...formData, bookingId: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">GR Number*</label>
-                                    <input type="text" required value={formData.grNo} onChange={e => setFormData({...formData, grNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" required value={formData.grNo} onChange={e => setFormData({ ...formData, grNo: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Bill Number</label>
-                                    <input type="text" value={formData.billNo || ''} onChange={e => setFormData({...formData, billNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.billNo || ''} onChange={e => setFormData({ ...formData, billNo: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Lorry Number*</label>
-                                    <input type="text" required value={formData.lorryNo} onChange={e => setFormData({...formData, lorryNo: e.target.value.toUpperCase()})} className="w-full p-2 border rounded uppercase" />
+                                    <input type="text" required value={formData.lorryNo} onChange={e => setFormData({ ...formData, lorryNo: e.target.value.toUpperCase() })} className="w-full p-2 border rounded uppercase" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Driver Number</label>
-                                    <input type="text" value={formData.driverNo || ''} onChange={e => setFormData({...formData, driverNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.driverNo || ''} onChange={e => setFormData({ ...formData, driverNo: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Owner Name</label>
-                                    <select value={formData.ownerName} onChange={e => setFormData({...formData, ownerName: e.target.value as any})} className="w-full p-2 border rounded">
+                                    <select value={formData.ownerName} onChange={e => setFormData({ ...formData, ownerName: e.target.value as any })} className="w-full p-2 border rounded">
                                         <option value="Self">Self</option>
                                         <option value="Third Party">Third Party</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">From</label>
-                                    <input type="text" value={formData.fromPlace} onChange={e => setFormData({...formData, fromPlace: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.fromPlace} onChange={e => setFormData({ ...formData, fromPlace: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">To</label>
-                                    <input type="text" value={formData.toPlace} onChange={e => setFormData({...formData, toPlace: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.toPlace} onChange={e => setFormData({ ...formData, toPlace: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                             </div>
                         </div>
@@ -366,7 +505,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Freight Amount</label>
-                                    <input type="number" value={formData.freight} onChange={e => setFormData({...formData, freight: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                    <input type="number" value={formData.freight} onChange={e => setFormData({ ...formData, freight: parseFloat(e.target.value) || 0 })} className="w-full p-2 border rounded" />
                                 </div>
                                 {/* Legacy Advance Input - Hidden if using the new array method effectively, or can be kept as readonly sum */}
                                 <div>
@@ -375,7 +514,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Other Expenses</label>
-                                    <input type="number" value={formData.otherExpenses} onChange={e => setFormData({...formData, otherExpenses: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                    <input type="number" value={formData.otherExpenses} onChange={e => setFormData({ ...formData, otherExpenses: parseFloat(e.target.value) || 0 })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Total Balance</label>
@@ -383,14 +522,14 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">POD Status</label>
-                                    <select value={formData.podStatus} onChange={e => setFormData({...formData, podStatus: e.target.value as any})} className="w-full p-2 border rounded">
+                                    <select value={formData.podStatus} onChange={e => setFormData({ ...formData, podStatus: e.target.value as any })} className="w-full p-2 border rounded">
                                         <option value="Pending">Pending</option>
                                         <option value="Completed">Completed</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Payment Status</label>
-                                    <select value={formData.paymentStatus} onChange={e => setFormData({...formData, paymentStatus: e.target.value as any})} className="w-full p-2 border rounded">
+                                    <select value={formData.paymentStatus} onChange={e => setFormData({ ...formData, paymentStatus: e.target.value as any })} className="w-full p-2 border rounded">
                                         <option value="Pending">Pending</option>
                                         <option value="Completed">Completed</option>
                                     </select>
@@ -404,7 +543,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                 <h3 className="text-lg font-bold text-gray-800">Advance Payments</h3>
                                 <div className="text-sm font-bold text-gray-600">Total: ₹{formData.advance}</div>
                             </div>
-                            
+
                             {/* List of Payments */}
                             {Array.isArray(formData.advances) && formData.advances.length > 0 && (
                                 <div className="mb-4 space-y-2">
@@ -414,7 +553,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                                             <div className="text-gray-500 w-32">{payment.date ? new Date(payment.date).toLocaleDateString('en-GB') : '-'}</div>
                                             <div className="flex-grow text-gray-600 truncate">{payment.notes || '-'}</div>
                                             <button type="button" onClick={() => handleRemovePayment(index)} className="text-red-500 hover:text-red-700">
-                                                <TrashIcon className="w-4 h-4"/>
+                                                <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </div>
                                     ))}
@@ -425,39 +564,39 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                             <div className="flex flex-col md:flex-row gap-3 items-end bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300">
                                 <div className="w-full md:w-32">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Amount (₹)</label>
-                                    <input 
-                                        type="number" 
-                                        placeholder="Amount" 
-                                        value={newPayment.amount || ''} 
-                                        onChange={e => setNewPayment({...newPayment, amount: parseFloat(e.target.value)})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="number"
+                                        placeholder="Amount"
+                                        value={newPayment.amount || ''}
+                                        onChange={e => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
                                 <div className="w-full md:w-40">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Date</label>
-                                    <input 
-                                        type="date" 
-                                        value={newPayment.date} 
-                                        onChange={e => setNewPayment({...newPayment, date: e.target.value})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="date"
+                                        value={newPayment.date}
+                                        onChange={e => setNewPayment({ ...newPayment, date: e.target.value })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
                                 <div className="flex-grow w-full">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Notes</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Optional notes (e.g. UPI/Cash)" 
-                                        value={newPayment.notes || ''} 
-                                        onChange={e => setNewPayment({...newPayment, notes: e.target.value})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="text"
+                                        placeholder="Optional notes (e.g. UPI/Cash)"
+                                        value={newPayment.notes || ''}
+                                        onChange={e => setNewPayment({ ...newPayment, notes: e.target.value })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
-                                <button 
-                                    type="button" 
-                                    onClick={handleAddPayment} 
+                                <button
+                                    type="button"
+                                    onClick={handleAddPayment}
                                     className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 font-semibold text-sm flex items-center shadow-sm"
                                 >
-                                    <PlusIcon className="w-4 h-4 mr-1"/> Add Payment
+                                    <PlusIcon className="w-4 h-4 mr-1" /> Add Payment
                                 </button>
                             </div>
                         </div>

@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
-import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, ListIcon, ArrowLeftIcon } from './icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { DashboardIcon, SearchIcon, PlusIcon, SaveIcon, PencilIcon, TrashIcon, ListIcon, ArrowLeftIcon, DownloadIcon, UploadIcon } from './icons';
 import { BookingRecord, PaymentRecord, SavedTruck } from '../types';
 import { getBookingRecords, saveBookingRecord, deleteBookingRecord, getSavedTrucks } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 interface BookingRegisterProps {
     onBack: () => void;
@@ -35,6 +36,8 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
     const [formData, setFormData] = useState<BookingRecord>(initialRecord);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Temp state for new payment entry
     const [newPayment, setNewPayment] = useState<PaymentRecord>({
@@ -52,10 +55,10 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         // Calculate total advance from the array. Ensure advances is an array.
         const advancesList = Array.isArray(formData.advances) ? formData.advances : [];
         const totalAdvance = advancesList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        
+
         // Calculate balance (Freight - Total Advance)
         const balance = (Number(formData.freight) || 0) - totalAdvance;
-        
+
         // Calculate Total Balance (Balance + Other Expenses)
         const total = balance + (Number(formData.otherExpenses) || 0);
 
@@ -76,7 +79,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             if (error.message && typeof error.message === 'string') return error.message;
             if (error.error_description && typeof error.error_description === 'string') return error.error_description;
             if (error.details && typeof error.details === 'string') return error.details;
-            
+
             // Fallback to JSON stringify for other objects
             try {
                 return JSON.stringify(error);
@@ -94,7 +97,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 getBookingRecords(),
                 getSavedTrucks()
             ]);
-            
+
             let loadedRecords: BookingRecord[] = [];
             let loadedTrucks: SavedTruck[] = [];
 
@@ -106,7 +109,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 const lowerErrorMsg = errorMsg.toLowerCase();
                 if (lowerErrorMsg.includes('relation "booking_registers" does not exist') || lowerErrorMsg.includes("in the schema cache")) {
                     toast.error(
-                        "Database setup for Booking Register is missing. Please run the setup script from the Data Management dashboard.", 
+                        "Database setup for Booking Register is missing. Please run the setup script from the Data Management dashboard.",
                         { duration: 10000, id: 'br-table-missing' }
                     );
                 } else {
@@ -117,16 +120,16 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             if (trucksResult.status === 'fulfilled') {
                 loadedTrucks = trucksResult.value;
             } else {
-                 console.error("Failed to load trucks:", trucksResult.reason);
+                console.error("Failed to load trucks:", trucksResult.reason);
             }
-            
+
             const sanitizedData = loadedRecords.map(record => ({
                 ...record,
-                advances: Array.isArray(record.advances) 
-                    ? record.advances 
+                advances: Array.isArray(record.advances)
+                    ? record.advances
                     : (record.advance ? [{ amount: record.advance, date: record.date || new Date().toISOString().split('T')[0], notes: 'Legacy Advance' }] : [])
             }));
-            
+
             setRecords(sanitizedData);
             setSavedTrucks(loadedTrucks);
         } catch (error) {
@@ -204,7 +207,125 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         }));
     };
 
-    const filteredRecords = records.filter(r => 
+    const handleExport = () => {
+        if (records.length === 0) {
+            toast.error("No data to export");
+            return;
+        }
+
+        const data = records.map(b => ({
+            Date: b.date,
+            'Party Name': b.partyName,
+            'GR Number': b.grNo,
+            'Bill Number': b.billNo,
+            'Lorry Number': b.lorryNo,
+            'Lorry Type': b.lorryType,
+            'From': b.fromPlace,
+            'To': b.toPlace,
+            'Weight': b.weight,
+            'Freight': b.freight,
+            'Other Expenses': b.otherExpenses,
+            'Advance': b.advance,
+            'Total Balance': b.totalBalance,
+            'Payment Status': b.paymentStatus
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(data);
+
+        // Auto-size columns
+        const colWidths: any[] = [];
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            let maxWidth = 10;
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                const cell = ws[cellAddress];
+                if (cell && cell.v) {
+                    const cellLength = cell.v.toString().length;
+                    maxWidth = Math.max(maxWidth, cellLength);
+                }
+            }
+            colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+        }
+        ws['!cols'] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Booking Register");
+        XLSX.writeFile(wb, `Booking_Register_${new Date().toISOString().split('T')[0]}.xlsx`);
+        toast.success("Excel exported successfully!");
+    };
+
+    const handleImportClick = () => {
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+            fileInputRef.current.click();
+        }
+    };
+
+    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        const toastId = toast.loading("Reading file...");
+
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            if (jsonData.length === 0) {
+                toast.error("File is empty", { id: toastId });
+                setIsImporting(false);
+                return;
+            }
+
+            let successCount = 0;
+
+            for (const row of jsonData) {
+                const booking: BookingRecord = {
+                    date: row['Date'] || new Date().toISOString().split('T')[0],
+                    partyName: row['Party Name'] || '',
+                    grNo: row['GR Number'] || '',
+                    billNo: row['Bill Number'] || '',
+                    lorryNo: row['Lorry Number'] || '',
+                    lorryType: (row['Lorry Type'] === 'Closed' ? 'Closed' : 'Open'),
+                    weight: Number(row['Weight']) || 0,
+                    fromPlace: row['From'] || '',
+                    toPlace: row['To'] || '',
+                    freight: Number(row['Freight']) || 0,
+                    advance: Number(row['Advance']) || 0,
+                    otherExpenses: Number(row['Other Expenses']) || 0,
+                    balance: 0,
+                    totalBalance: Number(row['Total Balance']) || 0,
+                    paymentStatus: (row['Payment Status'] === 'Completed' ? 'Completed' : 'Pending')
+                };
+
+                booking.balance = booking.freight + booking.otherExpenses - booking.advance;
+                if (!booking.totalBalance) booking.totalBalance = booking.balance;
+
+                if (booking.partyName) {
+                    await saveBookingRecord(booking);
+                    successCount++;
+                }
+            }
+
+            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
+            await loadData();
+
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to import file. Check format.", { id: toastId });
+        } finally {
+            setIsImporting(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const filteredRecords = records.filter(r =>
         (r.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r.grNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r.lorryNo || '').toLowerCase().includes(searchTerm.toLowerCase())
@@ -216,26 +337,44 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
 
     return (
         <div className="bg-white/70 backdrop-blur-sm p-4 sm:p-6 rounded-xl shadow-lg min-h-[500px]">
-             {/* Header */}
-             <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                 <div className="flex items-center gap-4 self-start">
                     <button onClick={onBack} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
-                         <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
+                        <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <h2 className="text-2xl font-bold text-ssk-blue">Booking Register</h2>
                 </div>
                 {view === 'list' && (
-                    <button 
-                        onClick={() => { setFormData(initialRecord); setView('form'); }}
-                        className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-md"
-                    >
-                        <PlusIcon className="w-5 h-5" /> New Booking
-                    </button>
+                    <div className="flex gap-2">
+                        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx, .xls" />
+                        <button
+                            onClick={handleImportClick}
+                            disabled={isImporting}
+                            className="bg-white border-2 border-blue-600 text-blue-600 px-4 py-2 rounded-lg font-semibold hover:bg-blue-50 transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                        >
+                            {isImporting ? <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div> : <UploadIcon className="w-5 h-5" />}
+                            Import
+                        </button>
+                        <button
+                            onClick={handleExport}
+                            className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center gap-2 shadow-md"
+                        >
+                            <DownloadIcon className="w-5 h-5" />
+                            Export CSV
+                        </button>
+                        <button
+                            onClick={() => { setFormData(initialRecord); setView('form'); }}
+                            className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-md"
+                        >
+                            <PlusIcon className="w-5 h-5" /> Add Row
+                        </button>
+                    </div>
                 )}
             </div>
 
-             {/* Dashboard Overview */}
-             {view === 'list' && (
+            {/* Dashboard Overview */}
+            {view === 'list' && (
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="bg-green-50 p-4 rounded-lg border border-green-100 flex items-center justify-between">
@@ -333,32 +472,32 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Booking ID</label>
-                                    <input type="text" placeholder="Auto / Optional" value={formData.bookingId || ''} onChange={e => setFormData({...formData, bookingId: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" placeholder="Auto / Optional" value={formData.bookingId || ''} onChange={e => setFormData({ ...formData, bookingId: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Party Name*</label>
-                                    <input type="text" required value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" required value={formData.partyName} onChange={e => setFormData({ ...formData, partyName: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Date*</label>
-                                    <input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="date" required value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">GR Number*</label>
-                                    <input type="text" required value={formData.grNo} onChange={e => setFormData({...formData, grNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" required value={formData.grNo} onChange={e => setFormData({ ...formData, grNo: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Bill Number</label>
-                                    <input type="text" value={formData.billNo || ''} onChange={e => setFormData({...formData, billNo: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" value={formData.billNo || ''} onChange={e => setFormData({ ...formData, billNo: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Lorry Number*</label>
-                                    <input 
+                                    <input
                                         list="truck-list"
-                                        type="text" 
-                                        value={formData.lorryNo} 
-                                        onChange={e => setFormData({...formData, lorryNo: e.target.value.toUpperCase()})} 
-                                        className="w-full p-2 border rounded uppercase" 
+                                        type="text"
+                                        value={formData.lorryNo}
+                                        onChange={e => setFormData({ ...formData, lorryNo: e.target.value.toUpperCase() })}
+                                        className="w-full p-2 border rounded uppercase"
                                         placeholder="Select or Type"
                                         required
                                     />
@@ -370,71 +509,71 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Lorry Type</label>
-                                    <select value={formData.lorryType} onChange={e => setFormData({...formData, lorryType: e.target.value as any})} className="w-full p-2 border rounded">
+                                    <select value={formData.lorryType} onChange={e => setFormData({ ...formData, lorryType: e.target.value as any })} className="w-full p-2 border rounded">
                                         <option value="Closed">Closed</option>
                                         <option value="Open">Open</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Weight (kg)*</label>
-                                    <input type="number" required value={formData.weight} onChange={e => setFormData({...formData, weight: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                    <input type="number" required value={formData.weight} onChange={e => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">From*</label>
-                                    <input type="text" required value={formData.fromPlace} onChange={e => setFormData({...formData, fromPlace: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" required value={formData.fromPlace} onChange={e => setFormData({ ...formData, fromPlace: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">To*</label>
-                                    <input type="text" required value={formData.toPlace} onChange={e => setFormData({...formData, toPlace: e.target.value})} className="w-full p-2 border rounded" />
+                                    <input type="text" required value={formData.toPlace} onChange={e => setFormData({ ...formData, toPlace: e.target.value })} className="w-full p-2 border rounded" />
                                 </div>
                             </div>
                         </div>
 
                         {/* Financials Row */}
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div className="bg-white p-4 rounded-lg border">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-white p-4 rounded-lg border">
                                 <h4 className="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Charges</h4>
                                 <div className="space-y-4">
-                                     <div>
+                                    <div>
                                         <label className="block text-xs font-bold text-gray-600 mb-1">Freight (₹)*</label>
-                                        <input type="number" required value={formData.freight} onChange={e => setFormData({...formData, freight: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                        <input type="number" required value={formData.freight} onChange={e => setFormData({ ...formData, freight: parseFloat(e.target.value) || 0 })} className="w-full p-2 border rounded" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-600 mb-1">Other Expenses (₹)</label>
-                                        <input type="number" value={formData.otherExpenses} onChange={e => setFormData({...formData, otherExpenses: parseFloat(e.target.value) || 0})} className="w-full p-2 border rounded" />
+                                        <input type="number" value={formData.otherExpenses} onChange={e => setFormData({ ...formData, otherExpenses: parseFloat(e.target.value) || 0 })} className="w-full p-2 border rounded" />
                                     </div>
                                 </div>
-                             </div>
+                            </div>
 
-                             <div className="bg-white p-4 rounded-lg border">
-                                 <h4 className="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Summary & Status</h4>
-                                 <div className="space-y-4">
-                                     <div className="flex justify-between items-center py-2 border-b border-dashed">
+                            <div className="bg-white p-4 rounded-lg border">
+                                <h4 className="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Summary & Status</h4>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center py-2 border-b border-dashed">
                                         <span className="text-sm text-gray-600">Total Freight</span>
                                         <span className="font-bold">₹{formData.freight}</span>
-                                     </div>
-                                     <div className="flex justify-between items-center py-2 border-b border-dashed">
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-dashed">
                                         <span className="text-sm text-gray-600">Total Advances</span>
                                         <span className="font-bold text-green-600">- ₹{formData.advance}</span>
-                                     </div>
-                                     <div className="flex justify-between items-center py-2 border-b border-dashed">
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 border-b border-dashed">
                                         <span className="text-sm text-gray-600">Other Expenses</span>
                                         <span className="font-bold">+ ₹{formData.otherExpenses}</span>
-                                     </div>
-                                     <div className="flex justify-between items-center py-2 bg-blue-50 px-2 rounded">
+                                    </div>
+                                    <div className="flex justify-between items-center py-2 bg-blue-50 px-2 rounded">
                                         <span className="text-sm font-bold text-blue-800">Total Due Balance</span>
                                         <span className="font-bold text-blue-800 text-lg">₹{formData.totalBalance}</span>
-                                     </div>
-                                      <div>
+                                    </div>
+                                    <div>
                                         <label className="block text-xs font-bold text-gray-600 mb-1">Payment Status</label>
-                                        <select value={formData.paymentStatus} onChange={e => setFormData({...formData, paymentStatus: e.target.value as any})} className="w-full p-2 border rounded bg-gray-50">
+                                        <select value={formData.paymentStatus} onChange={e => setFormData({ ...formData, paymentStatus: e.target.value as any })} className="w-full p-2 border rounded bg-gray-50">
                                             <option value="Pending">Pending</option>
                                             <option value="Completed">Completed</option>
                                         </select>
                                     </div>
-                                 </div>
-                             </div>
-                         </div>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Advance Payments Section */}
                         <div className="bg-white p-4 rounded-lg border shadow-sm">
@@ -442,7 +581,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                                 <h3 className="text-lg font-bold text-gray-800">Advance Payments</h3>
                                 <div className="text-sm font-bold text-gray-600">Total: ₹{formData.advance}</div>
                             </div>
-                            
+
                             {/* List of Payments */}
                             {Array.isArray(formData.advances) && formData.advances.length > 0 && (
                                 <div className="mb-4 space-y-2">
@@ -452,7 +591,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                                             <div className="text-gray-500 w-32">{payment.date ? new Date(payment.date).toLocaleDateString('en-GB') : '-'}</div>
                                             <div className="flex-grow text-gray-600 truncate">{payment.notes || '-'}</div>
                                             <button type="button" onClick={() => handleRemovePayment(index)} className="text-red-500 hover:text-red-700">
-                                                <TrashIcon className="w-4 h-4"/>
+                                                <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </div>
                                     ))}
@@ -463,39 +602,39 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                             <div className="flex flex-col md:flex-row gap-3 items-end bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300">
                                 <div className="w-full md:w-32">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Amount (₹)</label>
-                                    <input 
-                                        type="number" 
-                                        placeholder="Amount" 
-                                        value={newPayment.amount || ''} 
-                                        onChange={e => setNewPayment({...newPayment, amount: parseFloat(e.target.value)})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="number"
+                                        placeholder="Amount"
+                                        value={newPayment.amount || ''}
+                                        onChange={e => setNewPayment({ ...newPayment, amount: parseFloat(e.target.value) })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
                                 <div className="w-full md:w-40">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Date</label>
-                                    <input 
-                                        type="date" 
-                                        value={newPayment.date} 
-                                        onChange={e => setNewPayment({...newPayment, date: e.target.value})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="date"
+                                        value={newPayment.date}
+                                        onChange={e => setNewPayment({ ...newPayment, date: e.target.value })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
                                 <div className="flex-grow w-full">
                                     <label className="block text-xs font-bold text-gray-500 mb-1">Notes</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Optional notes (e.g. Bank Ref)" 
-                                        value={newPayment.notes || ''} 
-                                        onChange={e => setNewPayment({...newPayment, notes: e.target.value})} 
-                                        className="w-full p-2 border rounded text-sm" 
+                                    <input
+                                        type="text"
+                                        placeholder="Optional notes (e.g. Bank Ref)"
+                                        value={newPayment.notes || ''}
+                                        onChange={e => setNewPayment({ ...newPayment, notes: e.target.value })}
+                                        className="w-full p-2 border rounded text-sm"
                                     />
                                 </div>
-                                <button 
-                                    type="button" 
-                                    onClick={handleAddPayment} 
+                                <button
+                                    type="button"
+                                    onClick={handleAddPayment}
                                     className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-50 font-semibold text-sm flex items-center shadow-sm"
                                 >
-                                    <PlusIcon className="w-4 h-4 mr-1"/> Add Payment
+                                    <PlusIcon className="w-4 h-4 mr-1" /> Add Payment
                                 </button>
                             </div>
                         </div>

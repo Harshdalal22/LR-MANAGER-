@@ -286,7 +286,39 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             return;
         }
 
+        // Create worksheet from data
         const ws = XLSX.utils.json_to_sheet(data);
+
+        // Auto-size columns based on content
+        const colWidths: any[] = [];
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            let maxWidth = 10;
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                const cell = ws[cellAddress];
+                if (cell && cell.v) {
+                    const cellLength = cell.v.toString().length;
+                    maxWidth = Math.max(maxWidth, cellLength);
+                }
+            }
+            colWidths.push({ wch: Math.min(maxWidth + 2, 50) });
+        }
+        ws['!cols'] = colWidths;
+
+        // Style header row (bold, background color)
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (!ws[cellAddress]) continue;
+
+            ws[cellAddress].s = {
+                font: { bold: true, sz: 12 },
+                fill: { fgColor: { rgb: "4472C4" } },
+                alignment: { horizontal: "center", vertical: "center" }
+            };
+        }
+
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
         XLSX.writeFile(wb, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`);

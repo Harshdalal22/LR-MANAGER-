@@ -346,39 +346,46 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
 
-            // Smart Header Detection
+            // Smart Header Detection (Score-based)
             const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
             let headerRowIndex = 0;
-            // Scan logic depends on active tab, but generic keywords usually work
-            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
-                const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
+            let maxScore = 0;
 
-                if (activeTab === 'vehicle-hiring') {
-                    if (rowStr.includes('lorry') || rowStr.includes('truck') || (rowStr.includes('date') && rowStr.includes('freight'))) {
-                        headerRowIndex = i; break;
+            const knownKeywords = [
+                'date', 'booking', 'party', 'customer', 'name', 'client',
+                'gr', 'lr', 'bill', 'invoice',
+                'lorry', 'truck', 'vehicle', 'type',
+                'weight', 'wt', 'kg',
+                'from', 'source', 'to', 'dest',
+                'freight', 'amount', 'advance', 'balance', 'status', 'gst', 'pan', 'mobile', 'contact'
+            ];
+
+            // Scan first 15 rows
+            for (let i = 0; i < Math.min(rawRows.length, 15); i++) {
+                let score = 0;
+                const row = rawRows[i];
+                if (!row || !Array.isArray(row)) continue;
+
+                const rowCells = row.map(c => String(c).toLowerCase().trim());
+                rowCells.forEach(cell => {
+                    if (knownKeywords.some(k => cell.includes(k))) {
+                        score++;
                     }
-                } else if (activeTab === 'booking-register') {
-                    if (rowStr.includes('party') || rowStr.includes('customer') || (rowStr.includes('date') && rowStr.includes('freight'))) {
-                        headerRowIndex = i; break;
-                    }
-                } else if (activeTab === 'customer-details') {
-                    if (rowStr.includes('name') || rowStr.includes('party') || rowStr.includes('gst')) {
-                        headerRowIndex = i; break;
-                    }
-                } else if (activeTab === 'vehicle-fleet') {
-                    if (rowStr.includes('truck') || rowStr.includes('vehicle') || rowStr.includes('owner')) {
-                        headerRowIndex = i; break;
-                    }
+                });
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    headerRowIndex = i;
                 }
             }
 
-            console.log(`Using Header Row Index: ${headerRowIndex}`);
+            console.log(`Using Header Row Index: ${headerRowIndex} (Score: ${maxScore})`);
             const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
             console.log("Imported Raw Data (DataMgmt):", jsonData);
 
             if (jsonData.length === 0) {
-                toast.error("File is empty", { id: toastId });
+                toast.error("File appears empty or unreadable", { id: toastId });
                 setIsImporting(false);
                 return;
             }
@@ -392,8 +399,13 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             const getValue = (row: any, keys: string[]) => {
                 const rowKeys = Object.keys(row);
                 for (const key of keys) {
-                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                    let foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
                     if (foundKey) return row[foundKey];
+                    // lenient match
+                    if (key.length > 3) {
+                        foundKey = rowKeys.find(k => k.toLowerCase().includes(key.toLowerCase().trim()));
+                        if (foundKey) return row[foundKey];
+                    }
                 }
                 return undefined;
             };

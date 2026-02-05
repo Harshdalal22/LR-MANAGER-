@@ -266,42 +266,44 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
 
-            // Smart Header Detection
-            // 1. Convert to array of arrays to scan content
+            // Smart Header Detection (Score-based)
             const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-
             let headerRowIndex = 0;
-            let foundHeader = false;
+            let maxScore = 0;
 
-            // Scan first 10 rows for known columns
-            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
-                const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
-                // Check for existence of critical vehicle hiring columns
-                if ((rowStr.includes('date') || rowStr.includes('booking')) &&
-                    (rowStr.includes('lorry') || rowStr.includes('truck') || rowStr.includes('vehicle'))) {
-                    headerRowIndex = i;
-                    foundHeader = true;
-                    console.log("Found header at row:", i, rawRows[i]);
-                    break;
-                }
-            }
+            const knownKeywords = [
+                'date', 'booking', 'lorry', 'truck', 'vehicle', 'reg', 'no',
+                'gr', 'lr', 'bill', 'invoice',
+                'driver', 'owner', 'name', 'party',
+                'from', 'source', 'origin', 'to', 'dest',
+                'freight', 'amount', 'rate', 'advance', 'balance', 'status'
+            ];
 
-            if (!foundHeader) {
-                // heuristic fallback: looks for 'Date'
-                for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
-                    const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
-                    if (rowStr.includes('date') && rowStr.includes('freight')) {
-                        headerRowIndex = i;
-                        foundHeader = true;
-                        break;
+            // Scan first 15 rows to find the best header row
+            for (let i = 0; i < Math.min(rawRows.length, 15); i++) {
+                let score = 0;
+                const row = rawRows[i];
+                if (!row || !Array.isArray(row)) continue;
+
+                const rowStr = row.map(c => String(c).toLowerCase().trim()).join(' '); // full string check
+                const rowCells = row.map(c => String(c).toLowerCase().trim()); // individual cell check of course
+
+                // Check how many known keywords are present in this row's cells
+                rowCells.forEach(cell => {
+                    if (knownKeywords.some(k => cell.includes(k))) {
+                        score++;
                     }
+                });
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    headerRowIndex = i;
                 }
             }
 
-            console.log(`Using Header Row Index: ${headerRowIndex}`);
+            console.log(`Using Header Row Index: ${headerRowIndex} (Score: ${maxScore})`);
 
             // 2. Parse again using the found header row
-            // range: headerRowIndex tells xlsx to start reading from that row
             const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
             if (jsonData.length === 0) {
@@ -321,8 +323,16 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             const getValue = (row: any, keys: string[]) => {
                 const rowKeys = Object.keys(row);
                 for (const key of keys) {
-                    const foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
+                    // 1. Exact match (case insensitive)
+                    let foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
                     if (foundKey) return row[foundKey];
+
+                    // 2. "Contains" match (if strict exact failed, try lenient) 
+                    // Only apply lax check if key is long enough (>3 chars)
+                    if (key.length > 3) {
+                        foundKey = rowKeys.find(k => k.toLowerCase().includes(key.toLowerCase().trim()));
+                        if (foundKey) return row[foundKey];
+                    }
                 }
                 return undefined;
             };
@@ -331,13 +341,10 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             const parseDate = (val: any): string => {
                 if (!val) return new Date().toISOString().split('T')[0];
                 if (val instanceof Date) {
-                    // Adjust for timezone offset to prevent off-by-one errors
                     const offset = val.getTimezoneOffset() * 60000;
                     return new Date(val.getTime() - offset).toISOString().split('T')[0];
                 }
-                // Handle text dates (YYYY-MM-DD or DD/MM/YYYY)
                 if (typeof val === 'string') {
-                    // Try primitive parse
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
                 }
@@ -346,30 +353,35 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
 
             for (const row of jsonData) {
                 try {
-                    const lorryNo = getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']);
+                    // Expanded key list for maximum compatibility
+                    const lorryNo = getValue(row, [
+                        'Lorry Number', 'Lorry No', 'Lorry',
+                        'Truck Number', 'Truck No', 'Truck',
+                        'Vehicle No', 'Vehicle Number', 'Vehicle',
+                        'Reg No', 'RC No', 'Lorry #'
+                    ]);
 
-                    // Skip empty rows
                     if (!lorryNo) {
                         failCount++;
                         continue;
                     }
 
                     const hiring: VehicleHiringType = {
-                        date: parseDate(getValue(row, ['Date', 'Booking Date'])),
+                        date: parseDate(getValue(row, ['Date', 'Booking Date', 'Hiring Date'])),
                         lorryNo: String(lorryNo).trim(),
-                        grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || ''),
-                        billNo: String(getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || ''),
-                        driverNo: String(getValue(row, ['Driver Number', 'Driver No', 'Driver Phone', 'Driver Mobile']) || ''),
+                        grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No', 'GR', 'LR']) || ''),
+                        billNo: String(getValue(row, ['Bill Number', 'Bill No', 'Invoice No', 'Bill', 'Invoice']) || ''),
+                        driverNo: String(getValue(row, ['Driver Number', 'Driver No', 'Driver Phone', 'Driver Mobile', 'Driver']) || ''),
                         ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
-                        fromPlace: String(getValue(row, ['From', 'Source', 'Origin']) || ''),
-                        toPlace: String(getValue(row, ['To', 'Destination']) || ''),
-                        freight: Number(getValue(row, ['Freight', 'Freight Amount', 'Total Freight'])) || 0,
-                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges', 'Misc Charges'])) || 0,
-                        advance: Number(getValue(row, ['Advance', 'Total Advance', 'Advance Amount'])) || 0,
+                        fromPlace: String(getValue(row, ['From', 'Source', 'Origin', 'Loading']) || ''),
+                        toPlace: String(getValue(row, ['To', 'Destination', 'Unloading']) || ''),
+                        freight: Number(getValue(row, ['Freight', 'Freight Amount', 'Total Freight', 'Rate', 'Amount'])) || 0,
+                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges', 'Misc Charges', 'Extra']) || 0),
+                        advance: Number(getValue(row, ['Advance', 'Total Advance', 'Advance Amount', 'Less Advance']) || 0),
                         balance: 0,
-                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
-                        podStatus: (String(getValue(row, ['POD Status', 'POD'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending'),
-                        paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending')
+                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due', 'Net Balance'])) || 0,
+                        podStatus: (String(getValue(row, ['POD Status', 'POD', 'POD RC'])).toLowerCase().includes('complete') ? 'Completed' : 'Pending'),
+                        paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase().includes('complete') ? 'Completed' : 'Pending')
                     };
 
                     // Auto-calculate balance

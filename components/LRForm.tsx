@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
@@ -6,6 +7,9 @@ import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon 
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { DraftIndicator } from './DraftIndicator';
+
 
 
 interface LRFormProps {
@@ -74,7 +78,44 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [isAiLoading, setIsAiLoading] = useState(false);
 
-    
+    // Auto-save logic
+    const { hasDraft, lastSaved, clearDraft, restoreDraft } = useAutoSave<LorryReceipt>('lr-draft', formData, {
+        enabled: !existingLR, // Only auto-save if creating NEW record
+        debounceMs: 1000
+    });
+
+    // Check for draft on mount
+    useEffect(() => {
+        if (!existingLR && hasDraft) {
+            // Slight delay to ensure UI is ready and prevent immediate prompt on reload if user just saved
+            const timer = setTimeout(() => {
+                // If we are still showing initial state (empty form), prompt to restore
+                // We check a key field like lrNo or fromPlace to see if user has already started typing manually
+                // But generally, on mount with initial state, we are safe to ask.
+                if (window.confirm('We found an unsaved draft. Do you want to restore it?')) {
+                    const restored = restoreDraft();
+                    if (restored) {
+                        setFormData(restored);
+                        // Also restore billing party logic if needed
+                        if (JSON.stringify(restored.billingTo) === JSON.stringify(restored.consignor)) {
+                            setBillingPartyType('Consignor');
+                        } else if (JSON.stringify(restored.billingTo) === JSON.stringify(restored.consignee)) {
+                            setBillingPartyType('Consignee');
+                        } else {
+                            setBillingPartyType('Other');
+                        }
+                        toast.success('Draft restored successfully');
+                    }
+                } else {
+                    clearDraft(); // User explicitly said NO, so clear it
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [existingLR, hasDraft]); // Intentionally not including restoreDraft/clearDraft in deps as they are stable
+
+
+
     useEffect(() => {
         if (existingLR) {
             setFormData(existingLR);
@@ -87,13 +128,13 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             }
         } else {
             setFormData(initialLRState);
-             setBillingPartyType('Consignor');
+            setBillingPartyType('Consignor');
         }
     }, [existingLR]);
-    
+
     useEffect(() => {
         if (billingPartyType === 'Consignor') {
-             setFormData(prev => ({ ...prev, billingTo: prev.consignor }));
+            setFormData(prev => ({ ...prev, billingTo: prev.consignor }));
         } else if (billingPartyType === 'Consignee') {
             setFormData(prev => ({ ...prev, billingTo: prev.consignee }));
         }
@@ -120,7 +161,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
     const handlePartyChange = (party: 'consignor' | 'consignee' | 'billingTo', e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        
+
         // Update the specific field
         setFormData(prev => ({
             ...prev,
@@ -137,7 +178,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 // Determine if this saved party is relevant for the current field type (Consignor/Consignee)
                 // Assuming 'Both' applies everywhere. 
                 // We overwrite other fields if empty or if exact match is found
-                 setFormData(prev => ({
+                setFormData(prev => ({
                     ...prev,
                     [party]: {
                         ...prev[party],
@@ -152,7 +193,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             }
         }
     };
-    
+
     const handleItemChange = (index: number, field: keyof Item, value: string | number) => {
         const newItems = [...formData.items];
         (newItems[index] as any)[field] = value;
@@ -180,7 +221,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             }
         }));
     };
-    
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         // C Note No (lrNo) is now a required manual field
@@ -189,10 +230,14 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             return;
         }
         onSave(formData);
+        if (!existingLR) {
+            clearDraft();
+            toast.success('Draft cleared');
+        }
     };
 
     const handleCreateNew = () => {
-        if(window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
+        if (window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
             setFormData(initialLRState);
             setBillingPartyType('Consignor');
         }
@@ -240,25 +285,25 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             setIsAiLoading(false);
         }
     };
-    
+
     const renderPartySection = (title: string, partyKey: 'consignor' | 'consignee' | 'billingTo') => {
         const isDisabled = partyKey === 'billingTo' && billingPartyType !== 'Other';
         const disabledClass = isDisabled ? 'bg-gray-100 cursor-not-allowed' : 'text-gray-900 placeholder-gray-500';
 
         // Filter saved parties based on type if needed, or just show all
-        const relevantParties = savedParties; 
+        const relevantParties = savedParties;
 
         return (
             <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
                 <h3 className="bg-ssk-red text-white p-2 font-bold text-sm">{title.toUpperCase()}</h3>
                 <div className="p-2 space-y-1 bg-white">
-                    <input 
-                        list={`list-${partyKey}`} 
-                        name="name" 
-                        value={formData[partyKey].name} 
-                        onChange={(e) => handlePartyChange(partyKey, e)} 
-                        placeholder="NAME" 
-                        className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} 
+                    <input
+                        list={`list-${partyKey}`}
+                        name="name"
+                        value={formData[partyKey].name}
+                        onChange={(e) => handlePartyChange(partyKey, e)}
+                        placeholder="NAME"
+                        className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`}
                         disabled={isDisabled}
                         autoComplete="off"
                     />
@@ -269,15 +314,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     </datalist>
 
                     <textarea name="address" value={formData[partyKey].address} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="ADDRESS" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} rows={3} disabled={isDisabled}></textarea>
-                    <input type="text" name="city" value={formData[partyKey].city} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CITY" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
-                    <input type="text" name="contact" value={formData[partyKey].contact} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CONTACT" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
-                    <input type="text" name="pan" value={formData[partyKey].pan} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="PAN" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
-                    <input type="text" name="gst" value={formData[partyKey].gst} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="GST" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled}/>
+                    <input type="text" name="city" value={formData[partyKey].city} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CITY" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled} />
+                    <input type="text" name="contact" value={formData[partyKey].contact} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="CONTACT" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled} />
+                    <input type="text" name="pan" value={formData[partyKey].pan} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="PAN" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled} />
+                    <input type="text" name="gst" value={formData[partyKey].gst} onChange={(e) => handlePartyChange(partyKey, e)} placeholder="GST" className={`w-full text-xs p-1 border rounded-sm ${disabledClass}`} disabled={isDisabled} />
                 </div>
             </div>
         );
     }
-    
+
     const totalCharges = (Object.values(formData.charges) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const inputClass = "w-full p-2 border-gray-300 bg-white rounded-md text-sm text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-ssk-blue focus:border-transparent transition-all duration-200";
     const labelClass = "block text-xs font-bold text-gray-600 uppercase mb-1";
@@ -288,7 +333,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             <div className="w-full xl:w-3/5">
                 <div className="flex items-center gap-4 mb-6 border-b pb-4">
                     <button onClick={onCancel} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
-                         <ArrowLeftIcon className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" />
+                        <ArrowLeftIcon className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
                     <div className="flex items-center flex-wrap gap-2">
                         <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-4 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-sm shadow-sm border">
@@ -308,9 +353,17 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             <SparklesIcon className="w-5 h-5 mr-2" />
                             {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
                         </button>
+                        {!existingLR && (
+                            <DraftIndicator lastSaved={lastSaved} onClear={() => {
+                                clearDraft();
+                                setFormData(initialLRState);
+                                setBillingPartyType('Consignor');
+                                toast.success('Draft discarded');
+                            }} />
+                        )}
                     </div>
                 </div>
-            
+
                 <form onSubmit={handleSubmit}>
                     <Fieldset legend={t[language].coreDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4">
                         <div>
@@ -321,22 +374,22 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                     <label htmlFor="dummy" className="ml-2 block text-sm text-gray-900">Dummy</label>
                                 </div>
                                 <div className="flex items-center">
-                                    <input id="original" type="radio" name="lrType" value="Original" checked={formData.lrType === 'Original'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300"/>
+                                    <input id="original" type="radio" name="lrType" value="Original" checked={formData.lrType === 'Original'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
                                     <label htmlFor="original" className="ml-2 block text-sm text-gray-900">Original</label>
                                 </div>
                             </div>
                         </div>
                         <div>
                             <label className={labelClass}>{t[language].truckNo}*</label>
-                            <input 
+                            <input
                                 list="trucks-list"
-                                type="text" 
-                                name="truckNo" 
-                                placeholder={t[language].truckNo} 
-                                value={formData.truckNo} 
-                                onChange={handleChange} 
-                                className={`${inputClass} border-red-300`} 
-                                required 
+                                type="text"
+                                name="truckNo"
+                                placeholder={t[language].truckNo}
+                                value={formData.truckNo}
+                                onChange={handleChange}
+                                className={`${inputClass} border-red-300`}
+                                required
                                 autoComplete="off"
                             />
                             <datalist id="trucks-list">
@@ -345,7 +398,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         </div>
                         <div>
                             <label className={labelClass}>{t[language].cNoteNo}*</label>
-                            <input 
+                            <input
                                 type="text"
                                 name="lrNo"
                                 placeholder={t[language].cNoteNo}
@@ -360,10 +413,10 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         <div><label className={labelClass}>{t[language].fromPlace}*</label><input type="text" name="fromPlace" placeholder={t[language].fromPlace} value={formData.fromPlace} onChange={handleChange} className={inputClass} required /></div>
                         <div><label className={labelClass}>{t[language].toPlace}*</label><input type="text" name="toPlace" placeholder={t[language].toPlace} value={formData.toPlace} onChange={handleChange} className={inputClass} required /></div>
                     </Fieldset>
-                    
+
                     {/* Other fieldsets here, unchanged */}
                     <Fieldset legend={t[language].shipmentDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-4">
-                         <div><label className={labelClass}>{t[language].invoice}</label><input type="text" name="invoiceNo" placeholder={t[language].invoice} value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].invoice}</label><input type="text" name="invoiceNo" placeholder={t[language].invoice} value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].invoiceAmount}</label><input type="number" name="invoiceAmount" placeholder={t[language].invoiceAmount} value={formData.invoiceAmount} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].invoiceDate}</label><input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].ewayBillNo}</label><input type="text" name="ewayBillNo" placeholder={t[language].ewayBillNo} value={formData.ewayBillNo} onChange={handleChange} className={inputClass} /></div>
@@ -373,12 +426,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         <div><label className={labelClass}>{t[language].poDate}</label><input type="date" name="poDate" value={formData.poDate || ''} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].addressOfDelivery}</label><input type="text" name="addressOfDelivery" placeholder={t[language].addressOfDelivery} value={formData.addressOfDelivery} onChange={handleChange} className={inputClass} /></div>
                     </Fieldset>
-                    
+
                     <Fieldset legend={t[language].billingDetails} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className={labelClass}>{t[language].billingParty}</label>
                             <div className="flex items-center space-x-4 mt-2">
-                                 <div className="flex items-center">
+                                <div className="flex items-center">
                                     <input id="bill_consignor" type="radio" name="billingPartyType" value="Consignor" checked={billingPartyType === 'Consignor'} onChange={() => setBillingPartyType('Consignor')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
                                     <label htmlFor="bill_consignor" className="ml-2 block text-sm text-gray-900">{t[language].consignor}</label>
                                 </div>
@@ -386,20 +439,20 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                     <input id="bill_consignee" type="radio" name="billingPartyType" value="Consignee" checked={billingPartyType === 'Consignee'} onChange={() => setBillingPartyType('Consignee')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
                                     <label htmlFor="bill_consignee" className="ml-2 block text-sm text-gray-900">{t[language].consignee}</label>
                                 </div>
-                                 <div className="flex items-center">
+                                <div className="flex items-center">
                                     <input id="bill_other" type="radio" name="billingPartyType" value="Other" checked={billingPartyType === 'Other'} onChange={() => setBillingPartyType('Other')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue border-gray-300" />
                                     <label htmlFor="bill_other" className="ml-2 block text-sm text-gray-900">{t[language].other}</label>
                                 </div>
                             </div>
-                         </div>
-                         <div>
+                        </div>
+                        <div>
                             <label className={labelClass}>{t[language].gstPaidBy}</label>
-                             <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputClass}>
+                            <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputClass}>
                                 <option value="Transporter">{t[language].transporter}</option>
                                 <option value="Consignor">{t[language].consignor}</option>
                                 <option value="Consignee">{t[language].consignee}</option>
                             </select>
-                         </div>
+                        </div>
                     </Fieldset>
 
                     <Fieldset legend={t[language].partyDetails} className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -407,8 +460,8 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         {renderPartySection(t[language].consignee, 'consignee')}
                         {billingPartyType === 'Other' && renderPartySection(t[language].billingParty, 'billingTo')}
                     </Fieldset>
-                    
-                     <div className="border border-gray-300 p-3 rounded-xl shadow-lg bg-white/50 backdrop-blur-sm mb-6">
+
+                    <div className="border border-gray-300 p-3 rounded-xl shadow-lg bg-white/50 backdrop-blur-sm mb-6">
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="font-bold text-base text-gray-800">{t[language].itemDetails}</h3>
                             <button type="button" onClick={addItem} className="flex items-center bg-gray-100 text-gray-800 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors shadow-sm border">
@@ -427,12 +480,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             {formData.items.map((item, index) => (
                                 <div key={index} className="grid grid-cols-12 gap-2 items-center p-2 border-b last:border-b-0">
                                     <div className="col-span-1 text-gray-500">{index + 1}</div>
-                                    <div className="col-span-6"><input type="text" value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} className="w-full p-1.5 border rounded-md text-sm"/></div>
+                                    <div className="col-span-6"><input type="text" value={item.description} onChange={(e) => handleItemChange(index, 'description', e.target.value)} className="w-full p-1.5 border rounded-md text-sm" /></div>
                                     <div className="col-span-2"><input type="number" value={item.pcs} onChange={(e) => handleItemChange(index, 'pcs', parseInt(e.target.value) || 0)} className="w-full p-1.5 border rounded-md text-sm" placeholder="PCS" /></div>
-                                    <div className="col-span-2"><input type="number" value={item.weight} onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)} className="w-full p-1.5 border rounded-md text-sm" placeholder="Weight"/></div>
+                                    <div className="col-span-2"><input type="number" value={item.weight} onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)} className="w-full p-1.5 border rounded-md text-sm" placeholder="Weight" /></div>
                                     <div className="col-span-1 text-right">
                                         {formData.items.length > 1 && (
-                                            <button type="button" onClick={() => removeItem(index)} className="p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-100"><TrashIcon className="w-5 h-5"/></button>
+                                            <button type="button" onClick={() => removeItem(index)} className="p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-100"><TrashIcon className="w-5 h-5" /></button>
                                         )}
                                     </div>
                                 </div>
@@ -441,12 +494,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     </div>
 
                     <Fieldset legend={t[language].weightRate} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                         <div>
+                        <div>
                             <label className={labelClass}>{t[language].totalPkgsWeight}</label>
                             <input type="number" name="weight" value={formData.weight} readOnly placeholder="Auto-calculated" className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
                         </div>
                         <div><label className={labelClass}>{t[language].actualWeight}</label><input type="number" name="actualWeightMT" value={formData.actualWeightMT} onChange={handleChange} placeholder="WEIGHT (MT)" className={inputClass} /></div>
-                         <div><label className={labelClass}>{t[language].chargedWeight}</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
+                        <div><label className={labelClass}>{t[language].chargedWeight}</label><input type="number" name="chargedWeight" placeholder="CHARGED WEIGHT" value={formData.chargedWeight} onChange={handleChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].rate}</label><input type="number" name="rate" value={formData.rate} onChange={handleChange} placeholder="RATE" className={inputClass} /></div>
                         <div>
                             <label className={labelClass}>{t[language].calcBasis}</label>
@@ -456,7 +509,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             </select>
                         </div>
                     </Fieldset>
-                    
+
                     <Fieldset legend={t[language].chargesBreakdown} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
                         <div><label className={labelClass}>{t[language].hamail}</label><input type="number" name="hamail" value={formData.charges.hamail} onChange={handleChargeChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].surcharge}</label><input type="number" name="surCharge" value={formData.charges.surCharge} onChange={handleChargeChange} className={inputClass} /></div>
@@ -466,21 +519,21 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         <div><label className={labelClass}>{t[language].otherCharge}</label><input type="number" name="otherCharge" value={formData.charges.otherCharge} onChange={handleChargeChange} className={inputClass} /></div>
                         <div><label className={labelClass}>{t[language].risk}</label><input type="number" name="riskCharge" value={formData.charges.riskCharge} onChange={handleChargeChange} className={inputClass} /></div>
                     </Fieldset>
-                    
+
                     <Fieldset legend={t[language].totals} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                             <label className={labelClass}>{t[language].freight}</label>
-                            <input 
-                                type="number" 
-                                name="freight" 
-                                value={formData.freight} 
+                            <input
+                                type="number"
+                                name="freight"
+                                value={formData.freight}
                                 onChange={handleChange}
-                                placeholder="FREIGHT" 
+                                placeholder="FREIGHT"
                                 readOnly={formData.rateOn !== 'Fixed'}
-                                className={`${inputClass} ${formData.rateOn !== 'Fixed' ? 'bg-gray-200 cursor-not-allowed' : 'bg-white border-blue-400'}`} 
+                                className={`${inputClass} ${formData.rateOn !== 'Fixed' ? 'bg-gray-200 cursor-not-allowed' : 'bg-white border-blue-400'}`}
                             />
                         </div>
-                         <div>
+                        <div>
                             <label className={labelClass}>{t[language].totalOtherCharges}</label>
                             <input type="number" value={totalCharges} readOnly className={`${inputClass} bg-gray-200 cursor-not-allowed`} />
                         </div>
@@ -489,15 +542,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             <input type="number" value={(Number(formData.freight) || 0) + totalCharges} readOnly className={`${inputClass} bg-green-100 border-green-300 font-bold cursor-not-allowed`} />
                         </div>
                     </Fieldset>
-                    
+
                     <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6"><label className={labelClass}>{t[language].remark}</label><textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter remarks..." className={`${inputClass} h-24`}></textarea></div>
-                    
+
                     <div className="flex flex-col sm:flex-row sm:justify-center gap-4 pt-6 mt-4 border-t">
                         <button type="submit" className="w-full sm:w-auto bg-ssk-blue text-white px-8 py-2.5 rounded-md hover:bg-blue-800 font-bold text-base shadow-md transition-transform transform hover:scale-105">
                             {existingLR ? t[language].updateLR : t[language].saveLR}
                         </button>
                         <button type="button" onClick={() => setShowPreviewModal(true)} className="w-full sm:w-auto bg-gray-600 text-white px-8 py-2.5 rounded-md hover:bg-gray-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
-                           {t[language].preview}
+                            {t[language].preview}
                         </button>
                         <button type="button" onClick={onCancel} className="w-full sm:w-auto bg-ssk-red text-white px-8 py-2.5 rounded-md hover:bg-red-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
                             {t[language].cancel}
@@ -508,16 +561,16 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
             {/* Live Preview Section (Desktop only) */}
             <div className="hidden xl:block w-2/5 sticky top-28" style={{ height: 'calc(100vh - 8rem)' }}>
-                 <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-2xl p-4 h-full overflow-y-auto">
+                <div className="bg-white/70 backdrop-blur-sm rounded-xl shadow-2xl p-4 h-full overflow-y-auto">
                     <h3 className="text-xl font-bold text-ssk-blue mb-4 text-center">Live Preview</h3>
                     <div className="transform scale-100 origin-top bg-white shadow-lg">
                         <LRContent lr={formData} companyDetails={companyDetails} showCompanyDetails={true} showAmounts={true} />
                     </div>
-                 </div>
+                </div>
             </div>
-            
+
             {showPreviewModal && (
-                <LRPreviewModal 
+                <LRPreviewModal
                     isOpen={showPreviewModal}
                     onClose={() => setShowPreviewModal(false)}
                     lr={formData}

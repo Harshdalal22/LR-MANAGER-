@@ -5,6 +5,8 @@ import { VehicleHiring as VehicleHiringType, PaymentRecord } from '../types';
 import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
+import { useAutoSave } from '../hooks/useAutoSave';
+import { DraftIndicator } from './DraftIndicator';
 
 interface VehicleHiringProps {
     onBack: () => void;
@@ -39,136 +41,154 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
     const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Temp state for new payment entry
-    const [newPayment, setNewPayment] = useState<PaymentRecord>({
-        amount: 0,
-        date: new Date().toISOString().split('T')[0],
-        notes: ''
-    });
+    notes: ''
+});
 
-    useEffect(() => {
-        loadData();
-    }, []);
+const { hasDraft, lastSaved, clearDraft, restoreDraft } = useAutoSave<VehicleHiringType>('vehicle-hiring-draft', formData, {
+    enabled: view === 'form' && !formData.id,
+    debounceMs: 1000
+});
 
-    // Auto-calculate balances
-    useEffect(() => {
-        // Calculate total advance from the array. Ensure advances is an array.
-        const advancesList = Array.isArray(formData.advances) ? formData.advances : [];
-        const totalAdvance = advancesList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-        // If user manually entered advance before, we might want to respect it if list is empty, 
-        // but generally the list should drive the total. 
-        // To be safe, if list is empty but advance has value (legacy), use advance. 
-        // But for this feature, we want list to drive it.
-        // Let's assume if list has items, use list sum.
-
-        const finalAdvance = advancesList.length > 0 ? totalAdvance : (Number(formData.advance) || 0);
-
-        const balance = (Number(formData.freight) || 0) - finalAdvance;
-        const total = balance + (Number(formData.otherExpenses) || 0);
-
-        // Update state only if values changed to avoid infinite loop
-        if (formData.advance !== finalAdvance || formData.balance !== balance || formData.totalBalance !== total) {
-            setFormData(prev => ({
-                ...prev,
-                advance: finalAdvance,
-                balance: balance,
-                totalBalance: total
-            }));
-        }
-
-    }, [formData.freight, formData.advances, formData.otherExpenses, formData.advance]);
-
-    const getErrorMessage = (error: any): string => {
-        if (!error) return 'Unknown error';
-        if (typeof error === 'string') return error;
-        if (error instanceof Error) return error.message;
-        if (typeof error === 'object') {
-            if (error.message && typeof error.message === 'string') return error.message;
-            if (error.details && typeof error.details === 'string') return error.details;
-            try {
-                return JSON.stringify(error);
-            } catch {
-                return 'Unserializable error object';
-            }
-        }
-        return String(error);
-    };
-
-    const loadData = async () => {
-        setIsLoading(true);
-        try {
-            const data = await getVehicleHirings();
-
-            // Sanitize data to ensure advances array exists
-            const sanitizedData = data.map(record => ({
-                ...record,
-                advances: Array.isArray(record.advances) && record.advances.length > 0
-                    ? record.advances
-                    : (record.advance ? [{ amount: record.advance, date: record.date || new Date().toISOString().split('T')[0], notes: 'Legacy Advance' }] : [])
-            }));
-
-            setRecords(sanitizedData);
-        } catch (error) {
-            console.error("Failed to load vehicle hirings:", error);
-            const msg = getErrorMessage(error);
-            const lowerMsg = msg.toLowerCase();
-            if (lowerMsg.includes('relation "vehicle_hirings" does not exist') || lowerMsg.includes('in the schema cache')) {
-                toast.error(
-                    "Database setup for Vehicle Hiring is missing. Please run the setup script from the Data Management dashboard.",
-                    { duration: 10000, id: 'vh-table-missing' }
-                );
+useEffect(() => {
+    if (view === 'form' && !formData.id && hasDraft) {
+        const timer = setTimeout(() => {
+            if (window.confirm('Found an unsaved hiring draft. Restore it?')) {
+                const restored = restoreDraft();
+                if (restored) {
+                    setFormData(restored);
+                    toast.success('Draft restored');
+                }
             } else {
-                toast.error(`Failed to load hiring data: ${msg}`);
+                clearDraft();
             }
-        } finally {
-            setIsLoading(false);
-        }
-    };
+        }, 300);
+        return () => clearTimeout(timer);
+    }
+}, [view, formData.id, hasDraft]);
 
-    const handleEdit = (record: VehicleHiringType) => {
-        setFormData({
+useEffect(() => {
+    loadData();
+}, []);
+
+// Auto-calculate balances
+useEffect(() => {
+    // Calculate total advance from the array. Ensure advances is an array.
+    const advancesList = Array.isArray(formData.advances) ? formData.advances : [];
+    const totalAdvance = advancesList.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    // If user manually entered advance before, we might want to respect it if list is empty, 
+    // but generally the list should drive the total. 
+    // To be safe, if list is empty but advance has value (legacy), use advance. 
+    // But for this feature, we want list to drive it.
+    // Let's assume if list has items, use list sum.
+
+    const finalAdvance = advancesList.length > 0 ? totalAdvance : (Number(formData.advance) || 0);
+
+    const balance = (Number(formData.freight) || 0) - finalAdvance;
+    const total = balance + (Number(formData.otherExpenses) || 0);
+
+    // Update state only if values changed to avoid infinite loop
+    if (formData.advance !== finalAdvance || formData.balance !== balance || formData.totalBalance !== total) {
+        setFormData(prev => ({
+            ...prev,
+            advance: finalAdvance,
+            balance: balance,
+            totalBalance: total
+        }));
+    }
+
+}, [formData.freight, formData.advances, formData.otherExpenses, formData.advance]);
+
+const getErrorMessage = (error: any): string => {
+    if (!error) return 'Unknown error';
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    if (typeof error === 'object') {
+        if (error.message && typeof error.message === 'string') return error.message;
+        if (error.details && typeof error.details === 'string') return error.details;
+        try {
+            return JSON.stringify(error);
+        } catch {
+            return 'Unserializable error object';
+        }
+    }
+    return String(error);
+};
+
+const loadData = async () => {
+    setIsLoading(true);
+    try {
+        const data = await getVehicleHirings();
+
+        // Sanitize data to ensure advances array exists
+        const sanitizedData = data.map(record => ({
             ...record,
-            advances: Array.isArray(record.advances) ? record.advances : []
-        });
-        setView('form');
-    };
+            advances: Array.isArray(record.advances) && record.advances.length > 0
+                ? record.advances
+                : (record.advance ? [{ amount: record.advance, date: record.date || new Date().toISOString().split('T')[0], notes: 'Legacy Advance' }] : [])
+        }));
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this record?')) return;
-        const toastId = toast.loading('Deleting...');
-        try {
-            await deleteVehicleHiring(id);
-            setRecords(prev => prev.filter(r => r.id !== id));
-            toast.success('Deleted successfully', { id: toastId });
-        } catch (error) {
-            toast.error(`Failed to delete: ${getErrorMessage(error)}`, { id: toastId });
+        setRecords(sanitizedData);
+    } catch (error) {
+        console.error("Failed to load vehicle hirings:", error);
+        const msg = getErrorMessage(error);
+        const lowerMsg = msg.toLowerCase();
+        if (lowerMsg.includes('relation "vehicle_hirings" does not exist') || lowerMsg.includes('in the schema cache')) {
+            toast.error(
+                "Database setup for Vehicle Hiring is missing. Please run the setup script from the Data Management dashboard.",
+                { duration: 10000, id: 'vh-table-missing' }
+            );
+        } else {
+            toast.error(`Failed to load hiring data: ${msg}`);
         }
-    };
+    } finally {
+        setIsLoading(false);
+    }
+};
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const toastId = toast.loading('Saving...');
-        try {
-            const payload = {
-                ...formData,
-                advances: Array.isArray(formData.advances) ? formData.advances : []
-            };
+const handleEdit = (record: VehicleHiringType) => {
+    setFormData({
+        ...record,
+        advances: Array.isArray(record.advances) ? record.advances : []
+    });
+    setView('form');
+};
 
-            const saved = await saveVehicleHiring(payload);
+const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this record?')) return;
+    const toastId = toast.loading('Deleting...');
+    try {
+        await deleteVehicleHiring(id);
+        setRecords(prev => prev.filter(r => r.id !== id));
+        toast.success('Deleted successfully', { id: toastId });
+    } catch (error) {
+        toast.error(`Failed to delete: ${getErrorMessage(error)}`, { id: toastId });
+    }
+};
 
-            // Update local state with saved record
-            const savedWithAdvances = {
-                ...saved,
-                advances: Array.isArray(saved.advances) ? saved.advances : []
-            };
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const toastId = toast.loading('Saving...');
+    try {
+        const payload = {
+            ...formData,
+            advances: Array.isArray(formData.advances) ? formData.advances : []
+        };
 
-            if (formData.id) {
-                setRecords(prev => prev.map(r => r.id === saved.id ? savedWithAdvances : r));
-            } else {
-                setRecords(prev => [savedWithAdvances, ...prev]);
-            }
+        const saved = await saveVehicleHiring(payload);
+
+        // Update local state with saved record
+        const savedWithAdvances = {
+            ...saved,
+            advances: Array.isArray(saved.advances) ? saved.advances : []
+        };
+
+        if (formData.id) {
+            setRecords(prev => prev.map(r => r.id === saved.id ? savedWithAdvances : r));
+        } else {
+            setRecords(prev => [savedWithAdvances, ...prev]);
             toast.success('Saved successfully', { id: toastId });
+            if (!formData.id) clearDraft();
             setView('list');
         } catch (error) {
             toast.error(`Failed to save: ${getErrorMessage(error)}`, { id: toastId });
@@ -629,7 +649,16 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                 <div className="max-w-4xl mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-gray-50 p-4 rounded-lg border">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Basic Details</h3>
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h3 className="text-lg font-bold text-gray-800">Basic Details</h3>
+                                {!formData.id && (
+                                    <DraftIndicator lastSaved={lastSaved} onClear={() => {
+                                        clearDraft();
+                                        setFormData(initialRecord);
+                                        toast.success('Draft cleared');
+                                    }} />
+                                )}
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Date*</label>

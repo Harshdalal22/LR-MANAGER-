@@ -262,22 +262,60 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
 
         try {
             const data = await file.arrayBuffer();
-            // cellDates: true ensures Excel serial dates are converted to JS Date objects
             const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
 
-            console.log("Imported Raw Data:", jsonData); // Debug log
+            // Smart Header Detection
+            // 1. Convert to array of arrays to scan content
+            const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+            let headerRowIndex = 0;
+            let foundHeader = false;
+
+            // Scan first 10 rows for known columns
+            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
+                // Check for existence of critical vehicle hiring columns
+                if ((rowStr.includes('date') || rowStr.includes('booking')) &&
+                    (rowStr.includes('lorry') || rowStr.includes('truck') || rowStr.includes('vehicle'))) {
+                    headerRowIndex = i;
+                    foundHeader = true;
+                    console.log("Found header at row:", i, rawRows[i]);
+                    break;
+                }
+            }
+
+            if (!foundHeader) {
+                // heuristic fallback: looks for 'Date'
+                for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                    const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
+                    if (rowStr.includes('date') && rowStr.includes('freight')) {
+                        headerRowIndex = i;
+                        foundHeader = true;
+                        break;
+                    }
+                }
+            }
+
+            console.log(`Using Header Row Index: ${headerRowIndex}`);
+
+            // 2. Parse again using the found header row
+            // range: headerRowIndex tells xlsx to start reading from that row
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
             if (jsonData.length === 0) {
-                toast.error("File is empty", { id: toastId });
+                toast.error("File appears empty or unreadable", { id: toastId });
                 setIsImporting(false);
                 return;
             }
 
             let successCount = 0;
             let failCount = 0;
+
+            // Collect keys found (for debugging/user feedback)
+            const foundKeys = jsonData.length > 0 ? Object.keys(jsonData[0] as object).join(', ') : 'None';
+            console.log("Found Keys:", foundKeys);
 
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {

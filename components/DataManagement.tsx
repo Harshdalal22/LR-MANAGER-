@@ -345,7 +345,35 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            // Smart Header Detection
+            const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+            let headerRowIndex = 0;
+            // Scan logic depends on active tab, but generic keywords usually work
+            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
+
+                if (activeTab === 'vehicle-hiring') {
+                    if (rowStr.includes('lorry') || rowStr.includes('truck') || (rowStr.includes('date') && rowStr.includes('freight'))) {
+                        headerRowIndex = i; break;
+                    }
+                } else if (activeTab === 'booking-register') {
+                    if (rowStr.includes('party') || rowStr.includes('customer') || (rowStr.includes('date') && rowStr.includes('freight'))) {
+                        headerRowIndex = i; break;
+                    }
+                } else if (activeTab === 'customer-details') {
+                    if (rowStr.includes('name') || rowStr.includes('party') || rowStr.includes('gst')) {
+                        headerRowIndex = i; break;
+                    }
+                } else if (activeTab === 'vehicle-fleet') {
+                    if (rowStr.includes('truck') || rowStr.includes('vehicle') || rowStr.includes('owner')) {
+                        headerRowIndex = i; break;
+                    }
+                }
+            }
+
+            console.log(`Using Header Row Index: ${headerRowIndex}`);
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
             console.log("Imported Raw Data (DataMgmt):", jsonData);
 
@@ -357,6 +385,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
 
             let successCount = 0;
             let failCount = 0;
+            const foundKeys = jsonData.length > 0 ? Object.keys(jsonData[0] as object).join(', ') : 'None';
+            console.log("Found Keys:", foundKeys);
 
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {

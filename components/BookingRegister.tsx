@@ -276,7 +276,27 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            // Smart Header Detection
+            const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+            let headerRowIndex = 0;
+            let foundHeader = false;
+
+            // Scan first 10 rows
+            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+                const rowStr = rawRows[i].map(c => String(c).toLowerCase().trim()).join(' ');
+                // Critical columns for Booking
+                if ((rowStr.includes('date')) &&
+                    (rowStr.includes('party') || rowStr.includes('customer'))) {
+                    headerRowIndex = i;
+                    foundHeader = true;
+                    console.log("Found Booking header at row:", i, rawRows[i]);
+                    break;
+                }
+            }
+
+            console.log(`Using Header Row Index: ${headerRowIndex}`);
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { range: headerRowIndex });
 
             console.log("Imported Raw Data (Bookings):", jsonData);
 

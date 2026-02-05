@@ -262,10 +262,13 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
 
         try {
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data);
+            // cellDates: true ensures Excel serial dates are converted to JS Date objects
+            const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            console.log("Imported Raw Data:", jsonData); // Debug log
 
             if (jsonData.length === 0) {
                 toast.error("File is empty", { id: toastId });
@@ -274,6 +277,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             }
 
             let successCount = 0;
+            let failCount = 0;
 
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {
@@ -285,48 +289,79 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                 return undefined;
             };
 
-            for (const row of jsonData) {
-                const hiring: VehicleHiringType = {
-                    date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
-                    lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']) || '',
-                    grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
-                    billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || '',
-                    driverNo: getValue(row, ['Driver Number', 'Driver No', 'Driver Phone', 'Driver Mobile']) || '',
-                    ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
-                    fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
-                    toPlace: getValue(row, ['To', 'Destination']) || '',
-                    freight: Number(getValue(row, ['Freight', 'Freight Amount', 'Total Freight'])) || 0,
-                    otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges', 'Misc Charges'])) || 0,
-                    advance: Number(getValue(row, ['Advance', 'Total Advance', 'Advance Amount'])) || 0,
-                    balance: 0,
-                    totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
-                    podStatus: (getValue(row, ['POD Status', 'POD']) === 'Completed' ? 'Completed' : 'Pending'),
-                    paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
-                };
-
-                // Auto-calculate balance if not explicitly provided or if we want to ensure consistency
-                const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
-
-                // If totalBalance wasn't in the file, or if we prefer calculation:
-                if (!hiring.totalBalance || hiring.totalBalance === 0) {
-                    hiring.totalBalance = calculatedBalance;
-                    hiring.balance = hiring.totalBalance - hiring.otherExpenses; // Back-calculate pure freight balance
-                } else {
-                    hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+            // Helper to safely parse dates
+            const parseDate = (val: any): string => {
+                if (!val) return new Date().toISOString().split('T')[0];
+                if (val instanceof Date) {
+                    // Adjust for timezone offset to prevent off-by-one errors
+                    const offset = val.getTimezoneOffset() * 60000;
+                    return new Date(val.getTime() - offset).toISOString().split('T')[0];
                 }
+                // Handle text dates (YYYY-MM-DD or DD/MM/YYYY)
+                if (typeof val === 'string') {
+                    // Try primitive parse
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                }
+                return new Date().toISOString().split('T')[0];
+            };
 
-                if (hiring.lorryNo) {
+            for (const row of jsonData) {
+                try {
+                    const lorryNo = getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']);
+
+                    // Skip empty rows
+                    if (!lorryNo) {
+                        failCount++;
+                        continue;
+                    }
+
+                    const hiring: VehicleHiringType = {
+                        date: parseDate(getValue(row, ['Date', 'Booking Date'])),
+                        lorryNo: String(lorryNo).trim(),
+                        grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || ''),
+                        billNo: String(getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || ''),
+                        driverNo: String(getValue(row, ['Driver Number', 'Driver No', 'Driver Phone', 'Driver Mobile']) || ''),
+                        ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
+                        fromPlace: String(getValue(row, ['From', 'Source', 'Origin']) || ''),
+                        toPlace: String(getValue(row, ['To', 'Destination']) || ''),
+                        freight: Number(getValue(row, ['Freight', 'Freight Amount', 'Total Freight'])) || 0,
+                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges', 'Misc Charges'])) || 0,
+                        advance: Number(getValue(row, ['Advance', 'Total Advance', 'Advance Amount'])) || 0,
+                        balance: 0,
+                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
+                        podStatus: (String(getValue(row, ['POD Status', 'POD'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending'),
+                        paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending')
+                    };
+
+                    // Auto-calculate balance
+                    const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
+
+                    if (!hiring.totalBalance || hiring.totalBalance === 0) {
+                        hiring.totalBalance = calculatedBalance;
+                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                    } else {
+                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                    }
+
                     await saveVehicleHiring(hiring);
                     successCount++;
+                } catch (err) {
+                    console.error("Row import failed:", row, err);
+                    failCount++;
                 }
             }
 
-            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
-            await loadData();
+            if (successCount > 0) {
+                toast.success(`Imported ${successCount} records! ${failCount > 0 ? `(${failCount} skipped)` : ''}`, { id: toastId });
+                await loadData();
+            } else {
+                toast.error(`No valid records found. ${failCount} skipped.`, { id: toastId });
+            }
 
         } catch (error) {
-            console.error(error);
-            toast.error("Failed to import file. Check format.", { id: toastId });
+            console.error("File processing error:", error);
+            toast.error("Failed to process file.", { id: toastId });
         } finally {
             setIsImporting(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

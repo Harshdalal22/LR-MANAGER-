@@ -272,10 +272,13 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
 
         try {
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data);
+            // cellDates: true ensures Excel serial dates are converted to JS Date objects
+            const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            console.log("Imported Raw Data (Bookings):", jsonData);
 
             if (jsonData.length === 0) {
                 toast.error("File is empty", { id: toastId });
@@ -284,6 +287,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
             }
 
             let successCount = 0;
+            let failCount = 0;
 
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {
@@ -295,47 +299,76 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 return undefined;
             };
 
-            for (const row of jsonData) {
-                const booking: BookingRecord = {
-                    date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
-                    partyName: getValue(row, ['Party Name', 'Party', 'Customer Name', 'Customer']) || '',
-                    grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
-                    billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No', 'Bill']) || '',
-                    lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck No', 'Vehicle No']) || '',
-                    lorryType: (getValue(row, ['Lorry Type', 'Type']) === 'Closed' ? 'Closed' : 'Open'),
-                    weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
-                    fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
-                    toPlace: getValue(row, ['To', 'Destination']) || '',
-                    freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
-                    advance: Number(getValue(row, ['Advance', 'Advance Amount', 'Less Advance'])) || 0,
-                    otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
-                    balance: 0,
-                    totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
-                    paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
-                };
-
-                // Auto-calculate logic
-                const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
-
-                if (!booking.totalBalance || booking.totalBalance === 0) {
-                    booking.totalBalance = calculatedBalance;
-                    booking.balance = booking.totalBalance - booking.otherExpenses;
-                } else {
-                    booking.balance = booking.totalBalance - booking.otherExpenses;
+            // Helper to safely parse dates
+            const parseDate = (val: any): string => {
+                if (!val) return new Date().toISOString().split('T')[0];
+                if (val instanceof Date) {
+                    const offset = val.getTimezoneOffset() * 60000;
+                    return new Date(val.getTime() - offset).toISOString().split('T')[0];
                 }
+                if (typeof val === 'string') {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                }
+                return new Date().toISOString().split('T')[0];
+            };
 
-                if (booking.partyName) {
+            for (const row of jsonData) {
+                try {
+                    const partyName = getValue(row, ['Party Name', 'Party', 'Customer Name', 'Customer']);
+
+                    // Skip rows without Party Name (Primary Key-ish)
+                    if (!partyName) {
+                        failCount++;
+                        continue;
+                    }
+
+                    const booking: BookingRecord = {
+                        date: parseDate(getValue(row, ['Date', 'Booking Date'])),
+                        partyName: String(partyName).trim(),
+                        grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || ''),
+                        billNo: String(getValue(row, ['Bill Number', 'Bill No', 'Invoice No', 'Bill']) || ''),
+                        lorryNo: String(getValue(row, ['Lorry Number', 'Lorry No', 'Truck No', 'Vehicle No']) || ''),
+                        lorryType: (String(getValue(row, ['Lorry Type', 'Type'])).toLowerCase() === 'open' ? 'Open' : 'Closed'),
+                        weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
+                        fromPlace: String(getValue(row, ['From', 'Source', 'Origin']) || ''),
+                        toPlace: String(getValue(row, ['To', 'Destination']) || ''),
+                        freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                        advance: Number(getValue(row, ['Advance', 'Advance Amount', 'Less Advance'])) || 0,
+                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
+                        balance: 0,
+                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
+                        paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending')
+                    };
+
+                    // Auto-calculate logic
+                    const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
+
+                    if (!booking.totalBalance || booking.totalBalance === 0) {
+                        booking.totalBalance = calculatedBalance;
+                        booking.balance = booking.totalBalance - booking.otherExpenses;
+                    } else {
+                        booking.balance = booking.totalBalance - booking.otherExpenses;
+                    }
+
                     await saveBookingRecord(booking);
                     successCount++;
+                } catch (err) {
+                    console.error("Booking Import Row Failed:", row, err);
+                    failCount++;
                 }
             }
 
-            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
-            await loadData();
+            if (successCount > 0) {
+                toast.success(`Imported ${successCount} records! ${failCount > 0 ? `(${failCount} skipped)` : ''}`, { id: toastId });
+                await loadData();
+            } else {
+                toast.error(`No valid records found. ${failCount} skipped.`, { id: toastId });
+            }
 
         } catch (error) {
-            console.error(error);
-            toast.error("Failed to import file. Check format.", { id: toastId });
+            console.error("File processing error:", error);
+            toast.error("Failed to process file.", { id: toastId });
         } finally {
             setIsImporting(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

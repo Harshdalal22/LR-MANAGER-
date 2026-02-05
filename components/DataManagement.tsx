@@ -341,10 +341,13 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
 
         try {
             const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data);
+            // cellDates: true ensures Excel serial dates are converted to JS Date objects
+            const workbook = XLSX.read(data, { cellDates: true });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
+
+            console.log("Imported Raw Data (DataMgmt):", jsonData);
 
             if (jsonData.length === 0) {
                 toast.error("File is empty", { id: toastId });
@@ -353,6 +356,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             }
 
             let successCount = 0;
+            let failCount = 0;
 
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {
@@ -364,105 +368,126 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 return undefined;
             };
 
-            if (activeTab === 'vehicle-hiring') {
-                for (const row of jsonData) {
-                    const hiring: VehicleHiring = {
-                        date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
-                        lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']) || '',
-                        grNo: getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || '',
-                        billNo: getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || '',
-                        driverNo: getValue(row, ['Driver Number', 'Driver No', 'Driver Phone']) || '',
-                        ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
-                        fromPlace: getValue(row, ['From', 'Source', 'Origin']) || '',
-                        toPlace: getValue(row, ['To', 'Destination']) || '',
-                        freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
-                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
-                        advance: Number(getValue(row, ['Advance', 'Avg Advance'])) || 0,
-                        balance: 0,
-                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
-                        podStatus: (getValue(row, ['POD Status', 'POD']) === 'Completed' ? 'Completed' : 'Pending'),
-                        paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
-                    };
+            // Helper to safely parse dates
+            const parseDate = (val: any): string => {
+                if (!val) return new Date().toISOString().split('T')[0];
+                if (val instanceof Date) {
+                    const offset = val.getTimezoneOffset() * 60000;
+                    return new Date(val.getTime() - offset).toISOString().split('T')[0];
+                }
+                if (typeof val === 'string') {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                }
+                return new Date().toISOString().split('T')[0];
+            };
 
-                    // Simple calc
-                    const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
-                    if (!hiring.totalBalance || hiring.totalBalance === 0) {
-                        hiring.totalBalance = calculatedBalance;
-                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
-                    } else {
-                        hiring.balance = hiring.totalBalance - hiring.otherExpenses;
-                    }
+            for (const row of jsonData) {
+                try {
+                    if (activeTab === 'vehicle-hiring') {
+                        const lorryNo = getValue(row, ['Lorry Number', 'Lorry No', 'Truck Number', 'Truck No', 'Vehicle No']);
+                        if (!lorryNo) { failCount++; continue; }
 
-                    if (hiring.lorryNo) {
+                        const hiring: VehicleHiring = {
+                            date: parseDate(getValue(row, ['Date', 'Booking Date'])),
+                            lorryNo: String(lorryNo).trim(),
+                            grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number', 'LR No']) || ''),
+                            billNo: String(getValue(row, ['Bill Number', 'Bill No', 'Invoice No']) || ''),
+                            driverNo: String(getValue(row, ['Driver Number', 'Driver No', 'Driver Phone']) || ''),
+                            ownerName: getValue(row, ['Owner Name', 'Owner']) === 'Self' ? 'Self' : 'Third Party',
+                            fromPlace: String(getValue(row, ['From', 'Source', 'Origin']) || ''),
+                            toPlace: String(getValue(row, ['To', 'Destination']) || ''),
+                            freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                            otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
+                            advance: Number(getValue(row, ['Advance', 'Avg Advance'])) || 0,
+                            balance: 0,
+                            totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Due'])) || 0,
+                            podStatus: (String(getValue(row, ['POD Status', 'POD'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending'),
+                            paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending')
+                        };
+
+                        const calculatedBalance = hiring.freight + hiring.otherExpenses - hiring.advance;
+                        if (!hiring.totalBalance || hiring.totalBalance === 0) {
+                            hiring.totalBalance = calculatedBalance;
+                            hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                        } else {
+                            hiring.balance = hiring.totalBalance - hiring.otherExpenses;
+                        }
+
                         await saveVehicleHiring(hiring);
-                        successCount++;
-                    }
-                }
-            } else if (activeTab === 'booking-register') {
-                for (const row of jsonData) {
-                    const booking: BookingRecord = {
-                        date: getValue(row, ['Date', 'Booking Date']) || new Date().toISOString().split('T')[0],
-                        partyName: getValue(row, ['Party Name', 'Party', 'Customer']) || '',
-                        grNo: getValue(row, ['GR Number', 'GR No', 'LR Number']) || '',
-                        billNo: getValue(row, ['Bill Number', 'Bill No']) || '',
-                        lorryNo: getValue(row, ['Lorry Number', 'Lorry No', 'Truck No']) || '',
-                        lorryType: (getValue(row, ['Lorry Type', 'Type']) === 'Closed' ? 'Closed' : 'Open'),
-                        weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
-                        fromPlace: getValue(row, ['From', 'Source']) || '',
-                        toPlace: getValue(row, ['To', 'Destination']) || '',
-                        freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
-                        advance: Number(getValue(row, ['Advance', 'Advance Amount'])) || 0,
-                        otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
-                        balance: 0,
-                        totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
-                        paymentStatus: (getValue(row, ['Payment Status', 'Status']) === 'Completed' ? 'Completed' : 'Pending')
-                    };
 
-                    const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
-                    if (!booking.totalBalance || booking.totalBalance === 0) {
-                        booking.totalBalance = calculatedBalance;
-                        booking.balance = booking.totalBalance - booking.otherExpenses;
-                    } else {
-                        booking.balance = booking.totalBalance - booking.otherExpenses;
-                    }
+                    } else if (activeTab === 'booking-register') {
+                        const partyName = getValue(row, ['Party Name', 'Party', 'Customer']);
+                        if (!partyName) { failCount++; continue; }
 
-                    if (booking.partyName) {
+                        const booking: BookingRecord = {
+                            date: parseDate(getValue(row, ['Date', 'Booking Date'])),
+                            partyName: String(partyName).trim(),
+                            grNo: String(getValue(row, ['GR Number', 'GR No', 'LR Number']) || ''),
+                            billNo: String(getValue(row, ['Bill Number', 'Bill No']) || ''),
+                            lorryNo: String(getValue(row, ['Lorry Number', 'Lorry No', 'Truck No']) || ''),
+                            lorryType: (String(getValue(row, ['Lorry Type', 'Type'])).toLowerCase() === 'closed' ? 'Closed' : 'Open'),
+                            weight: Number(getValue(row, ['Weight', 'Wt', 'Kgs'])) || 0,
+                            fromPlace: String(getValue(row, ['From', 'Source']) || ''),
+                            toPlace: String(getValue(row, ['To', 'Destination']) || ''),
+                            freight: Number(getValue(row, ['Freight', 'Freight Amount'])) || 0,
+                            advance: Number(getValue(row, ['Advance', 'Advance Amount'])) || 0,
+                            otherExpenses: Number(getValue(row, ['Other Expenses', 'Other Charges'])) || 0,
+                            balance: 0,
+                            totalBalance: Number(getValue(row, ['Total Balance', 'Balance', 'Total'])) || 0,
+                            paymentStatus: (String(getValue(row, ['Payment Status', 'Status'])).toLowerCase() === 'completed' ? 'Completed' : 'Pending')
+                        };
+
+                        const calculatedBalance = booking.freight + booking.otherExpenses - booking.advance;
+                        if (!booking.totalBalance || booking.totalBalance === 0) {
+                            booking.totalBalance = calculatedBalance;
+                            booking.balance = booking.totalBalance - booking.otherExpenses;
+                        } else {
+                            booking.balance = booking.totalBalance - booking.otherExpenses;
+                        }
+
                         await saveBookingRecord(booking);
-                        successCount++;
-                    }
-                }
-            } else if (activeTab === 'customer-details') {
-                for (const row of jsonData) {
-                    const party: SavedParty = {
-                        name: getValue(row, ['Party Name', 'Name', 'Customer Name']) || '',
-                        type: (getValue(row, ['Type']) === 'Consignor' || getValue(row, ['Type']) === 'Consignee') ? getValue(row, ['Type']) : 'Both',
-                        address: getValue(row, ['Address', 'Location']) || '',
-                        city: getValue(row, ['City', 'Place']) || '',
-                        gst: getValue(row, ['GSTIN', 'GST', 'GST No']) || '',
-                        contact: getValue(row, ['Contact', 'Mobile', 'Phone', 'Cell']) || '',
-                        pan: getValue(row, ['PAN', 'PAN No']) || ''
-                    };
-                    if (party.name) {
+
+                    } else if (activeTab === 'customer-details') {
+                        const rawName = getValue(row, ['Party Name', 'Name', 'Customer Name']);
+                        if (!rawName) { failCount++; continue; }
+
+                        const party: SavedParty = {
+                            name: String(rawName).trim(),
+                            type: (getValue(row, ['Type']) === 'Consignor' || getValue(row, ['Type']) === 'Consignee') ? getValue(row, ['Type']) : 'Both',
+                            address: String(getValue(row, ['Address', 'Location']) || ''),
+                            city: String(getValue(row, ['City', 'Place']) || ''),
+                            gst: String(getValue(row, ['GSTIN', 'GST', 'GST No']) || ''),
+                            contact: String(getValue(row, ['Contact', 'Mobile', 'Phone', 'Cell']) || ''),
+                            pan: String(getValue(row, ['PAN', 'PAN No']) || '')
+                        };
                         await saveSavedParty(party);
-                        successCount++;
-                    }
-                }
-            } else if (activeTab === 'vehicle-fleet') {
-                for (const row of jsonData) {
-                    const truck: SavedTruck = {
-                        truckNo: getValue(row, ['Truck Number', 'Truck No', 'Vehicle No', 'Lorry Number']) || '',
-                        ownerName: getValue(row, ['Owner Name', 'Owner']) || '',
-                        contactNumber: getValue(row, ['Contact Number', 'Mobile', 'Phone']) || ''
-                    };
-                    if (truck.truckNo) {
+
+                    } else if (activeTab === 'vehicle-fleet') {
+                        const rawTruck = getValue(row, ['Truck Number', 'Truck No', 'Vehicle No', 'Lorry Number']);
+                        if (!rawTruck) { failCount++; continue; }
+
+                        const truck: SavedTruck = {
+                            truckNo: String(rawTruck).trim(),
+                            ownerName: String(getValue(row, ['Owner Name', 'Owner']) || ''),
+                            contactNumber: String(getValue(row, ['Contact Number', 'Mobile', 'Phone']) || '')
+                        };
                         await saveSavedTruck(truck);
-                        successCount++;
                     }
+
+                    successCount++;
+                } catch (err) {
+                    console.error("DataMgmt Import Row Failed:", row, err);
+                    failCount++;
                 }
             }
 
-            toast.success(`Successfully imported ${successCount} records!`, { id: toastId });
-            await fetchData(); // Refresh data
+            if (successCount > 0) {
+                toast.success(`Imported ${successCount} records! ${failCount > 0 ? `(${failCount} skipped)` : ''}`, { id: toastId });
+                await fetchData(); // Refresh data
+            } else {
+                toast.error(`No valid records found. ${failCount} skipped. Check console for details.`, { id: toastId });
+            }
 
         } catch (error) {
             console.error(error);

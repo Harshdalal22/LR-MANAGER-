@@ -37,6 +37,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isImporting, setIsImporting] = useState(false);
+    const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Temp state for new payment entry
@@ -419,6 +420,50 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         }
     };
 
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            const allIds = filteredRecords.map(r => r.id).filter((id): id is number => id !== undefined);
+            setSelectedRows(new Set(allIds));
+        } else {
+            setSelectedRows(new Set());
+        }
+    };
+
+    const handleSelectRow = (id: number | undefined, checked: boolean) => {
+        if (!id) return;
+        const newSelected = new Set(selectedRows);
+        if (checked) {
+            newSelected.add(id);
+        } else {
+            newSelected.delete(id);
+        }
+        setSelectedRows(newSelected);
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedRows.size === 0) {
+            toast.error('No rows selected');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ${selectedRows.size} record(s)?`)) {
+            return;
+        }
+
+        const toastId = toast.loading('Deleting records...');
+        try {
+            await Promise.all(
+                Array.from(selectedRows).map(id => deleteBookingRecord(id))
+            );
+            toast.success(`Successfully deleted ${selectedRows.size} record(s)`, { id: toastId });
+            setSelectedRows(new Set());
+            await loadData();
+        } catch (error) {
+            console.error('Bulk delete error:', error);
+            toast.error('Failed to delete some records', { id: toastId });
+        }
+    };
+
     const filteredRecords = records.filter(r =>
         (r.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (r.grNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -441,6 +486,15 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 </div>
                 {view === 'list' && (
                     <div className="flex gap-2">
+                        {selectedRows.size > 0 && (
+                            <button
+                                onClick={handleBulkDelete}
+                                className="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors flex items-center gap-2 shadow-md"
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                                Delete ({selectedRows.size})
+                            </button>
+                        )}
                         <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx, .xls" />
                         <button
                             onClick={handleImportClick}
@@ -509,6 +563,14 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                         <table className="w-full text-sm text-left text-gray-700 bg-white">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                 <tr>
+                                    <th className="px-4 py-3 w-12">
+                                        <input
+                                            type="checkbox"
+                                            checked={filteredRecords.length > 0 && filteredRecords.every(r => r.id && selectedRows.has(r.id))}
+                                            onChange={(e) => handleSelectAll(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                    </th>
                                     <th className="px-4 py-3">Date</th>
                                     <th className="px-4 py-3">Party Name</th>
                                     <th className="px-4 py-3">GR No</th>
@@ -522,12 +584,20 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                             </thead>
                             <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan={9} className="p-8 text-center">Loading...</td></tr>
+                                    <tr><td colSpan={10} className="p-8 text-center">Loading...</td></tr>
                                 ) : filteredRecords.length === 0 ? (
-                                    <tr><td colSpan={9} className="p-8 text-center text-gray-500">No records found.</td></tr>
+                                    <tr><td colSpan={10} className="p-8 text-center text-gray-500">No records found.</td></tr>
                                 ) : (
                                     filteredRecords.map(r => (
                                         <tr key={r.id} className="border-b hover:bg-gray-50">
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={r.id ? selectedRows.has(r.id) : false}
+                                                    onChange={(e) => handleSelectRow(r.id, e.target.checked)}
+                                                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                />
+                                            </td>
                                             <td className="px-4 py-3">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
                                             <td className="px-4 py-3 font-medium text-gray-900">{r.partyName}</td>
                                             <td className="px-4 py-3 text-blue-600">{r.grNo}</td>

@@ -354,76 +354,116 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </h1>
 
                 {/* Vertical Stack on Mobile, Grid on Desktop */}
-                <div className="flex flex-col md:flex-row gap-6 w-full max-w-6xl px-4">
+                <div className="flex flex-col md:flex-row gap-4 md:gap-6 w-full max-w-6xl px-4">
+
+                    {/* Manager Approval Section (Admin Only - Moved to Main Screen) */}
+                    {managerRequests.length > 0 && currentRole === 'Admin' && (
+                        <div className="md:col-span-full w-full mb-2">
+                            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                </span>
+                                Pending Manager Requests
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {managerRequests.map(req => (
+                                    <div key={req.id} className="bg-white border-[3px] border-blue-100 p-4 md:p-5 rounded-2xl shadow-[0_8px_15px_-3px_rgba(37,99,235,0.2)] md:hover:shadow-[0_15px_30px_-5px_rgba(37,99,235,0.3)] transition-all flex flex-col justify-between h-full hover:-translate-y-1 animate-pulse">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h5 className="font-extrabold text-blue-900 text-lg sm:text-base">{req.manager_name}</h5>
+                                                <span className="bg-blue-100 text-blue-700 text-[10px] md:text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap ml-2 mt-0.5">New Request</span>
+                                            </div>
+                                            <p className="text-xs md:text-sm text-gray-500 mb-4 font-mono truncate">{req.manager_email}</p>
+                                        </div>
+                                        <div className="flex gap-2 w-full mt-auto pt-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onRejectManagerRequest && onRejectManagerRequest(req.id); }}
+                                                className="px-3 md:px-4 py-2 bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-xs md:text-sm font-bold hover:bg-gray-100 flex-1 shadow-sm active:scale-95 transition-transform"
+                                            >
+                                                Reject
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onApproveManagerRequest && onApproveManagerRequest(req); }}
+                                                className="px-3 md:px-4 py-2 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl text-xs md:text-sm font-bold shadow-[0_4px_10px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_15px_rgba(37,99,235,0.4)] flex-1 active:scale-95 transition-all"
+                                            >
+                                                Approve
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* LR Management Card */}
                     <div
                         onClick={() => setActiveSection('lr')}
-                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(37,99,235,0.15)] hover:shadow-[0_20px_50px_rgba(37,99,235,0.25)] border-2 border-transparent hover:border-blue-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-blue-500 sm:border-transparent sm:border-2 hover:border-blue-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(37,99,235,0.2)] md:shadow-[0_20px_50px_rgba(37,99,235,0.15)] md:hover:shadow-[0_20px_50px_rgba(37,99,235,0.25)]"
                     >
                         {/* 3D gradient blob */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                        <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-blue-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
 
                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-blue-200">
-                                <DocumentTextIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                            <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-3 sm:p-4 md:p-6 rounded-2xl shadow-[0_10px_15px_-3px_rgba(37,99,235,0.4)] group-hover:shadow-[0_15px_25px_-5px_rgba(37,99,235,0.5)] transition-shadow duration-300">
+                                <DocumentTextIcon className="w-6 h-6 sm:w-8 sm:h-8 md:w-12 md:h-12 text-white" />
                             </div>
-                            <div className="text-left">
-                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
-                                <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].lrManagementDesc}</p>
+                            <div className="text-left flex-grow">
+                                <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-blue-700 transition-colors">{t[language].lrManagement}</h2>
+                                <p className="text-xs sm:text-sm md:text-base text-gray-500 leading-snug md:leading-relaxed max-w-[200px] sm:max-w-xs">{t[language].lrManagementDesc}</p>
                             </div>
-                            <div className="ml-auto md:ml-0 md:mt-4">
-                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            <div className="ml-auto md:ml-0 md:mt-4 self-center md:self-start">
+                                <span className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm group-hover:shadow-[0_4px_10px_rgba(37,99,235,0.3)]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Data Management Card - Restricted for Managers to specific sub-items */}
+                    {/* Data Management Card */}
                     <div
                         onClick={() => setActiveSection('data')}
-                        className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(147,51,234,0.15)] hover:shadow-[0_20px_50px_rgba(147,51,234,0.25)] border-2 border-transparent hover:border-purple-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-purple-500 sm:border-transparent sm:border-2 hover:border-purple-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(147,51,234,0.2)] md:shadow-[0_20px_50px_rgba(147,51,234,0.15)] md:hover:shadow-[0_20px_50px_rgba(147,51,234,0.25)]"
                     >
                         {/* 3D gradient blob */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                        <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-purple-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
 
                         <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                            <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-purple-200">
-                                <DashboardIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                            <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-3 sm:p-4 md:p-6 rounded-2xl shadow-[0_10px_15px_-3px_rgba(147,51,234,0.4)] group-hover:shadow-[0_15px_25px_-5px_rgba(147,51,234,0.5)] transition-shadow duration-300">
+                                <DashboardIcon className="w-6 h-6 sm:w-8 sm:h-8 md:w-12 md:h-12 text-white" />
                             </div>
-                            <div className="text-left">
-                                <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
-                                <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs ">{rbacEnabled && currentRole === 'Manager' ? "Manage Parties and Trucks" : t[language].dataManagementDesc}</p>
+                            <div className="text-left flex-grow">
+                                <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-purple-700 transition-colors">{t[language].dataManagement}</h2>
+                                <p className="text-xs sm:text-sm md:text-base text-gray-500 leading-snug md:leading-relaxed max-w-[200px] sm:max-w-xs">{rbacEnabled && currentRole === 'Manager' ? "Manage Parties and Trucks" : t[language].dataManagementDesc}</p>
                             </div>
-                            <div className="ml-auto md:ml-0 md:mt-4">
-                                <span className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            <div className="ml-auto md:ml-0 md:mt-4 self-center md:self-start">
+                                <span className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-purple-50 text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all shadow-sm group-hover:shadow-[0_4px_10px_rgba(147,51,234,0.3)]">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                 </span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Emergency Card - Hidden for Managers */}
+                    {/* Emergency Card */}
                     {(!rbacEnabled || currentRole === 'Admin') && (
                         <div
                             onClick={() => setActiveSection('emergency')}
-                            className="group flex-1 bg-white rounded-3xl p-6 md:p-10 shadow-[0_20px_50px_rgba(220,38,38,0.15)] hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)] border-2 border-transparent hover:border-red-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-2 relative overflow-hidden"
+                            className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-red-500 sm:border-transparent sm:border-2 hover:border-red-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(220,38,38,0.2)] md:shadow-[0_20px_50px_rgba(220,38,38,0.15)] md:hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)]"
                         >
                             {/* 3D gradient blob */}
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-red-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-60"></div>
+                            <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-red-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
 
                             <div className="flex flex-row md:flex-col items-center md:items-start gap-4 md:gap-6 relative z-10">
-                                <div className="bg-gradient-to-br from-red-500 to-red-700 p-4 md:p-6 rounded-2xl shadow-lg shadow-red-200">
-                                    <ExclamationTriangleIcon className="w-8 h-8 md:w-12 md:h-12 text-white" />
+                                <div className="bg-gradient-to-br from-red-500 to-red-700 p-3 sm:p-4 md:p-6 rounded-2xl shadow-[0_10px_15px_-3px_rgba(220,38,38,0.4)] group-hover:shadow-[0_15px_25px_-5px_rgba(220,38,38,0.5)] transition-shadow duration-300">
+                                    <ExclamationTriangleIcon className="w-6 h-6 sm:w-8 sm:h-8 md:w-12 md:h-12 text-white" />
                                 </div>
-                                <div className="text-left">
-                                    <h2 className="text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-red-700 transition-colors">{t[language].emergency}</h2>
-                                    <p className="text-sm md:text-base text-gray-500 leading-relaxed max-w-xs">{t[language].emergencyDesc}</p>
+                                <div className="text-left flex-grow">
+                                    <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-800 mb-1 md:mb-3 group-hover:text-red-700 transition-colors">{t[language].emergency}</h2>
+                                    <p className="text-xs sm:text-sm md:text-base text-gray-500 leading-snug md:leading-relaxed max-w-[200px] sm:max-w-xs">{t[language].emergencyDesc}</p>
                                 </div>
-                                <div className="ml-auto md:ml-0 md:mt-4">
-                                    <span className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                <div className="ml-auto md:ml-0 md:mt-4 self-center md:self-start">
+                                    <span className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-50 text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all shadow-sm group-hover:shadow-[0_4px_10px_rgba(220,38,38,0.3)]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-6 sm:w-6 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                     </span>
                                 </div>
                             </div>
@@ -573,46 +613,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             {activeSection === 'data' && (
                 <div className="animate-slideIn">
                     <p className="text-gray-500 font-medium mb-6">{t[language].selectModule}</p>
-
-                    {/* Manager Approval Section (Admin Only) */}
-                    {managerRequests.length > 0 && currentRole === 'Admin' && (
-                        <div className="mb-8">
-                            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                                </span>
-                                Pending Manager Requests
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {managerRequests.map(req => (
-                                    <div key={req.id} className="bg-white border-2 border-blue-100 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all flex flex-col justify-between h-full">
-                                        <div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h5 className="font-extrabold text-blue-900 text-lg">{req.manager_name}</h5>
-                                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">New Request</span>
-                                            </div>
-                                            <p className="text-sm text-gray-500 mb-4 font-mono">{req.manager_email}</p>
-                                        </div>
-                                        <div className="flex gap-2 w-full mt-2">
-                                            <button
-                                                onClick={() => onRejectManagerRequest && onRejectManagerRequest(req.id)}
-                                                className="px-4 py-2 bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 flex-1 shadow-sm active:scale-95 transition-transform"
-                                            >
-                                                Reject
-                                            </button>
-                                            <button
-                                                onClick={() => onApproveManagerRequest && onApproveManagerRequest(req)}
-                                                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-md flex-1 active:scale-95 transition-transform"
-                                            >
-                                                Approve
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Vertical Stack on Mobile, Grid on Larger Screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

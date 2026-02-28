@@ -41,10 +41,22 @@ const Auth: React.FC = () => {
 
                     // Listen for the magic moment
                     listenToAccessRequest(request.id, async (sessionData) => {
-                        toast.success('Admin Approved Request! Signing you in...', { duration: 4000 });
-                        sessionStorage.setItem('roleSelected', 'true'); // Automatically skip Role Selection modal
-                        sessionStorage.setItem('currentRole', 'Manager'); // Ensure they login as Manager!
-                        await applySession(sessionData);
+                        try {
+                            toast.success('Admin Approved Request! Signing you in...', { duration: 4000 });
+                            sessionStorage.setItem('roleSelected', 'true'); // Automatically skip Role Selection modal
+                            sessionStorage.setItem('currentRole', 'Manager'); // Ensure they login as Manager!
+                            await applySession(sessionData);
+
+                            // Force a hard reload to reset all React states (like currentRole and session) cleanly
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        } catch (err: any) {
+                            console.error("Auto-login error:", err);
+                            toast.error(`Auto-login failed: ${err.message || 'Unknown error. Please refresh and try again.'}`);
+                            setWaitingForApproval(false);
+                            setLoading(false);
+                        }
                     });
                     break;
             }

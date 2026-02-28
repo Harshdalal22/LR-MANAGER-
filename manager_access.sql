@@ -42,3 +42,6 @@ USING (true);
 
 -- Notify PostgREST to reload schema
 NOTIFY pgrst, 'reload config';
+
+-- Enable Realtime for this table so Manager logins are instant
+ALTER PUBLICATION supabase_realtime ADD TABLE public.manager_access_requests;

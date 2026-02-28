@@ -180,7 +180,11 @@ export const createManagerAccessRequest = async (companyEmail: string, managerNa
 };
 
 export const listenToAccessRequest = (requestId: string, onApproved: (sessionData: any) => void) => {
-    return supabase.channel(`request-${requestId}`)
+    let resolved = false;
+    let interval: ReturnType<typeof setInterval>;
+
+    // 1. Try to use realtime (instant)
+    const channel = supabase.channel(`request-${requestId}`)
         .on('postgres_changes', {
             event: 'UPDATE',
             schema: 'public',
@@ -188,11 +192,41 @@ export const listenToAccessRequest = (requestId: string, onApproved: (sessionDat
             filter: `id=eq.${requestId}`
         }, (payload) => {
             const row = payload.new;
-            if (row.status === 'approved' && row.session_data) {
+            if (row.status === 'approved' && row.session_data && !resolved) {
+                resolved = true;
+                clearInterval(interval);
+                supabase.removeChannel(channel);
                 onApproved(row.session_data);
             }
         })
         .subscribe();
+
+    // 2. Fallback: poll every 3 seconds just in case Realtime fails or isn't enabled
+    interval = setInterval(async () => {
+        if (resolved) {
+            clearInterval(interval);
+            return;
+        }
+        const { data, error } = await supabase
+            .from('manager_access_requests')
+            .select('*')
+            .eq('id', requestId)
+            .single();
+
+        if (!error && data && data.status === 'approved' && data.session_data && !resolved) {
+            resolved = true;
+            clearInterval(interval);
+            supabase.removeChannel(channel);
+            onApproved(data.session_data);
+        }
+    }, 3000);
+
+    // Return a cleanup function
+    return () => {
+        resolved = true;
+        clearInterval(interval);
+        supabase.removeChannel(channel);
+    };
 };
 
 export const listenForAdminAccessRequests = (companyEmail: string, onRequestAdded: (request: any) => void) => {

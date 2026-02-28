@@ -283,9 +283,34 @@ export const rejectAccessRequest = async (requestId: string) => {
     if (error) throw error;
 };
 
-export const applySession = async (sessionData: { access_token: string; refresh_token: string }) => {
-    const { data, error } = await supabase.auth.setSession(sessionData);
-    if (error) throw error;
+export const applySession = async (sessionData: any) => {
+    let parsedData = sessionData;
+
+    // Sometimes PostgreSQL JSONB returns as a stringified JSON string instead of an object
+    if (typeof sessionData === 'string') {
+        try {
+            parsedData = JSON.parse(sessionData);
+        } catch (e) {
+            console.error("[Manager Auth] Failed to parse session data string:", sessionData);
+            throw new Error("Invalid session format received from server.");
+        }
+    }
+
+    if (!parsedData || !parsedData.access_token || !parsedData.refresh_token) {
+        console.error("[Manager Auth] Missing tokens in session data:", parsedData);
+        throw new Error("Missing access or refresh token in session payload.");
+    }
+
+    const { data, error } = await supabase.auth.setSession({
+        access_token: parsedData.access_token,
+        refresh_token: parsedData.refresh_token
+    });
+
+    if (error) {
+        console.error("[Manager Auth] supabase.auth.setSession failed:", error);
+        throw error;
+    }
+
     return data;
 };
 

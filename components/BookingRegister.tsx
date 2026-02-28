@@ -5,12 +5,11 @@ import { BookingRecord, PaymentRecord, SavedTruck } from '../types';
 import { getBookingRecords, saveBookingRecord, deleteBookingRecord, getSavedTrucks } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { DraftIndicator } from './DraftIndicator';
 
 interface BookingRegisterProps {
     onBack: () => void;
 }
+
 
 const initialRecord: BookingRecord = {
     date: new Date().toISOString().split('T')[0],
@@ -48,29 +47,6 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         date: new Date().toISOString().split('T')[0],
         notes: ''
     });
-
-    const { hasDraft, lastSaved, clearDraft, restoreDraft } = useAutoSave<BookingRecord>('booking-draft', formData, {
-        enabled: view === 'form' && !formData.id, // Only when form is open and creating NEW record
-        debounceMs: 1000
-    });
-
-    useEffect(() => {
-        // If we switch to form view and it's a new record, check for draft
-        if (view === 'form' && !formData.id && hasDraft) {
-            const timer = setTimeout(() => {
-                if (window.confirm('Found an unsaved booking draft. Restore it?')) {
-                    const restored = restoreDraft();
-                    if (restored) {
-                        setFormData(restored);
-                        toast.success('Draft restored');
-                    }
-                } else {
-                    clearDraft();
-                }
-            }, 300);
-            return () => clearTimeout(timer);
-        }
-    }, [view, formData.id, hasDraft]);
 
     useEffect(() => {
         loadData();
@@ -201,7 +177,6 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 setRecords(prev => prev.map(r => r.id === saved.id ? saved : r));
             } else {
                 setRecords(prev => [saved, ...prev]);
-                if (!formData.id) clearDraft();
             }
             toast.success('Saved successfully', { id: toastId });
             setView('list');
@@ -658,16 +633,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
                 <div className="max-w-4xl mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-gray-50 p-4 rounded-lg border">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 className="text-lg font-bold text-gray-800">Booking Details</h3>
-                                {!formData.id && (
-                                    <DraftIndicator lastSaved={lastSaved} onClear={() => {
-                                        clearDraft();
-                                        setFormData(initialRecord);
-                                        toast.success('Draft cleared');
-                                    }} />
-                                )}
-                            </div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Booking Details</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Booking ID</label>

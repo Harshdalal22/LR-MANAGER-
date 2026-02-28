@@ -7,8 +7,6 @@ import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon 
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { DraftIndicator } from './DraftIndicator';
 
 
 
@@ -77,44 +75,6 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [billingPartyType, setBillingPartyType] = useState<'Consignor' | 'Consignee' | 'Other'>('Consignor');
     const [showPreviewModal, setShowPreviewModal] = useState(false);
     const [isAiLoading, setIsAiLoading] = useState(false);
-
-    // Auto-save logic
-    const { hasDraft, lastSaved, clearDraft, restoreDraft } = useAutoSave<LorryReceipt>('lr-draft', formData, {
-        enabled: !existingLR, // Only auto-save if creating NEW record
-        debounceMs: 1000
-    });
-
-    // Check for draft on mount
-    useEffect(() => {
-        if (!existingLR && hasDraft) {
-            // Slight delay to ensure UI is ready and prevent immediate prompt on reload if user just saved
-            const timer = setTimeout(() => {
-                // If we are still showing initial state (empty form), prompt to restore
-                // We check a key field like lrNo or fromPlace to see if user has already started typing manually
-                // But generally, on mount with initial state, we are safe to ask.
-                if (window.confirm('We found an unsaved draft. Do you want to restore it?')) {
-                    const restored = restoreDraft();
-                    if (restored) {
-                        setFormData(restored);
-                        // Also restore billing party logic if needed
-                        if (JSON.stringify(restored.billingTo) === JSON.stringify(restored.consignor)) {
-                            setBillingPartyType('Consignor');
-                        } else if (JSON.stringify(restored.billingTo) === JSON.stringify(restored.consignee)) {
-                            setBillingPartyType('Consignee');
-                        } else {
-                            setBillingPartyType('Other');
-                        }
-                        toast.success('Draft restored successfully');
-                    }
-                } else {
-                    clearDraft(); // User explicitly said NO, so clear it
-                }
-            }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [existingLR, hasDraft]); // Intentionally not including restoreDraft/clearDraft in deps as they are stable
-
-
 
     useEffect(() => {
         if (existingLR) {
@@ -230,10 +190,6 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             return;
         }
         onSave(formData);
-        if (!existingLR) {
-            clearDraft();
-            toast.success('Draft cleared');
-        }
     };
 
     const handleCreateNew = () => {
@@ -353,14 +309,6 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             <SparklesIcon className="w-5 h-5 mr-2" />
                             {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
                         </button>
-                        {!existingLR && (
-                            <DraftIndicator lastSaved={lastSaved} onClear={() => {
-                                clearDraft();
-                                setFormData(initialLRState);
-                                setBillingPartyType('Consignor');
-                                toast.success('Draft discarded');
-                            }} />
-                        )}
                     </div>
                 </div>
 

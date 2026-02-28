@@ -5,8 +5,6 @@ import { VehicleHiring as VehicleHiringType, PaymentRecord } from '../types';
 import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { DraftIndicator } from './DraftIndicator';
 
 interface VehicleHiringProps {
     onBack: () => void;
@@ -47,28 +45,6 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
         date: new Date().toISOString().split('T')[0],
         notes: ''
     });
-
-    const { hasDraft, lastSaved, clearDraft, restoreDraft } = useAutoSave<VehicleHiringType>('vehicle-hiring-draft', formData, {
-        enabled: view === 'form' && !formData.id,
-        debounceMs: 1000
-    });
-
-    useEffect(() => {
-        if (view === 'form' && !formData.id && hasDraft) {
-            const timer = setTimeout(() => {
-                if (window.confirm('Found an unsaved hiring draft. Restore it?')) {
-                    const restored = restoreDraft();
-                    if (restored) {
-                        setFormData(restored);
-                        toast.success('Draft restored');
-                    }
-                } else {
-                    clearDraft();
-                }
-            }, 300);
-            return () => clearTimeout(timer);
-        }
-    }, [view, formData.id, hasDraft]);
 
     useEffect(() => {
         loadData();
@@ -194,7 +170,6 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             }
 
             toast.success('Saved successfully', { id: toastId });
-            if (!formData.id) clearDraft();
             setView('list');
         } catch (error) {
             toast.error(`Failed to save: ${getErrorMessage(error)}`, { id: toastId });
@@ -655,16 +630,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                 <div className="max-w-4xl mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="bg-gray-50 p-4 rounded-lg border">
-                            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                                <h3 className="text-lg font-bold text-gray-800">Basic Details</h3>
-                                {!formData.id && (
-                                    <DraftIndicator lastSaved={lastSaved} onClear={() => {
-                                        clearDraft();
-                                        setFormData(initialRecord);
-                                        toast.success('Draft cleared');
-                                    }} />
-                                )}
-                            </div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Basic Details</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-600 mb-1">Date*</label>

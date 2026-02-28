@@ -152,19 +152,21 @@ const Header: React.FC<HeaderProps> = ({
 
     return (
         <header className="bg-ssk-blue text-white shadow-lg sticky top-0 z-30">
-            <div className="container mx-auto p-4 flex justify-between items-center">
-                <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="container mx-auto p-2 sm:p-4 flex flex-row justify-between items-center gap-1 sm:gap-4">
+                <div className="flex items-center space-x-1.5 sm:space-x-4 flex-1 mr-1">
                     {companyDetails.logoUrl && (
-                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-10 sm:h-12 w-20 sm:w-24 object-contain bg-white p-1 rounded-sm" />
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-8 sm:h-12 w-auto max-w-[48px] sm:max-w-[96px] object-contain bg-white p-0.5 sm:p-1 rounded-sm shrink-0" />
                     )}
-                    <h1 className="text-lg sm:text-xl md:text-2xl font-bold tracking-tight">{companyDetails.name}</h1>
+                    <h1 className="text-[9px] min-[380px]:text-[10px] sm:text-xl md:text-2xl font-black uppercase leading-tight break-words" style={{ lineHeight: '1.2' }}>
+                        {companyDetails.name}
+                    </h1>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-1 sm:gap-4 shrink-0">
 
                     {companyDetails.rbacEnabled && (
-                        <div className="flex items-center bg-white/10 rounded-lg p-1 border border-white/20">
-                            <span className={`px-2 py-1 text-xs font-bold rounded ${currentRole === 'Admin' ? 'bg-ssk-red text-white' : 'bg-gray-500 text-white'}`}>
-                                {currentRole}
+                        <div className="flex items-center bg-white/10 rounded-lg p-0.5 sm:p-1 border border-white/20">
+                            <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold rounded ${currentRole === 'Admin' ? 'bg-ssk-red text-white' : 'bg-gray-500 text-white'}`}>
+                                {currentRole === 'Admin' ? 'Adm' : currentRole}
                             </span>
                             <button
                                 onClick={() => {
@@ -174,37 +176,37 @@ const Header: React.FC<HeaderProps> = ({
                                         setIsPasskeyModalOpen(true);
                                     }
                                 }}
-                                className="ml-2 px-2 py-1 text-xs font-semibold bg-white text-ssk-blue rounded hover:bg-gray-100"
+                                className="ml-1 sm:ml-2 px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-semibold bg-white text-ssk-blue rounded hover:bg-gray-100"
                             >
-                                Switch
+                                Sw
                             </button>
                         </div>
                     )}
 
                     {/* Language Switcher */}
-                    <div className="flex items-center bg-blue-800 rounded-full p-1 border border-blue-600">
+                    <div className="flex items-center bg-blue-800 rounded-full p-0.5 sm:p-1 border border-blue-600">
                         <button
                             onClick={() => setLanguage('en')}
-                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'en' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all ${language === 'en' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
                         >
                             EN
                         </button>
                         <button
                             onClick={() => setLanguage('hi')}
-                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${language === 'hi' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all ${language === 'hi' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
                         >
                             HI
                         </button>
                     </div>
 
                     {userEmail && (
-                        <div className="hidden sm:flex items-center gap-4">
-                            <span className="text-sm font-medium">{userEmail}</span>
+                        <div className="flex items-center gap-2 sm:gap-4">
+                            <span className="hidden md:inline-block text-sm font-medium">{userEmail}</span>
                             <button
                                 onClick={onSignOut}
-                                className="bg-ssk-red text-white px-3 py-1.5 rounded-md text-sm font-semibold hover:bg-red-700 transition-colors"
+                                className="bg-ssk-red text-white px-2 py-1 sm:px-3 sm:py-1.5 rounded text-[10px] sm:text-sm font-semibold hover:bg-red-700 transition-colors whitespace-nowrap"
                             >
-                                {t[language].signOut}
+                                Out
                             </button>
                         </div>
                     )}
@@ -213,10 +215,10 @@ const Header: React.FC<HeaderProps> = ({
                             setLocalDetails(companyDetails);
                             setIsSettingsOpen(true);
                         }}
-                        className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                        className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
                         aria-label="Open Settings"
                     >
-                        <CogIcon className="w-6 h-6" />
+                        <CogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                     </button>
                 </div>
             </div>

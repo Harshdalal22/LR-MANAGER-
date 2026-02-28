@@ -1,16 +1,19 @@
 
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { signUp, signIn, sendPasswordReset, signInWithGoogle } from '../services/supabaseService';
+import { signUp, signIn, sendPasswordReset, signInWithGoogle, createManagerAccessRequest, listenToAccessRequest, applySession } from '../services/supabaseService';
 import { BookOpenIcon, GoogleIcon } from './icons';
 
-type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
+type AuthView = 'sign_in' | 'sign_up' | 'forgot_password' | 'manager_request';
 
 const Auth: React.FC = () => {
     const [view, setView] = useState<AuthView>('sign_in');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [managerName, setManagerName] = useState('');
+    const [companyEmail, setCompanyEmail] = useState('');
     const [loading, setLoading] = useState(false);
+    const [waitingForApproval, setWaitingForApproval] = useState(false);
 
     const handleAuthAction = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -31,12 +34,27 @@ const Auth: React.FC = () => {
                     await sendPasswordReset(email);
                     toast.success('Password reset email sent! Please check your inbox.', { id: toastId, duration: 6000 });
                     break;
+                case 'manager_request':
+                    const request = await createManagerAccessRequest(companyEmail, managerName, email);
+                    setWaitingForApproval(true);
+                    toast.success('Request sent! Waiting for Admin to approve...', { id: toastId, duration: 4000 });
+
+                    // Listen for the magic moment
+                    listenToAccessRequest(request.id, async (sessionData) => {
+                        toast.success('Admin Approved Request! Signing you in...', { duration: 4000 });
+                        sessionStorage.setItem('roleSelected', 'true'); // Automatically skip Role Selection modal
+                        sessionStorage.setItem('currentRole', 'Manager'); // Ensure they login as Manager!
+                        await applySession(sessionData);
+                    });
+                    break;
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
             toast.error(errorMessage, { id: toastId });
+            setWaitingForApproval(false);
         } finally {
-            setLoading(false);
+            if (view !== 'manager_request') setLoading(false);
+            else if (!waitingForApproval) setLoading(false);
         }
     };
 
@@ -49,27 +67,28 @@ const Auth: React.FC = () => {
         } catch (error) {
             console.error("Google Auth Error:", error);
             const errorMessage = error instanceof Error ? error.message : 'Google Sign In failed.';
-            
+
             toast.error(
                 <div>
                     <span className="font-bold">Login Failed: </span>
                     {errorMessage}
-                    <br/>
+                    <br />
                     <span className="text-xs mt-1 block opacity-90">
                         Check that your Google Cloud Project is NOT in "Testing" mode, or your email is added to "Test Users".
                     </span>
-                </div>, 
+                </div>,
                 { id: toastId, duration: 6000 }
             );
             setLoading(false);
         }
     };
-    
+
     const renderHeader = () => {
         switch (view) {
             case 'sign_in': return 'Welcome Back';
             case 'sign_up': return 'Join Bilty Book';
             case 'forgot_password': return 'Reset Password';
+            case 'manager_request': return 'Manager Access';
         }
     };
 
@@ -78,24 +97,26 @@ const Auth: React.FC = () => {
             case 'sign_in': return 'Enter your credentials to access your dashboard.';
             case 'sign_up': return 'Create a new account to manage your LRs.';
             case 'forgot_password': return 'Enter your email to receive a reset link.';
+            case 'manager_request': return 'Send a request to your admin for instant access.';
         }
     };
-    
+
     const renderButtonText = () => {
         switch (view) {
             case 'sign_in': return 'Sign In';
             case 'sign_up': return 'Create Account';
             case 'forgot_password': return 'Send Link';
+            case 'manager_request': return 'Request Access';
         }
     };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-200 via-gray-100 to-slate-200 py-12 px-4 sm:px-6 lg:px-8">
             <div className="w-full max-w-md space-y-8 relative">
-                
+
                 {/* 3D Card Container */}
                 <div className="bg-white rounded-3xl shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] border border-gray-100 p-10 relative overflow-hidden">
-                    
+
                     {/* Decorative Background Elements */}
                     <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
                     <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
@@ -113,80 +134,130 @@ const Auth: React.FC = () => {
 
                     {/* 3D Tabs / Toggle */}
                     {view !== 'forgot_password' && (
-                        <div className="flex p-1 bg-gray-100 rounded-xl shadow-inner mb-8 relative z-10">
+                        <div className="flex flex-wrap sm:flex-nowrap p-1 bg-gray-100 rounded-xl shadow-inner mb-8 relative z-10 text-xs sm:text-sm">
                             <button
                                 onClick={() => setView('sign_in')}
-                                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${
-                                    view === 'sign_in'
-                                        ? 'bg-white text-blue-700 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06)] transform scale-105'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
+                                className={`flex-1 min-w-[30%] py-2.5 font-bold rounded-lg transition-all duration-300 ${view === 'sign_in'
+                                    ? 'bg-white text-blue-700 shadow-md transform scale-105 z-10'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
                             >
-                                Sign In
+                                Admin Login
+                            </button>
+                            <button
+                                onClick={() => setView('manager_request')}
+                                className={`flex-1 min-w-[30%] py-2.5 font-bold rounded-lg transition-all duration-300 ${view === 'manager_request'
+                                    ? 'bg-white text-blue-700 shadow-md transform scale-105 z-10'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Manager
                             </button>
                             <button
                                 onClick={() => setView('sign_up')}
-                                className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all duration-300 ${
-                                    view === 'sign_up'
-                                        ? 'bg-white text-blue-700 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06)] transform scale-105'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                }`}
+                                className={`flex-1 py-2.5 font-bold rounded-lg transition-all duration-300 ${view === 'sign_up'
+                                    ? 'bg-white text-blue-700 shadow-md transform scale-105 z-10'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
                             >
                                 Sign Up
                             </button>
                         </div>
                     )}
 
-                    <form className="space-y-6 relative z-10" onSubmit={handleAuthAction}>
-                        <div>
-                            <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-1 ml-1">Email Address</label>
-                            <input
-                                id="email"
-                                name="email"
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:z-10 sm:text-sm shadow-inner bg-gray-50 transition-all duration-200"
-                                placeholder="name@company.com"
-                            />
-                        </div>
-
-                        {view !== 'forgot_password' && (
-                            <div>
-                                <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-1 ml-1">Password</label>
-                                <input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    autoComplete={view === 'sign_in' ? "current-password" : "new-password"}
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:z-10 sm:text-sm shadow-inner bg-gray-50 transition-all duration-200"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                        )}
-
-                        <div>
+                    {waitingForApproval ? (
+                        <div className="text-center py-10 relative z-10 isolate animate-pulse">
+                            <div className="w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+                            <h3 className="text-2xl font-bold text-blue-900 mb-2">Waiting for Admin</h3>
+                            <p className="text-gray-500">We have notified the Admin. Please wait here, you will be automatically logged in once approved.</p>
                             <button
-                                type="submit"
-                                disabled={loading}
-                                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_-10px_rgba(59,130,246,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(59,130,246,0.6)] transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                                onClick={() => setWaitingForApproval(false)}
+                                className="mt-8 text-sm font-semibold text-gray-500 hover:text-blue-600 underline"
                             >
-                                {loading ? (
-                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                ) : renderButtonText()}
+                                Cancel Request
                             </button>
                         </div>
-                    </form>
+                    ) : (
+                        <form className="space-y-6 relative z-10" onSubmit={handleAuthAction}>
+                            {view === 'manager_request' && (
+                                <>
+                                    <div>
+                                        <label htmlFor="companyEmail" className="block text-sm font-bold text-gray-700 mb-1 ml-1">Company (Admin) Email</label>
+                                        <input
+                                            id="companyEmail"
+                                            type="email"
+                                            required
+                                            value={companyEmail}
+                                            onChange={(e) => setCompanyEmail(e.target.value)}
+                                            className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 shadow-inner bg-gray-50 transition-all duration-200"
+                                            placeholder="admin@company.com"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="managerName" className="block text-sm font-bold text-gray-700 mb-1 ml-1">Your Name</label>
+                                        <input
+                                            id="managerName"
+                                            type="text"
+                                            required
+                                            value={managerName}
+                                            onChange={(e) => setManagerName(e.target.value)}
+                                            className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 shadow-inner bg-gray-50 transition-all duration-200"
+                                            placeholder="John Manager"
+                                        />
+                                    </div>
+                                </>
+                            )}
 
-                    {view !== 'forgot_password' && (
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-1 ml-1">{view === 'manager_request' ? "Your Email" : "Email Address"}</label>
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    autoComplete="email"
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:z-10 sm:text-sm shadow-inner bg-gray-50 transition-all duration-200"
+                                    placeholder={view === 'manager_request' ? "you@gmail.com" : "name@company.com"}
+                                />
+                            </div>
+
+                            {(view === 'sign_in' || view === 'sign_up') && (
+                                <div>
+                                    <label htmlFor="password" className="block text-sm font-bold text-gray-700 mb-1 ml-1">Password</label>
+                                    <input
+                                        id="password"
+                                        name="password"
+                                        type="password"
+                                        autoComplete={view === 'sign_in' ? "current-password" : "new-password"}
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="appearance-none relative block w-full px-4 py-3 border border-gray-200 placeholder-gray-400 text-gray-900 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 focus:z-10 sm:text-sm shadow-inner bg-gray-50 transition-all duration-200"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                            )}
+
+                            <div>
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_10px_20px_-10px_rgba(59,130,246,0.5)] hover:shadow-[0_15px_30px_-10px_rgba(59,130,246,0.6)] transform hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200"
+                                >
+                                    {loading ? (
+                                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    ) : renderButtonText()}
+                                </button>
+                            </div>
+                        </form>
+                    )}
+
+                    {(view === 'sign_in' || view === 'sign_up') && !waitingForApproval && (
                         <div className="mt-4 relative z-10">
                             <div className="relative">
                                 <div className="absolute inset-0 flex items-center">
@@ -227,7 +298,7 @@ const Auth: React.FC = () => {
                         ) : null}
                     </div>
                 </div>
-                
+
                 {/* Bottom Shadow Reflection */}
                 <div className="absolute top-full left-10 right-10 h-4 bg-black/10 blur-xl rounded-[50%]"></div>
             </div>

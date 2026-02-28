@@ -162,6 +162,84 @@ export const updateUserPassword = async (password: string) => {
     if (error) throw error;
 };
 
+// --- Manager Access Requests ---
+
+export const createManagerAccessRequest = async (companyEmail: string, managerName: string, managerEmail: string) => {
+    const { data, error } = await supabase
+        .from('manager_access_requests')
+        .insert([{
+            company_email: companyEmail.toLowerCase().trim(),
+            manager_name: managerName,
+            manager_email: managerEmail,
+            status: 'pending'
+        }])
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+};
+
+export const listenToAccessRequest = (requestId: string, onApproved: (sessionData: any) => void) => {
+    return supabase.channel(`request-${requestId}`)
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'manager_access_requests',
+            filter: `id=eq.${requestId}`
+        }, (payload) => {
+            const row = payload.new;
+            if (row.status === 'approved' && row.session_data) {
+                onApproved(row.session_data);
+            }
+        })
+        .subscribe();
+};
+
+export const listenForAdminAccessRequests = (companyEmail: string, onRequestAdded: (request: any) => void) => {
+    return supabase.channel(`admin-requests-${companyEmail}`)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'manager_access_requests',
+            filter: `company_email=eq.${companyEmail.toLowerCase().trim()}`
+        }, (payload) => {
+            onRequestAdded(payload.new);
+        })
+        .subscribe();
+};
+
+export const getPendingAccessRequests = async (companyEmail: string) => {
+    const { data, error } = await supabase
+        .from('manager_access_requests')
+        .select('*')
+        .eq('company_email', companyEmail.toLowerCase().trim())
+        .eq('status', 'pending');
+    if (error && error.code !== 'PGRST116') throw error; // Ignore table missing for now
+    return data || [];
+};
+
+export const approveAccessRequest = async (requestId: string, sessionData: any) => {
+    const { error } = await supabase
+        .from('manager_access_requests')
+        .update({ status: 'approved', session_data: sessionData })
+        .eq('id', requestId);
+    if (error) throw error;
+};
+
+export const rejectAccessRequest = async (requestId: string) => {
+    const { error } = await supabase
+        .from('manager_access_requests')
+        .update({ status: 'rejected' })
+        .eq('id', requestId);
+    if (error) throw error;
+};
+
+export const applySession = async (sessionData: { access_token: string; refresh_token: string }) => {
+    const { data, error } = await supabase.auth.setSession(sessionData);
+    if (error) throw error;
+    return data;
+};
+
 // --- Lorry Receipts ---
 
 export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {

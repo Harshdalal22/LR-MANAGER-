@@ -47,7 +47,11 @@ import {
     getSavedTrucks,
     saveSavedTruck,
     deleteSavedTruck,
-    updateUserPassword
+    updateUserPassword,
+    getPendingAccessRequests,
+    listenForAdminAccessRequests,
+    approveAccessRequest,
+    rejectAccessRequest
 } from './services/supabaseService';
 import { t, Language } from './utils/translations';
 
@@ -86,13 +90,16 @@ const App: React.FC = () => {
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
     const [isPasswordResetting, setIsPasswordResetting] = useState(false);
-    const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager'>('Admin');
+    const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager'>(() => {
+        return (sessionStorage.getItem('currentRole') as 'Admin' | 'Manager') || 'Admin';
+    });
     const [showRoleSelection, setShowRoleSelection] = useState(false);
     const [roleSelectionError, setRoleSelectionError] = useState('');
     const [isVerifyPasswordModalOpen, setIsVerifyPasswordModalOpen] = useState(false);
     const [passwordForVerification, setPasswordForVerification] = useState('');
     const [headerSettingsTrigger, setHeaderSettingsTrigger] = useState(0);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+    const [managerRequests, setManagerRequests] = useState<any[]>([]);
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
@@ -202,6 +209,55 @@ const App: React.FC = () => {
             }
         }
     }, [session, companyDetails.rbacEnabled]);
+
+    // Listen for Manager Access Requests
+    useEffect(() => {
+        if (session?.user?.email && currentRole === 'Admin') {
+            getPendingAccessRequests(session.user.email)
+                .then(reqs => setManagerRequests(reqs))
+                .catch(e => console.error("Error fetching requests:", e));
+
+            const subscription = listenForAdminAccessRequests(session.user.email, (newReq) => {
+                setManagerRequests(prev => [...prev, newReq]);
+                toast(`New Manager Access Request from ${newReq.manager_name}`, { icon: '👋', duration: 6000 });
+            });
+
+            return () => { subscription.unsubscribe(); };
+        } else {
+            setManagerRequests([]);
+        }
+    }, [session?.user?.email, currentRole]);
+
+    const handleApproveManagerRequest = async (request: any) => {
+        if (!session) return;
+        const toastId = toast.loading('Approving request and generating session...');
+        try {
+            // Give the manager our session (access and refresh token)
+            const currentSession = await getSession();
+            if (!currentSession) throw new Error("No active session to share.");
+
+            await approveAccessRequest(request.id, {
+                access_token: currentSession.access_token,
+                refresh_token: currentSession.refresh_token
+            });
+
+            setManagerRequests(prev => prev.filter(req => req.id !== request.id));
+            toast.success(`${request.manager_name} has been granted Manager access!`, { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to approve request");
+        }
+    };
+
+    const handleRejectManagerRequest = async (requestId: string) => {
+        try {
+            await rejectAccessRequest(requestId);
+            setManagerRequests(prev => prev.filter(req => req.id !== requestId));
+            toast.success('Request rejected.');
+        } catch (error) {
+            handleError(error, "Failed to reject request");
+        }
+    };
 
     const handleSaveLR = async (lr: LorryReceipt) => {
         const toastId = toast.loading('Saving LR...');
@@ -313,6 +369,7 @@ const App: React.FC = () => {
             setSession(null);
             setIsPasswordResetting(false);
             sessionStorage.removeItem('roleSelected');
+            sessionStorage.removeItem('currentRole');
             setCurrentRole('Admin');
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
@@ -346,6 +403,7 @@ const App: React.FC = () => {
             }
         }
         setCurrentRole(role);
+        sessionStorage.setItem('currentRole', role);
         toast.success(`Switched to ${role} mode`);
 
         // If switching to Manager while in restricted view, go to dashboard
@@ -374,6 +432,7 @@ const App: React.FC = () => {
 
         // Set role and mark as selected
         setCurrentRole(role);
+        sessionStorage.setItem('currentRole', role);
         setShowRoleSelection(false);
         setRoleSelectionError('');
         sessionStorage.setItem('roleSelected', 'true');
@@ -408,6 +467,7 @@ const App: React.FC = () => {
             // Success! Unlock Admin
             toast.success("Identity Verified! Admin access granted.", { id: toastId });
             setCurrentRole('Admin');
+            sessionStorage.setItem('currentRole', 'Admin');
 
             // Close all blocking modals
             setIsVerifyPasswordModalOpen(false);
@@ -588,6 +648,43 @@ const App: React.FC = () => {
                 onForgotPasskey={handleForgotPasskeyTrigger}
             />
             <main className="container mx-auto p-4 md:p-6">
+
+                {/* Manager Access Request Notification for Admin */}
+                {managerRequests.length > 0 && currentRole === 'Admin' && (
+                    <div className="mb-6 space-y-3">
+                        {managerRequests.map(req => (
+                            <div key={req.id} className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-xl shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 animate-fadeIn">
+                                <div>
+                                    <h4 className="text-lg font-bold text-blue-900 flex items-center gap-2">
+                                        <span className="relative flex h-3 w-3">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                        </span>
+                                        Manager Access Request
+                                    </h4>
+                                    <p className="text-sm text-blue-800 mt-1 pl-5">
+                                        <span className="font-bold">{req.manager_name}</span> ({req.manager_email}) is requesting Manager access to this device/browser.
+                                    </p>
+                                </div>
+                                <div className="flex gap-2 w-full sm:w-auto pl-5 sm:pl-0">
+                                    <button
+                                        onClick={() => handleRejectManagerRequest(req.id)}
+                                        className="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-50 flex-1 sm:flex-none"
+                                    >
+                                        Reject
+                                    </button>
+                                    <button
+                                        onClick={() => handleApproveManagerRequest(req)}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow flex-1 sm:flex-none"
+                                    >
+                                        Approve & Login
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {renderContent()}
                 <AdBanner />
             </main>

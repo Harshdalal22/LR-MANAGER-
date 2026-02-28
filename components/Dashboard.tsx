@@ -15,6 +15,9 @@ interface DashboardProps {
     setActiveSection: (section: 'lr' | 'data' | 'emergency' | null) => void;
     currentRole: 'Admin' | 'Manager';
     rbacEnabled?: boolean;
+    managerRequests?: any[]; // Array of pending requests
+    onApproveManagerRequest?: (request: any) => void;
+    onRejectManagerRequest?: (requestId: string) => void;
 }
 
 interface StatCardProps {
@@ -284,7 +287,21 @@ const FreightTrendChart: React.FC<{ data: { label: string; value: number; dateSt
 };
 
 
-const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewList, onEditLR, setCurrentView, language, activeSection, setActiveSection, currentRole, rbacEnabled }) => {
+const Dashboard: React.FC<DashboardProps> = ({
+    lorryReceipts,
+    onAddNew,
+    onViewList,
+    onEditLR,
+    setCurrentView,
+    language,
+    activeSection,
+    setActiveSection,
+    currentRole,
+    rbacEnabled,
+    managerRequests = [],
+    onApproveManagerRequest,
+    onRejectManagerRequest
+}) => {
 
     // --- Metric Calculations ---
     const totalLRs = lorryReceipts.length;
@@ -556,6 +573,46 @@ const Dashboard: React.FC<DashboardProps> = ({ lorryReceipts, onAddNew, onViewLi
             {activeSection === 'data' && (
                 <div className="animate-slideIn">
                     <p className="text-gray-500 font-medium mb-6">{t[language].selectModule}</p>
+
+                    {/* Manager Approval Section (Admin Only) */}
+                    {managerRequests.length > 0 && currentRole === 'Admin' && (
+                        <div className="mb-8">
+                            <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                                </span>
+                                Pending Manager Requests
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {managerRequests.map(req => (
+                                    <div key={req.id} className="bg-white border-2 border-blue-100 p-5 rounded-2xl shadow-md hover:shadow-lg transition-all flex flex-col justify-between h-full">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h5 className="font-extrabold text-blue-900 text-lg">{req.manager_name}</h5>
+                                                <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">New Request</span>
+                                            </div>
+                                            <p className="text-sm text-gray-500 mb-4 font-mono">{req.manager_email}</p>
+                                        </div>
+                                        <div className="flex gap-2 w-full mt-2">
+                                            <button
+                                                onClick={() => onRejectManagerRequest && onRejectManagerRequest(req.id)}
+                                                className="px-4 py-2 bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 flex-1 shadow-sm active:scale-95 transition-transform"
+                                            >
+                                                Reject
+                                            </button>
+                                            <button
+                                                onClick={() => onApproveManagerRequest && onApproveManagerRequest(req)}
+                                                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 shadow-md flex-1 active:scale-95 transition-transform"
+                                            >
+                                                Approve
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Vertical Stack on Mobile, Grid on Larger Screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

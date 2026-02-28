@@ -53,10 +53,13 @@ const Auth: React.FC = () => {
                             }, 1500);
                         } catch (err: any) {
                             console.error("Auto-login error:", err);
-                            toast.error(`Auto-login failed: ${err.message || 'Unknown error. Please refresh and try again.'}`);
+                            toast.error(err.message || 'Auto-login failed. Please refresh and try again.');
                             setWaitingForApproval(false);
                             setLoading(false);
                         }
+                    }, (err) => {
+                        console.error("Listener error:", err);
+                        toast.error(`Error checking approval status: ${err.message || 'Unknown error'}`);
                     });
                     break;
             }

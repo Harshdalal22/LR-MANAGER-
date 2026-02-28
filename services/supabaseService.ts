@@ -179,9 +179,11 @@ export const createManagerAccessRequest = async (companyEmail: string, managerNa
     return data;
 };
 
-export const listenToAccessRequest = (requestId: string, onApproved: (sessionData: any) => void) => {
+export const listenToAccessRequest = (requestId: string, onApproved: (sessionData: any) => void, onError?: (err: any) => void) => {
     let resolved = false;
     let interval: ReturnType<typeof setInterval>;
+
+    console.log(`[Manager Auth] Starting listener for request: ${requestId}`);
 
     // 1. Try to use realtime (instant)
     const channel = supabase.channel(`request-${requestId}`)
@@ -191,15 +193,19 @@ export const listenToAccessRequest = (requestId: string, onApproved: (sessionDat
             table: 'manager_access_requests',
             filter: `id=eq.${requestId}`
         }, (payload) => {
+            console.log("[Manager Auth] Realtime UPDATE received:", payload);
             const row = payload.new;
             if (row.status === 'approved' && row.session_data && !resolved) {
+                console.log("[Manager Auth] Request approved via Realtime!");
                 resolved = true;
                 clearInterval(interval);
                 supabase.removeChannel(channel);
                 onApproved(row.session_data);
             }
         })
-        .subscribe();
+        .subscribe((status, err) => {
+            console.log("[Manager Auth] Realtime subscription status:", status, err);
+        });
 
     // 2. Fallback: poll every 3 seconds just in case Realtime fails or isn't enabled
     interval = setInterval(async () => {
@@ -207,22 +213,31 @@ export const listenToAccessRequest = (requestId: string, onApproved: (sessionDat
             clearInterval(interval);
             return;
         }
+        console.log(`[Manager Auth] Polling for request ${requestId}...`);
         const { data, error } = await supabase
             .from('manager_access_requests')
             .select('*')
             .eq('id', requestId)
             .single();
 
-        if (!error && data && data.status === 'approved' && data.session_data && !resolved) {
-            resolved = true;
-            clearInterval(interval);
-            supabase.removeChannel(channel);
-            onApproved(data.session_data);
+        if (error) {
+            console.error("[Manager Auth] Polling error:", error);
+            if (onError) onError(error);
+        } else if (data) {
+            console.log(`[Manager Auth] Polled status: ${data.status}`);
+            if (data.status === 'approved' && data.session_data && !resolved) {
+                console.log("[Manager Auth] Request approved via Polling!");
+                resolved = true;
+                clearInterval(interval);
+                supabase.removeChannel(channel);
+                onApproved(data.session_data);
+            }
         }
     }, 3000);
 
     // Return a cleanup function
     return () => {
+        console.log(`[Manager Auth] Cleaning up listener for ${requestId}`);
         resolved = true;
         clearInterval(interval);
         supabase.removeChannel(channel);

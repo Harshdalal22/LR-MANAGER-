@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS public.manager_access_requests (
 -- Enable RLS
 ALTER TABLE public.manager_access_requests ENABLE ROW LEVEL SECURITY;
 
+-- Grant access to anon and authenticated roles
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.manager_access_requests TO anon, authenticated, service_role;
+
 -- Allow anyone to insert a request (since managers are not logged in yet)
 DROP POLICY IF EXISTS "Allow public inserts on requests" ON public.manager_access_requests;
 CREATE POLICY "Allow public inserts on requests" 

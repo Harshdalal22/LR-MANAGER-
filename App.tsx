@@ -490,7 +490,7 @@ const App: React.FC = () => {
     const renderContent = () => {
         // RBAC Restriction logic
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
-        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices', 'list'];
 
         if (isManager && restrictedViews.includes(currentView)) {
             return (

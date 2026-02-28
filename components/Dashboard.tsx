@@ -498,14 +498,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="animate-slideIn space-y-6">
                     {/* Actions Scroll View for Mobile */}
                     <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                        <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
-                            <InvoiceIcon className="w-5 h-5 mr-2" />
-                            {t[language].invoices}
-                        </button>
-                        <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
-                            <ListIcon className="w-5 h-5 mr-2" />
-                            {t[language].viewList}
-                        </button>
+                        {(!rbacEnabled || currentRole === 'Admin') && (
+                            <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
+                                <InvoiceIcon className="w-5 h-5 mr-2" />
+                                {t[language].invoices}
+                            </button>
+                        )}
+                        {(!rbacEnabled || currentRole === 'Admin') && (
+                            <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
+                                <ListIcon className="w-5 h-5 mr-2" />
+                                {t[language].viewList}
+                            </button>
+                        )}
                         <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
                             <CreateIcon className="w-5 h-5 mr-2" />
                             {t[language].createLR}
@@ -513,99 +517,103 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Stat Cards - Vertical Stack on Mobile */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard
-                            icon={<TruckIcon />}
-                            title={t[language].totalLRs}
-                            value={totalLRs}
-                            color="blue"
-                            onClick={onViewList}
-                        />
-                        <StatCard
-                            icon={<CurrencyRupeeIcon />}
-                            title={t[language].freightValue}
-                            value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
-                            color="green"
-                        />
-                        <StatCard
-                            icon={<UsersIcon />}
-                            title={t[language].consignors}
-                            value={uniqueConsignors}
-                            color="purple"
-                        />
-                        <StatCard
-                            icon={<UploadIcon />}
-                            title={t[language].pendingPODs}
-                            value={podsPending}
-                            color="orange"
-                        />
-                    </div>
-
-                    {/* Status Overview Grid */}
-                    <div className="bg-white rounded-3xl p-5 shadow-lg border border-gray-100">
-                        <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CreateIcon />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="blue" />
-                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<TruckIcon />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="yellow" />
-                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<ClockIcon />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="orange" />
-                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CheckCircleIcon />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="green" />
-                            <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<XIcon />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="red" />
-                        </div>
-                    </div>
-
-                    {/* Chart & Recent Activity */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                        {/* Recent Activity Card */}
-                        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
-                            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                                <h2 className="text-lg font-bold text-gray-800">{t[language].recentLRs}</h2>
+                    {(!rbacEnabled || currentRole === 'Admin') && (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <StatCard
+                                    icon={<TruckIcon />}
+                                    title={t[language].totalLRs}
+                                    value={totalLRs}
+                                    color="blue"
+                                    onClick={onViewList}
+                                />
+                                <StatCard
+                                    icon={<CurrencyRupeeIcon />}
+                                    title={t[language].freightValue}
+                                    value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
+                                    color="green"
+                                />
+                                <StatCard
+                                    icon={<UsersIcon />}
+                                    title={t[language].consignors}
+                                    value={uniqueConsignors}
+                                    color="purple"
+                                />
+                                <StatCard
+                                    icon={<UploadIcon />}
+                                    title={t[language].pendingPODs}
+                                    value={podsPending}
+                                    color="orange"
+                                />
                             </div>
-                            <div className="p-0">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
-                                            <tr>
-                                                <th className="px-6 py-4">LR No</th>
-                                                <th className="px-6 py-4 hidden sm:table-cell">Date</th>
-                                                <th className="px-6 py-4">Truck</th>
-                                                <th className="px-6 py-4 text-right">Freight</th>
-                                                <th className="px-6 py-4 text-center">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {recentLRs.map(lr => (
-                                                <tr key={lr.lrNo} className="hover:bg-blue-50/30 transition-colors">
-                                                    <td className="px-6 py-4 font-bold text-blue-600">{lr.lrNo}</td>
-                                                    <td className="px-6 py-4 hidden sm:table-cell text-gray-600">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-                                                            <span className="font-mono text-gray-700">{lr.truckNo}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <button onClick={() => onEditLR(lr.lrNo)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
-                                                            <PencilIcon className="w-4 h-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+
+                            {/* Status Overview Grid */}
+                            <div className="bg-white rounded-3xl p-5 shadow-lg border border-gray-100">
+                                <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                                    <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CreateIcon />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="blue" />
+                                    <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<TruckIcon />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="yellow" />
+                                    <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<ClockIcon />} title={t[language].outForDelivery} value={statusCounts['Out for Delivery'] || 0} color="orange" />
+                                    <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CheckCircleIcon />} title={t[language].delivered} value={statusCounts['Delivered'] || 0} color="green" />
+                                    <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<XIcon />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="red" />
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Chart Card */}
-                        <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 flex flex-col">
-                            <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
-                            <div className="flex-grow flex items-center justify-center min-h-[200px]">
-                                <FreightTrendChart data={chartData} />
+                            {/* Chart & Recent Activity */}
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                                {/* Recent Activity Card */}
+                                <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                                    <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                                        <h2 className="text-lg font-bold text-gray-800">{t[language].recentLRs}</h2>
+                                    </div>
+                                    <div className="p-0">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="text-xs text-gray-500 bg-gray-50 uppercase font-semibold">
+                                                    <tr>
+                                                        <th className="px-6 py-4">LR No</th>
+                                                        <th className="px-6 py-4 hidden sm:table-cell">Date</th>
+                                                        <th className="px-6 py-4">Truck</th>
+                                                        <th className="px-6 py-4 text-right">Freight</th>
+                                                        <th className="px-6 py-4 text-center">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {recentLRs.map(lr => (
+                                                        <tr key={lr.lrNo} className="hover:bg-blue-50/30 transition-colors">
+                                                            <td className="px-6 py-4 font-bold text-blue-600">{lr.lrNo}</td>
+                                                            <td className="px-6 py-4 hidden sm:table-cell text-gray-600">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
+                                                            <td className="px-6 py-4">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-2 h-2 rounded-full bg-gray-400"></div>
+                                                                    <span className="font-mono text-gray-700">{lr.truckNo}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
+                                                            <td className="px-6 py-4 text-center">
+                                                                <button onClick={() => onEditLR(lr.lrNo)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
+                                                                    <PencilIcon className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Chart Card */}
+                                <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 flex flex-col">
+                                    <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
+                                    <div className="flex-grow flex items-center justify-center min-h-[200px]">
+                                        <FreightTrendChart data={chartData} />
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             )}
 

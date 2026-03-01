@@ -47,22 +47,23 @@ const StatCard: React.FC<StatCardProps> = ({ icon, title, value, color, onClick,
         <div
             onClick={onClick}
             className={`
-                relative overflow-hidden
-                bg-white rounded-2xl p-5
-                border-b-4 ${styles.border}
-                shadow-lg ${styles.shadow}
-                transform transition-all duration-200
-                active:scale-95 hover:-translate-y-1
+                group relative overflow-hidden
+                bg-white rounded-3xl p-6
+                border border-gray-100 border-b-8 ${styles.border}
+                shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)]
+                transform transition-all duration-500 ease-out
+                active:scale-95 hover:-translate-y-2
                 flex items-center justify-between
+                animate-fadeInUp
                 ${onClick ? 'cursor-pointer' : ''}
                 ${className}
             `}
         >
-            <div className="z-10">
-                <p className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">{title}</p>
-                <p className="text-2xl font-extrabold text-gray-800">{value}</p>
+            <div className="z-10 relative">
+                <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-2 group-hover:text-gray-600 transition-colors">{title}</p>
+                <p className="text-3xl font-black text-gray-800 tracking-tight">{value}</p>
             </div>
-            <div className={`p-3 rounded-xl ${styles.bg} ${styles.text} shadow-inner`}>
+            <div className={`p-4 rounded-2xl ${styles.bg} ${styles.text} shadow-inner group-hover:scale-110 transition-transform duration-500 relative z-10`}>
                 {React.cloneElement(icon, { className: "w-8 h-8" })}
             </div>
             {/* Decorative background circle */}
@@ -94,34 +95,38 @@ const ManagementCard: React.FC<{ title: string; description?: string; icon: Reac
             target={href ? "_blank" : undefined}
             rel={href ? "noreferrer" : undefined}
             className={`
-                group relative
-                bg-white rounded-2xl p-6
-                shadow-xl hover:shadow-2xl
-                border border-gray-100
-                transform transition-all duration-300
-                hover:-translate-y-2 active:scale-95
+                group relative overflow-hidden
+                bg-white rounded-3xl p-6 md:p-8
+                shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)]
+                border border-gray-100 border-b-[6px] border-gray-200 hover:border-b-[6px] hover:border-[${gradient.split(' ')[1].replace('to-', '')}]
+                transform transition-all duration-500 ease-out
+                hover:-translate-y-2 active:scale-95 active:border-b-2
                 cursor-pointer
-                flex flex-row sm:flex-col items-center sm:text-center gap-4
+                flex flex-row sm:flex-col items-center sm:text-center gap-5
                 block no-underline
+                animate-fadeInUp
             `}
         >
+            {/* 3D background blob */}
+            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full opacity-10 bg-gradient-to-br ${gradient} blur-2xl -mr-10 -mt-10 group-hover:scale-150 transition-transform duration-700`}></div>
+
             {/* Icon Container */}
             <div className={`
-                p-4 rounded-2xl
+                p-5 rounded-3xl relative z-10
                 bg-gradient-to-br ${gradient}
-                text-white shadow-lg
-                flex-shrink-0
+                text-white shadow-xl group-hover:shadow-2xl
+                flex-shrink-0 group-hover:scale-110 transition-transform duration-500
             `}>
                 {React.cloneElement(icon, { className: "w-8 h-8" })}
             </div>
 
             {/* Text Content */}
-            <div className="flex-grow">
-                <h3 className="text-lg font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
+            <div className="flex-grow relative z-10">
+                <h3 className="text-xl font-black text-gray-800 group-hover:text-blue-600 transition-colors tracking-tight">
                     {title}
                 </h3>
                 {description && (
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    <p className="text-sm text-gray-400 mt-2 leading-relaxed font-medium">
                         {description}
                     </p>
                 )}
@@ -156,9 +161,12 @@ const EmergencyServiceCard: React.FC<{
     const style = themeStyles[colorTheme];
 
     return (
-        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden flex flex-col h-full transform transition-all hover:scale-[1.02]">
-            <div className={`h-24 bg-gradient-to-r ${style.gradient} relative`}>
-                <div className="absolute -bottom-8 left-6 p-4 bg-white rounded-2xl shadow-md">
+        <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.15)] border border-gray-100 overflow-hidden flex flex-col h-full transform transition-all duration-500 ease-out hover:-translate-y-2 group animate-fadeInUp">
+            <div className={`h-28 bg-gradient-to-r ${style.gradient} relative overflow-hidden`}>
+                {/* Abstract geometric shapes for modern feel */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-xl transform translate-x-10 -translate-y-10 group-hover:scale-150 transition-transform duration-700"></div>
+
+                <div className="absolute -bottom-8 left-6 p-4 bg-white rounded-2xl shadow-xl border border-gray-50 group-hover:scale-110 transition-transform duration-500 z-10">
                     {React.cloneElement(icon, { className: `w-8 h-8 ${style.text}` })}
                 </div>
             </div>
@@ -174,7 +182,7 @@ const EmergencyServiceCard: React.FC<{
                 </ul>
                 <button
                     onClick={onAction}
-                    className={`w-full py-3 rounded-xl text-white font-bold text-sm shadow-md transition-colors ${style.btn}`}
+                    className={`w-full py-4 rounded-2xl text-white font-black text-sm shadow-[0_4px_14px_0_rgba(0,0,0,0.1)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.15)] transition-all active:scale-95 ${style.btn}`}
                 >
                     {actionText}
                 </button>
@@ -186,7 +194,7 @@ const EmergencyServiceCard: React.FC<{
 const QuickActionButton: React.FC<{ icon: React.ReactElement; label: string; color: string; onClick: () => void }> = ({ icon, label, color, onClick }) => (
     <button
         onClick={onClick}
-        className={`flex flex-col items-center justify-center p-4 rounded-2xl bg-white border border-gray-100 shadow-md active:scale-95 transition-all ${color}`}
+        className={`group flex flex-col items-center justify-center p-4 rounded-[1.5rem] bg-white border border-gray-100 shadow-[0_4px_20px_rgb(0,0,0,0.04)] hover:shadow-[0_10px_25px_rgb(0,0,0,0.1)] active:scale-90 transform transition-all duration-300 hover:-translate-y-1 ${color}`}
     >
         <div className="mb-2 transform scale-110">
             {icon}
@@ -348,8 +356,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     // --- RENDER: MAIN SELECTION MENU ---
     if (!activeSection) {
         return (
-            <div className="flex flex-col items-center justify-start md:justify-center min-h-[70vh] gap-6 animate-fadeIn pt-8 pb-20">
-                <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 mb-4 text-center drop-shadow-sm tracking-tight leading-tight">
+            <div className="flex flex-col items-center justify-start md:justify-center min-h-[70vh] gap-6 animate-fadeInUp pt-8 pb-20">
+                <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 mb-4 text-center drop-shadow-md tracking-tight leading-tight animate-fadeInUp" style={{ animationDelay: '0.1s' }}>
                     {t[language].welcome}
                 </h1>
 
@@ -399,7 +407,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {/* LR Management Card */}
                     <div
                         onClick={() => setActiveSection('lr')}
-                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-blue-500 sm:border-transparent sm:border-2 hover:border-blue-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(37,99,235,0.2)] md:shadow-[0_20px_50px_rgba(37,99,235,0.15)] md:hover:shadow-[0_20px_50px_rgba(37,99,235,0.25)]"
+                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border border-gray-100 hover:border-blue-200 cursor-pointer transition-all duration-500 transform active:scale-95 hover:-translate-y-3 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(37,99,235,0.3)] animate-fadeInUp" style={{ animationDelay: '0.2s' }}
                     >
                         {/* 3D gradient blob */}
                         <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-blue-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
@@ -423,7 +431,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {/* Data Management Card */}
                     <div
                         onClick={() => setActiveSection('data')}
-                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-purple-500 sm:border-transparent sm:border-2 hover:border-purple-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(147,51,234,0.2)] md:shadow-[0_20px_50px_rgba(147,51,234,0.15)] md:hover:shadow-[0_20px_50px_rgba(147,51,234,0.25)]"
+                        className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border border-gray-100 hover:border-purple-200 cursor-pointer transition-all duration-500 transform active:scale-95 hover:-translate-y-3 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(147,51,234,0.3)] animate-fadeInUp" style={{ animationDelay: '0.3s' }}
                     >
                         {/* 3D gradient blob */}
                         <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-purple-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
@@ -448,7 +456,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {(!rbacEnabled || currentRole === 'Admin') && (
                         <div
                             onClick={() => setActiveSection('emergency')}
-                            className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border-b-4 sm:border-b-0 border-red-500 sm:border-transparent sm:border-2 hover:border-red-100 cursor-pointer transition-all duration-300 transform active:scale-[0.98] sm:hover:-translate-y-2 relative overflow-hidden shadow-[0_8px_20px_-5px_rgba(220,38,38,0.2)] md:shadow-[0_20px_50px_rgba(220,38,38,0.15)] md:hover:shadow-[0_20px_50px_rgba(220,38,38,0.25)]"
+                            className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border border-gray-100 hover:border-red-200 cursor-pointer transition-all duration-500 transform active:scale-95 hover:-translate-y-3 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(220,38,38,0.3)] animate-fadeInUp" style={{ animationDelay: '0.4s' }}
                         >
                             {/* 3D gradient blob */}
                             <div className="absolute top-0 right-0 w-24 h-24 md:w-32 md:h-32 bg-red-100 rounded-full blur-2xl md:blur-3xl -mr-8 -mt-8 md:-mr-10 md:-mt-10 opacity-70 group-hover:scale-110 transition-transform duration-500"></div>
@@ -495,7 +503,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* --- SECTION: LR MANAGEMENT --- */}
             {activeSection === 'lr' && (
-                <div className="animate-slideIn space-y-6">
+                <div className="animate-fadeInUp space-y-6">
                     {/* Actions Scroll View for Mobile */}
                     <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
                         {(!rbacEnabled || currentRole === 'Admin') && (
@@ -548,8 +556,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             {/* Status Overview Grid */}
-                            <div className="bg-white rounded-3xl p-5 shadow-lg border border-gray-100">
-                                <h3 className="text-lg font-extrabold text-gray-800 mb-4">{t[language].shipmentStatus}</h3>
+                            <div className="bg-white rounded-[2rem] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100">
+                                <h3 className="text-xl font-black text-gray-800 mb-5 tracking-tight">{t[language].shipmentStatus}</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                                     <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<CreateIcon />} title={t[language].booked} value={statusCounts['Booked'] || 0} color="blue" />
                                     <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<TruckIcon />} title={t[language].inTransit} value={statusCounts['In Transit'] || 0} color="yellow" />
@@ -563,9 +571,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                                 {/* Recent Activity Card */}
-                                <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+                                <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 overflow-hidden">
                                     <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                                        <h2 className="text-lg font-bold text-gray-800">{t[language].recentLRs}</h2>
+                                        <h2 className="text-xl font-black text-gray-800 tracking-tight">{t[language].recentLRs}</h2>
                                     </div>
                                     <div className="p-0">
                                         <div className="overflow-x-auto">
@@ -605,8 +613,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
 
                                 {/* Chart Card */}
-                                <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-6 flex flex-col">
-                                    <h2 className="text-lg font-bold text-gray-800 mb-6">{t[language].weeklyTrend}</h2>
+                                <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 p-6 flex flex-col">
+                                    <h2 className="text-xl font-black text-gray-800 mb-6 tracking-tight">{t[language].weeklyTrend}</h2>
                                     <div className="flex-grow flex items-center justify-center min-h-[200px]">
                                         <FreightTrendChart data={chartData} />
                                     </div>
@@ -619,7 +627,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* --- SECTION: DATA MANAGEMENT --- */}
             {activeSection === 'data' && (
-                <div className="animate-slideIn">
+                <div className="animate-fadeInUp space-y-6">
                     <p className="text-gray-500 font-medium mb-6">{t[language].selectModule}</p>
 
                     {/* Vertical Stack on Mobile, Grid on Larger Screens */}
@@ -671,7 +679,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* --- SECTION: EMERGENCY (REVAMPED) --- */}
             {activeSection === 'emergency' && (
-                <div className="animate-slideIn">
+                <div className="animate-fadeInUp space-y-6">
                     <p className="text-gray-500 font-medium mb-6">{t[language].emergencySubtitle}</p>
 
                     {/* Quick Actions Grid (Mobile-First Sticky/Prominent) */}

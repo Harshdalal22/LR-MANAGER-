@@ -512,17 +512,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {t[language].invoices}
                             </button>
                         )}
+                        {/* View List button - accessible to ALL roles including Manager */}
+                        <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
+                            <ListIcon className="w-5 h-5 mr-2" />
+                            {t[language].viewList}
+                        </button>
                         {(!rbacEnabled || currentRole === 'Admin') && (
-                            <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
-                                <ListIcon className="w-5 h-5 mr-2" />
-                                {t[language].viewList}
+                            <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
+                                <CreateIcon className="w-5 h-5 mr-2" />
+                                {t[language].createLR}
                             </button>
                         )}
-                        <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
-                            <CreateIcon className="w-5 h-5 mr-2" />
-                            {t[language].createLR}
-                        </button>
                     </div>
+
+                    {/* Manager Info Banner */}
+                    {rbacEnabled && currentRole === 'Manager' && (
+                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-amber-800 text-sm font-medium animate-fadeInUp">
+                            <span className="text-lg">👁️</span>
+                            <span>You are in <strong>View Only</strong> mode. You can view all LRs and their details, but cannot create, edit or delete them.</span>
+                        </div>
+                    )}
 
                     {/* Stat Cards - Vertical Stack on Mobile */}
                     {(!rbacEnabled || currentRole === 'Admin') && (

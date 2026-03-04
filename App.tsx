@@ -167,6 +167,16 @@ const App: React.FC = () => {
 
         setupAuth();
 
+        // Fallback: Check URL hash explicitly for recovery links in case event is missed
+        const hash = window.location.hash;
+        if (hash && hash.includes('type=recovery')) {
+            setIsPasswordResetting(true);
+            // We delay clearing the hash so Supabase has time to process the token and set the session
+            setTimeout(() => {
+                window.history.replaceState(null, '', window.location.pathname);
+            }, 2000);
+        }
+
         return () => {
             authSubscription?.unsubscribe();
         };
@@ -407,6 +417,7 @@ const App: React.FC = () => {
         toast.success(`Switched to ${role} mode`);
 
         // If switching to Manager while in restricted view, go to dashboard
+        // 'list' is now accessible to managers, so excluded from restricted
         const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
         if (role === 'Manager' && companyDetails.rbacEnabled && restrictedViews.includes(currentView)) {
             setCurrentView('dashboard');
@@ -490,7 +501,8 @@ const App: React.FC = () => {
     const renderContent = () => {
         // RBAC Restriction logic
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
-        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices', 'list'];
+        // 'list' is now accessible to managers (read-only mode enforced in LRList)
+        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
 
         if (isManager && restrictedViews.includes(currentView)) {
             return (
@@ -550,6 +562,7 @@ const App: React.FC = () => {
                         }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
+                        isReadOnly={isManager}
                     />
                 );
             case 'form':

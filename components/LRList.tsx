@@ -19,6 +19,7 @@ interface LRListProps {
     onViewPOD: (podPath: string) => void;
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
     language: Language;
+    isReadOnly?: boolean;
 }
 
 const statusColors: { [key in LRStatus]: string } = {
@@ -29,18 +30,19 @@ const statusColors: { [key in LRStatus]: string } = {
     'Cancelled': 'bg-red-100 text-red-800',
 };
 
-const LRList: React.FC<LRListProps> = ({ 
-    lorryReceipts, 
-    onEdit, 
-    onDelete, 
-    onAddNew, 
-    companyDetails, 
-    onBackToDashboard, 
+const LRList: React.FC<LRListProps> = ({
+    lorryReceipts,
+    onEdit,
+    onDelete,
+    onAddNew,
+    companyDetails,
+    onBackToDashboard,
     onUpdateStatus,
     onOpenPODUploader,
     onViewPOD,
     onUpdateInvoiceDetails,
-    language
+    language,
+    isReadOnly = false
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LRStatus | 'All'>('All');
@@ -48,18 +50,18 @@ const LRList: React.FC<LRListProps> = ({
     const [previewLR, setPreviewLR] = useState<LorryReceipt | null>(null);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [isBulkPrinting, setIsBulkPrinting] = useState(false);
-    
+
     // Bulk print settings
     const [bulkPrintShowAmounts, setBulkPrintShowAmounts] = useState(true);
 
     const filteredLRs = useMemo(() => {
         return lorryReceipts.filter(lr => {
-            const matchesSearch = 
+            const matchesSearch =
                 lr.lrNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 lr.consignor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 lr.consignee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 lr.truckNo.toLowerCase().includes(searchTerm.toLowerCase());
-            
+
             const matchesStatus = statusFilter === 'All' || lr.status === statusFilter;
 
             return matchesSearch && matchesStatus;
@@ -98,7 +100,7 @@ const LRList: React.FC<LRListProps> = ({
         if (selectedLRs.size === 0) return;
         setShowInvoiceModal(true);
     };
-    
+
     const getStatusIcon = (status: LRStatus) => {
         switch (status) {
             case 'Booked': return <DocumentTextIcon className="w-4 h-4" />;
@@ -120,24 +122,29 @@ const LRList: React.FC<LRListProps> = ({
                     </button>
                     <h2 className="text-2xl font-bold text-gray-800">{t[language].viewList}</h2>
                     <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>
+                    {isReadOnly && (
+                        <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
+                            👁️ View Only
+                        </span>
+                    )}
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                     <div className="relative">
-                        <input 
-                            type="text" 
-                            placeholder={t[language].searchPlaceholder} 
+                    <div className="relative">
+                        <input
+                            type="text"
+                            placeholder={t[language].searchPlaceholder}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                         <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
                     </div>
-                    
+
                     <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2">
                         <FilterIcon className="w-5 h-5 text-gray-500" />
-                        <select 
-                            value={statusFilter} 
+                        <select
+                            value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as LRStatus | 'All')}
                             className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none"
                         >
@@ -150,41 +157,43 @@ const LRList: React.FC<LRListProps> = ({
                         </select>
                     </div>
 
-                    <button onClick={onAddNew} className="bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
-                        <PlusIcon className="w-5 h-5" />
-                        <span className="hidden sm:inline">{t[language].newLR}</span>
-                    </button>
+                    {!isReadOnly && (
+                        <button onClick={onAddNew} className="bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
+                            <PlusIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">{t[language].newLR}</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Bulk Actions Bar */}
-            {selectedLRs.size > 0 && (
+            {!isReadOnly && selectedLRs.size > 0 && (
                 <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-blue-800">{selectedLRs.size} selected</span>
                         <button onClick={() => setSelectedLRs(new Set())} className="text-xs text-blue-600 hover:underline">Clear</button>
                     </div>
                     <div className="flex items-center gap-3">
-                         <div className="flex items-center gap-2 mr-4 bg-white px-2 py-1 rounded border border-blue-200">
-                             <input 
-                                type="checkbox" 
-                                id="bulkPrintAmounts" 
-                                checked={bulkPrintShowAmounts} 
+                        <div className="flex items-center gap-2 mr-4 bg-white px-2 py-1 rounded border border-blue-200">
+                            <input
+                                type="checkbox"
+                                id="bulkPrintAmounts"
+                                checked={bulkPrintShowAmounts}
                                 onChange={(e) => setBulkPrintShowAmounts(e.target.checked)}
                                 className="h-4 w-4 text-ssk-blue rounded"
-                             />
-                             <label htmlFor="bulkPrintAmounts" className="text-sm text-gray-700 cursor-pointer select-none">Show Amounts on Print</label>
-                         </div>
-                        
+                            />
+                            <label htmlFor="bulkPrintAmounts" className="text-sm text-gray-700 cursor-pointer select-none">Show Amounts on Print</label>
+                        </div>
+
                         {onUpdateInvoiceDetails && (
-                            <button 
+                            <button
                                 onClick={handleGenerateInvoice}
                                 className="flex items-center gap-2 bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-sm font-semibold transition-colors shadow-sm"
                             >
                                 <InvoiceIcon className="w-4 h-4" /> {t[language].generateInvoice}
                             </button>
                         )}
-                        <button 
+                        <button
                             onClick={handleBulkPrint}
                             className="flex items-center gap-2 bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 text-sm font-semibold transition-colors shadow-sm"
                         >
@@ -199,14 +208,16 @@ const LRList: React.FC<LRListProps> = ({
                 <table className="w-full text-sm text-left text-gray-500">
                     <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                         <tr>
-                            <th className="p-4 w-4">
-                                <input 
-                                    type="checkbox" 
-                                    checked={filteredLRs.length > 0 && selectedLRs.size === filteredLRs.length}
-                                    onChange={handleSelectAll}
-                                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                />
-                            </th>
+                            {!isReadOnly && (
+                                <th className="p-4 w-4">
+                                    <input
+                                        type="checkbox"
+                                        checked={filteredLRs.length > 0 && selectedLRs.size === filteredLRs.length}
+                                        onChange={handleSelectAll}
+                                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                </th>
+                            )}
                             <th className="px-4 py-3">{t[language].lrNoDate}</th>
                             <th className="px-4 py-3">{t[language].consignor}</th>
                             <th className="px-4 py-3">{t[language].consignee}</th>
@@ -214,7 +225,7 @@ const LRList: React.FC<LRListProps> = ({
                             <th className="px-4 py-3 text-right">{t[language].amount}</th>
                             <th className="px-4 py-3 text-center">{t[language].status}</th>
                             <th className="px-4 py-3 text-center">{t[language].pod}</th>
-                            <th className="px-4 py-3 text-center">{t[language].actions}</th>
+                            {!isReadOnly && <th className="px-4 py-3 text-center">{t[language].actions}</th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -227,14 +238,16 @@ const LRList: React.FC<LRListProps> = ({
                         ) : (
                             filteredLRs.map((lr) => (
                                 <tr key={lr.lrNo} className={`border-b hover:bg-gray-50 transition-colors ${selectedLRs.has(lr.lrNo) ? 'bg-blue-50/50' : ''}`}>
-                                    <td className="p-4">
-                                        <input 
-                                            type="checkbox" 
-                                            checked={selectedLRs.has(lr.lrNo)}
-                                            onChange={() => handleSelectLR(lr.lrNo)}
-                                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                        />
-                                    </td>
+                                    {!isReadOnly && (
+                                        <td className="p-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedLRs.has(lr.lrNo)}
+                                                onChange={() => handleSelectLR(lr.lrNo)}
+                                                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                        </td>
+                                    )}
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-900">{lr.lrNo}</div>
                                         <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
@@ -267,15 +280,21 @@ const LRList: React.FC<LRListProps> = ({
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         <div className="relative group">
-                                            <select
-                                                value={lr.status}
-                                                onChange={(e) => onUpdateStatus(lr.lrNo, e.target.value as LRStatus)}
-                                                className={`appearance-none cursor-pointer text-xs font-bold px-2 py-1 rounded-full border-0 text-center w-full focus:ring-2 focus:ring-blue-500 ${statusColors[lr.status]}`}
-                                            >
-                                                {Object.keys(statusColors).map(s => (
-                                                    <option key={s} value={s}>{s}</option>
-                                                ))}
-                                            </select>
+                                            {isReadOnly ? (
+                                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${statusColors[lr.status]}`}>
+                                                    {lr.status}
+                                                </span>
+                                            ) : (
+                                                <select
+                                                    value={lr.status}
+                                                    onChange={(e) => onUpdateStatus(lr.lrNo, e.target.value as LRStatus)}
+                                                    className={`appearance-none cursor-pointer text-xs font-bold px-2 py-1 rounded-full border-0 text-center w-full focus:ring-2 focus:ring-blue-500 ${statusColors[lr.status]}`}
+                                                >
+                                                    {Object.keys(statusColors).map(s => (
+                                                        <option key={s} value={s}>{s}</option>
+                                                    ))}
+                                                </select>
+                                            )}
                                         </div>
                                         {lr.status === 'Delivered' && (
                                             <div className="text-[10px] text-gray-400 mt-1">
@@ -285,33 +304,48 @@ const LRList: React.FC<LRListProps> = ({
                                     </td>
                                     <td className="px-4 py-3 text-center">
                                         {lr.pod_path ? (
-                                             <div className="flex justify-center gap-1">
+                                            <div className="flex justify-center gap-1">
                                                 <button onClick={() => onViewPOD(lr.pod_path!)} className="text-blue-600 hover:text-blue-800" title="View POD">
                                                     <DocumentTextIcon className="w-5 h-5" />
                                                 </button>
-                                                 <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-gray-600" title="Re-upload POD">
-                                                    <UploadIcon className="w-4 h-4" />
-                                                </button>
-                                             </div>
+                                                {!isReadOnly && (
+                                                    <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-gray-600" title="Re-upload POD">
+                                                        <UploadIcon className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         ) : (
-                                            <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-blue-600 transition-colors mx-auto block" title="Upload POD">
-                                                <UploadIcon className="w-5 h-5" />
-                                            </button>
+                                            isReadOnly ? (
+                                                <span className="text-xs text-gray-400">No POD</span>
+                                            ) : (
+                                                <button onClick={() => onOpenPODUploader(lr)} className="text-gray-400 hover:text-blue-600 transition-colors mx-auto block" title="Upload POD">
+                                                    <UploadIcon className="w-5 h-5" />
+                                                </button>
+                                            )
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button onClick={() => setPreviewLR(lr)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-blue-600 transition-colors" title="Preview / Print">
+                                    {!isReadOnly && (
+                                        <td className="px-4 py-3 text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button onClick={() => setPreviewLR(lr)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-blue-600 transition-colors" title="Preview / Print">
+                                                    <PrintIcon className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => onEdit(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-green-600 transition-colors" title="Edit">
+                                                    <PencilIcon className="w-4 h-4" />
+                                                </button>
+                                                <button onClick={() => onDelete(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-red-600 transition-colors" title="Delete">
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
+                                    {isReadOnly && (
+                                        <td className="px-4 py-3 text-center">
+                                            <button onClick={() => setPreviewLR(lr)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-blue-600 transition-colors" title="Preview">
                                                 <PrintIcon className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => onEdit(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-green-600 transition-colors" title="Edit">
-                                                <PencilIcon className="w-4 h-4" />
-                                            </button>
-                                            <button onClick={() => onDelete(lr.lrNo)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-red-600 transition-colors" title="Delete">
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </td>
+                                        </td>
+                                    )}
                                 </tr>
                             ))
                         )}
@@ -321,7 +355,7 @@ const LRList: React.FC<LRListProps> = ({
 
             {/* Modals */}
             {previewLR && (
-                <LRPreviewModal 
+                <LRPreviewModal
                     isOpen={!!previewLR}
                     onClose={() => setPreviewLR(null)}
                     lr={previewLR}
@@ -331,7 +365,7 @@ const LRList: React.FC<LRListProps> = ({
             )}
 
             {showInvoiceModal && selectedLRs.size > 0 && (
-                <InvoiceModal 
+                <InvoiceModal
                     isOpen={showInvoiceModal}
                     onClose={() => setShowInvoiceModal(false)}
                     lorryReceipts={lorryReceipts.filter(lr => selectedLRs.has(lr.lrNo))}
@@ -349,11 +383,11 @@ const LRList: React.FC<LRListProps> = ({
                             .filter(lr => selectedLRs.has(lr.lrNo))
                             .map((lr, index) => (
                                 <div key={lr.lrNo}>
-                                    <LRContent 
-                                        lr={lr} 
-                                        companyDetails={companyDetails} 
-                                        showCompanyDetails={true} 
-                                        showAmounts={bulkPrintShowAmounts} 
+                                    <LRContent
+                                        lr={lr}
+                                        companyDetails={companyDetails}
+                                        showCompanyDetails={true}
+                                        showAmounts={bulkPrintShowAmounts}
                                     />
                                     {index < selectedLRs.size - 1 && <div className="page-break" />}
                                 </div>

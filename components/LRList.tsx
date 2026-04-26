@@ -221,6 +221,25 @@ const LRList: React.FC<LRListProps> = ({
 
     return (
         <div className="bg-white/80 backdrop-blur-sm p-4 sm:p-6 rounded-xl shadow-lg border border-white/50 min-h-[600px] flex flex-col">
+            
+            {/* Top Level Tabs */}
+            <div className="flex border-b border-gray-200 mb-6">
+                <button
+                    onClick={() => setViewMode('lrs')}
+                    className={`py-3 px-6 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${viewMode === 'lrs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <DocumentTextIcon className="w-5 h-5" />
+                    Lorry Receipts
+                </button>
+                <button
+                    onClick={() => setViewMode('vouchers')}
+                    className={`py-3 px-6 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${viewMode === 'vouchers' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                >
+                    <InvoiceIcon className="w-5 h-5" />
+                    Voucher Section
+                </button>
+            </div>
+
             {/* Header Actions */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                 <div className="flex items-center gap-3 self-start md:self-center">
@@ -241,21 +260,6 @@ const LRList: React.FC<LRListProps> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button
-                            onClick={() => setViewMode('lrs')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${viewMode === 'lrs' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            Lorry Receipts
-                        </button>
-                        <button
-                            onClick={() => setViewMode('vouchers')}
-                            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${viewMode === 'vouchers' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                        >
-                            Vouchers
-                        </button>
-                    </div>
-
                     {viewMode === 'lrs' && (
                         <>
                             <div className="relative">

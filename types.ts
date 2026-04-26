@@ -191,6 +191,7 @@ export interface Voucher {
     voucher_no: string;
     amount: number;
     payment_mode: string;
+    party_name?: string;
     user_id?: string;
     created_at?: string;
 }

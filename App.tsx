@@ -614,6 +614,7 @@ const App: React.FC = () => {
                         language={language}
                         isReadOnly={isManager}
                         initialViewMode="lrs"
+                        savedParties={savedParties}
                     />
                 );
             case 'vouchers':
@@ -637,6 +638,7 @@ const App: React.FC = () => {
                         language={language}
                         isReadOnly={isManager}
                         initialViewMode="vouchers"
+                        savedParties={savedParties}
                     />
                 );
             case 'form':

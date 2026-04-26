@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { LorryReceipt, CompanyDetails, LRStatus } from '../types';
+import { LorryReceipt, CompanyDetails, LRStatus, SavedParty } from '../types';
 import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon, CheckCircleIcon, ClockIcon, TruckIcon, XIcon, UploadIcon, DocumentTextIcon, InvoiceIcon, PlusIcon, ArrowLeftIcon } from './icons';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
@@ -23,6 +23,7 @@ interface LRListProps {
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
     isReadOnly?: boolean;
     initialViewMode?: 'lrs' | 'vouchers';
+    savedParties?: SavedParty[];
 }
 
 const statusColors: { [key in LRStatus]: string } = {
@@ -46,7 +47,8 @@ const LRList: React.FC<LRListProps> = ({
     onUpdateInvoiceDetails,
     language,
     isReadOnly = false,
-    initialViewMode = 'lrs'
+    initialViewMode = 'lrs',
+    savedParties = []
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LRStatus | 'All'>('All');
@@ -65,6 +67,7 @@ const LRList: React.FC<LRListProps> = ({
     const [voucherNo, setVoucherNo] = useState(`VCH-${Math.floor(Math.random() * 10000)}`);
     const [voucherAmount, setVoucherAmount] = useState(0);
     const [voucherPaymentMode, setVoucherPaymentMode] = useState('Cash');
+    const [voucherParty, setVoucherParty] = useState('');
     const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
 
     const [viewMode, setViewMode] = useState<'lrs' | 'vouchers'>(initialViewMode);
@@ -187,7 +190,8 @@ const LRList: React.FC<LRListProps> = ({
                 description: voucherDescription,
                 voucher_no: voucherNo,
                 amount: voucherAmount,
-                payment_mode: voucherPaymentMode
+                payment_mode: voucherPaymentMode,
+                party_name: voucherParty || undefined
             });
 
             // Store in ledger as a debit
@@ -205,6 +209,7 @@ const LRList: React.FC<LRListProps> = ({
             // Reset fields
             setVoucherNo(`VCH-${Math.floor(Math.random() * 10000)}`);
             setVoucherAmount(0);
+            setVoucherParty('');
             if (viewMode === 'vouchers') fetchVouchers();
         } catch (error) {
             console.error('Error creating voucher:', error);
@@ -526,6 +531,7 @@ const LRList: React.FC<LRListProps> = ({
                             <tr>
                                 <th className="px-6 py-4 font-semibold">Date</th>
                                 <th className="px-6 py-4 font-semibold">Voucher No</th>
+                                <th className="px-6 py-4 font-semibold">Party Name</th>
                                 <th className="px-6 py-4 font-semibold">Description / Details</th>
                                 <th className="px-6 py-4 font-semibold">Mode of Payment</th>
                                 <th className="px-6 py-4 font-semibold text-right">Amount (₹)</th>
@@ -538,7 +544,7 @@ const LRList: React.FC<LRListProps> = ({
                                 </tr>
                             ) : vouchers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center">
+                                    <td colSpan={6} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center justify-center text-gray-500">
                                             <InvoiceIcon className="w-12 h-12 text-gray-300 mb-3" />
                                             <p className="text-lg font-medium">No Vouchers Found</p>
@@ -551,13 +557,20 @@ const LRList: React.FC<LRListProps> = ({
                                     <tr key={voucher.id} className="border-b hover:bg-gray-50 transition-colors bg-white">
                                         <td className="px-6 py-4 whitespace-nowrap">{new Date(voucher.date).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 font-bold text-gray-900 font-mono">{voucher.voucher_no}</td>
+                                        <td className="px-6 py-4">
+                                            {voucher.party_name ? (
+                                                <span className="font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md text-xs">{voucher.party_name}</span>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">—</span>
+                                            )}
+                                        </td>
                                         <td className="px-6 py-4 font-medium">{voucher.description}</td>
                                         <td className="px-6 py-4">
                                             <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
                                                 {voucher.payment_mode}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4 text-right font-bold text-red-600">{voucher.amount.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-right font-bold text-red-600">₹{voucher.amount.toLocaleString()}</td>
                                     </tr>
                                 ))
                             )}
@@ -697,6 +710,24 @@ const LRList: React.FC<LRListProps> = ({
                                     className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
                                     rows={2}
                                 />
+                            </div>
+
+                            {/* Party Selector */}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Party Name <span className="text-gray-400 font-normal">(optional)</span></label>
+                                <select
+                                    value={voucherParty}
+                                    onChange={(e) => setVoucherParty(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none bg-white"
+                                >
+                                    <option value="">— Select Party —</option>
+                                    {savedParties.map((p) => (
+                                        <option key={p.id || p.name} value={p.name}>{p.name} {p.city ? `(${p.city})` : ''}</option>
+                                    ))}
+                                </select>
+                                {voucherParty && (
+                                    <p className="text-xs text-blue-600 mt-1 font-medium">✓ Party selected: {voucherParty}</p>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

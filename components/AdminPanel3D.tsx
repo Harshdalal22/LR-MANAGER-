@@ -809,13 +809,14 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 lr.consignee?.name === selectedPartyLedger ||
                                 lr.billingTo?.name === selectedPartyLedger
                             )
+                            .filter(lr => Number(lr.invoiceAmount) > 0) // Only include if invoice generated with amount
                             .forEach(lr => {
                                 partyRows.push({
                                     date: lr.date,
                                     description: `LR ${lr.lrNo} — ${lr.fromPlace} → ${lr.toPlace}`,
                                     type: 'Invoice (Credit)',
                                     ref_no: lr.invoiceNo || lr.lrNo,
-                                    credit: Number(lr.invoiceAmount) || Number(lr.freight) || 0,
+                                    credit: Number(lr.invoiceAmount),
                                     debit: 0,
                                 });
                             });
@@ -849,6 +850,49 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     const totalCredit = partyRows.reduce((s, r) => s + r.credit, 0);
                     const totalDebit = partyRows.reduce((s, r) => s + r.debit, 0);
                     const totalBalance = totalCredit - totalDebit;
+
+                    const handleExportPDF = () => {
+                        import('jspdf').then(({ default: jsPDF }) => {
+                            import('jspdf-autotable').then(({ default: autoTable }) => {
+                                const doc = new jsPDF();
+                                
+                                // Header
+                                doc.setFontSize(18);
+                                doc.text(`Ledger Statement: ${selectedPartyLedger}`, 14, 22);
+                                
+                                doc.setFontSize(11);
+                                doc.setTextColor(100);
+                                doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, 14, 30);
+                                doc.text(`Total Credit: Rs. ${totalCredit.toLocaleString('en-IN')}`, 14, 38);
+                                doc.text(`Total Debit: Rs. ${totalDebit.toLocaleString('en-IN')}`, 14, 44);
+                                doc.text(`Net Balance: Rs. ${totalBalance.toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, 14, 50);
+
+                                const tableColumn = ["Date", "Type", "Ref No.", "Description", "Credit", "Debit", "Balance"];
+                                const tableRows = rowsWithBalance.map(row => [
+                                    new Date(row.date).toLocaleDateString('en-GB'),
+                                    row.type,
+                                    row.ref_no,
+                                    row.description,
+                                    row.credit ? row.credit.toLocaleString('en-IN') : '-',
+                                    row.debit ? row.debit.toLocaleString('en-IN') : '-',
+                                    row.runningBalance.toLocaleString('en-IN')
+                                ]);
+
+                                autoTable(doc, {
+                                    head: [tableColumn],
+                                    body: tableRows,
+                                    startY: 55,
+                                    theme: 'grid',
+                                    styles: { fontSize: 8, cellPadding: 2 },
+                                    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+                                    alternateRowStyles: { fillColor: [245, 245, 245] },
+                                });
+
+                                doc.save(`Ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+                                toast.success('PDF Downloaded successfully!');
+                            });
+                        });
+                    };
 
                     return (
                         <div className="space-y-6 animate-fadeIn">
@@ -900,10 +944,18 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                                     {/* Ledger Table */}
                                     <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
-                                        <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
-                                            <DocumentTextIcon className="w-6 h-6 text-blue-400" />
-                                            Ledger for: <span className="text-blue-300 ml-1">{selectedPartyLedger}</span>
-                                        </h2>
+                                        <div className="flex justify-between items-center mb-5">
+                                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                                <DocumentTextIcon className="w-6 h-6 text-blue-400" />
+                                                Ledger for: <span className="text-blue-300 ml-1">{selectedPartyLedger}</span>
+                                            </h2>
+                                            <button 
+                                                onClick={handleExportPDF}
+                                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-white font-bold transition-all shadow-lg hover:shadow-blue-500/50"
+                                            >
+                                                <DownloadIcon className="w-4 h-4" /> Export PDF
+                                            </button>
+                                        </div>
                                         <div className="overflow-x-auto custom-scrollbar">
                                             <table className="w-full text-left text-sm text-gray-300">
                                                 <thead className="text-xs text-gray-400 uppercase bg-white/5">

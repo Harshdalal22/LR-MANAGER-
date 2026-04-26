@@ -810,10 +810,17 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 lr.billingTo?.name === selectedPartyLedger
                             )
                             .forEach(lr => {
-                                const creditVal = Number(lr.invoiceAmount) > 0 ? Number(lr.invoiceAmount) : (Number(lr.freight) || 0);
+                                // Calculate raw amount = freight + all charges
+                                const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
+                                const rawAmount = (Number(lr.freight) || 0) + totalCharges;
+                                // Fallback calculates 18% tax on total
+                                const calculatedAmountWithTax = Math.round(rawAmount * 1.18);
+
+                                const creditVal = Number(lr.invoiceAmount) > 0 ? Number(lr.invoiceAmount) : calculatedAmountWithTax;
+                                
                                 partyRows.push({
                                     date: lr.date,
-                                    description: `LR ${lr.lrNo} — ${lr.fromPlace} → ${lr.toPlace}`,
+                                    description: `Bill Generated`,
                                     type: 'Invoice (Credit)',
                                     ref_no: lr.invoiceNo || lr.lrNo,
                                     credit: creditVal,

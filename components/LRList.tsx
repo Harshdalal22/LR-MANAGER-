@@ -6,8 +6,9 @@ import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 import { Language, t } from '../utils/translations';
-import { addLedgerEntry } from '../services/supabaseService';
+import { addLedgerEntry, getVouchers, addVoucher, subscribeToVouchers } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
+import { Voucher } from '../types';
 
 interface LRListProps {
     lorryReceipts: LorryReceipt[];
@@ -64,6 +65,35 @@ const LRList: React.FC<LRListProps> = ({
     const [voucherAmount, setVoucherAmount] = useState(0);
     const [voucherPaymentMode, setVoucherPaymentMode] = useState('Cash');
     const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
+
+    const [viewMode, setViewMode] = useState<'lrs' | 'vouchers'>('lrs');
+    const [vouchers, setVouchers] = useState<Voucher[]>([]);
+    const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
+
+    useEffect(() => {
+        if (viewMode === 'vouchers') {
+            fetchVouchers();
+            const subscription = subscribeToVouchers((payload) => {
+                fetchVouchers();
+            });
+            return () => {
+                subscription.unsubscribe();
+            };
+        }
+    }, [viewMode]);
+
+    const fetchVouchers = async () => {
+        setIsLoadingVouchers(true);
+        try {
+            const data = await getVouchers();
+            setVouchers(data);
+        } catch (error) {
+            console.error('Error fetching vouchers:', error);
+            toast.error('Failed to fetch vouchers');
+        } finally {
+            setIsLoadingVouchers(false);
+        }
+    };
 
     // Bulk print settings
     const [bulkPrintShowAmounts, setBulkPrintShowAmounts] = useState(true);
@@ -145,6 +175,16 @@ const LRList: React.FC<LRListProps> = ({
         setIsCreatingVoucher(true);
         const toastId = toast.loading('Creating voucher...');
         try {
+            // Store in vouchers table
+            await addVoucher({
+                date: voucherDate,
+                description: voucherDescription,
+                voucher_no: voucherNo,
+                amount: voucherAmount,
+                payment_mode: voucherPaymentMode
+            });
+
+            // Store in ledger as a debit
             await addLedgerEntry({
                 date: voucherDate,
                 description: voucherDescription,
@@ -159,6 +199,7 @@ const LRList: React.FC<LRListProps> = ({
             // Reset fields
             setVoucherNo(`VCH-${Math.floor(Math.random() * 10000)}`);
             setVoucherAmount(0);
+            if (viewMode === 'vouchers') fetchVouchers();
         } catch (error) {
             console.error('Error creating voucher:', error);
             toast.error('Failed to create voucher', { id: toastId });
@@ -186,8 +227,12 @@ const LRList: React.FC<LRListProps> = ({
                     <button onClick={onBackToDashboard} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
                         <ArrowLeftIcon className="w-6 h-6 transform group-hover:-translate-x-1 transition-transform" />
                     </button>
-                    <h2 className="text-2xl font-bold text-gray-800">{t[language].viewList}</h2>
-                    <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {viewMode === 'lrs' ? t[language].viewList : 'Vouchers'}
+                    </h2>
+                    {viewMode === 'lrs' && (
+                        <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">{filteredLRs.length}</span>
+                    )}
                     {isReadOnly && (
                         <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-amber-200 flex items-center gap-1">
                             👁️ View Only
@@ -196,44 +241,73 @@ const LRList: React.FC<LRListProps> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder={t[language].searchPlaceholder}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
-                    </div>
-
-                    <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2">
-                        <FilterIcon className="w-5 h-5 text-gray-500" />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value as LRStatus | 'All')}
-                            className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none"
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setViewMode('lrs')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${viewMode === 'lrs' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                         >
-                            <option value="All">{t[language].allStatus}</option>
-                            <option value="Booked">Booked</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Out for Delivery">Out for Delivery</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
+                            Lorry Receipts
+                        </button>
+                        <button
+                            onClick={() => setViewMode('vouchers')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${viewMode === 'vouchers' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Vouchers
+                        </button>
                     </div>
 
-                    {!isReadOnly && (
+                    {viewMode === 'lrs' && (
+                        <>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder={t[language].searchPlaceholder}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full sm:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <SearchIcon className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" />
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 px-3 py-2">
+                                <FilterIcon className="w-5 h-5 text-gray-500" />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value as LRStatus | 'All')}
+                                    className="bg-transparent border-none focus:ring-0 text-sm text-gray-700 cursor-pointer outline-none"
+                                >
+                                    <option value="All">{t[language].allStatus}</option>
+                                    <option value="Booked">Booked</option>
+                                    <option value="In Transit">In Transit</option>
+                                    <option value="Out for Delivery">Out for Delivery</option>
+                                    <option value="Delivered">Delivered</option>
+                                    <option value="Cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                        </>
+                    )}
+
+                    {!isReadOnly && viewMode === 'lrs' && (
                         <button onClick={onAddNew} className="bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
                             <PlusIcon className="w-5 h-5" />
                             <span className="hidden sm:inline">{t[language].newLR}</span>
+                        </button>
+                    )}
+                    
+                    {!isReadOnly && viewMode === 'vouchers' && (
+                        <button onClick={() => {
+                            setVoucherDescription('');
+                            setShowVoucherModal(true);
+                        }} className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2 shadow-sm font-semibold whitespace-nowrap">
+                            <PlusIcon className="w-5 h-5" />
+                            <span className="hidden sm:inline">Create Voucher</span>
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Bulk Actions Bar */}
-            {!isReadOnly && selectedLRs.size > 0 && (
+            {!isReadOnly && viewMode === 'lrs' && selectedLRs.size > 0 && (
                 <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 flex flex-wrap items-center justify-between gap-4 animate-fadeIn">
                     <div className="flex items-center gap-2">
                         <span className="font-bold text-blue-800">{selectedLRs.size} selected</span>
@@ -286,11 +360,12 @@ const LRList: React.FC<LRListProps> = ({
             )}
 
             {/* Table */}
-            <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200 flex-grow">
-                <table className="w-full text-sm text-left text-gray-500">
-                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
-                        <tr>
-                            {!isReadOnly && (
+            {viewMode === 'lrs' ? (
+                <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200 flex-grow">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                {!isReadOnly && (
                                 <th className="p-4 w-4">
                                     <input
                                         type="checkbox"
@@ -434,6 +509,52 @@ const LRList: React.FC<LRListProps> = ({
                     </tbody>
                 </table>
             </div>
+            ) : (
+                <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200 flex-grow">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
+                            <tr>
+                                <th className="px-6 py-4 font-semibold">Date</th>
+                                <th className="px-6 py-4 font-semibold">Voucher No</th>
+                                <th className="px-6 py-4 font-semibold">Description / Details</th>
+                                <th className="px-6 py-4 font-semibold">Mode of Payment</th>
+                                <th className="px-6 py-4 font-semibold text-right">Amount (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {isLoadingVouchers ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading vouchers...</td>
+                                </tr>
+                            ) : vouchers.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-12 text-center">
+                                        <div className="flex flex-col items-center justify-center text-gray-500">
+                                            <InvoiceIcon className="w-12 h-12 text-gray-300 mb-3" />
+                                            <p className="text-lg font-medium">No Vouchers Found</p>
+                                            <p className="text-sm mt-1">Create a voucher to track expenses or advances.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                vouchers.map((voucher) => (
+                                    <tr key={voucher.id} className="border-b hover:bg-gray-50 transition-colors bg-white">
+                                        <td className="px-6 py-4 whitespace-nowrap">{new Date(voucher.date).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 font-bold text-gray-900 font-mono">{voucher.voucher_no}</td>
+                                        <td className="px-6 py-4 font-medium">{voucher.description}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                                {voucher.payment_mode}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-red-600">{voucher.amount.toLocaleString()}</td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            )}
 
             {/* Modals */}
             {previewLR && (
@@ -587,9 +708,9 @@ const LRList: React.FC<LRListProps> = ({
                                         className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none bg-white"
                                     >
                                         <option value="Cash">Cash</option>
-                                        <option value="Bank Transfer">Bank Transfer / NEFT</option>
-                                        <option value="UPI">UPI</option>
                                         <option value="Cheque">Cheque</option>
+                                        <option value="Online">Online</option>
+                                        <option value="RTGS">RTGS</option>
                                     </select>
                                 </div>
                             </div>

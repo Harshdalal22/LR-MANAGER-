@@ -184,4 +184,15 @@ export interface LedgerEntry {
     created_at?: string;
 }
 
+export interface Voucher {
+    id?: string;
+    date: string;
+    description: string;
+    voucher_no: string;
+    amount: number;
+    payment_mode: string;
+    user_id?: string;
+    created_at?: string;
+}
+
 export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices';

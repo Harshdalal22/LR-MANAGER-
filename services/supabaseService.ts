@@ -1,7 +1,7 @@
 
 
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher } from '../types';
 
 /* 
 ================================================================================
@@ -760,6 +760,36 @@ export const subscribeToLedgerEntries = (callback: (payload: any) => void) => {
             event: '*',
             schema: 'public',
             table: 'ledger_entries'
+        }, callback)
+        .subscribe();
+};
+
+// --- Vouchers ---
+
+export const getVouchers = async (): Promise<Voucher[]> => {
+    const { data, error } = await supabase.from('vouchers').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || [];
+};
+
+export const addVoucher = async (voucher: Partial<Voucher>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No authenticated user");
+
+    const { data: appUser } = await supabase.from('app_users').select('admin_id').eq('operator_id', user.id).single();
+    const finalUserId = appUser?.admin_id || user.id;
+
+    const { data, error } = await supabase.from('vouchers').insert([{ ...voucher, user_id: finalUserId }]).select();
+    if (error) throw error;
+    return data[0];
+};
+
+export const subscribeToVouchers = (callback: (payload: any) => void) => {
+    return supabase.channel('vouchers_changes')
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'vouchers'
         }, callback)
         .subscribe();
 };

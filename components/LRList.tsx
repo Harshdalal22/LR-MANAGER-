@@ -6,6 +6,8 @@ import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 import { Language, t } from '../utils/translations';
+import { addLedgerEntry } from '../services/supabaseService';
+import { toast } from 'react-hot-toast';
 
 interface LRListProps {
     lorryReceipts: LorryReceipt[];
@@ -50,6 +52,10 @@ const LRList: React.FC<LRListProps> = ({
     const [previewLR, setPreviewLR] = useState<LorryReceipt | null>(null);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [isBulkPrinting, setIsBulkPrinting] = useState(false);
+    const [showLedgerCreateModal, setShowLedgerCreateModal] = useState(false);
+    const [ledgerDescription, setLedgerDescription] = useState('Freight Invoice');
+    const [ledgerDate, setLedgerDate] = useState(new Date().toISOString().split('T')[0]);
+    const [isPostingLedger, setIsPostingLedger] = useState(false);
 
     // Bulk print settings
     const [bulkPrintShowAmounts, setBulkPrintShowAmounts] = useState(true);
@@ -99,6 +105,32 @@ const LRList: React.FC<LRListProps> = ({
     const handleGenerateInvoice = () => {
         if (selectedLRs.size === 0) return;
         setShowInvoiceModal(true);
+    };
+
+    const handlePostToLedger = async () => {
+        setIsPostingLedger(true);
+        const toastId = toast.loading('Posting to ledger...');
+        try {
+            const selectedLRsArray = filteredLRs.filter(lr => selectedLRs.has(lr.lrNo));
+            const totalAmount = selectedLRsArray.reduce((acc, lr) => acc + (Number(lr.invoiceAmount) || Number(lr.freight) || 0), 0);
+            const invoiceNos = selectedLRsArray.map(lr => lr.invoiceNo || lr.lrNo).join(', ');
+
+            await addLedgerEntry({
+                date: ledgerDate,
+                description: ledgerDescription,
+                invoice_no: invoiceNos,
+                credit: totalAmount,
+                debit: 0
+            });
+            toast.success('Successfully posted to ledger', { id: toastId });
+            setShowLedgerCreateModal(false);
+            setSelectedLRs(new Set());
+        } catch (error) {
+            console.error('Error posting to ledger:', error);
+            toast.error('Failed to post to ledger', { id: toastId });
+        } finally {
+            setIsPostingLedger(false);
+        }
     };
 
     const getStatusIcon = (status: LRStatus) => {
@@ -193,6 +225,12 @@ const LRList: React.FC<LRListProps> = ({
                                 <InvoiceIcon className="w-4 h-4" /> {t[language].generateInvoice}
                             </button>
                         )}
+                        <button
+                            onClick={() => setShowLedgerCreateModal(true)}
+                            className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-semibold transition-colors shadow-sm"
+                        >
+                            <DocumentTextIcon className="w-4 h-4" /> Post to Ledger
+                        </button>
                         <button
                             onClick={handleBulkPrint}
                             className="flex items-center gap-2 bg-gray-700 text-white px-3 py-1.5 rounded-md hover:bg-gray-800 text-sm font-semibold transition-colors shadow-sm"
@@ -373,6 +411,72 @@ const LRList: React.FC<LRListProps> = ({
                     companyDetails={companyDetails}
                     onSaveInvoiceDetails={onUpdateInvoiceDetails}
                 />
+            )}
+
+            {/* Ledger Create Modal */}
+            {showLedgerCreateModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <DocumentTextIcon className="w-6 h-6 text-purple-600" />
+                                Post to Ledger
+                            </h3>
+                            <button onClick={() => setShowLedgerCreateModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Date</label>
+                                <input 
+                                    type="date" 
+                                    value={ledgerDate}
+                                    onChange={(e) => setLedgerDate(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                                <input 
+                                    type="text" 
+                                    value={ledgerDescription}
+                                    onChange={(e) => setLedgerDescription(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                                    placeholder="e.g. Freight Invoice"
+                                />
+                            </div>
+                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 space-y-2">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">Selected LRs:</span>
+                                    <span className="font-bold text-gray-800">{selectedLRs.size}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-600">Total Credit Amount:</span>
+                                    <span className="font-bold text-purple-700 text-lg">
+                                        ₹ {filteredLRs.filter(lr => selectedLRs.has(lr.lrNo)).reduce((acc, lr) => acc + (Number(lr.invoiceAmount) || Number(lr.freight) || 0), 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80">
+                            <button
+                                onClick={() => setShowLedgerCreateModal(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+                                disabled={isPostingLedger}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handlePostToLedger}
+                                disabled={isPostingLedger}
+                                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:opacity-90 transition-all font-semibold disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {isPostingLedger ? 'Posting...' : 'Post Entry'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Hidden Print Portal */}

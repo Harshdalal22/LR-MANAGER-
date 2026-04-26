@@ -741,6 +741,19 @@ export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
     return data || [];
 };
 
+export const addLedgerEntry = async (entry: Partial<LedgerEntry>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No authenticated user");
+
+    // For operators, assign to admin's account
+    const { data: appUser } = await supabase.from('app_users').select('admin_id').eq('operator_id', user.id).single();
+    const finalUserId = appUser?.admin_id || user.id;
+
+    const { data, error } = await supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select();
+    if (error) throw error;
+    return data[0];
+};
+
 export const subscribeToLedgerEntries = (callback: (payload: any) => void) => {
     return supabase.channel('ledger_entries_changes')
         .on('postgres_changes', {

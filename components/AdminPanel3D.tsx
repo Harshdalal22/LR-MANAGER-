@@ -809,14 +809,14 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 lr.consignee?.name === selectedPartyLedger ||
                                 lr.billingTo?.name === selectedPartyLedger
                             )
-                            .filter(lr => Number(lr.invoiceAmount) > 0) // Only include if invoice generated with amount
                             .forEach(lr => {
+                                const creditVal = Number(lr.invoiceAmount) > 0 ? Number(lr.invoiceAmount) : (Number(lr.freight) || 0);
                                 partyRows.push({
                                     date: lr.date,
                                     description: `LR ${lr.lrNo} — ${lr.fromPlace} → ${lr.toPlace}`,
                                     type: 'Invoice (Credit)',
                                     ref_no: lr.invoiceNo || lr.lrNo,
-                                    credit: Number(lr.invoiceAmount),
+                                    credit: creditVal,
                                     debit: 0,
                                 });
                             });

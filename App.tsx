@@ -580,6 +580,7 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
                         onViewList={() => setCurrentView('list')}
+                        onViewVouchers={() => setCurrentView('vouchers')}
                         onEditLR={handleEditLR}
                         setCurrentView={setCurrentView}
                         language={language}
@@ -612,6 +613,30 @@ const App: React.FC = () => {
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
                         isReadOnly={isManager}
+                        initialViewMode="lrs"
+                    />
+                );
+            case 'vouchers':
+                return (
+                    <LRList
+                        lorryReceipts={lorryReceipts}
+                        onEdit={handleEditLR}
+                        onDelete={handleDeleteLR}
+                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        companyDetails={companyDetails}
+                        onBackToDashboard={() => setCurrentView('dashboard')}
+                        onUpdateStatus={handleUpdateLRStatus}
+                        onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
+                        onViewPOD={async (path) => {
+                            try {
+                                const url = await getPodSignedUrl(path);
+                                window.open(url, '_blank');
+                            } catch (e) { toast.error("Could not load POD"); }
+                        }}
+                        onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                        language={language}
+                        isReadOnly={isManager}
+                        initialViewMode="vouchers"
                     />
                 );
             case 'form':

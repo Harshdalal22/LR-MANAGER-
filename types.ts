@@ -195,4 +195,4 @@ export interface Voucher {
     created_at?: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices';
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers';

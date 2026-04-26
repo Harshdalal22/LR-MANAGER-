@@ -21,8 +21,8 @@ interface LRListProps {
     onOpenPODUploader: (lr: LorryReceipt) => void;
     onViewPOD: (podPath: string) => void;
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
-    language: Language;
     isReadOnly?: boolean;
+    initialViewMode?: 'lrs' | 'vouchers';
 }
 
 const statusColors: { [key in LRStatus]: string } = {
@@ -45,7 +45,8 @@ const LRList: React.FC<LRListProps> = ({
     onViewPOD,
     onUpdateInvoiceDetails,
     language,
-    isReadOnly = false
+    isReadOnly = false,
+    initialViewMode = 'lrs'
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LRStatus | 'All'>('All');
@@ -66,7 +67,12 @@ const LRList: React.FC<LRListProps> = ({
     const [voucherPaymentMode, setVoucherPaymentMode] = useState('Cash');
     const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
 
-    const [viewMode, setViewMode] = useState<'lrs' | 'vouchers'>('lrs');
+    const [viewMode, setViewMode] = useState<'lrs' | 'vouchers'>(initialViewMode);
+    
+    // Sync viewMode when initialViewMode changes from outside
+    useEffect(() => {
+        if (initialViewMode) setViewMode(initialViewMode);
+    }, [initialViewMode]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
 

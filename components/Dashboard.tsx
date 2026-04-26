@@ -8,6 +8,7 @@ interface DashboardProps {
     lorryReceipts: LorryReceipt[];
     onAddNew: () => void;
     onViewList: () => void;
+    onViewVouchers?: () => void;
     onEditLR: (lrNo: string) => void;
     setCurrentView: (view: View) => void;
     language: Language;
@@ -299,6 +300,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     lorryReceipts,
     onAddNew,
     onViewList,
+    onViewVouchers,
     onEditLR,
     setCurrentView,
     language,
@@ -523,6 +525,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {t[language].createLR}
                             </button>
                         )}
+                        <button onClick={onViewVouchers} className="flex-shrink-0 flex items-center bg-gradient-to-r from-red-600 to-red-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-red-200 transition-all text-sm border-b-4 border-red-700 active:border-b-0 active:translate-y-1">
+                            <InvoiceIcon className="w-5 h-5 mr-2" />
+                            Vouchers
+                        </button>
                     </div>
 
                     {/* Manager Info Banner */}

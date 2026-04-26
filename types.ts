@@ -179,6 +179,7 @@ export interface LedgerEntry {
     voucher_no?: string;
     credit: number;
     debit: number;
+    payment_mode?: string;
     user_id?: string;
     created_at?: string;
 }

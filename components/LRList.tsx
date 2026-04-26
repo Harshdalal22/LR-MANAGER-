@@ -57,6 +57,14 @@ const LRList: React.FC<LRListProps> = ({
     const [ledgerDate, setLedgerDate] = useState(new Date().toISOString().split('T')[0]);
     const [isPostingLedger, setIsPostingLedger] = useState(false);
 
+    const [showVoucherModal, setShowVoucherModal] = useState(false);
+    const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
+    const [voucherDescription, setVoucherDescription] = useState('Driver Advance');
+    const [voucherNo, setVoucherNo] = useState(`VCH-${Math.floor(Math.random() * 10000)}`);
+    const [voucherAmount, setVoucherAmount] = useState(0);
+    const [voucherPaymentMode, setVoucherPaymentMode] = useState('Cash');
+    const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
+
     // Bulk print settings
     const [bulkPrintShowAmounts, setBulkPrintShowAmounts] = useState(true);
 
@@ -130,6 +138,32 @@ const LRList: React.FC<LRListProps> = ({
             toast.error('Failed to post to ledger', { id: toastId });
         } finally {
             setIsPostingLedger(false);
+        }
+    };
+
+    const handleCreateVoucher = async () => {
+        setIsCreatingVoucher(true);
+        const toastId = toast.loading('Creating voucher...');
+        try {
+            await addLedgerEntry({
+                date: voucherDate,
+                description: voucherDescription,
+                voucher_no: voucherNo,
+                credit: 0,
+                debit: voucherAmount,
+                payment_mode: voucherPaymentMode
+            });
+            toast.success('Successfully created voucher', { id: toastId });
+            setShowVoucherModal(false);
+            setSelectedLRs(new Set());
+            // Reset fields
+            setVoucherNo(`VCH-${Math.floor(Math.random() * 10000)}`);
+            setVoucherAmount(0);
+        } catch (error) {
+            console.error('Error creating voucher:', error);
+            toast.error('Failed to create voucher', { id: toastId });
+        } finally {
+            setIsCreatingVoucher(false);
         }
     };
 
@@ -230,6 +264,16 @@ const LRList: React.FC<LRListProps> = ({
                             className="flex items-center gap-2 bg-purple-600 text-white px-3 py-1.5 rounded-md hover:bg-purple-700 text-sm font-semibold transition-colors shadow-sm"
                         >
                             <DocumentTextIcon className="w-4 h-4" /> Post to Ledger
+                        </button>
+                        <button
+                            onClick={() => {
+                                const selectedLRsArray = filteredLRs.filter(lr => selectedLRs.has(lr.lrNo));
+                                setVoucherDescription(`Expense/Advance for LR: ${selectedLRsArray.map(lr => lr.lrNo).join(', ')}`);
+                                setShowVoucherModal(true);
+                            }}
+                            className="flex items-center gap-2 bg-red-500 text-white px-3 py-1.5 rounded-md hover:bg-red-600 text-sm font-semibold transition-colors shadow-sm"
+                        >
+                            <InvoiceIcon className="w-4 h-4" /> Create Voucher
                         </button>
                         <button
                             onClick={handleBulkPrint}
@@ -473,6 +517,97 @@ const LRList: React.FC<LRListProps> = ({
                                 className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:opacity-90 transition-all font-semibold disabled:opacity-50 flex items-center gap-2"
                             >
                                 {isPostingLedger ? 'Posting...' : 'Post Entry'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Voucher Create Modal */}
+            {showVoucherModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <InvoiceIcon className="w-6 h-6 text-red-500" />
+                                Create Voucher (Debit)
+                            </h3>
+                            <button onClick={() => setShowVoucherModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                                <XIcon className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4 overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={voucherDate}
+                                        onChange={(e) => setVoucherDate(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Voucher No.</label>
+                                    <input 
+                                        type="text" 
+                                        value={voucherNo}
+                                        onChange={(e) => setVoucherNo(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none font-mono"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Details / Description</label>
+                                <textarea 
+                                    value={voucherDescription}
+                                    onChange={(e) => setVoucherDescription(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none"
+                                    rows={2}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Amount (₹)</label>
+                                    <input 
+                                        type="number" 
+                                        value={voucherAmount || ''}
+                                        onChange={(e) => setVoucherAmount(Number(e.target.value))}
+                                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none font-bold text-red-600"
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Mode of Payment</label>
+                                    <select 
+                                        value={voucherPaymentMode}
+                                        onChange={(e) => setVoucherPaymentMode(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:border-transparent outline-none bg-white"
+                                    >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Bank Transfer">Bank Transfer / NEFT</option>
+                                        <option value="UPI">UPI</option>
+                                        <option value="Cheque">Cheque</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80">
+                            <button
+                                onClick={() => setShowVoucherModal(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors font-medium"
+                                disabled={isCreatingVoucher}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleCreateVoucher}
+                                disabled={isCreatingVoucher || voucherAmount <= 0}
+                                className="px-6 py-2 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:shadow-lg hover:opacity-90 transition-all font-semibold disabled:opacity-50 flex items-center gap-2"
+                            >
+                                {isCreatingVoucher ? 'Creating...' : 'Create Voucher'}
                             </button>
                         </div>
                     </div>

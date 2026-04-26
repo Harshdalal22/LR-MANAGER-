@@ -820,6 +820,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                             <tr>
                                                 <th className="px-6 py-4 rounded-tl-xl font-semibold">Date</th>
                                                 <th className="px-6 py-4 font-semibold">Description</th>
+                                                <th className="px-6 py-4 font-semibold">Mode</th>
                                                 <th className="px-6 py-4 font-semibold">Invoice No. (Credit)</th>
                                                 <th className="px-6 py-4 font-semibold">Voucher No. (Debit)</th>
                                                 <th className="px-6 py-4 font-semibold text-right">Credit (₹)</th>
@@ -830,7 +831,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                         <tbody className="divide-y divide-white/10">
                                             {entriesWithBalance.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
+                                                    <td colSpan={8} className="px-6 py-8 text-center text-gray-400">
                                                         No ledger entries found.
                                                     </td>
                                                 </tr>
@@ -839,6 +840,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                                     <tr key={entry.id || index} className="hover:bg-white/5 transition">
                                                         <td className="px-6 py-4 whitespace-nowrap">{entry.date}</td>
                                                         <td className="px-6 py-4 font-medium text-white">{entry.description}</td>
+                                                        <td className="px-6 py-4 text-gray-300">{entry.payment_mode || '-'}</td>
                                                         <td className="px-6 py-4 text-blue-400">{entry.invoice_no || '-'}</td>
                                                         <td className="px-6 py-4 text-red-400">{entry.voucher_no || '-'}</td>
                                                         <td className="px-6 py-4 text-right text-green-400 font-semibold">{entry.credit ? entry.credit.toLocaleString() : '-'}</td>
@@ -850,7 +852,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                         </tbody>
                                         <tfoot className="bg-white/5 font-bold text-white border-t border-white/20">
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-4 text-right">TOTAL</td>
+                                                <td colSpan={5} className="px-6 py-4 text-right">TOTAL</td>
                                                 <td className="px-6 py-4 text-right text-green-400">{totalLedgerCredit.toLocaleString()}</td>
                                                 <td className="px-6 py-4 text-right text-red-400">{totalLedgerDebit.toLocaleString()}</td>
                                                 <td className="px-6 py-4 text-right text-blue-400">{totalLedgerBalance.toLocaleString()}</td>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { createOperator, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks } from '../services/supabaseService';
-import { LedgerEntry, LorryReceipt } from '../types';
+import { createOperator, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers } from '../services/supabaseService';
+import { LedgerEntry, LorryReceipt, SavedParty, Voucher } from '../types';
 import {
     UsersIcon,
     CogIcon,
@@ -317,6 +317,12 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalUsersCount, setTotalUsersCount] = useState(0);
 
+    // Party Ledger State
+    const [allLRs, setAllLRs] = useState<LorryReceipt[]>([]);
+    const [allVouchers, setAllVouchers] = useState<Voucher[]>([]);
+    const [partyList, setPartyList] = useState<string[]>([]);
+    const [selectedPartyLedger, setSelectedPartyLedger] = useState<string>('');
+
     const fetchOperators = async () => {
         setIsLoadingUsers(true);
         try {
@@ -361,8 +367,21 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
     const fetchLedgerData = async () => {
         try {
-            const data = await getLedgerEntries();
+            const [data, lrs, vouchers, parties] = await Promise.all([
+                getLedgerEntries(),
+                getLorryReceipts(),
+                getVouchers(),
+                getSavedParties()
+            ]);
             setLedgerEntries(data);
+            setAllLRs(lrs);
+            setAllVouchers(vouchers);
+            // Build unique party name list from LRs + vouchers + saved parties
+            const namesFromLRs = lrs.flatMap(lr => [lr.consignor?.name, lr.consignee?.name, lr.billingTo?.name].filter(Boolean) as string[]);
+            const namesFromVouchers = vouchers.map(v => v.party_name).filter(Boolean) as string[];
+            const namesFromParties = parties.map(p => p.name).filter(Boolean) as string[];
+            const uniqueNames = Array.from(new Set([...namesFromParties, ...namesFromLRs, ...namesFromVouchers])).sort();
+            setPartyList(uniqueNames);
         } catch (error) {
             console.error("Error fetching ledger:", error);
         }
@@ -769,98 +788,189 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                 {/* Ledger Tab */}
                 {activeTab === 'ledger' && (() => {
-                    const totalLedgerCredit = ledgerEntries.reduce((acc, entry) => acc + (Number(entry.credit) || 0), 0);
-                    const totalLedgerDebit = ledgerEntries.reduce((acc, entry) => acc + (Number(entry.debit) || 0), 0);
-                    const totalLedgerBalance = totalLedgerCredit - totalLedgerDebit;
+                    // --- Party Ledger Logic ---
+                    type LedgerRow = {
+                        date: string;
+                        description: string;
+                        type: 'Invoice (Credit)' | 'Voucher (Debit)';
+                        ref_no: string;
+                        payment_mode?: string;
+                        credit: number;
+                        debit: number;
+                    };
 
-                    let currentBalance = 0;
-                    const entriesWithBalance = [...ledgerEntries].reverse().map(entry => {
-                        currentBalance += (Number(entry.credit) || 0) - (Number(entry.debit) || 0);
-                        return { ...entry, runningBalance: currentBalance };
-                    }).reverse();
+                    const partyRows: LedgerRow[] = [];
+
+                    if (selectedPartyLedger) {
+                        // Invoices → Credit rows (match consignor, consignee, or billingTo)
+                        allLRs
+                            .filter(lr =>
+                                lr.consignor?.name === selectedPartyLedger ||
+                                lr.consignee?.name === selectedPartyLedger ||
+                                lr.billingTo?.name === selectedPartyLedger
+                            )
+                            .forEach(lr => {
+                                partyRows.push({
+                                    date: lr.date,
+                                    description: `LR ${lr.lrNo} — ${lr.fromPlace} → ${lr.toPlace}`,
+                                    type: 'Invoice (Credit)',
+                                    ref_no: lr.invoiceNo || lr.lrNo,
+                                    credit: Number(lr.invoiceAmount) || Number(lr.freight) || 0,
+                                    debit: 0,
+                                });
+                            });
+
+                        // Vouchers → Debit rows
+                        allVouchers
+                            .filter(v => v.party_name === selectedPartyLedger)
+                            .forEach(v => {
+                                partyRows.push({
+                                    date: v.date,
+                                    description: v.description,
+                                    type: 'Voucher (Debit)',
+                                    ref_no: v.voucher_no,
+                                    payment_mode: v.payment_mode,
+                                    credit: 0,
+                                    debit: Number(v.amount) || 0,
+                                });
+                            });
+                    }
+
+                    // Sort by date ascending
+                    partyRows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                    // Running balance
+                    let runningBal = 0;
+                    const rowsWithBalance = partyRows.map(row => {
+                        runningBal += row.credit - row.debit;
+                        return { ...row, runningBalance: runningBal };
+                    });
+
+                    const totalCredit = partyRows.reduce((s, r) => s + r.credit, 0);
+                    const totalDebit = partyRows.reduce((s, r) => s + r.debit, 0);
+                    const totalBalance = totalCredit - totalDebit;
 
                     return (
                         <div className="space-y-6 animate-fadeIn">
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-xl rounded-2xl border border-green-500/30 p-6">
-                                    <h3 className="text-green-400 font-semibold mb-2">Total Credit</h3>
-                                    <p className="text-3xl font-black text-white">₹ {totalLedgerCredit.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-red-500/20 to-rose-600/20 backdrop-blur-xl rounded-2xl border border-red-500/30 p-6">
-                                    <h3 className="text-red-400 font-semibold mb-2">Total Debit</h3>
-                                    <p className="text-3xl font-black text-white">₹ {totalLedgerDebit.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-blue-500/20 to-indigo-600/20 backdrop-blur-xl rounded-2xl border border-blue-500/30 p-6">
-                                    <h3 className="text-blue-400 font-semibold mb-2">Total Balance</h3>
-                                    <p className="text-3xl font-black text-white">₹ {totalLedgerBalance.toLocaleString()}</p>
+                            {/* Party Selector */}
+                            <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
+                                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                    <UserIcon className="w-6 h-6 text-blue-400" />
+                                    Party Ledger — Select a Party
+                                </h2>
+                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                                    <select
+                                        value={selectedPartyLedger}
+                                        onChange={e => setSelectedPartyLedger(e.target.value)}
+                                        className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
+                                    >
+                                        <option value="" className="text-gray-900">— Select Party to View Ledger —</option>
+                                        {partyList.map(p => (
+                                            <option key={p} value={p} className="text-gray-900">{p}</option>
+                                        ))}
+                                    </select>
+                                    {selectedPartyLedger && (
+                                        <button
+                                            onClick={() => setSelectedPartyLedger('')}
+                                            className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-gray-300 hover:bg-white/20 transition text-sm"
+                                        >Clear</button>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Ledger Table */}
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl overflow-hidden">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                                        <DocumentTextIcon className="w-7 h-7 text-blue-400" />
-                                        Financial Ledger
-                                    </h2>
-                                    <div className="flex gap-2">
-                                        <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition">
-                                            <FilterIcon className="w-4 h-4" /> Filter
-                                        </button>
-                                        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg transition">
-                                            <DownloadIcon className="w-4 h-4" /> Export
-                                        </button>
+                            {/* Summary Cards */}
+                            {selectedPartyLedger && (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-xl rounded-2xl border border-green-500/30 p-6">
+                                            <h3 className="text-green-400 font-semibold mb-1 text-sm uppercase tracking-wider">Total Credit (Invoices)</h3>
+                                            <p className="text-3xl font-black text-white">₹{totalCredit.toLocaleString('en-IN')}</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-red-500/20 to-rose-600/20 backdrop-blur-xl rounded-2xl border border-red-500/30 p-6">
+                                            <h3 className="text-red-400 font-semibold mb-1 text-sm uppercase tracking-wider">Total Debit (Vouchers)</h3>
+                                            <p className="text-3xl font-black text-white">₹{totalDebit.toLocaleString('en-IN')}</p>
+                                        </div>
+                                        <div className={`bg-gradient-to-br ${totalBalance >= 0 ? 'from-blue-500/20 to-indigo-600/20 border-blue-500/30' : 'from-orange-500/20 to-red-600/20 border-orange-500/30'} backdrop-blur-xl rounded-2xl border p-6`}>
+                                            <h3 className={`${totalBalance >= 0 ? 'text-blue-400' : 'text-orange-400'} font-semibold mb-1 text-sm uppercase tracking-wider`}>Net Balance (Credit − Debit)</h3>
+                                            <p className={`text-3xl font-black ${totalBalance >= 0 ? 'text-white' : 'text-orange-300'}`}>
+                                                {totalBalance < 0 ? '− ' : ''}₹{Math.abs(totalBalance).toLocaleString('en-IN')}
+                                            </p>
+                                        </div>
                                     </div>
-                                </div>
-                                
-                                <div className="overflow-x-auto custom-scrollbar">
-                                    <table className="w-full text-left text-sm text-gray-300">
-                                        <thead className="text-xs text-gray-400 uppercase bg-white/5">
-                                            <tr>
-                                                <th className="px-6 py-4 rounded-tl-xl font-semibold">Date</th>
-                                                <th className="px-6 py-4 font-semibold">Description</th>
-                                                <th className="px-6 py-4 font-semibold">Mode</th>
-                                                <th className="px-6 py-4 font-semibold">Invoice No. (Credit)</th>
-                                                <th className="px-6 py-4 font-semibold">Voucher No. (Debit)</th>
-                                                <th className="px-6 py-4 font-semibold text-right">Credit (₹)</th>
-                                                <th className="px-6 py-4 font-semibold text-right">Debit (₹)</th>
-                                                <th className="px-6 py-4 rounded-tr-xl font-semibold text-right">Balance (₹)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/10">
-                                            {entriesWithBalance.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={8} className="px-6 py-8 text-center text-gray-400">
-                                                        No ledger entries found.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                entriesWithBalance.map((entry, index) => (
-                                                    <tr key={entry.id || index} className="hover:bg-white/5 transition">
-                                                        <td className="px-6 py-4 whitespace-nowrap">{entry.date}</td>
-                                                        <td className="px-6 py-4 font-medium text-white">{entry.description}</td>
-                                                        <td className="px-6 py-4 text-gray-300">{entry.payment_mode || '-'}</td>
-                                                        <td className="px-6 py-4 text-blue-400">{entry.invoice_no || '-'}</td>
-                                                        <td className="px-6 py-4 text-red-400">{entry.voucher_no || '-'}</td>
-                                                        <td className="px-6 py-4 text-right text-green-400 font-semibold">{entry.credit ? entry.credit.toLocaleString() : '-'}</td>
-                                                        <td className="px-6 py-4 text-right text-red-400 font-semibold">{entry.debit ? entry.debit.toLocaleString() : '-'}</td>
-                                                        <td className="px-6 py-4 text-right text-white font-bold">{entry.runningBalance.toLocaleString()}</td>
+
+                                    {/* Ledger Table */}
+                                    <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
+                                        <h2 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
+                                            <DocumentTextIcon className="w-6 h-6 text-blue-400" />
+                                            Ledger for: <span className="text-blue-300 ml-1">{selectedPartyLedger}</span>
+                                        </h2>
+                                        <div className="overflow-x-auto custom-scrollbar">
+                                            <table className="w-full text-left text-sm text-gray-300">
+                                                <thead className="text-xs text-gray-400 uppercase bg-white/5">
+                                                    <tr>
+                                                        <th className="px-4 py-3 rounded-tl-xl font-semibold">Date</th>
+                                                        <th className="px-4 py-3 font-semibold">Type</th>
+                                                        <th className="px-4 py-3 font-semibold">Ref No.</th>
+                                                        <th className="px-4 py-3 font-semibold">Description</th>
+                                                        <th className="px-4 py-3 font-semibold">Mode</th>
+                                                        <th className="px-4 py-3 font-semibold text-right text-green-400">Credit (₹)</th>
+                                                        <th className="px-4 py-3 font-semibold text-right text-red-400">Debit (₹)</th>
+                                                        <th className="px-4 py-3 font-semibold text-right rounded-tr-xl">Balance (₹)</th>
                                                     </tr>
-                                                ))
-                                            )}
-                                        </tbody>
-                                        <tfoot className="bg-white/5 font-bold text-white border-t border-white/20">
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-4 text-right">TOTAL</td>
-                                                <td className="px-6 py-4 text-right text-green-400">{totalLedgerCredit.toLocaleString()}</td>
-                                                <td className="px-6 py-4 text-right text-red-400">{totalLedgerDebit.toLocaleString()}</td>
-                                                <td className="px-6 py-4 text-right text-blue-400">{totalLedgerBalance.toLocaleString()}</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/10">
+                                                    {rowsWithBalance.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
+                                                                No transactions found for <strong className="text-white">{selectedPartyLedger}</strong>.
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        rowsWithBalance.map((row, idx) => (
+                                                            <tr key={idx} className={`hover:bg-white/5 transition ${row.type === 'Invoice (Credit)' ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
+                                                                <td className="px-4 py-3 whitespace-nowrap text-gray-300">{new Date(row.date).toLocaleDateString('en-GB')}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                                                                        row.type === 'Invoice (Credit)'
+                                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                                                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                                                    }`}>{row.type}</span>
+                                                                </td>
+                                                                <td className="px-4 py-3 font-mono text-xs text-blue-300">{row.ref_no}</td>
+                                                                <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate" title={row.description}>{row.description}</td>
+                                                                <td className="px-4 py-3 text-gray-400 text-xs">{row.payment_mode || '—'}</td>
+                                                                <td className="px-4 py-3 text-right font-bold text-green-400">{row.credit ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
+                                                                <td className="px-4 py-3 text-right font-bold text-red-400">{row.debit ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
+                                                                <td className={`px-4 py-3 text-right font-black text-lg ${ row.runningBalance >= 0 ? 'text-white' : 'text-orange-300'}`}>
+                                                                    {row.runningBalance < 0 ? '−' : ''}₹{Math.abs(row.runningBalance).toLocaleString('en-IN')}
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    )}
+                                                </tbody>
+                                                <tfoot className="bg-white/5 font-bold text-white border-t-2 border-white/20">
+                                                    <tr>
+                                                        <td colSpan={5} className="px-4 py-4 text-right text-gray-300 uppercase tracking-wider text-xs">TOTAL</td>
+                                                        <td className="px-4 py-4 text-right text-green-400 text-lg">₹{totalCredit.toLocaleString('en-IN')}</td>
+                                                        <td className="px-4 py-4 text-right text-red-400 text-lg">₹{totalDebit.toLocaleString('en-IN')}</td>
+                                                        <td className={`px-4 py-4 text-right text-xl font-black ${totalBalance >= 0 ? 'text-blue-300' : 'text-orange-300'}`}>
+                                                            {totalBalance < 0 ? '−' : ''}₹{Math.abs(totalBalance).toLocaleString('en-IN')}
+                                                        </td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {!selectedPartyLedger && (
+                                <div className="text-center py-20 text-gray-400">
+                                    <UserIcon className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                                    <p className="text-xl font-semibold">Select a party above to view their ledger</p>
+                                    <p className="text-sm mt-2 opacity-70">All invoices and vouchers linked to that party will appear here</p>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     );
                 })()}

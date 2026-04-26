@@ -802,13 +802,13 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     const partyRows: LedgerRow[] = [];
 
                     if (selectedPartyLedger) {
-                        // Invoices → Credit rows (match consignor, consignee, or billingTo)
+                        // Invoices → Credit rows (Only generated invoices matched by Billing/Consignor party)
                         allLRs
-                            .filter(lr =>
-                                lr.consignor?.name === selectedPartyLedger ||
-                                lr.consignee?.name === selectedPartyLedger ||
-                                lr.billingTo?.name === selectedPartyLedger
-                            )
+                            .filter(lr => lr.isInvoiceGenerated || lr.invoiceNo)
+                            .filter(lr => {
+                                const billedToName = lr.billingTo?.name || lr.consignor?.name;
+                                return billedToName === selectedPartyLedger;
+                            })
                             .forEach(lr => {
                                 // Calculate raw amount = freight + all charges
                                 const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
@@ -819,7 +819,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 const creditVal = Number(lr.invoiceAmount) > 0 ? Number(lr.invoiceAmount) : calculatedAmountWithTax;
                                 
                                 partyRows.push({
-                                    date: lr.date,
+                                    date: lr.invoiceDate || lr.date,
                                     description: `Bill Generated`,
                                     type: 'Invoice (Credit)',
                                     ref_no: lr.invoiceNo || lr.lrNo,

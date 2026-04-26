@@ -18,6 +18,7 @@ import AdBanner from './components/AdBanner';
 import PODUploadModal from './components/PODUploadModal';
 import PasswordResetModal from './components/PasswordResetModal';
 import RoleSelection from './components/RoleSelection';
+import AdminPanel3D from './components/AdminPanel3D';
 import {
     LorryReceipt,
     CompanyDetails,
@@ -90,8 +91,8 @@ const App: React.FC = () => {
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
     const [isPasswordResetting, setIsPasswordResetting] = useState(false);
-    const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager'>(() => {
-        return (sessionStorage.getItem('currentRole') as 'Admin' | 'Manager') || 'Admin';
+    const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager' | 'Operator'>(() => {
+        return (sessionStorage.getItem('currentRole') as 'Admin' | 'Manager' | 'Operator') || 'Admin';
     });
     const [showRoleSelection, setShowRoleSelection] = useState(false);
     const [roleSelectionError, setRoleSelectionError] = useState('');
@@ -100,6 +101,7 @@ const App: React.FC = () => {
     const [headerSettingsTrigger, setHeaderSettingsTrigger] = useState(0);
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
     const [managerRequests, setManagerRequests] = useState<any[]>([]);
+    const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
@@ -107,6 +109,49 @@ const App: React.FC = () => {
     };
 
 
+    const handleUpdateDetails = async (details: CompanyDetails) => {
+        const toastId = toast.loading('Saving settings...');
+        try {
+            const saved = await saveCompanyDetails(details);
+            setCompanyDetails(saved);
+            toast.success('Settings updated successfully', { id: toastId });
+            setHeaderSettingsTrigger(prev => prev + 1);
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to save settings");
+        }
+    };
+
+    const handleUploadAsset = async (file: File, type: 'logo' | 'signature') => {
+        const toastId = toast.loading(`Uploading ${type}...`);
+        try {
+            const url = await uploadCompanyAsset(file, type);
+            const updated = { ...companyDetails, [type === 'logo' ? 'logoUrl' : 'signatureImageUrl']: url };
+            setCompanyDetails(updated);
+            await saveCompanyDetails(updated);
+            toast.success(`${type === 'logo' ? 'Logo' : 'Signature'} uploaded successfully`, { id: toastId });
+            setHeaderSettingsTrigger(prev => prev + 1);
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to upload asset");
+        }
+    };
+
+    const handleRoleChangeRequest = (role: 'Admin' | 'Manager') => {
+        if (role === 'Admin' && companyDetails.rbacEnabled) {
+            const passkey = prompt("Enter Admin Passkey:");
+            if (passkey) {
+                handleRoleChange(role, passkey);
+            }
+        } else if (role === 'Manager' && companyDetails.rbacEnabled && currentRole !== 'Admin') {
+            const passkey = prompt("Enter Manager Passkey:");
+            if (passkey) {
+                handleRoleChange(role, passkey);
+            }
+        } else {
+            handleRoleChange(role);
+        }
+    };
 
     const navigateTo = (view: View) => {
         setViewHistory(prev => [...prev, currentView]);
@@ -501,10 +546,14 @@ const App: React.FC = () => {
     const renderContent = () => {
         // RBAC Restriction logic
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
-        // 'list' is now accessible to managers (read-only mode enforced in LRList)
-        const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+        const isOperator = currentRole === 'Operator';
+        
+        // 'list' is now accessible to managers/operators
+        const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+        // Operator can access data-management (parties/trucks) but NOT invoices
+        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'booking-register', 'invoices'];
 
-        if (isManager && restrictedViews.includes(currentView)) {
+        if ((isManager && restrictedViewsManager.includes(currentView)) || (isOperator && restrictedViewsOperator.includes(currentView))) {
             return (
                 <div className="bg-white p-10 rounded-3xl shadow-xl text-center max-w-lg mx-auto border border-gray-100 animate-fadeIn">
                     <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -513,7 +562,7 @@ const App: React.FC = () => {
                         </svg>
                     </div>
                     <h2 className="text-2xl font-black text-gray-800 mb-2">Access Restricted</h2>
-                    <p className="text-gray-500 mb-8 font-medium">Managers do not have permission to access this module. Please switch to Admin mode if you have the passkey.</p>
+                    <p className="text-gray-500 mb-8 font-medium">You do not have permission to access this module. Please switch to Admin mode if you have the passkey.</p>
                     <button
                         onClick={() => setCurrentView('dashboard')}
                         className="w-full py-4 bg-ssk-blue text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform"
@@ -653,15 +702,18 @@ const App: React.FC = () => {
             <Toaster position="top-center" />
             <Header
                 companyDetails={companyDetails}
-                onUpdateDetails={async (d) => { const s = await saveCompanyDetails(d); setCompanyDetails(s); return true; }}
-                onUploadAsset={uploadCompanyAsset}
-                userEmail={session.user.email}
+                onUpdateDetails={handleUpdateDetails}
+                onUploadAsset={handleUploadAsset}
+                userEmail={session?.user?.email}
                 onSignOut={handleSignOut}
                 language={language}
                 setLanguage={setLanguage}
                 currentRole={currentRole}
-                onRoleChange={handleRoleChange}
+                onRoleChange={handleRoleChangeRequest}
                 onForgotPasskey={handleForgotPasskeyTrigger}
+                settingsTrigger={headerSettingsTrigger}
+                isOperator={currentRole === 'Operator'}
+                onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
             />
             <main className="container mx-auto p-4 md:p-6">
                 {renderContent()}
@@ -741,6 +793,12 @@ const App: React.FC = () => {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+            
+            {isAdminPanelOpen && (
+                <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
+                    <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
                 </div>
             )}
         </div>

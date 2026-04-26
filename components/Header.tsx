@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CompanyDetails } from '../types';
-import { CogIcon, XIcon, SpinnerIcon, GlobeIcon } from './icons';
+import { CogIcon, XIcon, SpinnerIcon, GlobeIcon, UsersIcon } from './icons';
 import { Language, t } from '../utils/translations';
 
 import { toast } from 'react-hot-toast';
@@ -18,6 +18,8 @@ interface HeaderProps {
     onRoleChange: (role: 'Admin' | 'Manager', passkey?: string) => boolean;
     onForgotPasskey?: () => void;
     settingsTrigger?: number;
+    isOperator?: boolean;
+    onOpenAdminPanel?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -31,7 +33,9 @@ const Header: React.FC<HeaderProps> = ({
     currentRole,
     onRoleChange,
     onForgotPasskey,
-    settingsTrigger
+    settingsTrigger,
+    isOperator,
+    onOpenAdminPanel
 }) => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [localDetails, setLocalDetails] = useState(companyDetails);
@@ -163,7 +167,7 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
                 <div className="flex items-center gap-1 sm:gap-4 shrink-0">
 
-                    {companyDetails.rbacEnabled && (
+                    {!isOperator && companyDetails.rbacEnabled && (
                         <div className="flex items-center bg-white/10 rounded-lg p-0.5 sm:p-1 border border-white/20">
                             <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold rounded ${currentRole === 'Admin' ? 'bg-ssk-red text-white' : 'bg-gray-500 text-white'}`}>
                                 {currentRole === 'Admin' ? 'Adm' : currentRole}
@@ -180,6 +184,14 @@ const Header: React.FC<HeaderProps> = ({
                             >
                                 Sw
                             </button>
+                        </div>
+                    )}
+                    
+                    {isOperator && (
+                        <div className="flex items-center bg-white/10 rounded-lg p-0.5 sm:p-1 border border-white/20">
+                            <span className="px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold rounded bg-green-500 text-white">
+                                Operator
+                            </span>
                         </div>
                     )}
 
@@ -210,16 +222,30 @@ const Header: React.FC<HeaderProps> = ({
                             </button>
                         </div>
                     )}
-                    <button
-                        onClick={() => {
-                            setLocalDetails(companyDetails);
-                            setIsSettingsOpen(true);
-                        }}
-                        className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
-                        aria-label="Open Settings"
-                    >
-                        <CogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </button>
+                    {!isOperator && (
+                        <div className="flex gap-1 sm:gap-2">
+                            {currentRole === 'Admin' && onOpenAdminPanel && (
+                                <button
+                                    onClick={onOpenAdminPanel}
+                                    className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
+                                    title="Admin Control Center"
+                                    aria-label="Open Admin Control Center"
+                                >
+                                    <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                </button>
+                            )}
+                            <button
+                                onClick={() => {
+                                    setLocalDetails(companyDetails);
+                                    setIsSettingsOpen(true);
+                                }}
+                                className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
+                                aria-label="Open Settings"
+                            >
+                                <CogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 

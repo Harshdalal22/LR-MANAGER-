@@ -1,7 +1,7 @@
 
 
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry } from '../types';
 
 /* 
 ================================================================================
@@ -104,7 +104,79 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Secondary client for creating users without logging out the admin
+const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
+    auth: { persistSession: false }
+});
+
 const getSupabase = () => supabase;
+
+export const getEffectiveUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+    
+    // If the current role is Operator, use the admin's ID
+    const role = sessionStorage.getItem('currentRole');
+    if (role === 'Operator') {
+        const adminId = sessionStorage.getItem('adminId');
+        if (adminId) return adminId;
+    }
+    return user.id;
+};
+
+export const checkOperatorRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    // Check if this user is mapped as an operator
+    const { data, error } = await supabase
+        .from('app_users')
+        .select('*')
+        .eq('operator_id', user.id)
+        .single();
+    
+    if (error && error.code !== 'PGRST116') {
+        console.error("Error checking operator role:", error);
+    }
+    
+    if (data && data.admin_id) {
+        return {
+            isAdmin: false,
+            role: data.role || 'Operator',
+            adminId: data.admin_id
+        };
+    }
+    
+    return { isAdmin: true, role: 'Admin', adminId: user.id };
+};
+
+export const createOperator = async (email: string, password: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Only an Admin can create an operator");
+
+    // Create the user using the secondary client to prevent logout
+    const { data: newUserData, error: signUpError } = await supabaseSecondary.auth.signUp({
+        email,
+        password,
+    });
+
+    if (signUpError) throw signUpError;
+    if (!newUserData.user) throw new Error("Failed to create operator account");
+
+    // Add mapping to app_users table
+    const { error: insertError } = await supabase
+        .from('app_users')
+        .insert([{
+            operator_id: newUserData.user.id,
+            admin_id: user.id,
+            email: email,
+            role: 'Operator'
+        }]);
+
+    if (insertError) throw insertError;
+
+    return newUserData.user;
+};
 
 // --- Auth ---
 
@@ -341,8 +413,7 @@ export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryR
 }
 
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const effectiveUserId = await getEffectiveUserId();
 
     // Destructure to separate frontend-only fields and 'id' if present
     const {
@@ -367,7 +438,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
 
     const payload = {
         ...sanitizedRest,
-        user_id: user.id,
+        user_id: effectiveUserId,
         is_invoice_generated: !!isInvoiceGenerated // Ensure boolean
     };
 
@@ -417,11 +488,10 @@ export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceN
 // --- PODs ---
 
 export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const effectiveUserId = await getEffectiveUserId();
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/${lrNo}_${Date.now()}.${fileExt}`;
+    const filePath = `${effectiveUserId}/${lrNo}_${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
         .from('pods')
@@ -479,13 +549,12 @@ export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
 };
 
 export const saveCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const effectiveUserId = await getEffectiveUserId();
 
     // Map camelCase to snake_case for database
     const payload: any = {
         ...details,
-        user_id: user.id,
+        user_id: effectiveUserId,
         rbac_enabled: details.rbacEnabled,
         admin_passkey: details.adminPasskey,
         manager_passkey: details.managerPasskey,
@@ -566,11 +635,10 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
 };
 
 export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const effectiveUserId = await getEffectiveUserId();
 
     const fileExt = file.name.split('.').pop();
-    const filePath = `${user.id}/${assetType}_${Date.now()}.${fileExt}`;
+    const filePath = `${effectiveUserId}/${assetType}_${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
         .from('company_assets')
@@ -592,9 +660,8 @@ export const getSavedParties = async (): Promise<SavedParty[]> => {
 };
 
 export const saveSavedParty = async (party: SavedParty): Promise<SavedParty> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    const payload = { ...party, user_id: user.id };
+    const effectiveUserId = await getEffectiveUserId();
+    const payload = { ...party, user_id: effectiveUserId };
     const { data, error } = await supabase.from('saved_parties').upsert(payload).select().single();
     if (error) throw error;
     return data;
@@ -612,9 +679,8 @@ export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
 };
 
 export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    const payload = { ...truck, user_id: user.id };
+    const effectiveUserId = await getEffectiveUserId();
+    const payload = { ...truck, user_id: effectiveUserId };
     const { data, error } = await supabase.from('saved_trucks').upsert(payload).select().single();
     if (error) throw error;
     return data;
@@ -634,9 +700,8 @@ export const getVehicleHirings = async (): Promise<VehicleHiring[]> => {
 };
 
 export const saveVehicleHiring = async (record: VehicleHiring): Promise<VehicleHiring> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    const payload = { ...record, user_id: user.id };
+    const effectiveUserId = await getEffectiveUserId();
+    const payload = { ...record, user_id: effectiveUserId };
     const { data, error } = await supabase.from('vehicle_hirings').upsert(payload).select().single();
     if (error) throw error;
     return data;
@@ -656,9 +721,8 @@ export const getBookingRecords = async (): Promise<BookingRecord[]> => {
 };
 
 export const saveBookingRecord = async (record: BookingRecord): Promise<BookingRecord> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    const payload = { ...record, user_id: user.id };
+    const effectiveUserId = await getEffectiveUserId();
+    const payload = { ...record, user_id: effectiveUserId };
     const { data, error } = await supabase.from('booking_registers').upsert(payload).select().single();
     if (error) throw error;
     return data;
@@ -667,4 +731,22 @@ export const saveBookingRecord = async (record: BookingRecord): Promise<BookingR
 export const deleteBookingRecord = async (id: string) => {
     const { error } = await supabase.from('booking_registers').delete().eq('id', id);
     if (error) throw error;
+};
+
+// --- Ledger Entries ---
+
+export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
+    const { data, error } = await supabase.from('ledger_entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || [];
+};
+
+export const subscribeToLedgerEntries = (callback: (payload: any) => void) => {
+    return supabase.channel('ledger_entries_changes')
+        .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'ledger_entries'
+        }, callback)
+        .subscribe();
 };

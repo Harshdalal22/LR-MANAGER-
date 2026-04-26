@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
+import { createOperator, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks } from '../services/supabaseService';
+import { LedgerEntry, LorryReceipt } from '../types';
 import {
     UsersIcon,
     CogIcon,
@@ -298,13 +301,115 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
 };
 
 const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'system' | 'analytics'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'system' | 'analytics' | 'ledger'>('overview');
     const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Operator State
+    const [showAddUserModal, setShowAddUserModal] = useState(false);
+    const [operatorEmail, setOperatorEmail] = useState('');
+    const [operatorPassword, setOperatorPassword] = useState('');
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
+    const [operators, setOperators] = useState<any[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+
+    const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+    const [activeLRCount, setActiveLRCount] = useState(0);
+    const [totalRevenue, setTotalRevenue] = useState(0);
+    const [totalUsersCount, setTotalUsersCount] = useState(0);
+
+    const fetchOperators = async () => {
+        setIsLoadingUsers(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data, error } = await supabase
+                    .from('app_users')
+                    .select('*')
+                    .eq('admin_id', user.id);
+                if (error && error.code !== 'PGRST116') throw error;
+                if (data) setOperators(data);
+            }
+        } catch (error) {
+            console.error("Error fetching operators:", error);
+        } finally {
+            setIsLoadingUsers(false);
+        }
+    };
 
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
+
+    const fetchOverviewData = async () => {
+        try {
+            const [lrs, parties, trucks] = await Promise.all([
+                getLorryReceipts(),
+                getSavedParties(),
+                getSavedTrucks()
+            ]);
+            setActiveLRCount(lrs.length);
+            const revenue = lrs.reduce((acc: number, lr: LorryReceipt) => acc + (lr.invoiceAmount || lr.freight || 0), 0);
+            setTotalRevenue(revenue);
+            
+            const totalUsers = parties.length + trucks.length + operators.length;
+            setTotalUsersCount(totalUsers);
+        } catch (error) {
+            console.error("Error fetching overview stats:", error);
+        }
+    };
+
+    const fetchLedgerData = async () => {
+        try {
+            const data = await getLedgerEntries();
+            setLedgerEntries(data);
+        } catch (error) {
+            console.error("Error fetching ledger:", error);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'overview') {
+            fetchOverviewData();
+            fetchOperators(); // To get correct operator count
+        } else if (activeTab === 'ledger') {
+            fetchLedgerData();
+        } else if (activeTab === 'users') {
+            fetchOperators();
+        }
+    }, [activeTab]);
+
+    useEffect(() => {
+        const subscription = subscribeToLedgerEntries((payload) => {
+            fetchLedgerData();
+        });
+        return () => {
+            subscription.unsubscribe();
+        };
+    }, []);
+
+    const handleCreateOperator = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (operators.length >= 2) {
+            toast.error("You can only create up to 2 operators.");
+            return;
+        }
+        
+        setIsCreatingUser(true);
+        const toastId = toast.loading('Creating operator...');
+        try {
+            await createOperator(operatorEmail, operatorPassword);
+            toast.success("Operator created successfully!", { id: toastId });
+            setShowAddUserModal(false);
+            setOperatorEmail('');
+            setOperatorPassword('');
+            fetchOperators();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to create operator.", { id: toastId });
+        } finally {
+            setIsCreatingUser(false);
+        }
+    };
 
     // Mock data
     const recentActivities: ActivityItem[] = [
@@ -366,6 +471,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                 <div className="mb-8 flex gap-2 p-2 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-x-auto">
                     {[
                         { id: 'overview', label: 'Overview', icon: <DashboardIcon className="w-5 h-5" /> },
+                        { id: 'ledger', label: 'Ledger', icon: <DocumentTextIcon className="w-5 h-5" /> },
                         { id: 'users', label: 'Users', icon: <UsersIcon className="w-5 h-5" /> },
                         { id: 'system', label: 'System', icon: <ServerIcon className="w-5 h-5" /> },
                         { id: 'analytics', label: 'Analytics', icon: <ChartBarIcon className="w-5 h-5" /> },
@@ -389,36 +495,36 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     <div className="space-y-8 animate-fadeIn">
                         {/* Stats Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <StatCard3D
+                                <StatCard3D
                                 title="Total Users"
-                                value="1,247"
+                                value={totalUsersCount}
                                 icon={<UsersIcon />}
                                 trend="up"
-                                trendValue="+12%"
+                                trendValue="+2%"
                                 color="blue"
                                 delay={0}
                             />
                             <StatCard3D
                                 title="Active LRs"
-                                value="3,842"
+                                value={activeLRCount}
                                 icon={<DocumentTextIcon />}
                                 trend="up"
-                                trendValue="+8%"
+                                trendValue="+5%"
                                 color="green"
                                 delay={100}
                             />
                             <StatCard3D
                                 title="Total Revenue"
-                                value="₹24.5L"
+                                value={`₹${(totalRevenue / 100000).toFixed(2)}L`}
                                 icon={<CurrencyRupeeIcon />}
                                 trend="up"
-                                trendValue="+15%"
+                                trendValue="+8%"
                                 color="purple"
                                 delay={200}
                             />
                             <StatCard3D
                                 title="System Health"
-                                value="98.5%"
+                                value="100%"
                                 icon={<ActivityIcon />}
                                 trend="neutral"
                                 trendValue="Stable"
@@ -502,27 +608,83 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                 {activeTab === 'users' && (
                     <div className="space-y-6 animate-fadeIn">
                         <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
-                            <h2 className="text-2xl font-bold text-white mb-6">User Management</h2>
-                            <p className="text-gray-300 mb-6">Manage user accounts, roles, and permissions from this panel.</p>
+                            <h2 className="text-2xl font-bold text-white mb-6">Operator Management</h2>
+                            <p className="text-gray-300 mb-6">Create up to 2 Operators who can manage LRs and Trucks/Parties on your behalf.</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <button className="px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 flex items-center justify-center gap-2">
-                                    <PlusIcon className="w-5 h-5" />
-                                    Add New User
-                                </button>
-                                <button className="px-6 py-4 bg-white/10 border border-white/20 rounded-xl text-white font-semibold hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2">
-                                    <SearchIcon className="w-5 h-5" />
-                                    Search Users
-                                </button>
-                                <button className="px-6 py-4 bg-white/10 border border-white/20 rounded-xl text-white font-semibold hover:bg-white/20 transition-all duration-300 flex items-center justify-center gap-2">
-                                    <DownloadIcon className="w-5 h-5" />
-                                    Export Data
-                                </button>
-                            </div>
+                            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+                                {/* Operator List */}
+                                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                        <UsersIcon className="w-6 h-6 text-blue-400" />
+                                        Active Operators ({operators.length}/2)
+                                    </h3>
+                                    
+                                    {isLoadingUsers ? (
+                                        <div className="text-center py-8 text-gray-400">Loading...</div>
+                                    ) : operators.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-400">
+                                            No operators added yet.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {operators.map((op, idx) => (
+                                                <div key={op.operator_id || idx} className="p-4 bg-white/10 rounded-xl flex items-center justify-between">
+                                                    <div>
+                                                        <p className="font-semibold text-white">{op.email}</p>
+                                                        <p className="text-xs text-blue-300 capitalize">{op.role}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
-                            <div className="text-center py-12 text-gray-400">
-                                <UsersIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                                <p>User management interface will be displayed here</p>
+                                {/* Add Operator Form */}
+                                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                        <PlusIcon className="w-6 h-6 text-green-400" />
+                                        Create New Operator
+                                    </h3>
+
+                                    {operators.length >= 2 ? (
+                                        <div className="p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-200">
+                                            You have reached the limit of 2 operators.
+                                        </div>
+                                    ) : (
+                                        <form onSubmit={handleCreateOperator} className="space-y-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-1">Operator Email</label>
+                                                <input 
+                                                    type="email" 
+                                                    value={operatorEmail}
+                                                    onChange={(e) => setOperatorEmail(e.target.value)}
+                                                    required
+                                                    className="w-full px-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                                                    placeholder="operator@company.com"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-1">Operator Password</label>
+                                                <input 
+                                                    type="password" 
+                                                    value={operatorPassword}
+                                                    onChange={(e) => setOperatorPassword(e.target.value)}
+                                                    required
+                                                    minLength={6}
+                                                    className="w-full px-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                                                    placeholder="Enter a secure password"
+                                                />
+                                            </div>
+                                            <button 
+                                                type="submit"
+                                                disabled={isCreatingUser}
+                                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl font-bold text-white shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 disabled:opacity-50"
+                                            >
+                                                {isCreatingUser ? 'Creating...' : 'Create Operator'}
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -604,6 +766,102 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                         </div>
                     </div>
                 )}
+
+                {/* Ledger Tab */}
+                {activeTab === 'ledger' && (() => {
+                    const totalLedgerCredit = ledgerEntries.reduce((acc, entry) => acc + (Number(entry.credit) || 0), 0);
+                    const totalLedgerDebit = ledgerEntries.reduce((acc, entry) => acc + (Number(entry.debit) || 0), 0);
+                    const totalLedgerBalance = totalLedgerCredit - totalLedgerDebit;
+
+                    let currentBalance = 0;
+                    const entriesWithBalance = [...ledgerEntries].reverse().map(entry => {
+                        currentBalance += (Number(entry.credit) || 0) - (Number(entry.debit) || 0);
+                        return { ...entry, runningBalance: currentBalance };
+                    }).reverse();
+
+                    return (
+                        <div className="space-y-6 animate-fadeIn">
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-xl rounded-2xl border border-green-500/30 p-6">
+                                    <h3 className="text-green-400 font-semibold mb-2">Total Credit</h3>
+                                    <p className="text-3xl font-black text-white">₹ {totalLedgerCredit.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-gradient-to-br from-red-500/20 to-rose-600/20 backdrop-blur-xl rounded-2xl border border-red-500/30 p-6">
+                                    <h3 className="text-red-400 font-semibold mb-2">Total Debit</h3>
+                                    <p className="text-3xl font-black text-white">₹ {totalLedgerDebit.toLocaleString()}</p>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-500/20 to-indigo-600/20 backdrop-blur-xl rounded-2xl border border-blue-500/30 p-6">
+                                    <h3 className="text-blue-400 font-semibold mb-2">Total Balance</h3>
+                                    <p className="text-3xl font-black text-white">₹ {totalLedgerBalance.toLocaleString()}</p>
+                                </div>
+                            </div>
+
+                            {/* Ledger Table */}
+                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl overflow-hidden">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                        <DocumentTextIcon className="w-7 h-7 text-blue-400" />
+                                        Financial Ledger
+                                    </h2>
+                                    <div className="flex gap-2">
+                                        <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-white hover:bg-white/10 transition">
+                                            <FilterIcon className="w-4 h-4" /> Filter
+                                        </button>
+                                        <button className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl text-white font-bold hover:shadow-lg transition">
+                                            <DownloadIcon className="w-4 h-4" /> Export
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="overflow-x-auto custom-scrollbar">
+                                    <table className="w-full text-left text-sm text-gray-300">
+                                        <thead className="text-xs text-gray-400 uppercase bg-white/5">
+                                            <tr>
+                                                <th className="px-6 py-4 rounded-tl-xl font-semibold">Date</th>
+                                                <th className="px-6 py-4 font-semibold">Description</th>
+                                                <th className="px-6 py-4 font-semibold">Invoice No. (Credit)</th>
+                                                <th className="px-6 py-4 font-semibold">Voucher No. (Debit)</th>
+                                                <th className="px-6 py-4 font-semibold text-right">Credit (₹)</th>
+                                                <th className="px-6 py-4 font-semibold text-right">Debit (₹)</th>
+                                                <th className="px-6 py-4 rounded-tr-xl font-semibold text-right">Balance (₹)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/10">
+                                            {entriesWithBalance.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
+                                                        No ledger entries found.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                entriesWithBalance.map((entry, index) => (
+                                                    <tr key={entry.id || index} className="hover:bg-white/5 transition">
+                                                        <td className="px-6 py-4 whitespace-nowrap">{entry.date}</td>
+                                                        <td className="px-6 py-4 font-medium text-white">{entry.description}</td>
+                                                        <td className="px-6 py-4 text-blue-400">{entry.invoice_no || '-'}</td>
+                                                        <td className="px-6 py-4 text-red-400">{entry.voucher_no || '-'}</td>
+                                                        <td className="px-6 py-4 text-right text-green-400 font-semibold">{entry.credit ? entry.credit.toLocaleString() : '-'}</td>
+                                                        <td className="px-6 py-4 text-right text-red-400 font-semibold">{entry.debit ? entry.debit.toLocaleString() : '-'}</td>
+                                                        <td className="px-6 py-4 text-right text-white font-bold">{entry.runningBalance.toLocaleString()}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                        <tfoot className="bg-white/5 font-bold text-white border-t border-white/20">
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-4 text-right">TOTAL</td>
+                                                <td className="px-6 py-4 text-right text-green-400">{totalLedgerCredit.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right text-red-400">{totalLedgerDebit.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right text-blue-400">{totalLedgerBalance.toLocaleString()}</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })()}
             </div>
 
             {/* Custom Scrollbar Styles */}

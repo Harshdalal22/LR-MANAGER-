@@ -171,4 +171,16 @@ export interface BookingRecord {
     user_id?: string;
 }
 
+export interface LedgerEntry {
+    id?: string;
+    date: string;
+    description: string;
+    invoice_no?: string;
+    voucher_no?: string;
+    credit: number;
+    debit: number;
+    user_id?: string;
+    created_at?: string;
+}
+
 export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices';

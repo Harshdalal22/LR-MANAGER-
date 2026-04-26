@@ -13,7 +13,7 @@ interface DashboardProps {
     language: Language;
     activeSection: 'lr' | 'data' | 'emergency' | null;
     setActiveSection: (section: 'lr' | 'data' | 'emergency' | null) => void;
-    currentRole: 'Admin' | 'Manager';
+    currentRole: 'Admin' | 'Manager' | 'Operator';
     rbacEnabled?: boolean;
     managerRequests?: any[]; // Array of pending requests
     onApproveManagerRequest?: (request: any) => void;
@@ -453,7 +453,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Emergency Card */}
-                    {(!rbacEnabled || currentRole === 'Admin') && (
+                    {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                         <div
                             onClick={() => setActiveSection('emergency')}
                             className="group flex-1 bg-white rounded-[2rem] p-5 sm:p-6 md:p-10 border border-gray-100 hover:border-red-200 cursor-pointer transition-all duration-500 transform active:scale-95 hover:-translate-y-3 relative overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(220,38,38,0.3)] animate-fadeInUp" style={{ animationDelay: '0.4s' }}
@@ -506,7 +506,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="animate-fadeInUp space-y-6">
                     {/* Actions Scroll View for Mobile */}
                     <div className="flex overflow-x-auto pb-2 gap-3 no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-                        {(!rbacEnabled || currentRole === 'Admin') && (
+                        {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <button onClick={() => setCurrentView('invoices')} className="flex-shrink-0 flex items-center bg-gradient-to-r from-green-600 to-green-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-green-200 transition-all text-sm border-b-4 border-green-700 active:border-b-0 active:translate-y-1">
                                 <InvoiceIcon className="w-5 h-5 mr-2" />
                                 {t[language].invoices}
@@ -517,7 +517,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <ListIcon className="w-5 h-5 mr-2" />
                             {t[language].viewList}
                         </button>
-                        {(!rbacEnabled || currentRole === 'Admin') && (
+                        {currentRole !== 'Manager' && (
                             <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
                                 <CreateIcon className="w-5 h-5 mr-2" />
                                 {t[language].createLR}
@@ -530,6 +530,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-amber-800 text-sm font-medium animate-fadeInUp">
                             <span className="text-lg">👁️</span>
                             <span>You are in <strong>View Only</strong> mode. You can view all LRs and their details, but cannot create, edit or delete them.</span>
+                        </div>
+                    )}
+                    
+                    {/* Operator Info Banner */}
+                    {currentRole === 'Operator' && (
+                        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-2xl px-4 py-3 text-green-800 text-sm font-medium animate-fadeInUp">
+                            <span className="text-lg">🛠️</span>
+                            <span>You are an <strong>Operator</strong>. You can create LRs, Trucks, and Parties on behalf of your admin.</span>
                         </div>
                     )}
 

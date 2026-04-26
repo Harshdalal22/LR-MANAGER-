@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { signUp, signIn, sendPasswordReset, signInWithGoogle, createManagerAccessRequest, listenToAccessRequest, applySession } from '../services/supabaseService';
+import { signUp, signIn, sendPasswordReset, signInWithGoogle, createManagerAccessRequest, listenToAccessRequest, applySession, checkOperatorRole } from '../services/supabaseService';
 import { BookOpenIcon, GoogleIcon } from './icons';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password' | 'manager_request';
@@ -24,6 +24,12 @@ const Auth: React.FC = () => {
             switch (view) {
                 case 'sign_in':
                     await signIn(email, password);
+                    const roleInfo = await checkOperatorRole();
+                    if (roleInfo && !roleInfo.isAdmin) {
+                        sessionStorage.setItem('currentRole', 'Operator');
+                        sessionStorage.setItem('adminId', roleInfo.adminId);
+                        sessionStorage.setItem('roleSelected', 'true'); // Skip role selection
+                    }
                     toast.success('Signed in successfully! Redirecting...', { id: toastId });
                     break;
                 case 'sign_up':

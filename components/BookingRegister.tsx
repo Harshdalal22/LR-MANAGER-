@@ -38,7 +38,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isImporting, setIsImporting] = useState(false);
-    const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+    const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Temp state for new payment entry
@@ -423,14 +423,14 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            const allIds = filteredRecords.map(r => r.id).filter((id): id is number => id !== undefined);
+            const allIds = filteredRecords.map(r => r.id).filter((id): id is string => id !== undefined);
             setSelectedRows(new Set(allIds));
         } else {
             setSelectedRows(new Set());
         }
     };
 
-    const handleSelectRow = (id: number | undefined, checked: boolean) => {
+    const handleSelectRow = (id: string | undefined, checked: boolean) => {
         if (!id) return;
         const newSelected = new Set(selectedRows);
         if (checked) {
@@ -454,7 +454,7 @@ const BookingRegister: React.FC<BookingRegisterProps> = ({ onBack }) => {
         const toastId = toast.loading('Deleting records...');
         try {
             await Promise.all(
-                Array.from(selectedRows).map(id => deleteBookingRecord(id))
+                Array.from(selectedRows).map((id: string) => deleteBookingRecord(id))
             );
             toast.success(`Successfully deleted ${selectedRows.size} record(s)`, { id: toastId });
             setSelectedRows(new Set());

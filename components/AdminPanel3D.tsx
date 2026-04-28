@@ -802,28 +802,44 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     const partyRows: LedgerRow[] = [];
 
                     if (selectedPartyLedger) {
-                        // Invoices → Credit rows (Only generated invoices matched by Billing/Consignor party)
+                        // Group LRs by invoiceNo for the selected party
+                        const partyInvoices: { [key: string]: { date: string, amountExclTax: number, invoiceNo: string } } = {};
+
                         allLRs
-                            .filter(lr => lr.isInvoiceGenerated || lr.invoiceNo)
+                            .filter(lr => lr.isInvoiceGenerated && lr.invoiceNo)
                             .filter(lr => {
                                 const billedToName = lr.billingTo?.name || lr.consignor?.name;
                                 return billedToName === selectedPartyLedger;
                             })
                             .forEach(lr => {
-                                // Exclusively use invoiceAmount without fallback
-                                const creditVal = Number(lr.invoiceAmount) || 0;
-                                
-                                if (creditVal > 0) {
-                                    partyRows.push({
+                                const invNo = lr.invoiceNo as string;
+                                const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
+                                const rawAmount = (Number(lr.freight) || 0) + totalCharges;
+
+                                if (!partyInvoices[invNo]) {
+                                    partyInvoices[invNo] = {
                                         date: lr.invoiceDate || lr.date,
-                                        description: `Bill Generated`,
-                                        type: 'Invoice (Credit)',
-                                        ref_no: lr.invoiceNo || lr.lrNo,
-                                        credit: creditVal,
-                                        debit: 0,
-                                    });
+                                        amountExclTax: 0,
+                                        invoiceNo: invNo
+                                    };
                                 }
+                                partyInvoices[invNo].amountExclTax += rawAmount;
                             });
+
+                        // Create a single ledger credit row for each aggregated Invoice
+                        Object.values(partyInvoices).forEach(inv => {
+                            // Total amount include tax 18%
+                            const amountWithTax = Math.round(inv.amountExclTax * 1.18);
+                            
+                            partyRows.push({
+                                date: inv.date,
+                                description: `Bill Generated`,
+                                type: 'Invoice (Credit)',
+                                ref_no: inv.invoiceNo,
+                                credit: amountWithTax,
+                                debit: 0,
+                            });
+                        });
 
                         // Vouchers → Debit rows
                         allVouchers

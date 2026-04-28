@@ -525,10 +525,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {t[language].createLR}
                             </button>
                         )}
-                        <button onClick={onViewVouchers} className="flex-shrink-0 flex items-center bg-gradient-to-r from-red-600 to-red-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-red-200 transition-all text-sm border-b-4 border-red-700 active:border-b-0 active:translate-y-1">
-                            <InvoiceIcon className="w-5 h-5 mr-2" />
-                            Vouchers
-                        </button>
+                        {currentRole !== 'Operator' && (
+                            <button onClick={onViewVouchers} className="flex-shrink-0 flex items-center bg-gradient-to-r from-red-600 to-red-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-red-200 transition-all text-sm border-b-4 border-red-700 active:border-b-0 active:translate-y-1">
+                                <InvoiceIcon className="w-5 h-5 mr-2" />
+                                Vouchers
+                            </button>
+                        )}
                     </div>
 
                     {/* Manager Info Banner */}
@@ -548,7 +550,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     )}
 
                     {/* Stat Cards - Vertical Stack on Mobile */}
-                    {(!rbacEnabled || currentRole === 'Admin') && (
+                    {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                         <>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                                 <StatCard
@@ -655,7 +657,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Vertical Stack on Mobile, Grid on Larger Screens */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {(!rbacEnabled || currentRole === 'Admin') && (
+                        {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <ManagementCard
                                 title={t[language].vehicleHiring}
                                 description="Manage truck hiring records and payments"
@@ -664,7 +666,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 colorTheme="orange"
                             />
                         )}
-                        {(!rbacEnabled || currentRole === 'Admin') && (
+                        {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <ManagementCard
                                 title={t[language].bookingRegister}
                                 description="Maintain booking records and freight details"
@@ -687,7 +689,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             onClick={() => setCurrentView('trucks')}
                             colorTheme="teal"
                         />
-                        {(!rbacEnabled || currentRole === 'Admin') && (
+                        {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <ManagementCard
                                 title={t[language].dataSetup}
                                 description="Database fixes and system configuration"

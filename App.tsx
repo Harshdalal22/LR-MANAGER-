@@ -550,8 +550,8 @@ const App: React.FC = () => {
         
         // 'list' is now accessible to managers/operators
         const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
-        // Operator can access data-management (parties/trucks) but NOT invoices
-        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'booking-register', 'invoices'];
+        // Operator can access parties/trucks but NOT invoices, vouchers, or data-management
+        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'booking-register', 'invoices', 'vouchers', 'data-management'];
 
         if ((isManager && restrictedViewsManager.includes(currentView)) || (isOperator && restrictedViewsOperator.includes(currentView))) {
             return (

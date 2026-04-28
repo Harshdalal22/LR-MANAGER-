@@ -810,22 +810,19 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 return billedToName === selectedPartyLedger;
                             })
                             .forEach(lr => {
-                                // Calculate raw amount = freight + all charges
-                                const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
-                                const rawAmount = (Number(lr.freight) || 0) + totalCharges;
-                                // Fallback calculates 18% tax on total
-                                const calculatedAmountWithTax = Math.round(rawAmount * 1.18);
-
-                                const creditVal = Number(lr.invoiceAmount) > 0 ? Number(lr.invoiceAmount) : calculatedAmountWithTax;
+                                // Exclusively use invoiceAmount without fallback
+                                const creditVal = Number(lr.invoiceAmount) || 0;
                                 
-                                partyRows.push({
-                                    date: lr.invoiceDate || lr.date,
-                                    description: `Bill Generated`,
-                                    type: 'Invoice (Credit)',
-                                    ref_no: lr.invoiceNo || lr.lrNo,
-                                    credit: creditVal,
-                                    debit: 0,
-                                });
+                                if (creditVal > 0) {
+                                    partyRows.push({
+                                        date: lr.invoiceDate || lr.date,
+                                        description: `Bill Generated`,
+                                        type: 'Invoice (Credit)',
+                                        ref_no: lr.invoiceNo || lr.lrNo,
+                                        credit: creditVal,
+                                        debit: 0,
+                                    });
+                                }
                             });
 
                         // Vouchers → Debit rows

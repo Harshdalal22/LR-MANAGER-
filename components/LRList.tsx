@@ -6,7 +6,7 @@ import { PencilIcon, TrashIcon, SearchIcon, PrintIcon, FilterIcon, DashboardIcon
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 import { Language, t } from '../utils/translations';
-import { addLedgerEntry, getVouchers, addVoucher, subscribeToVouchers } from '../services/supabaseService';
+import { addLedgerEntry, getVouchers, addVoucher, subscribeToVouchers, updateVoucher } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
 import { Voucher } from '../types';
 
@@ -69,6 +69,7 @@ const LRList: React.FC<LRListProps> = ({
     const [voucherPaymentMode, setVoucherPaymentMode] = useState('Cash');
     const [voucherParty, setVoucherParty] = useState('');
     const [isCreatingVoucher, setIsCreatingVoucher] = useState(false);
+    const [editingVoucherId, setEditingVoucherId] = useState<string | null>(null);
 
     const [viewMode, setViewMode] = useState<'lrs' | 'vouchers'>(initialViewMode);
     
@@ -182,38 +183,50 @@ const LRList: React.FC<LRListProps> = ({
 
     const handleCreateVoucher = async () => {
         setIsCreatingVoucher(true);
-        const toastId = toast.loading('Creating voucher...');
+        const isEditing = !!editingVoucherId;
+        const toastId = toast.loading(isEditing ? 'Updating voucher...' : 'Creating voucher...');
         try {
-            // Store in vouchers table
-            await addVoucher({
+            const voucherData = {
                 date: voucherDate,
                 description: voucherDescription,
                 voucher_no: voucherNo,
                 amount: voucherAmount,
                 payment_mode: voucherPaymentMode,
                 party_name: voucherParty || undefined
-            });
+            };
 
-            // Store in ledger as a debit
-            await addLedgerEntry({
-                date: voucherDate,
-                description: voucherDescription,
-                voucher_no: voucherNo,
-                credit: 0,
-                debit: voucherAmount,
-                payment_mode: voucherPaymentMode
-            });
-            toast.success('Successfully created voucher', { id: toastId });
+            if (isEditing) {
+                await updateVoucher(editingVoucherId, voucherData);
+                toast.success('Successfully updated voucher', { id: toastId });
+            } else {
+                // Store in vouchers table
+                await addVoucher(voucherData);
+
+                // Store in ledger as a debit only on creation
+                await addLedgerEntry({
+                    date: voucherDate,
+                    description: voucherDescription,
+                    voucher_no: voucherNo,
+                    credit: 0,
+                    debit: voucherAmount,
+                    payment_mode: voucherPaymentMode
+                });
+                toast.success('Successfully created voucher', { id: toastId });
+            }
+
             setShowVoucherModal(false);
             setSelectedLRs(new Set());
+            setEditingVoucherId(null);
+            
             // Reset fields
             setVoucherNo(`VCH-${Math.floor(Math.random() * 10000)}`);
             setVoucherAmount(0);
             setVoucherParty('');
+            setVoucherDescription('');
             if (viewMode === 'vouchers') fetchVouchers();
         } catch (error) {
-            console.error('Error creating voucher:', error);
-            toast.error('Failed to create voucher', { id: toastId });
+            console.error('Error saving voucher:', error);
+            toast.error(isEditing ? 'Failed to update voucher' : 'Failed to create voucher', { id: toastId });
         } finally {
             setIsCreatingVoucher(false);
         }
@@ -535,6 +548,7 @@ const LRList: React.FC<LRListProps> = ({
                                 <th className="px-6 py-4 font-semibold">Description / Details</th>
                                 <th className="px-6 py-4 font-semibold">Mode of Payment</th>
                                 <th className="px-6 py-4 font-semibold text-right">Amount (₹)</th>
+                                {!isReadOnly && <th className="px-6 py-4 font-semibold text-center">Actions</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -571,6 +585,26 @@ const LRList: React.FC<LRListProps> = ({
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-red-600">₹{voucher.amount.toLocaleString()}</td>
+                                        {!isReadOnly && (
+                                            <td className="px-6 py-4 text-center">
+                                                <button 
+                                                    onClick={() => {
+                                                        setEditingVoucherId(voucher.id || null);
+                                                        setVoucherDate(voucher.date);
+                                                        setVoucherNo(voucher.voucher_no);
+                                                        setVoucherDescription(voucher.description);
+                                                        setVoucherParty(voucher.party_name || '');
+                                                        setVoucherAmount(voucher.amount);
+                                                        setVoucherPaymentMode(voucher.payment_mode);
+                                                        setShowVoucherModal(true);
+                                                    }}
+                                                    className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg hover:text-green-600 transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <PencilIcon className="w-4 h-4" />
+                                                </button>
+                                            </td>
+                                        )}
                                     </tr>
                                 ))
                             )}
@@ -674,9 +708,12 @@ const LRList: React.FC<LRListProps> = ({
                         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
                             <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                                 <InvoiceIcon className="w-6 h-6 text-red-500" />
-                                Create Voucher (Debit)
+                                {editingVoucherId ? 'Edit Voucher' : 'Create Voucher (Debit)'}
                             </h3>
-                            <button onClick={() => setShowVoucherModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                            <button onClick={() => {
+                                setShowVoucherModal(false);
+                                setEditingVoucherId(null);
+                            }} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
                                 <XIcon className="w-6 h-6" />
                             </button>
                         </div>
@@ -758,7 +795,10 @@ const LRList: React.FC<LRListProps> = ({
                         </div>
                         <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50/80">
                             <button
-                                onClick={() => setShowVoucherModal(false)}
+                                onClick={() => {
+                                    setShowVoucherModal(false);
+                                    setEditingVoucherId(null);
+                                }}
                                 className="px-4 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-colors font-medium"
                                 disabled={isCreatingVoucher}
                             >
@@ -769,7 +809,7 @@ const LRList: React.FC<LRListProps> = ({
                                 disabled={isCreatingVoucher || voucherAmount <= 0}
                                 className="px-6 py-2 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-xl hover:shadow-lg hover:opacity-90 transition-all font-semibold disabled:opacity-50 flex items-center gap-2"
                             >
-                                {isCreatingVoucher ? 'Creating...' : 'Create Voucher'}
+                                {isCreatingVoucher ? (editingVoucherId ? 'Updating...' : 'Creating...') : (editingVoucherId ? 'Update Voucher' : 'Create Voucher')}
                             </button>
                         </div>
                     </div>

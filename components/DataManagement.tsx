@@ -12,12 +12,13 @@ import * as XLSX from 'xlsx';
 
 interface DataManagementProps {
     onBack: () => void;
+    currentRole?: string;
 }
 
 type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'database-setup';
 
-const DataManagement: React.FC<DataManagementProps> = ({ onBack }) => {
-    const [activeTab, setActiveTab] = useState<Tab>('database-setup');
+const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole }) => {
+    const [activeTab, setActiveTab] = useState<Tab>(currentRole === 'Operator' ? 'customer-details' : 'database-setup');
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -731,7 +732,12 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     { id: 'customer-details', label: 'Customer Details' },
                     { id: 'vehicle-fleet', label: 'Vehicle Fleet' },
                     { id: 'database-setup', label: 'Database Setup' }
-                ].map((tab) => (
+                ].filter(tab => {
+                    if (currentRole === 'Operator') {
+                        return tab.id === 'customer-details' || tab.id === 'vehicle-fleet';
+                    }
+                    return true;
+                }).map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as Tab)}

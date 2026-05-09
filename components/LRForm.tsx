@@ -87,10 +87,31 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 setBillingPartyType('Other');
             }
         } else {
-            setFormData(initialLRState);
-            setBillingPartyType('Consignor');
+            const savedDraft = localStorage.getItem('lr_draft_data');
+            const savedBilling = localStorage.getItem('lr_draft_billing') as 'Consignor' | 'Consignee' | 'Other';
+            if (savedDraft) {
+                try {
+                    setFormData(JSON.parse(savedDraft));
+                    setBillingPartyType(savedBilling || 'Consignor');
+                } catch (e) {
+                    console.error('Failed to parse draft LR data');
+                    setFormData(initialLRState);
+                    setBillingPartyType('Consignor');
+                }
+            } else {
+                setFormData(initialLRState);
+                setBillingPartyType('Consignor');
+            }
         }
     }, [existingLR]);
+
+    // Auto-save draft to local storage whenever formData or billingPartyType changes
+    useEffect(() => {
+        if (!existingLR) {
+            localStorage.setItem('lr_draft_data', JSON.stringify(formData));
+            localStorage.setItem('lr_draft_billing', billingPartyType);
+        }
+    }, [formData, billingPartyType, existingLR]);
 
     useEffect(() => {
         if (billingPartyType === 'Consignor') {
@@ -189,11 +210,20 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             toast.error('Please fill all required fields marked with *.');
             return;
         }
+        
+        // Clear draft when successfully saved
+        if (!existingLR) {
+            localStorage.removeItem('lr_draft_data');
+            localStorage.removeItem('lr_draft_billing');
+        }
+        
         onSave(formData);
     };
 
     const handleCreateNew = () => {
         if (window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
+            localStorage.removeItem('lr_draft_data');
+            localStorage.removeItem('lr_draft_billing');
             setFormData(initialLRState);
             setBillingPartyType('Consignor');
         }

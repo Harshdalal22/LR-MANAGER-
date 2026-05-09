@@ -1,7 +1,7 @@
 
 
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice } from '../types';
 
 /* 
 ================================================================================
@@ -154,6 +154,12 @@ export const createOperator = async (email: string, password: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Only an Admin can create an operator");
 
+    // Ensure the current user is an admin
+    const roleInfo = await checkOperatorRole();
+    if (roleInfo && !roleInfo.isAdmin) {
+        throw new Error("Access Denied: Operators cannot create new users.");
+    }
+
     // Create the user using the secondary client to prevent logout
     const { data: newUserData, error: signUpError } = await supabaseSecondary.auth.signUp({
         email,
@@ -178,6 +184,12 @@ export const createOperator = async (email: string, password: string) => {
     return newUserData.user;
 };
 export const updateOperatorAuth = async (operatorId: string, newEmail: string, newPassword: string) => {
+    // Ensure the current user is an admin
+    const roleInfo = await checkOperatorRole();
+    if (roleInfo && !roleInfo.isAdmin) {
+        throw new Error("Access Denied: Operators cannot modify users.");
+    }
+
     const { error } = await supabase.rpc('update_operator_auth', {
         p_operator_id: operatorId,
         p_new_email: newEmail,
@@ -792,6 +804,12 @@ export const addVoucher = async (voucher: Partial<Voucher>) => {
     return data[0];
 };
 
+export const updateVoucher = async (id: string, voucherUpdates: Partial<Voucher>) => {
+    const { data, error } = await supabase.from('vouchers').update(voucherUpdates).eq('id', id).select();
+    if (error) throw error;
+    return data[0];
+};
+
 export const subscribeToVouchers = (callback: (payload: any) => void) => {
     return supabase.channel('vouchers_changes')
         .on('postgres_changes', {
@@ -800,4 +818,54 @@ export const subscribeToVouchers = (callback: (payload: any) => void) => {
             table: 'vouchers'
         }, callback)
         .subscribe();
+};
+
+// --- GPS Invoices ---
+
+export const getGPSInvoices = async (): Promise<GPSInvoice[]> => {
+    const { data, error } = await supabase.from('gps_invoices').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || [];
+};
+
+export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No authenticated user");
+
+    const payload = { ...invoice, user_id: user.id };
+    
+    // Map camelCase to snake_case
+    const dbPayload = {
+        id: payload.id,
+        invoice_no: payload.invoiceNo,
+        date: payload.date,
+        customer_name: payload.customerName,
+        vehicle_no: payload.vehicleNo,
+        gps_imei: payload.gpsImei,
+        amount: payload.amount,
+        status: payload.status,
+        user_id: payload.user_id
+    };
+
+    const { data, error } = await supabase.from('gps_invoices').upsert(dbPayload).select().single();
+    if (error) throw error;
+    
+    // Map snake_case back to camelCase
+    return {
+        id: data.id,
+        invoiceNo: data.invoice_no,
+        date: data.date,
+        customerName: data.customer_name,
+        vehicleNo: data.vehicle_no,
+        gpsImei: data.gps_imei,
+        amount: data.amount,
+        status: data.status,
+        user_id: data.user_id,
+        created_at: data.created_at
+    };
+};
+
+export const deleteGPSInvoice = async (id: string) => {
+    const { error } = await supabase.from('gps_invoices').delete().eq('id', id);
+    if (error) throw error;
 };

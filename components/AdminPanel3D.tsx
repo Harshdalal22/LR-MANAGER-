@@ -54,7 +54,7 @@ import {
 
 interface AdminPanel3DProps {
     onClose?: () => void;
-    currentRole: 'Admin' | 'Manager';
+    currentRole: 'Admin' | 'Manager' | 'Operator';
 }
 
 interface StatCard3DProps {
@@ -695,7 +695,8 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 </div>
 
                                 {/* Add Operator Form */}
-                                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
+                                {currentRole === 'Admin' && (
+                                    <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
                                     <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                                         <PlusIcon className="w-6 h-6 text-green-400" />
                                         Create New Operator
@@ -740,6 +741,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                         </form>
                                     )}
                                 </div>
+                                )}
                             </div>
                         </div>
 

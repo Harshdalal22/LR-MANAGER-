@@ -19,6 +19,7 @@ import PODUploadModal from './components/PODUploadModal';
 import PasswordResetModal from './components/PasswordResetModal';
 import RoleSelection from './components/RoleSelection';
 import AdminPanel3D from './components/AdminPanel3D';
+import GPSPanel from './components/GPSPanel';
 import {
     LorryReceipt,
     CompanyDetails,
@@ -52,7 +53,8 @@ import {
     getPendingAccessRequests,
     listenForAdminAccessRequests,
     approveAccessRequest,
-    rejectAccessRequest
+    rejectAccessRequest,
+    checkOperatorRole
 } from './services/supabaseService';
 import { t, Language } from './utils/translations';
 
@@ -180,11 +182,36 @@ const App: React.FC = () => {
                 const currentSession = await getSession();
                 setSession(currentSession);
 
+                if (currentSession) {
+                    const roleInfo = await checkOperatorRole();
+                    if (roleInfo && !roleInfo.isAdmin) {
+                        sessionStorage.setItem('currentRole', 'Operator');
+                        sessionStorage.setItem('adminId', roleInfo.adminId);
+                        setCurrentRole('Operator');
+                    }
+                }
+
                 if (!currentSession) {
                     setIsLoading(false);
                 }
 
-                const { data } = subscribeToAuthState((event, session) => {
+                const { data } = subscribeToAuthState(async (event, session) => {
+                    if (session) {
+                        setIsLoading(true);
+                        const roleInfo = await checkOperatorRole();
+                        if (roleInfo && !roleInfo.isAdmin) {
+                            sessionStorage.setItem('currentRole', 'Operator');
+                            sessionStorage.setItem('adminId', roleInfo.adminId);
+                            setCurrentRole('Operator');
+                        } else if (roleInfo && roleInfo.isAdmin) {
+                            const storedRole = sessionStorage.getItem('currentRole');
+                            if (!storedRole || storedRole === 'Operator') {
+                                sessionStorage.setItem('currentRole', 'Admin');
+                                setCurrentRole('Admin');
+                            }
+                        }
+                    }
+
                     setSession(session);
 
                     if (event === 'PASSWORD_RECOVERY') {
@@ -192,6 +219,10 @@ const App: React.FC = () => {
                     }
 
                     if (!session) {
+                        sessionStorage.removeItem('currentRole');
+                        sessionStorage.removeItem('adminId');
+                        sessionStorage.removeItem('roleSelected');
+                        setCurrentRole('Admin');
                         setLorryReceipts([]);
                         setSavedParties([]);
                         setSavedTrucks([]);
@@ -554,8 +585,8 @@ const App: React.FC = () => {
         
         // 'list' is now accessible to managers
         const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
-        // Operator can access parties/trucks but NOT invoices, vouchers, data-management, or list
-        const restrictedViewsOperator: View[] = ['list', 'vehicle-hiring', 'booking-register', 'invoices', 'vouchers', 'data-management'];
+        // Operator can access parties/trucks (inside data-management) but NOT invoices, vouchers, or list
+        const restrictedViewsOperator: View[] = ['list', 'vehicle-hiring', 'booking-register', 'invoices', 'vouchers'];
 
         if ((isManager && restrictedViewsManager.includes(currentView)) || (isOperator && restrictedViewsOperator.includes(currentView))) {
             return (
@@ -663,7 +694,7 @@ const App: React.FC = () => {
             case 'booking-register':
                 return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
             case 'data-management':
-                return <DataManagement onBack={() => setCurrentView('dashboard')} />;
+                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} />;
             case 'parties':
                 return (
                     <PartyManagement
@@ -727,6 +758,15 @@ const App: React.FC = () => {
         );
     }
 
+
+    if (session?.user?.email === 'gps@ssk.com') {
+        return (
+            <div className="bg-slate-50 min-h-screen font-sans">
+                <Toaster position="top-center" />
+                <GPSPanel companyDetails={companyDetails} onSignOut={handleSignOut} />
+            </div>
+        );
+    }
 
     return (
         <div className="bg-slate-50 min-h-screen font-sans">

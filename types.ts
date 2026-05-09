@@ -196,4 +196,17 @@ export interface Voucher {
     created_at?: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers';
+export interface GPSInvoice {
+    id?: string;
+    invoiceNo: string;
+    date: string;
+    customerName: string;
+    vehicleNo: string;
+    gpsImei: string;
+    amount: number;
+    status: 'Paid' | 'Unpaid';
+    user_id?: string;
+    created_at?: string;
+}
+
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel';

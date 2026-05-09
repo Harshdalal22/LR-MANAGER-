@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { createOperator, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers } from '../services/supabaseService';
+import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers } from '../services/supabaseService';
 import { LedgerEntry, LorryReceipt, SavedParty, Voucher } from '../types';
 import {
     UsersIcon,
@@ -312,6 +312,11 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
     const [operators, setOperators] = useState<any[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(true);
 
+    const [editingOperator, setEditingOperator] = useState<any>(null);
+    const [editEmail, setEditEmail] = useState('');
+    const [editPassword, setEditPassword] = useState('');
+    const [isUpdatingOperator, setIsUpdatingOperator] = useState(false);
+
     const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
     const [activeLRCount, setActiveLRCount] = useState(0);
     const [totalRevenue, setTotalRevenue] = useState(0);
@@ -427,6 +432,26 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
             toast.error(error.message || "Failed to create operator.", { id: toastId });
         } finally {
             setIsCreatingUser(false);
+        }
+    };
+
+    const handleUpdateOperator = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingOperator) return;
+
+        setIsUpdatingOperator(true);
+        const toastId = toast.loading('Updating operator...');
+        try {
+            await updateOperatorAuth(editingOperator.operator_id, editEmail, editPassword);
+            toast.success("Operator updated successfully!", { id: toastId });
+            setEditingOperator(null);
+            setEditEmail('');
+            setEditPassword('');
+            fetchOperators();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to update operator.", { id: toastId });
+        } finally {
+            setIsUpdatingOperator(false);
         }
     };
 
@@ -652,6 +677,17 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                                         <p className="font-semibold text-white">{op.email}</p>
                                                         <p className="text-xs text-blue-300 capitalize">{op.role}</p>
                                                     </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingOperator(op);
+                                                            setEditEmail(op.email);
+                                                            setEditPassword('');
+                                                        }}
+                                                        className="p-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 rounded-lg transition-colors"
+                                                        title="Edit Operator"
+                                                    >
+                                                        <PencilIcon className="w-5 h-5" />
+                                                    </button>
                                                 </div>
                                             ))}
                                         </div>
@@ -706,6 +742,64 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 </div>
                             </div>
                         </div>
+
+                        {/* Edit Operator Modal */}
+                        {editingOperator && (
+                            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                                <div className="bg-slate-800 text-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/10 animate-fadeInUp">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+                                            <PencilIcon className="w-6 h-6 text-blue-400" />
+                                            Edit Operator
+                                        </h3>
+                                        <button onClick={() => setEditingOperator(null)} className="p-1 hover:bg-white/10 rounded-full transition-colors text-gray-400">
+                                            <CloseIcon className="w-6 h-6" />
+                                        </button>
+                                    </div>
+                                    <form onSubmit={handleUpdateOperator} className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-1">Update Email</label>
+                                            <input 
+                                                type="email" 
+                                                value={editEmail}
+                                                onChange={(e) => setEditEmail(e.target.value)}
+                                                required
+                                                className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                                                placeholder="operator@company.com"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                                            <input 
+                                                type="password" 
+                                                value={editPassword}
+                                                onChange={(e) => setEditPassword(e.target.value)}
+                                                required
+                                                minLength={6}
+                                                className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                                                placeholder="Enter new password"
+                                            />
+                                        </div>
+                                        <div className="pt-4 flex gap-3">
+                                            <button 
+                                                type="button"
+                                                onClick={() => setEditingOperator(null)}
+                                                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-white transition-all duration-300"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                type="submit"
+                                                disabled={isUpdatingOperator}
+                                                className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl font-bold text-white shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 disabled:opacity-50"
+                                            >
+                                                {isUpdatingOperator ? 'Updating...' : 'Save Changes'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

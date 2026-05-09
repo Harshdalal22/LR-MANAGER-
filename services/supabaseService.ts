@@ -177,6 +177,14 @@ export const createOperator = async (email: string, password: string) => {
 
     return newUserData.user;
 };
+export const updateOperatorAuth = async (operatorId: string, newEmail: string, newPassword: string) => {
+    const { error } = await supabase.rpc('update_operator_auth', {
+        p_operator_id: operatorId,
+        p_new_email: newEmail,
+        p_new_password: newPassword
+    });
+    if (error) throw error;
+};
 
 // --- Auth ---
 

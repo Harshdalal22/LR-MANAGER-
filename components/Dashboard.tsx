@@ -515,10 +515,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </button>
                         )}
                         {/* View List button - accessible to ALL roles including Manager */}
-                        <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
-                            <ListIcon className="w-5 h-5 mr-2" />
-                            {t[language].viewList}
-                        </button>
+                        {currentRole !== 'Operator' && (
+                            <button onClick={onViewList} className="flex-shrink-0 flex items-center bg-white text-gray-700 px-5 py-3 rounded-xl font-bold hover:shadow-lg transition-all text-sm border-b-4 border-gray-200 active:border-b-0 active:translate-y-1">
+                                <ListIcon className="w-5 h-5 mr-2" />
+                                {t[language].viewList}
+                            </button>
+                        )}
                         {currentRole !== 'Manager' && (
                             <button onClick={onAddNew} className="flex-shrink-0 flex items-center bg-gradient-to-r from-blue-600 to-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-blue-200 transition-all text-sm border-b-4 border-blue-700 active:border-b-0 active:translate-y-1">
                                 <CreateIcon className="w-5 h-5 mr-2" />
@@ -550,23 +552,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                     )}
 
                     {/* Stat Cards - Vertical Stack on Mobile */}
-                    <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <StatCard
-                                icon={<TruckIcon />}
+                    {currentRole !== 'Operator' && (
+                        <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <StatCard
+                                    icon={<TruckIcon />}
                                     title={t[language].totalLRs}
                                     value={totalLRs}
                                     color="blue"
                                     onClick={onViewList}
                                 />
-                                {currentRole !== 'Operator' && (
-                                    <StatCard
-                                        icon={<CurrencyRupeeIcon />}
-                                        title={t[language].freightValue}
-                                        value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
-                                        color="green"
-                                    />
-                                )}
+                                <StatCard
+                                    icon={<CurrencyRupeeIcon />}
+                                    title={t[language].freightValue}
+                                    value={`₹${totalFreight.toLocaleString('en-IN', { maximumFractionDigits: 0, notation: "compact" })}`}
+                                    color="green"
+                                />
                                 <StatCard
                                     icon={<UsersIcon />}
                                     title={t[language].consignors}
@@ -594,10 +595,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             {/* Chart & Recent Activity */}
-                            <div className={`grid grid-cols-1 ${currentRole !== 'Operator' ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
-
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                 {/* Recent Activity Card */}
-                                <div className={`${currentRole !== 'Operator' ? 'lg:col-span-2' : ''} bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 overflow-hidden`}>
+                                <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 overflow-hidden">
                                     <div className="p-6 border-b border-gray-100 bg-gray-50/50">
                                         <h2 className="text-xl font-black text-gray-800 tracking-tight">{t[language].recentLRs}</h2>
                                     </div>
@@ -609,7 +609,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                         <th className="px-6 py-4">LR No</th>
                                                         <th className="px-6 py-4 hidden sm:table-cell">Date</th>
                                                         <th className="px-6 py-4">Truck</th>
-                                                        {currentRole !== 'Operator' && <th className="px-6 py-4 text-right">Freight</th>}
+                                                        <th className="px-6 py-4 text-right">Freight</th>
                                                         <th className="px-6 py-4 text-center">Action</th>
                                                     </tr>
                                                 </thead>
@@ -624,9 +624,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                                     <span className="font-mono text-gray-700">{lr.truckNo}</span>
                                                                 </div>
                                                             </td>
-                                                            {currentRole !== 'Operator' && (
-                                                                <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
-                                                            )}
+                                                            <td className="px-6 py-4 text-right font-bold text-gray-800">₹{Number(lr.freight).toLocaleString('en-IN')}</td>
                                                             <td className="px-6 py-4 text-center">
                                                                 <button onClick={() => onEditLR(lr.lrNo)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors">
                                                                     <PencilIcon className="w-4 h-4" />
@@ -641,16 +639,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
 
                                 {/* Chart Card */}
-                                {currentRole !== 'Operator' && (
-                                    <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 p-6 flex flex-col">
-                                        <h2 className="text-xl font-black text-gray-800 mb-6 tracking-tight">{t[language].weeklyTrend}</h2>
-                                        <div className="flex-grow flex items-center justify-center min-h-[200px]">
-                                            <FreightTrendChart data={chartData} />
-                                        </div>
+                                <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 p-6 flex flex-col">
+                                    <h2 className="text-xl font-black text-gray-800 mb-6 tracking-tight">{t[language].weeklyTrend}</h2>
+                                    <div className="flex-grow flex items-center justify-center min-h-[200px]">
+                                        <FreightTrendChart data={chartData} />
                                     </div>
-                                )}
+                                </div>
                             </div>
                         </>
+                    )}
                 </div>
             )}
 

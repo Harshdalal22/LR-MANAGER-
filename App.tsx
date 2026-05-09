@@ -362,7 +362,11 @@ const App: React.FC = () => {
                 return [savedLR, ...prev];
             });
             toast.success('LR Saved Successfully', { id: toastId });
-            navigateTo('list');
+            if (currentRole === 'Operator') {
+                navigateTo('dashboard');
+            } else {
+                navigateTo('list');
+            }
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to save LR");
@@ -548,10 +552,10 @@ const App: React.FC = () => {
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
         const isOperator = currentRole === 'Operator';
         
-        // 'list' is now accessible to managers/operators
+        // 'list' is now accessible to managers
         const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
-        // Operator can access parties/trucks but NOT invoices, vouchers, or data-management
-        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'booking-register', 'invoices', 'vouchers', 'data-management'];
+        // Operator can access parties/trucks but NOT invoices, vouchers, data-management, or list
+        const restrictedViewsOperator: View[] = ['list', 'vehicle-hiring', 'booking-register', 'invoices', 'vouchers', 'data-management'];
 
         if ((isManager && restrictedViewsManager.includes(currentView)) || (isOperator && restrictedViewsOperator.includes(currentView))) {
             return (

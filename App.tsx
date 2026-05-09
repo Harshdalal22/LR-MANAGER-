@@ -239,7 +239,11 @@ const App: React.FC = () => {
                 });
                 authSubscription = data.subscription;
 
-            } catch (error) {
+            } catch (error: any) {
+                if (error?.message?.includes('signal is aborted') || error?.name === 'AbortError') {
+                    // Ignore abort errors from rapid re-renders or overlapping auth requests
+                    return;
+                }
                 handleError(error, "Failed to initialize authentication");
                 setIsLoading(false);
             }

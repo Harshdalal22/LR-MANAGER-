@@ -1,7 +1,8 @@
 -- Run this script in the Supabase SQL Editor
 -- This allows Admins to easily change the email and password of their Operators
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Ensure pgcrypto is installed in the extensions schema (Supabase default)
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
 CREATE OR REPLACE FUNCTION update_operator_auth(
   p_operator_id uuid,
@@ -26,11 +27,12 @@ BEGIN
   END IF;
 
   -- 2. Update auth.users
+  -- We use extensions.crypt and extensions.gen_salt because Supabase installs extensions in the "extensions" schema.
   IF p_new_email IS NOT NULL AND p_new_email != '' THEN
     UPDATE auth.users 
     SET 
       email = p_new_email,
-      encrypted_password = crypt(p_new_password, gen_salt('bf'))
+      encrypted_password = extensions.crypt(p_new_password, extensions.gen_salt('bf'))
     WHERE id = p_operator_id;
     
     -- Also update app_users table email
@@ -40,7 +42,7 @@ BEGIN
   ELSE
     UPDATE auth.users 
     SET 
-      encrypted_password = crypt(p_new_password, gen_salt('bf'))
+      encrypted_password = extensions.crypt(p_new_password, extensions.gen_salt('bf'))
     WHERE id = p_operator_id;
   END IF;
 

@@ -182,7 +182,7 @@ const App: React.FC = () => {
                 const currentSession = await getSession();
                 setSession(currentSession);
 
-                if (currentSession) {
+                if (currentSession && currentSession.user?.email !== 'gps@ssk.com') {
                     const roleInfo = await checkOperatorRole();
                     if (roleInfo && !roleInfo.isAdmin) {
                         sessionStorage.setItem('currentRole', 'Operator');
@@ -197,17 +197,21 @@ const App: React.FC = () => {
 
                 const { data } = subscribeToAuthState(async (event, session) => {
                     if (session) {
-                        setIsLoading(true);
-                        const roleInfo = await checkOperatorRole();
-                        if (roleInfo && !roleInfo.isAdmin) {
-                            sessionStorage.setItem('currentRole', 'Operator');
-                            sessionStorage.setItem('adminId', roleInfo.adminId);
-                            setCurrentRole('Operator');
-                        } else if (roleInfo && roleInfo.isAdmin) {
-                            const storedRole = sessionStorage.getItem('currentRole');
-                            if (!storedRole || storedRole === 'Operator') {
-                                sessionStorage.setItem('currentRole', 'Admin');
-                                setCurrentRole('Admin');
+                        if (session.user?.email === 'gps@ssk.com') {
+                            setIsLoading(false);
+                        } else {
+                            setIsLoading(true);
+                            const roleInfo = await checkOperatorRole();
+                            if (roleInfo && !roleInfo.isAdmin) {
+                                sessionStorage.setItem('currentRole', 'Operator');
+                                sessionStorage.setItem('adminId', roleInfo.adminId);
+                                setCurrentRole('Operator');
+                            } else if (roleInfo && roleInfo.isAdmin) {
+                                const storedRole = sessionStorage.getItem('currentRole');
+                                if (!storedRole || storedRole === 'Operator') {
+                                    sessionStorage.setItem('currentRole', 'Admin');
+                                    setCurrentRole('Admin');
+                                }
                             }
                         }
                     }
@@ -260,6 +264,10 @@ const App: React.FC = () => {
 
     const fetchData = async () => {
         if (!session) return;
+        if (session.user?.email === 'gps@ssk.com') {
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
         try {
             const [lrs, company, parties, trucks] = await Promise.all([
@@ -298,7 +306,7 @@ const App: React.FC = () => {
 
     // Listen for Manager Access Requests
     useEffect(() => {
-        if (session?.user?.email && currentRole === 'Admin') {
+        if (session?.user?.email && session.user.email !== 'gps@ssk.com' && currentRole === 'Admin') {
             getPendingAccessRequests(session.user.email)
                 .then(reqs => setManagerRequests(reqs))
                 .catch(e => console.error("Error fetching requests:", e));

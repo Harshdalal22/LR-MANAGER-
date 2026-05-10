@@ -861,7 +861,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     { id: 'database-setup', label: 'Database Setup' }
                 ].filter(tab => {
                     if (currentRole === 'Operator') {
-                        return tab.id === 'customer-details' || tab.id === 'vehicle-fleet';
+                        return tab.id === 'customer-details' || tab.id === 'vehicle-fleet' || tab.id === 'register-entries';
                     }
                     return true;
                 }).map((tab) => (

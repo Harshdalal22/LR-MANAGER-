@@ -183,16 +183,18 @@ const App: React.FC = () => {
                 const currentSession = await getSession();
                 setSession(currentSession);
 
-                if (currentSession && currentSession.user?.email !== 'gps@ssk.com') {
-                    const roleInfo = await checkOperatorRole();
-                    if (roleInfo && !roleInfo.isAdmin) {
-                        sessionStorage.setItem('currentRole', 'Operator');
-                        sessionStorage.setItem('adminId', roleInfo.adminId);
-                        setCurrentRole('Operator');
+                if (currentSession) {
+                    if (currentSession.user?.email !== 'gps@ssk.com') {
+                        const roleInfo = await checkOperatorRole();
+                        if (roleInfo && !roleInfo.isAdmin) {
+                            sessionStorage.setItem('currentRole', 'Operator');
+                            sessionStorage.setItem('adminId', roleInfo.adminId);
+                            setCurrentRole('Operator');
+                        }
                     }
-                }
-
-                if (!currentSession) {
+                    // For existing session, we'll let fetchData (triggered by session state change)
+                    // handle setting setIsLoading(false) after it finishes loading initial data.
+                } else {
                     setIsLoading(false);
                 }
 
@@ -268,7 +270,10 @@ const App: React.FC = () => {
     }, []);
 
     const fetchData = async () => {
-        if (!session) return;
+        if (!session) {
+            setIsLoading(false);
+            return;
+        }
         if (session.user?.email === 'gps@ssk.com') {
             setIsLoading(false);
             return;
@@ -289,6 +294,7 @@ const App: React.FC = () => {
             handleError(error, "Failed to load data");
         } finally {
             setIsDataLoading(false);
+            setIsLoading(false);
         }
     };
 

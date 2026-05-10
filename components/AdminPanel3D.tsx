@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers, getCompanyDetails } from '../services/supabaseService';
-import { LedgerEntry, LorryReceipt, SavedParty, Voucher, CompanyDetails } from '../types';
+import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers, getCompanyDetails, saveLedgerStatement, getLedgerStatements, deleteLedgerStatement } from '../services/supabaseService';
+import { LedgerEntry, LorryReceipt, SavedParty, Voucher, CompanyDetails, LedgerStatement } from '../types';
 import {
     UsersIcon,
     CogIcon,
@@ -331,6 +331,8 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
     const [ledgerToDate, setLedgerToDate] = useState<string>('');
     const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
     const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
+    const [ledgerStatements, setLedgerStatements] = useState<LedgerStatement[]>([]);
+    const [ledgerSubTab, setLedgerSubTab] = useState<'view' | 'saved'>('view');
 
     const fetchOperators = async () => {
         setIsLoadingUsers(true);
@@ -400,12 +402,22 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
         }
     };
 
+    const loadLedgerStatements = async () => {
+        try {
+            const data = await getLedgerStatements();
+            setLedgerStatements(data);
+        } catch (err) {
+            console.error("Error loading statements:", err);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === 'overview') {
             fetchOverviewData();
             fetchOperators(); // To get correct operator count
         } else if (activeTab === 'ledger') {
             fetchLedgerData();
+            loadLedgerStatements();
         } else if (activeTab === 'users') {
             fetchOperators();
         }
@@ -1017,15 +1029,20 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     
                                     const detailsLine = [
                                         companyDetails.mobile ? `Mob: ${companyDetails.mobile}` : '',
-                                        companyDetails.email ? `Email: ${companyDetails.email}` : '',
-                                        companyDetails.gstNo ? `GST: ${companyDetails.gstNo}` : ''
+                                        companyDetails.email ? `Email: ${companyDetails.email}` : ''
                                     ].filter(Boolean).join('  |  ');
                                     
-                                    doc.text(detailsLine, pageWidth / 2, 32, { align: 'center' });
+                                    doc.text(detailsLine, pageWidth / 2, 31, { align: 'center' });
+                                    
+                                    if (companyDetails.gstNo) {
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text(`GST NO: ${companyDetails.gstNo}`, pageWidth / 2, 35, { align: 'center' });
+                                        doc.setFont('helvetica', 'normal');
+                                    }
                                     
                                     doc.setDrawColor(41, 128, 185);
                                     doc.setLineWidth(0.5);
-                                    doc.line(14, 36, pageWidth - 14, 36);
+                                    doc.line(14, 38, pageWidth - 14, 38);
                                 }
 
                                 // --- 2. Party & Statement Details ---
@@ -1106,14 +1123,60 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                                 doc.save(`Ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}.pdf`);
                                 toast.success('PDF Downloaded successfully!');
+
+                                // --- 5. Save to database & Storage ---
+                                const pdfBlob = doc.output('blob');
+                                const fileName = `ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`;
+                                const filePath = `statements/${fileName}`;
+
+                                saveLedgerStatement({
+                                    admin_id: (supabase.auth.getUser() as any).id, // Will be replaced by service
+                                    party_name: selectedPartyLedger,
+                                    from_date: ledgerFromDate || '2000-01-01',
+                                    to_date: ledgerToDate || new Date().toISOString().split('T')[0],
+                                    file_path: filePath
+                                }, pdfBlob).then(() => {
+                                    loadLedgerStatements();
+                                }).catch(err => {
+                                    console.error("Error saving statement:", err);
+                                });
                             });
                         });
                     };
 
+                    const handleDeleteStatement = async (statement: LedgerStatement) => {
+                        if (!confirm("Are you sure you want to delete this saved statement?")) return;
+                        try {
+                            await deleteLedgerStatement(statement.id, statement.file_path);
+                            toast.success("Statement deleted!");
+                            loadLedgerStatements();
+                        } catch (err) {
+                            toast.error("Error deleting statement");
+                        }
+                    };
+
                     return (
                         <div className="space-y-6 animate-fadeIn">
-                            {/* Party Selector *                            {/* Party Selector & Filters */}
-                            <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
+                            {/* Ledger Navigation Sub-tabs */}
+                            <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/10 w-fit">
+                                <button 
+                                    onClick={() => setLedgerSubTab('view')}
+                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${ledgerSubTab === 'view' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    View Ledger
+                                </button>
+                                <button 
+                                    onClick={() => setLedgerSubTab('saved')}
+                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${ledgerSubTab === 'saved' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    Saved Statements ({ledgerStatements.length})
+                                </button>
+                            </div>
+
+                            {ledgerSubTab === 'view' ? (
+                                <>
+                                    {/* Party Selector & Filters */}
+                                    <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
                                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                                     <UserIcon className="w-6 h-6 text-blue-400" />
                                     Ledger Filters
@@ -1279,6 +1342,77 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     <UserIcon className="w-16 h-16 mx-auto mb-4 opacity-30" />
                                     <p className="text-xl font-semibold">Select a party above to view their ledger</p>
                                     <p className="text-sm mt-2 opacity-70">All invoices and vouchers linked to that party will appear here</p>
+                                </div>
+                            )}
+                                </>
+                            ) : (
+                                <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
+                                    <div className="flex justify-between items-center mb-5">
+                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <CloudIcon className="w-6 h-6 text-blue-400" />
+                                            Saved Statements History
+                                        </h2>
+                                        <button 
+                                            onClick={loadLedgerStatements}
+                                            className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition"
+                                            title="Refresh List"
+                                        >
+                                            <RefreshIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    <div className="overflow-x-auto custom-scrollbar">
+                                        <table className="w-full text-left text-sm text-gray-300">
+                                            <thead className="text-xs text-gray-400 uppercase bg-white/5">
+                                                <tr>
+                                                    <th className="px-4 py-3 rounded-tl-xl font-semibold">Date Saved</th>
+                                                    <th className="px-4 py-3 font-semibold">Party Name</th>
+                                                    <th className="px-4 py-3 font-semibold">Period</th>
+                                                    <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/10">
+                                                {ledgerStatements.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
+                                                            No saved statements found. Export a ledger to save it here.
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    ledgerStatements.map((stmt) => (
+                                                        <tr key={stmt.id} className="hover:bg-white/5 transition">
+                                                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
+                                                                {new Date(stmt.created_at).toLocaleString('en-GB')}
+                                                            </td>
+                                                            <td className="px-4 py-3 font-bold text-white">{stmt.party_name}</td>
+                                                            <td className="px-4 py-3 text-xs text-gray-400">
+                                                                {new Date(stmt.from_date).toLocaleDateString('en-GB')} to {new Date(stmt.to_date).toLocaleDateString('en-GB')}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <div className="flex items-center justify-center gap-3">
+                                                                    <a 
+                                                                        href={stmt.file_url} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer"
+                                                                        className="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 hover:text-blue-300 transition"
+                                                                        title="Download/View PDF"
+                                                                    >
+                                                                        <DownloadIcon className="w-5 h-5" />
+                                                                    </a>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteStatement(stmt)}
+                                                                        className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition"
+                                                                        title="Delete Statement"
+                                                                    >
+                                                                        <TrashIcon className="w-5 h-5" />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>

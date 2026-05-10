@@ -244,4 +244,15 @@ export interface RegisterEntry {
     created_at?: string;
 }
 
+export interface LedgerStatement {
+    id: string;
+    admin_id: string;
+    party_name: string;
+    from_date: string;
+    to_date: string;
+    file_path: string;
+    file_url?: string;
+    created_at: string;
+}
+
 export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager';

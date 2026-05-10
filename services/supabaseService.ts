@@ -1,7 +1,7 @@
 
 
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice, LedgerStatement } from '../types';
 
 /* 
 ================================================================================
@@ -892,5 +892,47 @@ export const saveRegisterEntry = async (entry: any) => {
 
 export const deleteRegisterEntry = async (id: string) => {
     const { error } = await supabase.from('register_entries').delete().eq('id', id);
+    if (error) throw error;
+};
+
+// --- Ledger Statements (PDF Storage) ---
+
+export const saveLedgerStatement = async (statement: Omit<LedgerStatement, 'id' | 'created_at' | 'file_url'>, fileBlob: Blob) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No authenticated user");
+
+    // 1. Upload file to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('statements')
+        .upload(statement.file_path, fileBlob, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    // 2. Get public URL
+    const { data: { publicUrl } } = supabase.storage.from('statements').getPublicUrl(statement.file_path);
+
+    // 3. Save to database
+    const { data, error } = await supabase.from('ledger_statements').insert([{
+        ...statement,
+        file_url: publicUrl
+    }]).select().single();
+
+    if (error) throw error;
+    return data;
+};
+
+export const getLedgerStatements = async (): Promise<LedgerStatement[]> => {
+    const { data, error } = await supabase.from('ledger_statements').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+};
+
+export const deleteLedgerStatement = async (id: string, filePath: string) => {
+    // 1. Delete from storage
+    const { error: storageError } = await supabase.storage.from('statements').remove([filePath]);
+    if (storageError) console.error("Storage delete error:", storageError);
+
+    // 2. Delete from database
+    const { error } = await supabase.from('ledger_statements').delete().eq('id', id);
     if (error) throw error;
 };

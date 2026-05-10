@@ -823,6 +823,116 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             );
         }
 
+        if (activeTab === 'register-entries') {
+            const filtered = registers.filter(r =>
+                (r.gr_no || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (r.vehicle_no || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (r.owner_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            return (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left text-gray-700 whitespace-nowrap">
+                        <thead className="text-[10px] text-white uppercase bg-blue-700">
+                            <tr>
+                                <th className="px-3 py-3 border-r border-blue-600 sticky left-0 bg-blue-700">Actions</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Month</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Date</th>
+                                <th className="px-3 py-3 border-r border-blue-600">GR No</th>
+                                <th className="px-3 py-3 border-r border-blue-600">LRC No</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Bill No</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Vehicle No</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Contact No</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Owner Name</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Ref TPT</th>
+                                <th className="px-3 py-3 border-r border-blue-600">From</th>
+                                <th className="px-3 py-3 border-r border-blue-600">To</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Fare</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Adv</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Bal</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Actual Bal</th>
+                                <th className="px-3 py-3 border-r border-blue-600">POD Status</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Driver Pay</th>
+                                <th className="px-3 py-3 border-r border-blue-600">Note</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party TPT</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Fare</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Adv</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Bal</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Other Exp</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Total Bal</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Pay</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Commission</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Difference</th>
+                                <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Total</th>
+                                <th className="px-3 py-3 border-blue-600">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filtered.length === 0 ? (
+                                <tr>
+                                    <td colSpan={29} className="p-8 text-center text-gray-500 italic">
+                                        No records found. Use <strong>Import Excel</strong> to upload data, or the Database Setup script to create the table.
+                                    </td>
+                                </tr>
+                            ) : filtered.map((r, idx) => (
+                                <tr key={r.id || idx} className={`border-b hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                    <td className="px-3 py-2 border-r text-center sticky left-0 bg-inherit">
+                                        <button onClick={() => r.id && handleDelete(r.id, 'register')} className="p-1 hover:bg-red-100 rounded text-red-500">
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </td>
+                                    <td className="px-3 py-2 border-r">{r.month || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
+                                    <td className="px-3 py-2 border-r font-bold text-blue-700">{r.gr_no || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.lrc_no || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.bill_no || '-'}</td>
+                                    <td className="px-3 py-2 border-r font-mono font-bold">{r.vehicle_no || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.contact_no || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.owner_name || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.ref_tpt || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.from_loc || '-'}</td>
+                                    <td className="px-3 py-2 border-r">{r.to_loc || '-'}</td>
+                                    <td className="px-3 py-2 border-r text-right font-semibold text-green-700">₹{r.driver_fare ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_advance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_balance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-green-700">₹{r.actual_balance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.pod_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                            {r.pod_status || 'Pending'}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 border-r text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.driver_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {r.driver_payment_status || 'Pending'}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 border-r text-gray-500 italic">{r.note || '-'}</td>
+                                    <td className="px-3 py-2 border-r text-orange-700">{r.party_tpt || '-'}</td>
+                                    <td className="px-3 py-2 border-r text-right font-semibold text-orange-700">₹{r.party_fare ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_advance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_balance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.other_exp ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right font-bold text-orange-700">₹{r.party_total_balance ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.party_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {r.party_payment_status || 'Pending'}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.commission ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.difference ?? 0}</td>
+                                    <td className="px-3 py-2 border-r text-right font-bold text-purple-700">₹{r.total ?? 0}</td>
+                                    <td className="px-3 py-2 text-center">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                            {r.status || '-'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
         return <div className="p-8 text-center text-gray-500">Select a tab to view records.</div>;
     };
 

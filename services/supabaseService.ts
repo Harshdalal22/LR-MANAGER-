@@ -368,30 +368,26 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     // Destructure to separate frontend-only fields and 'id' if present
     const {
         isInvoiceGenerated,
-        createdBy, // Exclude frontend-only field
-        // @ts-ignore - 'id' might exist on the object if fetched from DB
+        createdBy,
+        // @ts-ignore
         id,
-        // @ts-ignore - 'created_at' might exist
+        // @ts-ignore
         created_at,
         ...rest
     } = lr;
 
-    // Sanitize Payload: Convert empty strings to NULL for dates and 0 for numbers
     const sanitizedRest = { ...rest } as any;
     const dateFields = ['invoiceDate', 'poDate', 'ewayBillDate', 'ewayExDate'];
     const numericFields = ['invoiceAmount', 'chargedWeight', 'freight', 'weight', 'actualWeightMT', 'rate'];
 
     dateFields.forEach(field => {
-        if (sanitizedRest[field] === '') {
-            sanitizedRest[field] = null;
-        }
+        if (sanitizedRest[field] === '') sanitizedRest[field] = null;
     });
 
     numericFields.forEach(field => {
         if (sanitizedRest[field] === '' || sanitizedRest[field] === undefined || sanitizedRest[field] === null) {
             sanitizedRest[field] = 0;
         } else {
-            // Explicitly cast to Number to ensure DB compatibility
             sanitizedRest[field] = Number(sanitizedRest[field]) || 0;
         }
     });
@@ -399,18 +395,24 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     const payload = {
         ...sanitizedRest,
         user_id: effectiveUserId,
-        is_invoice_generated: !!isInvoiceGenerated // Ensure boolean
+        is_invoice_generated: !!isInvoiceGenerated
     };
 
-    const { data, error } = await supabase
+    // Use a timeout to prevent hanging UI
+    const savePromise = supabase
         .from('lorry_receipts')
         .upsert(payload, { onConflict: 'lrNo' })
         .select()
         .single();
 
+    const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Request timed out. Please check your internet or run the Database Fix.")), 15000)
+    );
+
+    const { data, error } = await Promise.race([savePromise, timeoutPromise]) as any;
+
     if (error) {
         console.error("Supabase Save Error:", error);
-        // Throw a clean error message to avoid [object Object] in UI
         throw new Error(error.message || "Database error occurred while saving LR.");
     }
 

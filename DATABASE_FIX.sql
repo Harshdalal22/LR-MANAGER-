@@ -15,6 +15,10 @@ ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS "billingTo" JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS items JSONB;
 ALTER TABLE public.lorry_receipts ADD COLUMN IF NOT EXISTS charges JSONB;
 
+-- Ensure lrNo is unique for correct upsert operations
+ALTER TABLE public.lorry_receipts DROP CONSTRAINT IF EXISTS "lorry_receipts_lrNo_key";
+ALTER TABLE public.lorry_receipts ADD CONSTRAINT "lorry_receipts_lrNo_key" UNIQUE ("lrNo");
+
 ALTER TABLE public.lorry_receipts ALTER COLUMN "invoiceDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ALTER COLUMN "poDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayBillDate" DROP NOT NULL;

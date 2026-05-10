@@ -92,5 +92,8 @@ INSERT INTO storage.buckets (id, name, public) VALUES ('company_assets', 'compan
 INSERT INTO storage.buckets (id, name, public) VALUES ('pods', 'pods', true) ON CONFLICT (id) DO NOTHING;
 
 -- === STEP 6: STORAGE POLICIES ===
+DROP POLICY IF EXISTS "Public Assets" ON storage.objects;
 CREATE POLICY "Public Assets" ON storage.objects FOR SELECT TO public USING (bucket_id = 'company_assets');
+
+DROP POLICY IF EXISTS "Auth Uploads" ON storage.objects;
 CREATE POLICY "Auth Uploads" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id IN ('company_assets', 'pods'));

@@ -898,17 +898,19 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     const partyRows: LedgerRow[] = [];
 
                     if (selectedPartyLedger) {
-                        // Group LRs by invoiceNo for the selected party
-                        const partyInvoices: { [key: string]: { date: string, amountExclTax: number, invoiceNo: string } } = {};
+                        // Group LRs by invoiceNo for the selected party (or ALL)
+                        const partyInvoices: { [key: string]: { date: string, amountExclTax: number, invoiceNo: string, partyName: string } } = {};
 
                         allLRs
                             .filter(lr => lr.isInvoiceGenerated && lr.invoiceNo)
                             .filter(lr => {
+                                if (selectedPartyLedger === 'ALL') return true;
                                 const billedToName = lr.billingTo?.name || lr.consignor?.name;
                                 return billedToName === selectedPartyLedger;
                             })
                             .forEach(lr => {
                                 const invNo = lr.invoiceNo as string;
+                                const billedToName = lr.billingTo?.name || lr.consignor?.name || 'Unknown Party';
                                 const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
                                 const rawAmount = (Number(lr.freight) || 0) + totalCharges;
 
@@ -916,7 +918,8 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     partyInvoices[invNo] = {
                                         date: lr.invoiceDate || lr.date,
                                         amountExclTax: 0,
-                                        invoiceNo: invNo
+                                        invoiceNo: invNo,
+                                        partyName: billedToName
                                     };
                                 }
                                 partyInvoices[invNo].amountExclTax += rawAmount;
@@ -929,7 +932,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                             
                             partyRows.push({
                                 date: inv.date,
-                                description: `Bill Generated`,
+                                description: selectedPartyLedger === 'ALL' ? `Bill Generated (${inv.partyName})` : `Bill Generated`,
                                 type: 'Invoice (Credit)',
                                 ref_no: inv.invoiceNo,
                                 credit: amountWithTax,
@@ -939,11 +942,11 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                         // Vouchers → Debit rows
                         allVouchers
-                            .filter(v => v.party_name === selectedPartyLedger)
+                            .filter(v => selectedPartyLedger === 'ALL' ? true : v.party_name === selectedPartyLedger)
                             .forEach(v => {
                                 partyRows.push({
                                     date: v.date,
-                                    description: v.description,
+                                    description: selectedPartyLedger === 'ALL' ? `${v.description} (${v.party_name})` : v.description,
                                     type: 'Voucher (Debit)',
                                     ref_no: v.voucher_no,
                                     payment_mode: v.payment_mode,
@@ -1025,6 +1028,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                         className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
                                     >
                                         <option value="" className="text-gray-900">— Select Party to View Ledger —</option>
+                                        <option value="ALL" className="text-gray-900 font-bold bg-blue-100">ALL PARTIES (COMBINED LEDGER)</option>
                                         {partyList.map(p => (
                                             <option key={p} value={p} className="text-gray-900">{p}</option>
                                         ))}

@@ -478,6 +478,15 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         }
     };
 
+    const parseNumber = (val: any): number => {
+        if (val === null || val === undefined || val === '') return 0;
+        if (typeof val === 'number') return val;
+        // Remove currency symbols, commas, and other formatting
+        const clean = String(val).replace(/[^\d.-]/g, '');
+        const num = parseFloat(clean);
+        return isNaN(num) ? 0 : num;
+    };
+
     const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -666,35 +675,35 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         if (!grNo) { failCount++; continue; }
 
                         const register: RegisterEntry = {
-                            month: String(getValue(row, ['Month']) || ''),
+                            month: String(getValue(row, ['Month', 'Mnth']) || ''),
                             gr_no: String(grNo).trim(),
-                            lrc_no: String(getValue(row, ['LRC No', 'LRC Number', 'LRC']) || ''),
-                            bill_no: String(getValue(row, ['Bill No', 'Bill Number', 'Invoice No']) || ''),
-                            date: parseDate(getValue(row, ['Date'])),
-                            vehicle_no: String(getValue(row, ['Vehicle No', 'Vehicle Number', 'Truck No']) || ''),
-                            contact_no: String(getValue(row, ['Contact No', 'Contact Number', 'Phone']) || ''),
+                            lrc_no: String(getValue(row, ['LRC No', 'LRC Number', 'LRC', 'LRC No.']) || ''),
+                            bill_no: String(getValue(row, ['Bill No', 'Bill Number', 'Invoice No', 'Inv No']) || ''),
+                            date: parseDate(getValue(row, ['Date', 'DT'])),
+                            vehicle_no: String(getValue(row, ['Vehicle No', 'Vehicle Number', 'Truck No', 'Vehicle']) || ''),
+                            contact_no: String(getValue(row, ['Contact No', 'Contact Number', 'Phone', 'Mobile']) || ''),
                             owner_name: String(getValue(row, ['Owner Name', 'Owner']) || ''),
-                            ref_tpt: String(getValue(row, ['Ref TPT', 'Ref Transporter']) || ''),
-                            from_loc: String(getValue(row, ['From', 'From Location', 'Source']) || ''),
+                            ref_tpt: String(getValue(row, ['Ref TPT', 'Ref Transporter', 'Ref TPT Party TPT']) || ''),
+                            from_loc: String(getValue(row, ['From', 'From Location', 'Source', 'Origin']) || ''),
                             to_loc: String(getValue(row, ['To', 'To Location', 'Destination']) || ''),
-                            driver_fare: Number(getValue(row, ['Driver Fare', 'Driver Rate'])) || 0,
-                            driver_advance: Number(getValue(row, ['Driver Advance', 'Advance', 'Driver Adv'])) || 0,
+                            driver_fare: parseNumber(getValue(row, ['Driver Fare', 'Driver Rate', 'Fare'])),
+                            driver_advance: parseNumber(getValue(row, ['Driver Advance', 'Advance', 'Driver Adv', 'Adv'])),
                             pod_status: String(getValue(row, ['POD Status', 'POD']) || ''),
-                            driver_payment_status: String(getValue(row, ['Driver Payment Status', 'Payment Status', 'Driver Pay']) || ''),
+                            driver_payment_status: String(getValue(row, ['Driver Payment Status', 'Payment Status', 'Driver Pay', 'Pay Status']) || ''),
                             note: String(getValue(row, ['Note', 'Remarks', 'Remark']) || ''),
-                            driver_balance: Number(getValue(row, ['Driver Balance', 'Balance', 'Driver Bal'])) || 0,
-                            actual_balance: Number(getValue(row, ['Actual Balance'])) || 0,
-                            party_tpt: String(getValue(row, ['Party TPT', 'Party Transporter']) || ''),
-                            party_fare: Number(getValue(row, ['Party Fare', 'Party Rate'])) || 0,
-                            party_advance: Number(getValue(row, ['Party Advance', 'Party Adv'])) || 0,
-                            party_balance: Number(getValue(row, ['Party Balance', 'Party Bal'])) || 0,
-                            other_exp: Number(getValue(row, ['Other Exp', 'Other Expenses', 'Other Exp.'])) || 0,
-                            party_total_balance: Number(getValue(row, ['Party Total Balance', 'Party Total Bal'])) || 0,
-                            party_payment_status: String(getValue(row, ['Party Payment Status', 'Party Pay']) || ''),
-                            commission: Number(getValue(row, ['Commission'])) || 0,
-                            difference: Number(getValue(row, ['Difference'])) || 0,
-                            total: Number(getValue(row, ['Total'])) || 0,
-                            status: String(getValue(row, ['Status']) || '')
+                            driver_balance: parseNumber(getValue(row, ['Driver Balance', 'Balance', 'Driver Bal', 'Bal'])),
+                            actual_balance: parseNumber(getValue(row, ['Actual Balance', 'Act Bal'])),
+                            party_tpt: String(getValue(row, ['Party TPT', 'Party Transporter', 'Client']) || ''),
+                            party_fare: parseNumber(getValue(row, ['Party Fare', 'Party Rate', 'Party Pay Fare'])),
+                            party_advance: parseNumber(getValue(row, ['Party Advance', 'Party Adv', 'Party Adv.'])),
+                            party_balance: parseNumber(getValue(row, ['Party Balance', 'Party Bal', 'Party Bal.'])),
+                            other_exp: parseNumber(getValue(row, ['Other Exp', 'Other Expenses', 'Other Exp.', 'Misc Exp'])),
+                            party_total_balance: parseNumber(getValue(row, ['Party Total Balance', 'Party Total Bal', 'Net Bal'])),
+                            party_payment_status: String(getValue(row, ['Party Payment Status', 'Party Pay', 'Party Payment']) || ''),
+                            commission: parseNumber(getValue(row, ['Commission', 'Comm'])),
+                            difference: parseNumber(getValue(row, ['Difference', 'Diff'])),
+                            total: parseNumber(getValue(row, ['Total', 'Grand Total'])),
+                            status: String(getValue(row, ['Status', 'Shipment Status']) || '')
                         };
                         await saveRegisterEntry(register);
                     }

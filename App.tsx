@@ -474,12 +474,16 @@ const App: React.FC = () => {
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
         try {
-            await signOut();
+            // Optimistically clear local state for instant UI transition
             setSession(null);
             setIsPasswordResetting(false);
             sessionStorage.removeItem('roleSelected');
             sessionStorage.removeItem('currentRole');
             setCurrentRole('Admin');
+            
+            // Background the remote signout call
+            signOut().catch(err => console.error("Sign out error:", err));
+            
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);

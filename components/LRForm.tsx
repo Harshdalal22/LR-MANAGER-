@@ -229,7 +229,12 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         if (window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
             localStorage.removeItem('lr_draft_data');
             localStorage.removeItem('lr_draft_billing');
-            setFormData(initialLRState);
+            
+            let nextLrNo = '';
+            if (lorryReceipts && lorryReceipts.length > 0) {
+                nextLrNo = getNextSequence(lorryReceipts[0].lrNo);
+            }
+            setFormData({ ...initialLRState, lrNo: nextLrNo });
             setBillingPartyType('Consignor');
         }
     }

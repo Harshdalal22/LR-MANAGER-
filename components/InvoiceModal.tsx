@@ -288,6 +288,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
             try {
                 const lrNos = lorryReceipts.map(lr => lr.lrNo);
                 await onSaveInvoiceDetails(lrNos, billNo, billDate);
+                // Automatically download PDF upon successful save
+                handleDownloadPDF();
                 onClose();
             } catch (error) {
                 // error handled in parent
@@ -341,11 +343,11 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                                 className="flex items-center bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 font-semibold disabled:bg-gray-400"
                             >
                                 <SaveIcon className="w-5 h-5 mr-1"/>
-                                {isSaving ? 'Saving...' : 'Save Invoice'}
+                                {isSaving ? 'Saving...' : 'Save & Download PDF'}
                             </button>
                         )}
                         <button onClick={handleDownloadPDF} className="flex items-center bg-ssk-red text-white px-3 py-2 rounded-md hover:bg-red-700 font-semibold">
-                            <DownloadIcon className="w-5 h-5 mr-1"/>Download PDF
+                            <DownloadIcon className="w-5 h-5 mr-1"/>Download PDF Only
                         </button>
                         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-300">
                             <XIcon className="w-6 h-6"/>

@@ -4,6 +4,7 @@ import { getGPSInvoices, saveGPSInvoice, deleteGPSInvoice } from '../services/su
 import { DownloadIcon, PlusIcon, TrashIcon, XIcon, SaveIcon } from './icons';
 import { toWords } from '../utils/numberToWords';
 import { toast } from 'react-hot-toast';
+import { getNextSequence } from '../utils/sequenceUtils';
 
 declare const html2pdf: any;
 
@@ -64,6 +65,9 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut }) => {
             setIsFormOpen(false);
             setFormData({ date: new Date().toISOString().split('T')[0], status: 'Paid' });
             toast.success('Invoice Saved!', { id: toastId });
+            
+            // Automatically download the PDF after saving
+            generatePdf(saved);
         } catch (error) {
             toast.error("Failed to save invoice");
             console.error(error);
@@ -108,6 +112,19 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut }) => {
         }, 300);
     };
 
+    const handleOpenForm = () => {
+        let nextInvNo = 'GPS-001';
+        if (invoices.length > 0) {
+            nextInvNo = getNextSequence(invoices[0].invoiceNo);
+        }
+        setFormData({
+            invoiceNo: nextInvNo,
+            date: new Date().toISOString().split('T')[0],
+            status: 'Paid'
+        });
+        setIsFormOpen(true);
+    };
+
     return (
         <div className="p-4 md:p-8">
             <div className="flex justify-between items-center mb-6">
@@ -117,7 +134,7 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut }) => {
                 </div>
                 <div className="flex gap-4">
                     <button 
-                        onClick={() => setIsFormOpen(true)}
+                        onClick={handleOpenForm}
                         className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-medium flex items-center hover:bg-blue-700"
                     >
                         <PlusIcon className="w-5 h-5 mr-1" /> New Invoice

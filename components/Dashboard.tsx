@@ -690,6 +690,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             onClick={() => setCurrentView('trucks')}
                             colorTheme="teal"
                         />
+                        <ManagementCard
+                            title={t[language].registerManager}
+                            description="Maintain Excel-like logistics tracking register"
+                            icon={<DocumentTextIcon />}
+                            onClick={() => setCurrentView('register-manager')}
+                            colorTheme="indigo"
+                        />
                         {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <ManagementCard
                                 title={t[language].dataSetup}

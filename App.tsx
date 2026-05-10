@@ -708,6 +708,8 @@ const App: React.FC = () => {
                 return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
             case 'data-management':
                 return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} />;
+            case 'register-manager':
+                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} initialTab="register-entries" />;
             case 'parties':
                 return (
                     <PartyManagement

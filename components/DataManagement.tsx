@@ -13,12 +13,13 @@ import * as XLSX from 'xlsx';
 interface DataManagementProps {
     onBack: () => void;
     currentRole?: string;
+    initialTab?: Tab;
 }
 
 type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'database-setup';
 
-const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole }) => {
-    const [activeTab, setActiveTab] = useState<Tab>(currentRole === 'Operator' ? 'customer-details' : 'database-setup');
+const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab }) => {
+    const [activeTab, setActiveTab] = useState<Tab>(initialTab || (currentRole === 'Operator' ? 'customer-details' : 'database-setup'));
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);

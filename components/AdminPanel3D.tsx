@@ -1013,7 +1013,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     doc.setFontSize(10);
                                     doc.setFont('helvetica', 'normal');
                                     doc.setTextColor(60, 60, 60);
-                                    doc.text(companyDetails.address || '', pageWidth / 2, 26, { align: 'center' });
+                                    doc.text(companyDetails.address || '', pageWidth / 2, 26, { align: 'center', maxWidth: pageWidth - 40 });
                                     
                                     const detailsLine = [
                                         companyDetails.mobile ? `Mob: ${companyDetails.mobile}` : '',
@@ -1021,26 +1021,35 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                         companyDetails.gstNo ? `GST: ${companyDetails.gstNo}` : ''
                                     ].filter(Boolean).join('  |  ');
                                     
-                                    doc.text(detailsLine, pageWidth / 2, 31, { align: 'center' });
+                                    doc.text(detailsLine, pageWidth / 2, 32, { align: 'center' });
                                     
                                     doc.setDrawColor(41, 128, 185);
                                     doc.setLineWidth(0.5);
-                                    doc.line(14, 35, pageWidth - 14, 35);
+                                    doc.line(14, 36, pageWidth - 14, 36);
                                 }
 
                                 // --- 2. Party & Statement Details ---
-                                doc.setFontSize(14);
+                                doc.setFontSize(16);
                                 doc.setFont('helvetica', 'bold');
                                 doc.setTextColor(0, 0, 0);
-                                doc.text("LEDGER STATEMENT", 14, 45);
+                                doc.text("STATEMENT", 14, 45);
                                 
                                 doc.setFontSize(10);
                                 doc.text(`Party: ${selectedPartyLedger}`, 14, 52);
                                 
                                 const partyObj = savedParties.find(p => p.name === selectedPartyLedger);
-                                if (partyObj && partyObj.address) {
+                                if (partyObj) {
                                     doc.setFont('helvetica', 'normal');
-                                    doc.text(`Address: ${partyObj.address}`, 14, 57, { maxWidth: pageWidth / 2 });
+                                    let currentY = 57;
+                                    if (partyObj.address) {
+                                        doc.text(`Address: ${partyObj.address}`, 14, currentY, { maxWidth: pageWidth / 2 + 20 });
+                                        currentY += 6;
+                                    }
+                                    if (partyObj.gst) {
+                                        doc.setFont('helvetica', 'bold');
+                                        doc.text(`GST: ${partyObj.gst}`, 14, currentY);
+                                        doc.setFont('helvetica', 'normal');
+                                    }
                                 }
 
                                 doc.setFont('helvetica', 'bold');

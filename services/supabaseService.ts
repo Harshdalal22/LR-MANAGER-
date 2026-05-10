@@ -635,23 +635,6 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
     };
 };
 
-export const uploadCompanyAsset = async (file: File, assetType: 'logo' | 'signature'): Promise<string> => {
-    const effectiveUserId = await getEffectiveUserId();
-
-    const fileExt = file.name.split('.').pop();
-    const filePath = `${effectiveUserId}/${assetType}_${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-        .from('company_assets')
-        .upload(filePath, file, { upsert: true });
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage.from('company_assets').getPublicUrl(filePath);
-    return publicUrl;
-};
-
-
 // --- Saved Parties & Trucks ---
 
 export const getSavedParties = async (): Promise<SavedParty[]> => {

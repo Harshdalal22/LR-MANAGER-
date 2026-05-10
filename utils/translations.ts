@@ -37,7 +37,6 @@ export const t = {
     manageTrucks: "Manage Trucks",
     vehicleHiring: "Vehicle Hiring",
     bookingRegister: "Booking Register",
-    registerManager: "Register Manager",
     dataSetup: "Data Setup",
     
     // Emergency
@@ -205,7 +204,6 @@ export const t = {
     manageTrucks: "ट्रक प्रबंधित करें",
     vehicleHiring: "वाहन हायरिंग",
     bookingRegister: "बुकिंग रजिस्टर",
-    registerManager: "रजिस्टर मैनेजर",
     dataSetup: "डेटा सेटअप",
     
     // Emergency

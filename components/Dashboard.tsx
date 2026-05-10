@@ -667,15 +667,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 colorTheme="orange"
                             />
                         )}
-                        {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
-                            <ManagementCard
-                                title={t[language].bookingRegister}
-                                description="Maintain booking records and freight details"
-                                icon={<ListIcon />}
-                                onClick={() => setCurrentView('booking-register')}
-                                colorTheme="green"
-                            />
-                        )}
+                        <ManagementCard
+                            title={t[language].bookingRegister}
+                            description="Comprehensive Excel-like logistics tracking and financial register"
+                            icon={<DocumentTextIcon />}
+                            onClick={() => setCurrentView('booking-register')}
+                            colorTheme="green"
+                        />
                         <ManagementCard
                             title={t[language].manageParties}
                             description="Add or edit consignor and consignee details"
@@ -689,13 +687,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                             icon={<TruckIcon />}
                             onClick={() => setCurrentView('trucks')}
                             colorTheme="teal"
-                        />
-                        <ManagementCard
-                            title={t[language].registerManager}
-                            description="Maintain Excel-like logistics tracking register"
-                            icon={<DocumentTextIcon />}
-                            onClick={() => setCurrentView('register-manager')}
-                            colorTheme="indigo"
                         />
                         {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                             <ManagementCard

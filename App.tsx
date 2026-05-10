@@ -705,11 +705,9 @@ const App: React.FC = () => {
             case 'vehicle-hiring':
                 return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
             case 'booking-register':
-                return <BookingRegister onBack={() => setCurrentView('dashboard')} />;
+                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} initialTab="register-entries" />;
             case 'data-management':
                 return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} />;
-            case 'register-manager':
-                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} initialTab="register-entries" />;
             case 'parties':
                 return (
                     <PartyManagement

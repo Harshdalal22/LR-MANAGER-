@@ -869,3 +869,28 @@ export const deleteGPSInvoice = async (id: string) => {
     const { error } = await supabase.from('gps_invoices').delete().eq('id', id);
     if (error) throw error;
 };
+
+// --- Register Entries ---
+export const getRegisterEntries = async () => {
+    const { data, error } = await supabase.from('register_entries').select('*').order('created_at', { ascending: false });
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || [];
+};
+
+export const saveRegisterEntry = async (entry: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("No authenticated user");
+
+    const { data: appUser } = await supabase.from('app_users').select('admin_id').eq('operator_id', user.id).single();
+    const finalUserId = appUser?.admin_id || user.id;
+
+    const payload = { ...entry, admin_id: finalUserId };
+    const { data, error } = await supabase.from('register_entries').upsert(payload).select().single();
+    if (error) throw error;
+    return data;
+};
+
+export const deleteRegisterEntry = async (id: string) => {
+    const { error } = await supabase.from('register_entries').delete().eq('id', id);
+    if (error) throw error;
+};

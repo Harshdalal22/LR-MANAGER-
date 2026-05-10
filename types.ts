@@ -209,4 +209,39 @@ export interface GPSInvoice {
     created_at?: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel';
+export interface RegisterEntry {
+    id?: string;
+    admin_id?: string;
+    month: string;
+    gr_no: string;
+    lrc_no: string;
+    bill_no: string;
+    date: string;
+    vehicle_no: string;
+    contact_no: string;
+    owner_name: string;
+    ref_tpt: string;
+    from_loc: string;
+    to_loc: string;
+    driver_fare: number;
+    driver_advance: number;
+    pod_status: string;
+    driver_payment_status: string;
+    note: string;
+    driver_balance: number;
+    actual_balance: number;
+    party_tpt: string;
+    party_fare: number;
+    party_advance: number;
+    party_balance: number;
+    other_exp: number;
+    party_total_balance: number;
+    party_payment_status: string;
+    commission: number;
+    difference: number;
+    total: number;
+    status: string;
+    created_at?: string;
+}
+
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager';

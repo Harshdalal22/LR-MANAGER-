@@ -3,11 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DashboardIcon, CheckCircleIcon, SearchIcon, PlusIcon, DownloadIcon, UploadIcon, PrintIcon, PencilIcon, TrashIcon, DocumentTextIcon, ArrowLeftIcon } from './icons';
 import { toast } from 'react-hot-toast';
 import {
-    getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks,
-    deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck,
-    saveVehicleHiring, saveBookingRecord, saveSavedParty, saveSavedTruck
+    getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks, getRegisterEntries,
+    deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck, deleteRegisterEntry,
+    saveVehicleHiring, saveBookingRecord, saveSavedParty, saveSavedTruck, saveRegisterEntry
 } from '../services/supabaseService';
-import { VehicleHiring, BookingRecord, SavedParty, SavedTruck } from '../types';
+import { VehicleHiring, BookingRecord, SavedParty, SavedTruck, RegisterEntry } from '../types';
 import * as XLSX from 'xlsx';
 
 interface DataManagementProps {
@@ -15,7 +15,7 @@ interface DataManagementProps {
     currentRole?: string;
 }
 
-type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'database-setup';
+type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'database-setup';
 
 const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole }) => {
     const [activeTab, setActiveTab] = useState<Tab>(currentRole === 'Operator' ? 'customer-details' : 'database-setup');
@@ -29,6 +29,7 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole }) 
     const [bookings, setBookings] = useState<BookingRecord[]>([]);
     const [parties, setParties] = useState<SavedParty[]>([]);
     const [trucks, setTrucks] = useState<SavedTruck[]>([]);
+    const [registers, setRegisters] = useState<RegisterEntry[]>([]);
 
     // SQL Script State
     const [copied, setCopied] = useState(false);
@@ -105,6 +106,54 @@ DROP POLICY IF EXISTS "Users can manage their own booking records" ON public.boo
 CREATE POLICY "Users can manage their own booking records" ON public.booking_registers FOR ALL
 USING (auth.uid() = user_id);
 
+-- Table: register_entries
+CREATE TABLE IF NOT EXISTS public.register_entries (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    admin_id UUID NOT NULL,
+    month TEXT,
+    gr_no TEXT,
+    lrc_no TEXT,
+    bill_no TEXT,
+    date TEXT,
+    vehicle_no TEXT,
+    contact_no TEXT,
+    owner_name TEXT,
+    ref_tpt TEXT,
+    from_loc TEXT,
+    to_loc TEXT,
+    driver_fare NUMERIC,
+    driver_advance NUMERIC,
+    pod_status TEXT,
+    driver_payment_status TEXT,
+    note TEXT,
+    driver_balance NUMERIC,
+    actual_balance NUMERIC,
+    party_tpt TEXT,
+    party_fare NUMERIC,
+    party_advance NUMERIC,
+    party_balance NUMERIC,
+    other_exp NUMERIC,
+    party_total_balance NUMERIC,
+    party_payment_status TEXT,
+    commission NUMERIC,
+    difference NUMERIC,
+    total NUMERIC,
+    status TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.register_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can access register entries" ON public.register_entries;
+CREATE POLICY "Users can access register entries" ON public.register_entries 
+FOR ALL 
+USING (
+    auth.uid() = admin_id 
+    OR 
+    EXISTS (
+        SELECT 1 FROM app_users 
+        WHERE app_users.operator_id = auth.uid() 
+        AND app_users.admin_id = register_entries.admin_id
+    )
+);
 
 -- === STEP 3: REFRESH SCHEMA CACHE ===
 NOTIFY pgrst, 'reload config';
@@ -176,6 +225,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 case 'vehicle-fleet':
                     setTrucks(await getSavedTrucks());
                     break;
+                case 'register-entries':
+                    setRegisters(await getRegisterEntries());
+                    break;
                 default:
                     break;
             }
@@ -193,7 +245,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         setTimeout(() => setCopied(false), 3000);
     };
 
-    const handleDelete = async (id: string, type: 'hiring' | 'booking' | 'party' | 'truck') => {
+    const handleDelete = async (id: string, type: 'hiring' | 'booking' | 'party' | 'truck' | 'register') => {
         if (!confirm('Are you sure you want to delete this record?')) return;
         try {
             if (type === 'hiring') {
@@ -208,6 +260,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             } else if (type === 'truck') {
                 await deleteSavedTruck(id);
                 setTrucks(prev => prev.filter(i => i.id !== id));
+            } else if (type === 'register') {
+                await deleteRegisterEntry(id);
+                setRegisters(prev => prev.filter(i => i.id !== id));
             }
             toast.success('Deleted successfully');
         } catch (error) {
@@ -277,6 +332,40 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     'Contact Number': t.contactNumber
                 }));
                 filename = 'Vehicle_Fleet_Data';
+                break;
+            case 'register-entries':
+                data = registers.map(r => ({
+                    'Month': r.month,
+                    'GR No': r.gr_no,
+                    'LRC No': r.lrc_no,
+                    'Bill No': r.bill_no,
+                    'Date': r.date,
+                    'Vehicle No': r.vehicle_no,
+                    'Contact No': r.contact_no,
+                    'Owner Name': r.owner_name,
+                    'Ref TPT': r.ref_tpt,
+                    'From': r.from_loc,
+                    'To': r.to_loc,
+                    'Driver Fare': r.driver_fare,
+                    'Driver Advance': r.driver_advance,
+                    'POD Status': r.pod_status,
+                    'Driver Payment Status': r.driver_payment_status,
+                    'Note': r.note,
+                    'Driver Balance': r.driver_balance,
+                    'Actual Balance': r.actual_balance,
+                    'Party TPT': r.party_tpt,
+                    'Party Fare': r.party_fare,
+                    'Party Advance': r.party_advance,
+                    'Party Balance': r.party_balance,
+                    'Other Exp': r.other_exp,
+                    'Party Total Balance': r.party_total_balance,
+                    'Party Payment Status': r.party_payment_status,
+                    'Commission': r.commission,
+                    'Difference': r.difference,
+                    'Total': r.total,
+                    'Status': r.status
+                }));
+                filename = 'Register_Entries';
                 break;
             default:
                 return;
@@ -516,6 +605,42 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             contactNumber: String(getValue(row, ['Contact Number', 'Mobile', 'Phone']) || '')
                         };
                         await saveSavedTruck(truck);
+                    } else if (activeTab === 'register-entries') {
+                        const grNo = getValue(row, ['GR No', 'GR Number', 'GR']);
+                        if (!grNo) { failCount++; continue; }
+
+                        const register: RegisterEntry = {
+                            month: String(getValue(row, ['Month']) || ''),
+                            gr_no: String(grNo).trim(),
+                            lrc_no: String(getValue(row, ['LRC No', 'LRC Number', 'LRC']) || ''),
+                            bill_no: String(getValue(row, ['Bill No', 'Bill Number', 'Invoice No']) || ''),
+                            date: parseDate(getValue(row, ['Date'])),
+                            vehicle_no: String(getValue(row, ['Vehicle No', 'Vehicle Number', 'Truck No']) || ''),
+                            contact_no: String(getValue(row, ['Contact No', 'Contact Number', 'Phone']) || ''),
+                            owner_name: String(getValue(row, ['Owner Name', 'Owner']) || ''),
+                            ref_tpt: String(getValue(row, ['Ref TPT', 'Ref Transporter']) || ''),
+                            from_loc: String(getValue(row, ['From', 'From Location', 'Source']) || ''),
+                            to_loc: String(getValue(row, ['To', 'To Location', 'Destination']) || ''),
+                            driver_fare: Number(getValue(row, ['Driver Fare', 'Driver Rate'])) || 0,
+                            driver_advance: Number(getValue(row, ['Driver Advance', 'Advance'])) || 0,
+                            pod_status: String(getValue(row, ['POD Status', 'POD']) || ''),
+                            driver_payment_status: String(getValue(row, ['Driver Payment Status', 'Payment Status']) || ''),
+                            note: String(getValue(row, ['Note', 'Remarks', 'Remark']) || ''),
+                            driver_balance: Number(getValue(row, ['Driver Balance', 'Balance'])) || 0,
+                            actual_balance: Number(getValue(row, ['Actual Balance'])) || 0,
+                            party_tpt: String(getValue(row, ['Party TPT', 'Party Transporter']) || ''),
+                            party_fare: Number(getValue(row, ['Party Fare', 'Party Rate'])) || 0,
+                            party_advance: Number(getValue(row, ['Party Advance'])) || 0,
+                            party_balance: Number(getValue(row, ['Party Balance'])) || 0,
+                            other_exp: Number(getValue(row, ['Other Exp', 'Other Expenses'])) || 0,
+                            party_total_balance: Number(getValue(row, ['Party Total Balance'])) || 0,
+                            party_payment_status: String(getValue(row, ['Party Payment Status'])) || '',
+                            commission: Number(getValue(row, ['Commission'])) || 0,
+                            difference: Number(getValue(row, ['Difference'])) || 0,
+                            total: Number(getValue(row, ['Total'])) || 0,
+                            status: String(getValue(row, ['Status']) || '')
+                        };
+                        await saveRegisterEntry(register);
                     }
 
                     successCount++;
@@ -707,6 +832,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             case 'booking-register': return bookings.length;
             case 'customer-details': return parties.length;
             case 'vehicle-fleet': return trucks.length;
+            case 'register-entries': return registers.length;
             default: return 0;
         }
     }
@@ -731,6 +857,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     { id: 'booking-register', label: 'Booking Register' },
                     { id: 'customer-details', label: 'Customer Details' },
                     { id: 'vehicle-fleet', label: 'Vehicle Fleet' },
+                    { id: 'register-entries', label: 'Register' },
                     { id: 'database-setup', label: 'Database Setup' }
                 ].filter(tab => {
                     if (currentRole === 'Operator') {

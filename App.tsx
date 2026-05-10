@@ -200,7 +200,6 @@ const App: React.FC = () => {
                         if (session.user?.email === 'gps@ssk.com') {
                             setIsLoading(false);
                         } else {
-                            setIsLoading(true);
                             const roleInfo = await checkOperatorRole();
                             if (roleInfo && !roleInfo.isAdmin) {
                                 sessionStorage.setItem('currentRole', 'Operator');
@@ -213,6 +212,7 @@ const App: React.FC = () => {
                                     setCurrentRole('Admin');
                                 }
                             }
+                            setIsLoading(false);
                         }
                     }
 

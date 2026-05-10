@@ -24,14 +24,6 @@ const Auth: React.FC = () => {
             switch (view) {
                 case 'sign_in':
                     await signIn(email, password);
-                    if (email.toLowerCase() !== 'gps@ssk.com') {
-                        const roleInfo = await checkOperatorRole();
-                        if (roleInfo && !roleInfo.isAdmin) {
-                            sessionStorage.setItem('currentRole', 'Operator');
-                            sessionStorage.setItem('adminId', roleInfo.adminId);
-                            sessionStorage.setItem('roleSelected', 'true'); // Skip role selection
-                        }
-                    }
                     toast.success('Signed in successfully! Redirecting...', { id: toastId });
                     break;
                 case 'sign_up':

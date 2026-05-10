@@ -462,13 +462,20 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         ...rest
     } = lr;
 
-    // Sanitize Payload: Convert empty string dates to NULL to prevent "invalid input syntax for type date"
+    // Sanitize Payload: Convert empty strings to NULL for dates and 0 for numbers
     const sanitizedRest = { ...rest } as any;
     const dateFields = ['invoiceDate', 'poDate', 'ewayBillDate', 'ewayExDate'];
+    const numericFields = ['invoiceAmount', 'chargedWeight', 'freight', 'weight', 'actualWeightMT', 'rate'];
 
     dateFields.forEach(field => {
         if (sanitizedRest[field] === '') {
             sanitizedRest[field] = null;
+        }
+    });
+
+    numericFields.forEach(field => {
+        if (sanitizedRest[field] === '' || sanitizedRest[field] === undefined) {
+            sanitizedRest[field] = 0;
         }
     });
 

@@ -1268,6 +1268,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         </table>
                     </div>
                 </div>
+            </div>
             );
         }
 

@@ -40,6 +40,10 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, in
     const [filterParty, setFilterParty] = useState('');
     const [filterGR, setFilterGR] = useState('');
 
+    // Selection States for Bulk Actions
+    const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
+    const [selectedRegisterIds, setSelectedRegisterIds] = useState<string[]>([]);
+
     // SQL Script State
     const [copied, setCopied] = useState(false);
     const sqlScript = `
@@ -271,6 +275,29 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         } catch (error) {
             console.error(error);
             toast.error("Failed to save entry", { id: toastId });
+        }
+    };
+
+    const handleDeleteBulk = async (type: 'booking' | 'register') => {
+        const ids = type === 'booking' ? selectedBookingIds : selectedRegisterIds;
+        if (ids.length === 0) return;
+        if (!confirm(`Are you sure you want to delete ${ids.length} selected records?`)) return;
+
+        const toastId = toast.loading(`Deleting ${ids.length} records...`);
+        try {
+            if (type === 'booking') {
+                await Promise.all(ids.map(id => deleteBookingRecord(id)));
+                setBookings(prev => prev.filter(b => b.id && !ids.includes(b.id)));
+                setSelectedBookingIds([]);
+            } else if (type === 'register') {
+                await Promise.all(ids.map(id => deleteRegisterEntry(id)));
+                setRegisters(prev => prev.filter(r => r.id && !ids.includes(r.id)));
+                setSelectedRegisterIds([]);
+            }
+            toast.success('Deleted successfully', { id: toastId });
+        } catch (error) {
+            console.error(error);
+            toast.error('Failed to delete some records', { id: toastId });
         }
     };
 
@@ -748,9 +775,31 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             );
             return (
                 <div className="overflow-x-auto">
+                    {selectedBookingIds.length > 0 && (
+                        <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center sticky left-0">
+                            <span className="text-red-700 text-xs font-bold">{selectedBookingIds.length} items selected</span>
+                            <button 
+                                onClick={() => handleDeleteBulk('booking')}
+                                className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-bold transition-colors shadow-sm"
+                            >
+                                Delete Selected
+                            </button>
+                        </div>
+                    )}
                     <table className="w-full text-xs text-left text-gray-700">
                         <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
                             <tr>
+                                <th className="px-3 py-3 border-r w-10 text-center">
+                                    <input 
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                        checked={filtered.length > 0 && selectedBookingIds.length === filtered.length}
+                                        onChange={() => {
+                                            const ids = filtered.map(b => b.id).filter((id): id is string => !!id);
+                                            setSelectedBookingIds(prev => prev.length === ids.length ? [] : ids);
+                                        }}
+                                    />
+                                </th>
                                 <th className="px-3 py-3 border-r">Date</th>
                                 <th className="px-3 py-3 border-r">Party Name</th>
                                 <th className="px-3 py-3 border-r">GR Number</th>
@@ -761,9 +810,24 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={6} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
+                                <tr><td colSpan={7} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
                             ) : filtered.map(r => (
-                                <tr key={r.id} className="bg-white border-b hover:bg-gray-50">
+                                <tr key={r.id} className={`bg-white border-b hover:bg-gray-50 transition-colors ${selectedBookingIds.includes(r.id!) ? 'bg-blue-50/50' : ''}`}>
+                                    <td className="px-3 py-2 border-r text-center">
+                                        <input 
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={r.id ? selectedBookingIds.includes(r.id) : false}
+                                            onChange={() => {
+                                                if (!r.id) return;
+                                                setSelectedBookingIds(prev => 
+                                                    prev.includes(r.id!) 
+                                                        ? prev.filter(id => id !== r.id) 
+                                                        : [...prev, r.id!]
+                                                );
+                                            }}
+                                        />
+                                    </td>
                                     <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
                                     <td className="px-3 py-2 border-r font-medium">{r.partyName}</td>
                                     <td className="px-3 py-2 border-r">{r.grNo}</td>
@@ -921,10 +985,32 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     </div>
 
                     <div className="overflow-x-auto">
+                        {selectedRegisterIds.length > 0 && (
+                            <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center sticky left-0 z-20">
+                                <span className="text-red-700 text-xs font-bold">{selectedRegisterIds.length} items selected</span>
+                                <button 
+                                    onClick={() => handleDeleteBulk('register')}
+                                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-bold transition-colors shadow-sm"
+                                >
+                                    Delete Selected
+                                </button>
+                            </div>
+                        )}
                         <table className="w-full text-xs text-left text-gray-700 whitespace-nowrap">
                             <thead className="text-[10px] text-white uppercase bg-blue-700">
                                 <tr>
-                                    <th className="px-3 py-3 border-r border-blue-600 sticky left-0 bg-blue-700 z-10">Actions</th>
+                                    <th className="px-3 py-3 border-r border-blue-600 sticky left-0 bg-blue-700 z-10 text-center w-10">
+                                        <input 
+                                            type="checkbox"
+                                            className="rounded border-blue-400 text-white focus:ring-blue-300 bg-blue-800"
+                                            checked={filtered.length > 0 && selectedRegisterIds.length === filtered.length}
+                                            onChange={() => {
+                                                const ids = filtered.map(r => r.id).filter((id): id is string => !!id);
+                                                setSelectedRegisterIds(prev => prev.length === ids.length ? [] : ids);
+                                            }}
+                                        />
+                                    </th>
+                                    <th className="px-3 py-3 border-r border-blue-600 sticky left-[40px] bg-blue-700 z-10">Actions</th>
                                     <th className="px-3 py-3 border-r border-blue-600">Month</th>
                                     <th className="px-3 py-3 border-r border-blue-600">Date</th>
                                     <th className="px-3 py-3 border-r border-blue-600">GR No</th>
@@ -959,13 +1045,28 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             <tbody>
                                 {filtered.length === 0 ? (
                                     <tr>
-                                        <td colSpan={30} className="p-8 text-center text-gray-500 italic">
+                                        <td colSpan={31} className="p-8 text-center text-gray-500 italic">
                                             No records found matching filters.
                                         </td>
                                     </tr>
                                 ) : filtered.map((r, idx) => (
-                                    <tr key={r.id || idx} className={`border-b hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                                    <tr key={r.id || idx} className={`border-b hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedRegisterIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
                                         <td className="px-3 py-2 border-r text-center sticky left-0 bg-inherit z-10">
+                                            <input 
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={r.id ? selectedRegisterIds.includes(r.id) : false}
+                                                onChange={() => {
+                                                    if (!r.id) return;
+                                                    setSelectedRegisterIds(prev => 
+                                                        prev.includes(r.id!) 
+                                                            ? prev.filter(id => id !== r.id) 
+                                                            : [...prev, r.id!]
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center sticky left-[40px] bg-inherit z-10">
                                             <div className="flex items-center justify-center gap-1">
                                                 <button 
                                                     onClick={() => { setEditingRegister(r); setShowRegisterForm(true); }}

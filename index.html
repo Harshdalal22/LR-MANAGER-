@@ -5,90 +5,127 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Bilty Book</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'ssk-blue': '#1e3a8a',
-              'ssk-red': '#dc2626',
-            },
-            keyframes: {
-              fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(20px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
-              },
-              slideIn: {
-                '0%': { opacity: '0', transform: 'translateX(-20px)' },
-                '100%': { opacity: '1', transform: 'translateX(0)' },
-              }
-            },
-            animation: {
-              fadeInUp: 'fadeInUp 0.6s ease-out forwards',
-              slideIn: 'slideIn 0.5s ease-out forwards',
-            }
-          },
-        },
-      }
-    </script>
+
+    <!-- Preconnect to Supabase for faster API calls -->
+    <link rel="preconnect" href="https://supabase.co" />
+    <link rel="dns-prefetch" href="https://supabase.co" />
+
     <style>
-      @media print {
-        body * {
-          visibility: hidden;
-        }
-        #print-root, #print-root * {
-          visibility: visible;
-        }
-        #print-root {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-          height: 100%;
-        }
-        .printable-area {
-          border: none !important;
-          box-shadow: none !important;
-        }
-        @page {
-          size: A4;
-          margin: 0;
-        }
-        .page-break {
-          page-break-after: always;
-        }
-        .page-break:last-child {
-          page-break-after: auto;
-        }
+      /* ─── Critical CSS (inline = zero network wait) ─────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #f8fafc;
+        -webkit-font-smoothing: antialiased;
       }
-      /* Added for 3D UI feel */
+
+      /* Instant splash screen — shown while React loads */
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #2563eb 100%);
+        z-index: 9999;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      #app-splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+      .splash-logo {
+        width: 72px; height: 72px;
+        background: rgba(255,255,255,0.15);
+        border-radius: 20px;
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.25);
+        animation: splashPop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+      }
+      .splash-logo svg { width: 40px; height: 40px; fill: white; }
+
+      .splash-title {
+        font-size: 28px; font-weight: 800; color: white;
+        letter-spacing: -0.5px;
+        animation: splashFade 0.5s 0.1s ease forwards; opacity: 0;
+      }
+      .splash-sub {
+        font-size: 14px; color: rgba(255,255,255,0.7);
+        margin-top: 6px;
+        animation: splashFade 0.5s 0.2s ease forwards; opacity: 0;
+      }
+
+      /* Spinner */
+      .splash-spinner {
+        width: 36px; height: 36px;
+        border: 3px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        margin-top: 32px;
+        animation: spin 0.7s linear infinite;
+      }
+
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes splashPop {
+        from { transform: scale(0.6); opacity: 0; }
+        to   { transform: scale(1);   opacity: 1; }
+      }
+      @keyframes splashFade {
+        from { transform: translateY(8px); opacity: 0; }
+        to   { transform: translateY(0);   opacity: 1; }
+      }
+
+      /* ─── Print styles ────────────────────────────────────────────────────── */
+      @media print {
+        body * { visibility: hidden; }
+        #print-root, #print-root * { visibility: visible; }
+        #print-root { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+        .printable-area { border: none !important; box-shadow: none !important; }
+        @page { size: A4; margin: 0; }
+        .page-break { page-break-after: always; }
+        .page-break:last-child { page-break-after: auto; }
+      }
+
+      /* Input focus 3D effect */
       input:focus, textarea:focus, select:focus {
         transform: scale(1.02);
-        box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.5);
+        box-shadow: 0 0 0 2px rgba(30,58,138,0.5);
         transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        outline: none;
       }
     </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
-    "react-hot-toast": "https://aistudiocdn.com/react-hot-toast@^2.6.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
-  }
-}
-</script>
-  <!-- Google AdSense script loader -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-app-pub-2742543836663851" crossorigin="anonymous"></script>
-</head>
+  </head>
+
   <body>
+    <!-- Instant splash — visible before any JS runs -->
+    <div id="app-splash">
+      <div class="splash-logo">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+        </svg>
+      </div>
+      <div class="splash-title">Bilty Book</div>
+      <div class="splash-sub">Logistics Manager</div>
+      <div class="splash-spinner"></div>
+    </div>
+
     <div id="root"></div>
     <div id="print-root"></div>
+
+    <!-- Main app bundle (Vite handles everything) -->
     <script type="module" src="/index.tsx"></script>
+
+    <!-- AdSense loads AFTER the app — doesn't block render -->
+    <script>
+      window.addEventListener('load', function() {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-app-pub-2742543836663851';
+        s.crossOrigin = 'anonymous';
+        document.body.appendChild(s);
+      });
+    </script>
   </body>
 </html>

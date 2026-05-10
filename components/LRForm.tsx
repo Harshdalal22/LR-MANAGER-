@@ -208,7 +208,9 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         // C Note No (lrNo) is now a required manual field
         if (!formData.lrNo || !formData.truckNo || !formData.fromPlace || !formData.toPlace || !formData.consignor.name || !formData.consignee.name) {
@@ -216,13 +218,20 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
             return;
         }
         
-        // Clear draft when successfully saved
-        if (!existingLR) {
-            localStorage.removeItem('lr_draft_data');
-            localStorage.removeItem('lr_draft_billing');
+        setIsSaving(true);
+        try {
+            // Clear draft when successfully saved
+            if (!existingLR) {
+                localStorage.removeItem('lr_draft_data');
+                localStorage.removeItem('lr_draft_billing');
+            }
+            
+            await onSave(formData);
+        } catch (error) {
+            console.error("Save error:", error);
+        } finally {
+            setIsSaving(false);
         }
-        
-        onSave(formData);
     };
 
     const handleCreateNew = () => {
@@ -534,8 +543,22 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6"><label className={labelClass}>{t[language].remark}</label><textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter remarks..." className={`${inputClass} h-24`}></textarea></div>
 
                     <div className="flex flex-col sm:flex-row sm:justify-center gap-4 pt-6 mt-4 border-t">
-                        <button type="submit" className="w-full sm:w-auto bg-ssk-blue text-white px-8 py-2.5 rounded-md hover:bg-blue-800 font-bold text-base shadow-md transition-transform transform hover:scale-105">
-                            {existingLR ? t[language].updateLR : t[language].saveLR}
+                        <button 
+                            type="submit" 
+                            disabled={isSaving}
+                            className={`w-full sm:w-auto bg-ssk-blue text-white px-8 py-2.5 rounded-md hover:bg-blue-800 font-bold text-base shadow-md transition-all transform ${isSaving ? 'opacity-70 cursor-not-allowed scale-95' : 'hover:scale-105'}`}
+                        >
+                            {isSaving ? (
+                                <span className="flex items-center">
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Saving...
+                                </span>
+                            ) : (
+                                existingLR ? t[language].updateLR : t[language].saveLR
+                            )}
                         </button>
                         <button type="button" onClick={() => setShowPreviewModal(true)} className="w-full sm:w-auto bg-gray-600 text-white px-8 py-2.5 rounded-md hover:bg-gray-700 font-bold text-base shadow-md transition-transform transform hover:scale-105">
                             {t[language].preview}

@@ -111,10 +111,25 @@ const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
 
 const getSupabase = () => supabase;
 
+let cachedUserId: string | null = null;
+
 export const getEffectiveUserId = async () => {
+    // Return cached ID if available to speed up repeated operations
+    if (cachedUserId) {
+        // If Operator, check for adminId in session
+        const role = sessionStorage.getItem('currentRole');
+        if (role === 'Operator') {
+            const adminId = sessionStorage.getItem('adminId');
+            if (adminId) return adminId;
+        }
+        return cachedUserId;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated");
     
+    cachedUserId = user.id;
+
     // If the current role is Operator, use the admin's ID
     const role = sessionStorage.getItem('currentRole');
     if (role === 'Operator') {
@@ -230,6 +245,7 @@ export const signInWithGoogle = async () => {
 };
 
 export const signOut = async () => {
+    cachedUserId = null;
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
 };

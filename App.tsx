@@ -90,6 +90,7 @@ const App: React.FC = () => {
     const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
     const [viewHistory, setViewHistory] = useState<View[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isDataLoading, setIsDataLoading] = useState(false);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
     const [language, setLanguage] = useState<Language>('en');
     const [isPasswordResetting, setIsPasswordResetting] = useState(false);
@@ -272,7 +273,7 @@ const App: React.FC = () => {
             setIsLoading(false);
             return;
         }
-        setIsLoading(true);
+        setIsDataLoading(true);
         try {
             const [lrs, company, parties, trucks] = await Promise.all([
                 getLorryReceipts(),
@@ -287,7 +288,7 @@ const App: React.FC = () => {
         } catch (error) {
             handleError(error, "Failed to load data");
         } finally {
-            setIsLoading(false);
+            setIsDataLoading(false);
         }
     };
 

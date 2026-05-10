@@ -44,37 +44,55 @@ ALTER TABLE public.lorry_receipts ALTER COLUMN "ewayExDate" DROP NOT NULL;
 ALTER TABLE public.lorry_receipts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own LRs" ON public.lorry_receipts;
 CREATE POLICY "Users can manage their own LRs" ON public.lorry_receipts FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.lorry_receipts.user_id)
+);
 
 -- Table: company_details
 ALTER TABLE public.company_details ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own company details" ON public.company_details;
 CREATE POLICY "Users can manage their own company details" ON public.company_details FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.company_details.user_id)
+);
 
 -- Table: saved_parties
 ALTER TABLE public.saved_parties ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own saved parties" ON public.saved_parties;
 CREATE POLICY "Users can manage their own saved parties" ON public.saved_parties FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.saved_parties.user_id)
+);
 
 -- Table: saved_trucks
 ALTER TABLE public.saved_trucks ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own saved trucks" ON public.saved_trucks;
 CREATE POLICY "Users can manage their own saved trucks" ON public.saved_trucks FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.saved_trucks.user_id)
+);
 
 -- Table: vehicle_hirings
 ALTER TABLE public.vehicle_hirings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own vehicle hirings" ON public.vehicle_hirings;
 CREATE POLICY "Users can manage their own vehicle hirings" ON public.vehicle_hirings FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.vehicle_hirings.user_id)
+);
 
 -- Table: booking_registers
 ALTER TABLE public.booking_registers ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can manage their own booking records" ON public.booking_registers;
 CREATE POLICY "Users can manage their own booking records" ON public.booking_registers FOR ALL
-USING (auth.uid() = user_id);
+USING (
+    auth.uid() = user_id OR 
+    EXISTS (SELECT 1 FROM public.app_users WHERE operator_id = auth.uid() AND admin_id = public.booking_registers.user_id)
+);
 
 
 -- === STEP 3: REFRESH SCHEMA CACHE ===
@@ -474,8 +492,11 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     });
 
     numericFields.forEach(field => {
-        if (sanitizedRest[field] === '' || sanitizedRest[field] === undefined) {
+        if (sanitizedRest[field] === '' || sanitizedRest[field] === undefined || sanitizedRest[field] === null) {
             sanitizedRest[field] = 0;
+        } else {
+            // Explicitly cast to Number to ensure DB compatibility
+            sanitizedRest[field] = Number(sanitizedRest[field]) || 0;
         }
     });
 

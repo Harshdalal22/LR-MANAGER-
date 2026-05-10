@@ -211,17 +211,17 @@ const Header: React.FC<HeaderProps> = ({
                         </button>
                     </div>
 
-                    {userEmail && (
-                        <div className="flex items-center gap-2 sm:gap-4">
-                            <span className="hidden md:inline-block text-sm font-medium">{userEmail}</span>
+                    <div className="flex items-center gap-2 sm:gap-4">
+                        {userEmail && <span className="hidden md:inline-block text-sm font-medium">{userEmail}</span>}
+                        {onSignOut && (
                             <button
                                 onClick={onSignOut}
                                 className="bg-ssk-red text-white px-2 py-1 sm:px-3 sm:py-1.5 rounded text-[10px] sm:text-sm font-semibold hover:bg-red-700 transition-colors whitespace-nowrap"
                             >
-                                Out
+                                Sign Out
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                     {!isOperator && (
                         <div className="flex gap-1 sm:gap-2">
                             {currentRole === 'Admin' && onOpenAdminPanel && (

@@ -1,13 +1,9 @@
-
-
-import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice, LedgerStatement } from '../types';
-
 /* 
 ================================================================================
  🛠️ COMPLETE DATABASE FIX SCRIPT (FIXES SCHEMA & 403 PERMISSION ERRORS)
 ================================================================================
- Copy and run this ENTIRE script in your Supabase SQL Editor.
+ Copy and run everything BELOW this line in your Supabase SQL Editor.
+ Do NOT include the 'import' lines or '*/' characters.
 ================================================================================
 
 -- === STEP 1: ADD/FIX COLUMNS & CONSTRAINTS ===
@@ -114,6 +110,9 @@ CREATE POLICY "Auth Uploads" ON storage.objects FOR INSERT TO authenticated WITH
 
 ================================================================================
 */
+
+import { createClient, Session, Subscription } from '@supabase/supabase-js';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice, LedgerStatement } from '../types';
 
 // ⚠️ IMPORTANT: Replace these with YOUR Supabase project details!
 // You can find these in your Supabase Dashboard -> Settings -> API

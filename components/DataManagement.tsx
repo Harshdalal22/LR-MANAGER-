@@ -3,14 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { DashboardIcon, CheckCircleIcon, SearchIcon, PlusIcon, DownloadIcon, UploadIcon, PrintIcon, PencilIcon, TrashIcon, DocumentTextIcon, ArrowLeftIcon, XIcon } from './icons';
 import { toast } from 'react-hot-toast';
 import {
-    getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks, getRegisterEntries, getCompanyDetails,
+    getVehicleHirings, getBookingRecords, getSavedParties, getSavedTrucks, getRegisterEntries,
     deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck, deleteRegisterEntry,
     saveVehicleHiring, saveBookingRecord, saveSavedParty, saveSavedTruck, saveRegisterEntry
 } from '../services/supabaseService';
-import { VehicleHiring, BookingRecord, SavedParty, SavedTruck, RegisterEntry, CompanyDetails } from '../types';
+import { VehicleHiring, BookingRecord, SavedParty, SavedTruck, RegisterEntry } from '../types';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 interface DataManagementProps {
     onBack: () => void;
@@ -41,13 +39,6 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, in
     const [filterMonth, setFilterMonth] = useState('');
     const [filterParty, setFilterParty] = useState('');
     const [filterGR, setFilterGR] = useState('');
-
-    // Ledger States
-    const [ledgerDateFrom, setLedgerDateFrom] = useState('');
-    const [ledgerDateTo, setLedgerDateTo] = useState('');
-    const [ledgerParty, setLedgerParty] = useState('');
-
-    const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
 
     // SQL Script State
     const [copied, setCopied] = useState(false);
@@ -230,10 +221,6 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
     const fetchData = async () => {
         setIsLoading(true);
         try {
-            // Fetch company details for reports
-            const details = await getCompanyDetails();
-            setCompanyDetails(details);
-
             switch (activeTab) {
                 case 'vehicle-hiring':
                     setHirings(await getVehicleHirings());
@@ -708,157 +695,6 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         }
     };
 
-    const handleDownloadLedgerPDF = () => {
-        if (!ledgerParty) {
-            toast.error("Please select a party first");
-            return;
-        }
-
-        const filtered = registers.filter(r => {
-            const matchesParty = r.party_tpt && r.party_tpt.toLowerCase().includes(ledgerParty.toLowerCase());
-            const matchesDateFrom = !ledgerDateFrom || (r.date && r.date >= ledgerDateFrom);
-            const matchesDateTo = !ledgerDateTo || (r.date && r.date <= ledgerDateTo);
-            return matchesParty && matchesDateFrom && matchesDateTo;
-        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-        if (filtered.length === 0) {
-            toast.error("No records found for the selected party and date range");
-            return;
-        }
-
-        const doc = new jsPDF('p', 'mm', 'a4');
-        const pageWidth = doc.internal.pageSize.width;
-        
-        // --- Header Section ---
-        doc.setFontSize(22);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(0, 51, 153); // Deep Blue
-        doc.text(companyDetails?.name || "Our Company", pageWidth / 2, 20, { align: 'center' });
-        
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(80);
-        doc.text(companyDetails?.address || "", pageWidth / 2, 26, { align: 'center' });
-        doc.text(`Email: ${companyDetails?.email || ""} | Contact: ${companyDetails?.contact?.join(", ") || ""}`, pageWidth / 2, 31, { align: 'center' });
-        if (companyDetails?.gstn) doc.text(`GSTIN: ${companyDetails.gstn}`, pageWidth / 2, 36, { align: 'center' });
-
-        doc.setDrawColor(0, 51, 153);
-        doc.setLineWidth(0.5);
-        doc.line(10, 40, pageWidth - 10, 40);
-
-        // --- Party Details Section ---
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(33, 33, 33);
-        doc.text(ledgerParty.toUpperCase(), 15, 50);
-        
-        doc.setFontSize(11);
-        doc.setTextColor(100);
-        doc.text("Ledger Account", pageWidth - 15, 50, { align: 'right' });
-        
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.text(`Period: ${ledgerDateFrom ? new Date(ledgerDateFrom).toLocaleDateString('en-GB') : 'Start'} to ${ledgerDateTo ? new Date(ledgerDateTo).toLocaleDateString('en-GB') : 'End'}`, 15, 56);
-
-        // --- Table Data Preparation ---
-        const tableRows: any[] = [];
-        let totalDebit = 0;
-        let totalCredit = 0;
-
-        filtered.forEach(r => {
-            const date = r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-';
-            
-            // Debit Entry (Sale)
-            const debitAmt = (Number(r.party_fare) || 0) + (Number(r.other_exp) || 0);
-            if (debitAmt > 0) {
-                tableRows.push([
-                    date,
-                    `GR No: ${r.gr_no || '-'} (${r.from_loc || '-'} to ${r.to_loc || '-'})`,
-                    "GST SALE",
-                    r.gr_no || '-',
-                    debitAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-                    ""
-                ]);
-                totalDebit += debitAmt;
-            }
-
-            // Credit Entry (Advance)
-            const creditAmt = Number(r.party_advance) || 0;
-            if (creditAmt > 0) {
-                tableRows.push([
-                    date,
-                    "Advance Received / Payment",
-                    "RECEIPT",
-                    r.gr_no || '-',
-                    "",
-                    creditAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                ]);
-                totalCredit += creditAmt;
-            }
-        });
-
-        const closingBalance = totalDebit - totalCredit;
-
-        // --- Table Section ---
-        autoTable(doc, {
-            startY: 62,
-            head: [['Date', 'Particulars', 'Vch Type', 'Vch No', 'Debit', 'Credit']],
-            body: tableRows,
-            theme: 'grid',
-            headStyles: { fillColor: [0, 51, 153], textColor: 255, fontSize: 9, halign: 'center', cellPadding: 3 },
-            bodyStyles: { fontSize: 8, textColor: 40, cellPadding: 2 },
-            columnStyles: {
-                0: { cellWidth: 22 },
-                1: { cellWidth: 'auto' },
-                2: { cellWidth: 22, halign: 'center' },
-                3: { cellWidth: 22, halign: 'center' },
-                4: { cellWidth: 28, halign: 'right' },
-                5: { cellWidth: 28, halign: 'right' },
-            },
-            margin: { top: 10, left: 10, right: 10 },
-            styles: { font: 'helvetica' }
-        });
-
-        // --- Summary Section ---
-        const finalY = (doc as any).lastAutoTable.finalY + 10;
-        
-        // Prevent summary from flowing off page
-        if (finalY > 260) {
-            doc.addPage();
-            // Reset Y for new page
-        }
-
-        const summaryY = finalY > 260 ? 20 : finalY;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        
-        doc.text("Total Debit:", pageWidth - 80, summaryY);
-        doc.text(totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2 }), pageWidth - 15, summaryY, { align: 'right' });
-        
-        doc.text("Total Credit:", pageWidth - 80, summaryY + 7);
-        doc.text(totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2 }), pageWidth - 15, summaryY + 7, { align: 'right' });
-
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.2);
-        doc.line(pageWidth - 85, summaryY + 10, pageWidth - 10, summaryY + 10);
-
-        doc.setFontSize(12);
-        doc.text("Closing Balance:", pageWidth - 80, summaryY + 18);
-        doc.setTextColor(closingBalance > 0 ? [192, 57, 43] : [39, 174, 96]); // Red if Dr, Green if Cr
-        doc.text(`${Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })} ${closingBalance >= 0 ? 'Dr' : 'Cr'}`, pageWidth - 15, summaryY + 18, { align: 'right' });
-
-        // Footer
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.setFont("helvetica", "italic");
-        doc.text("Generated by SSK Logistics Management System", 15, 285);
-        doc.text(`Date: ${new Date().toLocaleString()}`, pageWidth - 15, 285, { align: 'right' });
-
-        doc.save(`Ledger_${ledgerParty.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
-        toast.success("Ledger PDF downloaded successfully!");
-    };
-
     const renderTableContent = () => {
         if (isLoading) return <div className="p-8 text-center text-gray-500">Loading data...</div>;
 
@@ -1031,80 +867,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             });
 
             return (
-                <div className="space-y-6">
-                    {/* Ledger Export Section */}
-                    <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 space-y-4 shadow-sm">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
-                                    <DownloadIcon className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-bold text-blue-900 uppercase tracking-widest">Party Ledger Report</h3>
-                                    <p className="text-[10px] text-blue-600 font-semibold">Generate professionally formatted A4 PDF reports for parties</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
-                                    Select Party
-                                </label>
-                                <select 
-                                    value={ledgerParty}
-                                    onChange={(e) => setLedgerParty(e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-xl border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm font-medium"
-                                >
-                                    <option value="">-- Choose Party --</option>
-                                    {[...new Set(registers.map(r => r.party_tpt).filter(Boolean))].sort().map(p => (
-                                        <option key={p} value={p}>{p}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                                    From Date
-                                </label>
-                                <input 
-                                    type="date" 
-                                    value={ledgerDateFrom}
-                                    onChange={(e) => setLedgerDateFrom(e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-xl border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm font-medium"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-                                    To Date
-                                </label>
-                                <input 
-                                    type="date" 
-                                    value={ledgerDateTo}
-                                    onChange={(e) => setLedgerDateTo(e.target.value)}
-                                    className="w-full text-xs p-2.5 rounded-xl border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm font-medium"
-                                />
-                            </div>
-                            <div className="flex items-end">
-                                <button 
-                                    onClick={handleDownloadLedgerPDF}
-                                    disabled={!ledgerParty}
-                                    className="w-full bg-blue-600 text-white text-xs font-black py-3 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group uppercase tracking-widest"
-                                >
-                                    <PrintIcon className="w-4 h-4 group-hover:scale-125 transition-transform" />
-                                    Download Ledger
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4 pt-4 border-t border-gray-100">
-                        <div className="flex items-center gap-2">
-                            <SearchIcon className="w-4 h-4 text-gray-400" />
-                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Quick Filter Register Data</h3>
-                        </div>
+                <div className="space-y-4">
+                    {/* Filter Bar */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-gray-500 uppercase">Filter by Date</label>
@@ -1268,7 +1032,6 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         </table>
                     </div>
                 </div>
-            </div>
             );
         }
 
@@ -1306,7 +1069,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     { id: 'booking-register', label: 'Booking Register' },
                     { id: 'customer-details', label: 'Customer Details' },
                     { id: 'vehicle-fleet', label: 'Vehicle Fleet' },
-                    { id: 'register-entries', label: 'Ledger / Register' },
+                    { id: 'register-entries', label: 'Register' },
                     { id: 'database-setup', label: 'Database Setup' }
                 ].filter(tab => {
                     if (currentRole === 'Operator') {

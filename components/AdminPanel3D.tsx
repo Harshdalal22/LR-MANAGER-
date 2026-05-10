@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
-import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers } from '../services/supabaseService';
-import { LedgerEntry, LorryReceipt, SavedParty, Voucher } from '../types';
+import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers, getCompanyDetails } from '../services/supabaseService';
+import { LedgerEntry, LorryReceipt, SavedParty, Voucher, CompanyDetails } from '../types';
 import {
     UsersIcon,
     CogIcon,
@@ -327,6 +327,10 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
     const [allVouchers, setAllVouchers] = useState<Voucher[]>([]);
     const [partyList, setPartyList] = useState<string[]>([]);
     const [selectedPartyLedger, setSelectedPartyLedger] = useState<string>('');
+    const [ledgerFromDate, setLedgerFromDate] = useState<string>('');
+    const [ledgerToDate, setLedgerToDate] = useState<string>('');
+    const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
+    const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
 
     const fetchOperators = async () => {
         setIsLoadingUsers(true);
@@ -372,15 +376,19 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
     const fetchLedgerData = async () => {
         try {
-            const [data, lrs, vouchers, parties] = await Promise.all([
+            const [data, lrs, vouchers, parties, company] = await Promise.all([
                 getLedgerEntries(),
                 getLorryReceipts(),
                 getVouchers(),
-                getSavedParties()
+                getSavedParties(),
+                getCompanyDetails()
             ]);
             setLedgerEntries(data);
             setAllLRs(lrs);
             setAllVouchers(vouchers);
+            setSavedParties(parties);
+            setCompanyDetails(company);
+
             // Build unique party name list from LRs + vouchers + saved parties
             const namesFromLRs = lrs.flatMap(lr => [lr.consignor?.name, lr.consignee?.name, lr.billingTo?.name].filter(Boolean) as string[]);
             const namesFromVouchers = vouchers.map(v => v.party_name).filter(Boolean) as string[];
@@ -904,9 +912,18 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                         allLRs
                             .filter(lr => lr.isInvoiceGenerated && lr.invoiceNo)
                             .filter(lr => {
-                                if (selectedPartyLedger === 'ALL') return true;
-                                const billedToName = lr.billingTo?.name || lr.consignor?.name;
-                                return billedToName === selectedPartyLedger;
+                                // Party filter
+                                if (selectedPartyLedger !== 'ALL') {
+                                    const billedToName = lr.billingTo?.name || lr.consignor?.name;
+                                    if (billedToName !== selectedPartyLedger) return false;
+                                }
+                                
+                                // Date range filter
+                                const lrDate = new Date(lr.invoiceDate || lr.date).getTime();
+                                if (ledgerFromDate && lrDate < new Date(ledgerFromDate).getTime()) return false;
+                                if (ledgerToDate && lrDate > new Date(ledgerToDate).getTime()) return false;
+                                
+                                return true;
                             })
                             .forEach(lr => {
                                 const invNo = lr.invoiceNo as string;
@@ -942,7 +959,17 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                         // Vouchers → Debit rows
                         allVouchers
-                            .filter(v => selectedPartyLedger === 'ALL' ? true : v.party_name === selectedPartyLedger)
+                            .filter(v => {
+                                // Party filter
+                                if (selectedPartyLedger !== 'ALL' && v.party_name !== selectedPartyLedger) return false;
+                                
+                                // Date range filter
+                                const vDate = new Date(v.date).getTime();
+                                if (ledgerFromDate && vDate < new Date(ledgerFromDate).getTime()) return false;
+                                if (ledgerToDate && vDate > new Date(ledgerToDate).getTime()) return false;
+                                
+                                return true;
+                            })
                             .forEach(v => {
                                 partyRows.push({
                                     date: v.date,
@@ -973,19 +1000,75 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                     const handleExportPDF = () => {
                         import('jspdf').then(({ default: jsPDF }) => {
                             import('jspdf-autotable').then(({ default: autoTable }) => {
-                                const doc = new jsPDF();
+                                const doc = new jsPDF('p', 'mm', 'a4');
+                                const pageWidth = doc.internal.pageSize.getWidth();
                                 
-                                // Header
-                                doc.setFontSize(18);
-                                doc.text(`Ledger Statement: ${selectedPartyLedger}`, 14, 22);
+                                // --- 1. Company Header ---
+                                if (companyDetails) {
+                                    doc.setFontSize(22);
+                                    doc.setFont('helvetica', 'bold');
+                                    doc.setTextColor(41, 128, 185); // Blue
+                                    doc.text(companyDetails.name.toUpperCase(), pageWidth / 2, 20, { align: 'center' });
+                                    
+                                    doc.setFontSize(10);
+                                    doc.setFont('helvetica', 'normal');
+                                    doc.setTextColor(60, 60, 60);
+                                    doc.text(companyDetails.address || '', pageWidth / 2, 26, { align: 'center' });
+                                    
+                                    const detailsLine = [
+                                        companyDetails.mobile ? `Mob: ${companyDetails.mobile}` : '',
+                                        companyDetails.email ? `Email: ${companyDetails.email}` : '',
+                                        companyDetails.gstNo ? `GST: ${companyDetails.gstNo}` : ''
+                                    ].filter(Boolean).join('  |  ');
+                                    
+                                    doc.text(detailsLine, pageWidth / 2, 31, { align: 'center' });
+                                    
+                                    doc.setDrawColor(41, 128, 185);
+                                    doc.setLineWidth(0.5);
+                                    doc.line(14, 35, pageWidth - 14, 35);
+                                }
+
+                                // --- 2. Party & Statement Details ---
+                                doc.setFontSize(14);
+                                doc.setFont('helvetica', 'bold');
+                                doc.setTextColor(0, 0, 0);
+                                doc.text("LEDGER STATEMENT", 14, 45);
+                                
+                                doc.setFontSize(10);
+                                doc.text(`Party: ${selectedPartyLedger}`, 14, 52);
+                                
+                                const partyObj = savedParties.find(p => p.name === selectedPartyLedger);
+                                if (partyObj && partyObj.address) {
+                                    doc.setFont('helvetica', 'normal');
+                                    doc.text(`Address: ${partyObj.address}`, 14, 57, { maxWidth: pageWidth / 2 });
+                                }
+
+                                doc.setFont('helvetica', 'bold');
+                                doc.text("Statement Period:", pageWidth - 14, 52, { align: 'right' });
+                                doc.setFont('helvetica', 'normal');
+                                const dateRange = `${ledgerFromDate || 'Start'} to ${ledgerToDate || 'End'}`;
+                                doc.text(dateRange, pageWidth - 14, 57, { align: 'right' });
+
+                                // --- 3. Summary Box ---
+                                doc.setDrawColor(200);
+                                doc.setFillColor(245, 245, 245);
+                                doc.roundedRect(14, 65, pageWidth - 28, 15, 2, 2, 'FD');
+                                
+                                doc.setFontSize(9);
+                                doc.setFont('helvetica', 'bold');
+                                doc.text("Total Credit", 25, 71);
+                                doc.text("Total Debit", pageWidth / 2, 71, { align: 'center' });
+                                doc.text("Net Balance", pageWidth - 25, 71, { align: 'right' });
                                 
                                 doc.setFontSize(11);
-                                doc.setTextColor(100);
-                                doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, 14, 30);
-                                doc.text(`Total Credit: Rs. ${totalCredit.toLocaleString('en-IN')}`, 14, 38);
-                                doc.text(`Total Debit: Rs. ${totalDebit.toLocaleString('en-IN')}`, 14, 44);
-                                doc.text(`Net Balance: Rs. ${totalBalance.toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, 14, 50);
+                                doc.setTextColor(39, 174, 96); // Green
+                                doc.text(`Rs. ${totalCredit.toLocaleString('en-IN')}`, 25, 77);
+                                doc.setTextColor(192, 57, 43); // Red
+                                doc.text(`Rs. ${totalDebit.toLocaleString('en-IN')}`, pageWidth / 2, 77, { align: 'center' });
+                                doc.setTextColor(totalBalance >= 0 ? 41 : 192, totalBalance >= 0 ? 128 : 57, totalBalance >= 0 ? 185 : 43);
+                                doc.text(`Rs. ${Math.abs(totalBalance).toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, pageWidth - 25, 77, { align: 'right' });
 
+                                // --- 4. Ledger Table ---
                                 const tableColumn = ["Date", "Type", "Ref No.", "Description", "Credit", "Debit", "Balance"];
                                 const tableRows = rowsWithBalance.map(row => [
                                     new Date(row.date).toLocaleDateString('en-GB'),
@@ -1000,11 +1083,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 autoTable(doc, {
                                     head: [tableColumn],
                                     body: tableRows,
-                                    startY: 55,
+                                    startY: 85,
                                     theme: 'grid',
-                                    styles: { fontSize: 8, cellPadding: 2 },
-                                    headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-                                    alternateRowStyles: { fillColor: [245, 245, 245] },
+                                    styles: { fontSize: 8, cellPadding: 2, font: 'helvetica' },
+                                    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
+                                    alternateRowStyles: { fillColor: [248, 249, 250] },
+                                    columnStyles: {
+                                        4: { halign: 'right' },
+                                        5: { halign: 'right' },
+                                        6: { halign: 'right', fontStyle: 'bold' }
+                                    }
                                 });
 
                                 doc.save(`Ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}.pdf`);
@@ -1015,30 +1103,64 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
 
                     return (
                         <div className="space-y-6 animate-fadeIn">
-                            {/* Party Selector */}
+                            {/* Party Selector *                            {/* Party Selector & Filters */}
                             <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
                                 <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
                                     <UserIcon className="w-6 h-6 text-blue-400" />
-                                    Party Ledger — Select a Party
+                                    Ledger Filters
                                 </h2>
-                                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                                    <select
-                                        value={selectedPartyLedger}
-                                        onChange={e => setSelectedPartyLedger(e.target.value)}
-                                        className="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium"
-                                    >
-                                        <option value="" className="text-gray-900">— Select Party to View Ledger —</option>
-                                        <option value="ALL" className="text-gray-900 font-bold bg-blue-100">ALL PARTIES (COMBINED LEDGER)</option>
-                                        {partyList.map(p => (
-                                            <option key={p} value={p} className="text-gray-900">{p}</option>
-                                        ))}
-                                    </select>
-                                    {selectedPartyLedger && (
+                                <div className="flex flex-col lg:flex-row gap-4 items-end">
+                                    <div className="flex-1 w-full">
+                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">Select Party</label>
+                                        <select
+                                            value={selectedPartyLedger}
+                                            onChange={e => setSelectedPartyLedger(e.target.value)}
+                                            className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium transition-all hover:bg-white/15"
+                                        >
+                                            <option value="" className="text-gray-900">— Select Party to View Ledger —</option>
+                                            <option value="ALL" className="text-gray-900 font-bold bg-blue-100">ALL PARTIES (COMBINED LEDGER)</option>
+                                            {partyList.map(p => (
+                                                <option key={p} value={p} className="text-gray-900">{p}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="w-full lg:w-48">
+                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">From Date</label>
+                                        <div className="relative">
+                                            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                                            <input 
+                                                type="date"
+                                                value={ledgerFromDate}
+                                                onChange={e => setLedgerFromDate(e.target.value)}
+                                                className="w-full bg-white/10 border border-white/20 text-white rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all hover:bg-white/15"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full lg:w-48">
+                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">To Date</label>
+                                        <div className="relative">
+                                            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
+                                            <input 
+                                                type="date"
+                                                value={ledgerToDate}
+                                                onChange={e => setLedgerToDate(e.target.value)}
+                                                className="w-full bg-white/10 border border-white/20 text-white rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all hover:bg-white/15"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 w-full lg:w-auto">
                                         <button
-                                            onClick={() => setSelectedPartyLedger('')}
-                                            className="px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-gray-300 hover:bg-white/20 transition text-sm"
-                                        >Clear</button>
-                                    )}
+                                            onClick={() => {
+                                                setSelectedPartyLedger('');
+                                                setLedgerFromDate('');
+                                                setLedgerToDate('');
+                                            }}
+                                            className="flex-1 lg:flex-none px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:bg-white/10 hover:text-white transition text-sm font-bold"
+                                        >Reset</button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1065,9 +1187,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     {/* Ledger Table */}
                                     <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
                                         <div className="flex justify-between items-center mb-5">
-                                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                                <DocumentTextIcon className="w-6 h-6 text-blue-400" />
-                                                Ledger for: <span className="text-blue-300 ml-1">{selectedPartyLedger}</span>
+                                            <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <DocumentTextIcon className="w-6 h-6 text-blue-400" />
+                                                    Ledger for: <span className="text-blue-300">{selectedPartyLedger}</span>
+                                                </div>
+                                                {(ledgerFromDate || ledgerToDate) && (
+                                                    <span className="text-xs font-normal text-gray-400 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
+                                                        Period: {ledgerFromDate || '...'} to {ledgerToDate || '...'}
+                                                    </span>
+                                                )}
                                             </h2>
                                             <button 
                                                 onClick={handleExportPDF}

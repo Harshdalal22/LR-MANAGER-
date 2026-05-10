@@ -1036,65 +1036,73 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                     
                                     if (companyDetails.gstNo) {
                                         doc.setFont('helvetica', 'bold');
-                                        doc.text(`GST NO: ${companyDetails.gstNo}`, pageWidth / 2, 35, { align: 'center' });
+                                        doc.setTextColor(41, 128, 185); // Blue
+                                        doc.text(`GST NO: ${companyDetails.gstNo}`, pageWidth / 2, 36, { align: 'center' });
                                         doc.setFont('helvetica', 'normal');
+                                        doc.setTextColor(60, 60, 60);
                                     }
                                     
                                     doc.setDrawColor(41, 128, 185);
                                     doc.setLineWidth(0.5);
-                                    doc.line(14, 38, pageWidth - 14, 38);
+                                    doc.line(14, 40, pageWidth - 14, 40);
                                 }
 
                                 // --- 2. Party & Statement Details ---
                                 doc.setFontSize(16);
                                 doc.setFont('helvetica', 'bold');
                                 doc.setTextColor(0, 0, 0);
-                                doc.text("STATEMENT", 14, 45);
+                                doc.text("STATEMENT", 14, 48);
                                 
                                 doc.setFontSize(10);
-                                doc.text(`Party: ${selectedPartyLedger}`, 14, 52);
+                                doc.text(`Party: ${selectedPartyLedger}`, 14, 55);
                                 
                                 const partyObj = savedParties.find(p => p.name === selectedPartyLedger);
+                                let currentY = 60;
                                 if (partyObj) {
                                     doc.setFont('helvetica', 'normal');
-                                    let currentY = 57;
                                     if (partyObj.address) {
-                                        doc.text(`Address: ${partyObj.address}`, 14, currentY, { maxWidth: pageWidth / 2 + 20 });
-                                        currentY += 6;
+                                        const addressText = `Address: ${partyObj.address}`;
+                                        const splitAddress = doc.splitTextToSize(addressText, pageWidth / 2 + 20);
+                                        doc.text(splitAddress, 14, currentY);
+                                        currentY += (splitAddress.length * 5) + 2;
                                     }
                                     if (partyObj.gst) {
                                         doc.setFont('helvetica', 'bold');
                                         doc.text(`GST: ${partyObj.gst}`, 14, currentY);
                                         doc.setFont('helvetica', 'normal');
+                                        currentY += 8;
                                     }
                                 }
 
                                 doc.setFont('helvetica', 'bold');
-                                doc.text("Statement Period:", pageWidth - 14, 52, { align: 'right' });
+                                doc.text("Statement Period:", pageWidth - 14, 55, { align: 'right' });
                                 doc.setFont('helvetica', 'normal');
                                 const dateRange = `${ledgerFromDate || 'Start'} to ${ledgerToDate || 'End'}`;
-                                doc.text(dateRange, pageWidth - 14, 57, { align: 'right' });
+                                doc.text(dateRange, pageWidth - 14, 60, { align: 'right' });
 
                                 // --- 3. Summary Box ---
                                 doc.setDrawColor(200);
                                 doc.setFillColor(245, 245, 245);
-                                doc.roundedRect(14, 65, pageWidth - 28, 15, 2, 2, 'FD');
+                                // Ensure summary box doesn't overlap with party details if address is long
+                                const summaryBoxY = Math.max(70, currentY);
+                                doc.roundedRect(14, summaryBoxY, pageWidth - 28, 15, 2, 2, 'FD');
                                 
                                 doc.setFontSize(9);
                                 doc.setFont('helvetica', 'bold');
-                                doc.text("Total Credit", 25, 71);
-                                doc.text("Total Debit", pageWidth / 2, 71, { align: 'center' });
-                                doc.text("Net Balance", pageWidth - 25, 71, { align: 'right' });
+                                doc.text("Total Credit", 25, summaryBoxY + 6);
+                                doc.text("Total Debit", pageWidth / 2, summaryBoxY + 6, { align: 'center' });
+                                doc.text("Net Balance", pageWidth - 25, summaryBoxY + 6, { align: 'right' });
                                 
                                 doc.setFontSize(11);
                                 doc.setTextColor(39, 174, 96); // Green
-                                doc.text(`Rs. ${totalCredit.toLocaleString('en-IN')}`, 25, 77);
+                                doc.text(`Rs. ${totalCredit.toLocaleString('en-IN')}`, 25, summaryBoxY + 12);
                                 doc.setTextColor(192, 57, 43); // Red
-                                doc.text(`Rs. ${totalDebit.toLocaleString('en-IN')}`, pageWidth / 2, 77, { align: 'center' });
+                                doc.text(`Rs. ${totalDebit.toLocaleString('en-IN')}`, pageWidth / 2, summaryBoxY + 12, { align: 'center' });
                                 doc.setTextColor(totalBalance >= 0 ? 41 : 192, totalBalance >= 0 ? 128 : 57, totalBalance >= 0 ? 185 : 43);
-                                doc.text(`Rs. ${Math.abs(totalBalance).toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, pageWidth - 25, 77, { align: 'right' });
+                                doc.text(`Rs. ${Math.abs(totalBalance).toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, pageWidth - 25, summaryBoxY + 12, { align: 'right' });
 
                                 // --- 4. Ledger Table ---
+                                const tableStartY = summaryBoxY + 20;
                                 const tableColumn = ["Date", "Type", "Ref No.", "Description", "Credit", "Debit", "Balance"];
                                 const tableRows = rowsWithBalance.map(row => [
                                     new Date(row.date).toLocaleDateString('en-GB'),
@@ -1109,7 +1117,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                                 autoTable(doc, {
                                     head: [tableColumn],
                                     body: tableRows,
-                                    startY: 85,
+                                    startY: tableStartY,
                                     theme: 'grid',
                                     styles: { fontSize: 8, cellPadding: 2, font: 'helvetica' },
                                     headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },

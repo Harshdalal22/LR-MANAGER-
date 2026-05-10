@@ -18,32 +18,6 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      },
-      build: {
-        // Increase chunk size limit warning
-        chunkSizeWarningLimit: 1000,
-        rollupOptions: {
-          output: {
-            // Split vendor libraries into separate cached chunks
-            manualChunks(id) {
-              if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
-                return 'react-vendor';
-              }
-              if (id.includes('node_modules/@supabase')) {
-                return 'supabase-vendor';
-              }
-              if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) {
-                return 'pdf-vendor';
-              }
-              if (id.includes('node_modules/xlsx')) {
-                return 'xlsx-vendor';
-              }
-              if (id.includes('node_modules/@google/genai')) {
-                return 'genai-vendor';
-              }
-            }
-          }
-        }
       }
     };
 });

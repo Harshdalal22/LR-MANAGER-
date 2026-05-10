@@ -24,11 +24,13 @@ const Auth: React.FC = () => {
             switch (view) {
                 case 'sign_in':
                     await signIn(email, password);
-                    const roleInfo = await checkOperatorRole();
-                    if (roleInfo && !roleInfo.isAdmin) {
-                        sessionStorage.setItem('currentRole', 'Operator');
-                        sessionStorage.setItem('adminId', roleInfo.adminId);
-                        sessionStorage.setItem('roleSelected', 'true'); // Skip role selection
+                    if (email.toLowerCase() !== 'gps@ssk.com') {
+                        const roleInfo = await checkOperatorRole();
+                        if (roleInfo && !roleInfo.isAdmin) {
+                            sessionStorage.setItem('currentRole', 'Operator');
+                            sessionStorage.setItem('adminId', roleInfo.adminId);
+                            sessionStorage.setItem('roleSelected', 'true'); // Skip role selection
+                        }
                     }
                     toast.success('Signed in successfully! Redirecting...', { id: toastId });
                     break;
@@ -69,7 +71,10 @@ const Auth: React.FC = () => {
                     });
                     break;
             }
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.message?.includes('signal is aborted') || error?.name === 'AbortError') {
+                return; // Ignore harmless fetch cancellations when unmounting
+            }
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
             toast.error(errorMessage, { id: toastId });
             setWaitingForApproval(false);

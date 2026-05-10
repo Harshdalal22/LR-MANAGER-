@@ -1,42 +1,25 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+
+
+import React, { useState, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { Session, Subscription } from '@supabase/supabase-js';
-
-// ── Eager (needed on first paint) ────────────────────────────────────────────
 import Auth from './components/Auth';
 import Header from './components/Header';
-
-// ── Lazy (loaded only when the user navigates to that screen) ────────────────
-const Dashboard       = lazy(() => import('./components/Dashboard'));
-const LRList          = lazy(() => import('./components/LRList'));
-const LRForm          = lazy(() => import('./components/LRForm'));
-const VehicleHiring   = lazy(() => import('./components/VehicleHiring'));
-const BookingRegister = lazy(() => import('./components/BookingRegister'));
-const DataManagement  = lazy(() => import('./components/DataManagement'));
-const PartyManagement = lazy(() => import('./components/PartyManagement'));
-const TruckManagement = lazy(() => import('./components/TruckManagement'));
-const InvoiceList     = lazy(() => import('./components/InvoiceList'));
-const AdBanner        = lazy(() => import('./components/AdBanner'));
-const PODUploadModal  = lazy(() => import('./components/PODUploadModal'));
-const PasswordResetModal = lazy(() => import('./components/PasswordResetModal'));
-const RoleSelection   = lazy(() => import('./components/RoleSelection'));
-const AdminPanel3D    = lazy(() => import('./components/AdminPanel3D'));
-const GPSPanel        = lazy(() => import('./components/GPSPanel'));
-
-// Minimal spinner shown while a lazy chunk loads
-const ChunkLoader = () => (
-  <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh' }}>
-    <div style={{
-      width: 36, height: 36,
-      border: '3px solid #e2e8f0',
-      borderTopColor: '#1e3a8a',
-      borderRadius: '50%',
-      animation: 'spin 0.7s linear infinite'
-    }} />
-    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-  </div>
-);
-
+import Dashboard from './components/Dashboard';
+import LRList from './components/LRList';
+import LRForm from './components/LRForm';
+import VehicleHiring from './components/VehicleHiring';
+import BookingRegister from './components/BookingRegister';
+import DataManagement from './components/DataManagement';
+import PartyManagement from './components/PartyManagement';
+import TruckManagement from './components/TruckManagement';
+import InvoiceList from './components/InvoiceList';
+import AdBanner from './components/AdBanner';
+import PODUploadModal from './components/PODUploadModal';
+import PasswordResetModal from './components/PasswordResetModal';
+import RoleSelection from './components/RoleSelection';
+import AdminPanel3D from './components/AdminPanel3D';
+import GPSPanel from './components/GPSPanel';
 import {
     LorryReceipt,
     CompanyDetails,
@@ -771,8 +754,11 @@ const App: React.FC = () => {
     };
 
     if (isLoading) {
-        // Splash screen in index.html covers this — return null avoids a flash of unstyled content
-        return null;
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-slate-50">
+                <p className="text-lg font-semibold text-gray-700">Loading Bilty Book...</p>
+            </div>
+        );
     }
 
     if (!session) {
@@ -789,120 +775,116 @@ const App: React.FC = () => {
         return (
             <div className="bg-slate-50 min-h-screen font-sans">
                 <Toaster position="top-center" />
-                <Suspense fallback={<ChunkLoader />}>
-                    <GPSPanel companyDetails={companyDetails} onSignOut={handleSignOut} />
-                </Suspense>
+                <GPSPanel companyDetails={companyDetails} onSignOut={handleSignOut} />
             </div>
         );
     }
 
     return (
-        <Suspense fallback={<ChunkLoader />}>
-            <div className="bg-slate-50 min-h-screen font-sans">
-                <Toaster position="top-center" />
-                <Header
-                    companyDetails={companyDetails}
-                    onUpdateDetails={handleUpdateDetails}
-                    onUploadAsset={handleUploadAsset}
-                    userEmail={session?.user?.email}
-                    onSignOut={handleSignOut}
-                    language={language}
-                    setLanguage={setLanguage}
-                    currentRole={currentRole}
-                    onRoleChange={handleRoleChangeRequest}
-                    onForgotPasskey={handleForgotPasskeyTrigger}
-                    settingsTrigger={headerSettingsTrigger}
-                    isOperator={currentRole === 'Operator'}
-                    onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+        <div className="bg-slate-50 min-h-screen font-sans">
+            <Toaster position="top-center" />
+            <Header
+                companyDetails={companyDetails}
+                onUpdateDetails={handleUpdateDetails}
+                onUploadAsset={handleUploadAsset}
+                userEmail={session?.user?.email}
+                onSignOut={handleSignOut}
+                language={language}
+                setLanguage={setLanguage}
+                currentRole={currentRole}
+                onRoleChange={handleRoleChangeRequest}
+                onForgotPasskey={handleForgotPasskeyTrigger}
+                settingsTrigger={headerSettingsTrigger}
+                isOperator={currentRole === 'Operator'}
+                onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+            />
+            <main className="container mx-auto p-4 md:p-6">
+                {renderContent()}
+                <AdBanner />
+            </main>
+            {uploadingPODFor && (
+                <PODUploadModal
+                    isOpen={!!uploadingPODFor}
+                    onClose={() => setUploadingPODFor(null)}
+                    lr={uploadingPODFor}
+                    onUpload={async (lr, file) => {
+                        try {
+                            const updated = await uploadPOD(file, lr.lrNo);
+                            setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
+                            setUploadingPODFor(null);
+                            toast.success('POD uploaded successfully');
+                        } catch (e) {
+                            handleError(e, "Failed to upload POD");
+                        }
+                    }}
                 />
-                <main className="container mx-auto p-4 md:p-6">
-                    {renderContent()}
-                    <AdBanner />
-                </main>
-                {uploadingPODFor && (
-                    <PODUploadModal
-                        isOpen={!!uploadingPODFor}
-                        onClose={() => setUploadingPODFor(null)}
-                        lr={uploadingPODFor}
-                        onUpload={async (lr, file) => {
-                            try {
-                                const updated = await uploadPOD(file, lr.lrNo);
-                                setLorryReceipts(prev => prev.map(r => r.lrNo === updated.lrNo ? updated : r));
-                                setUploadingPODFor(null);
-                                toast.success('POD uploaded successfully');
-                            } catch (e) {
-                                handleError(e, "Failed to upload POD");
-                            }
-                        }}
-                    />
-                )}
-                {isPasswordResetting && (
-                    <PasswordResetModal
-                        isOpen={isPasswordResetting}
-                        onSubmit={handleUpdatePassword}
-                        onCancel={() => setIsPasswordResetting(false)}
-                    />
-                )}
-                {showRoleSelection && (
-                    <RoleSelection
-                        onRoleSelect={handleRoleSelection}
-                        onCancel={handleCancelRoleSelection}
-                        onForgotPasskey={handleForgotPasskeyTrigger}
-                    />
-                )}
-                {isVerifyPasswordModalOpen && (
-                    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                        <div className="bg-white text-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm font-sans">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <span className="text-2xl">🔒</span>
-                                </div>
-                                <h3 className="text-xl font-bold mb-2 text-gray-800">Verify Identity</h3>
-                                <p className="text-sm text-gray-500">
-                                    To reset your Admin Passkey, please enter your main account password.
-                                </p>
+            )}
+            {isPasswordResetting && (
+                <PasswordResetModal
+                    isOpen={isPasswordResetting}
+                    onSubmit={handleUpdatePassword}
+                    onCancel={() => setIsPasswordResetting(false)}
+                />
+            )}
+            {showRoleSelection && (
+                <RoleSelection
+                    onRoleSelect={handleRoleSelection}
+                    onCancel={handleCancelRoleSelection}
+                    onForgotPasskey={handleForgotPasskeyTrigger}
+                />
+            )}
+            {isVerifyPasswordModalOpen && (
+                <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white text-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm font-sans animate-fadeIn">
+                        <div className="text-center mb-6">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-2xl">🔒</span>
                             </div>
+                            <h3 className="text-xl font-bold mb-2 text-gray-800">Verify Identity</h3>
+                            <p className="text-sm text-gray-500">
+                                To reset your Admin Passkey, please enter your main account password.
+                            </p>
+                        </div>
 
-                            <input
-                                type="password"
-                                autoFocus
-                                placeholder="Account Password"
-                                value={passwordForVerification}
-                                onChange={(e) => setPasswordForVerification(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleVerifyPassword()}
-                                className="w-full p-3 border-2 border-gray-200 rounded-lg mb-6 text-center text-lg"
-                            />
+                        <input
+                            type="password"
+                            autoFocus
+                            placeholder="Account Password"
+                            value={passwordForVerification}
+                            onChange={(e) => setPasswordForVerification(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleVerifyPassword()}
+                            className="w-full p-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:ring-0 mb-6 text-center text-lg"
+                        />
 
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => {
-                                        setIsVerifyPasswordModalOpen(false);
-                                        setPasswordForVerification('');
-                                    }}
-                                    className="flex-1 px-4 py-2 border rounded-lg font-semibold text-gray-600"
-                                    disabled={isVerifyingPassword}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleVerifyPassword}
-                                    disabled={!passwordForVerification || isVerifyingPassword}
-                                    className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold shadow-lg ${isVerifyingPassword ? 'opacity-75 cursor-not-allowed' : ''}`}
-                                >
-                                    {isVerifyingPassword ? 'Verifying...' : 'Verify'}
-                                </button>
-                            </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => {
+                                    setIsVerifyPasswordModalOpen(false);
+                                    setPasswordForVerification('');
+                                }}
+                                className="flex-1 px-4 py-2 border rounded-lg font-semibold hover:bg-gray-50 text-gray-600"
+                                disabled={isVerifyingPassword}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleVerifyPassword}
+                                disabled={!passwordForVerification || isVerifyingPassword}
+                                className={`flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg font-bold shadow-lg transition-transform ${isVerifyingPassword ? 'opacity-75 cursor-not-allowed' : 'active:scale-95'}`}
+                            >
+                                {isVerifyingPassword ? 'Verifying...' : 'Verify'}
+                            </button>
                         </div>
                     </div>
-                )}
-
-                {isAdminPanelOpen && (
-                    <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
-                        <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
-                    </div>
-                )}
-            </div>
-        </Suspense>
+                </div>
+            )}
+            
+            {isAdminPanelOpen && (
+                <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
+                    <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
+                </div>
+            )}
+        </div>
     );
 };
 

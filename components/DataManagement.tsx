@@ -7,18 +7,21 @@ import {
     deleteVehicleHiring, deleteBookingRecord, deleteSavedParty, deleteSavedTruck, deleteRegisterEntry,
     saveVehicleHiring, saveBookingRecord, saveSavedParty, saveSavedTruck, saveRegisterEntry
 } from '../services/supabaseService';
-import { VehicleHiring, BookingRecord, SavedParty, SavedTruck, RegisterEntry } from '../types';
+import { VehicleHiring, BookingRecord, SavedParty, SavedTruck, RegisterEntry, CompanyDetails } from '../types';
 import * as XLSX from 'xlsx';
 
 interface DataManagementProps {
     onBack: () => void;
     currentRole?: string;
     initialTab?: Tab;
+    companyDetails?: CompanyDetails;
+    onUpdateDetails?: (details: CompanyDetails) => Promise<boolean>;
+    onUploadAsset?: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
 }
 
-type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'database-setup';
+type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'database-setup' | 'brand-settings';
 
-const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab }) => {
+const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab, companyDetails, onUpdateDetails, onUploadAsset }) => {
     const [activeTab, setActiveTab] = useState<Tab>(initialTab || (currentRole === 'Operator' ? 'customer-details' : 'database-setup'));
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -46,6 +49,102 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, in
 
     // SQL Script State
     const [copied, setCopied] = useState(false);
+    
+    // Company Settings State
+    const [localDetails, setLocalDetails] = useState<CompanyDetails | null>(companyDetails || null);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+    const [isUploadingSignature, setIsUploadingSignature] = useState(false);
+    const [confirmAdminPasskey, setConfirmAdminPasskey] = useState('');
+    const [confirmManagerPasskey, setConfirmManagerPasskey] = useState('');
+
+    useEffect(() => {
+        if (companyDetails) {
+            setLocalDetails(companyDetails);
+        }
+    }, [companyDetails]);
+
+    const handleSaveSettings = async () => {
+        if (!localDetails || !onUpdateDetails) return;
+        
+        if (localDetails.rbacEnabled) {
+            if (confirmAdminPasskey && localDetails.adminPasskey !== confirmAdminPasskey) {
+                toast.error("Admin Passkeys do not match!");
+                return;
+            }
+            if (confirmManagerPasskey && localDetails.managerPasskey !== confirmManagerPasskey) {
+                toast.error("Manager Passkeys do not match!");
+                return;
+            }
+        }
+
+        setIsSavingSettings(true);
+        const toastId = toast.loading("Saving settings...");
+
+        try {
+            const success = await onUpdateDetails(localDetails);
+            if (success) {
+                toast.success("Settings saved successfully!", { id: toastId });
+                setConfirmAdminPasskey('');
+                setConfirmManagerPasskey('');
+            } else {
+                toast.error("Failed to save settings.", { id: toastId });
+            }
+        } catch (error: any) {
+            console.error("Save error:", error);
+            const message = error?.message || "Error saving settings.";
+            toast.error(message, { id: toastId, duration: 5000 });
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!localDetails || !onUpdateDetails || !onUploadAsset) return;
+        const file = e.target.files?.[0];
+        if (file) {
+            setIsUploadingLogo(true);
+            try {
+                const url = await onUploadAsset(file, 'logo');
+                if (url) {
+                    const updatedDetails = { ...localDetails, logoUrl: url };
+                    setLocalDetails(updatedDetails);
+                    const success = await onUpdateDetails(updatedDetails);
+                    if (success) toast.success("Logo uploaded and saved successfully!");
+                    else toast.error("Logo uploaded but failed to save to database");
+                }
+            } catch (error: any) {
+                console.error("Logo upload error:", error);
+                toast.error(error?.message || "Failed to upload logo");
+            } finally {
+                setIsUploadingLogo(false);
+            }
+        }
+    };
+
+    const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!localDetails || !onUpdateDetails || !onUploadAsset) return;
+        const file = e.target.files?.[0];
+        if (file) {
+            setIsUploadingSignature(true);
+            try {
+                const url = await onUploadAsset(file, 'signature');
+                if (url) {
+                    const updatedDetails = { ...localDetails, signatureImageUrl: url };
+                    setLocalDetails(updatedDetails);
+                    const success = await onUpdateDetails(updatedDetails);
+                    if (success) toast.success("Signature uploaded and saved successfully!");
+                    else toast.error("Signature uploaded but failed to save to database");
+                }
+            } catch (error: any) {
+                console.error("Signature upload error:", error);
+                toast.error(error?.message || "Failed to upload signature");
+            } finally {
+                setIsUploadingSignature(false);
+            }
+        }
+    };
+
     const sqlScript = `
 -- ================================================================================
 -- 🛠️ COMPLETE DATABASE FIX SCRIPT (FIXES SCHEMA & 403 PERMISSION ERRORS)
@@ -1200,6 +1299,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                     { id: 'customer-details', label: 'Customer Details' },
                     { id: 'vehicle-fleet', label: 'Vehicle Fleet' },
                     { id: 'register-entries', label: 'Register' },
+                    { id: 'brand-settings', label: 'Company Settings' },
                     { id: 'database-setup', label: 'Database Setup' }
                 ].filter(tab => {
                     if (currentRole === 'Operator') {
@@ -1220,7 +1320,166 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 ))}
             </div>
 
-            {activeTab === 'database-setup' ? (
+            {activeTab === 'brand-settings' && localDetails ? (
+                <div className="space-y-6 max-w-4xl mx-auto pb-12">
+                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6">
+                        <h2 className="text-xl font-bold text-blue-900 mb-1">Company Branding & General Settings</h2>
+                        <p className="text-sm text-blue-700">Update your company details, logo, and signature for invoices. Changes here affect the whole application.</p>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Company Name</label>
+                            <input type="text" value={localDetails.name} onChange={(e) => setLocalDetails({ ...localDetails, name: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Tagline</label>
+                            <input type="text" value={localDetails.tagline} onChange={(e) => setLocalDetails({ ...localDetails, tagline: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Address</label>
+                            <textarea value={localDetails.address} onChange={(e) => setLocalDetails({ ...localDetails, address: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows={2}></textarea>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Email</label>
+                                <input type="email" value={localDetails.email} onChange={(e) => setLocalDetails({ ...localDetails, email: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Website</label>
+                                <input type="text" value={localDetails.web} onChange={(e) => setLocalDetails({ ...localDetails, web: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">PAN No.</label>
+                                <input type="text" value={localDetails.pan} onChange={(e) => setLocalDetails({ ...localDetails, pan: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">GSTN</label>
+                                <input type="text" value={localDetails.gstn} onChange={(e) => setLocalDetails({ ...localDetails, gstn: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">SAC/HSN Code</label>
+                            <input type="text" value={localDetails.sacCode || ''} onChange={(e) => setLocalDetails({ ...localDetails, sacCode: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" placeholder="e.g. 9965" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Contact Numbers (comma-separated)</label>
+                            <input type="text" value={localDetails.contact.join(', ')} onChange={(e) => setLocalDetails({ ...localDetails, contact: e.target.value.split(',').map(s => s.trim()) })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Jurisdiction City</label>
+                            <input type="text" value={localDetails.jurisdictionCity} onChange={(e) => setLocalDetails({ ...localDetails, jurisdictionCity: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700">Branch Locations (comma-separated)</label>
+                            <input type="text" value={localDetails.branchLocations.join(', ')} onChange={(e) => setLocalDetails({ ...localDetails, branchLocations: e.target.value.split(',').map(s => s.trim()) })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <h3 className="text-lg font-bold border-b pb-2 text-ssk-blue">Bank Details</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Bank Name</label>
+                                <input type="text" value={localDetails.bankDetails.name} onChange={(e) => setLocalDetails({ ...localDetails, bankDetails: { ...localDetails.bankDetails, name: e.target.value } })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Branch</label>
+                                <input type="text" value={localDetails.bankDetails.branch} onChange={(e) => setLocalDetails({ ...localDetails, bankDetails: { ...localDetails.bankDetails, branch: e.target.value } })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Account Number</label>
+                                <input type="text" value={localDetails.bankDetails.accountNo} onChange={(e) => setLocalDetails({ ...localDetails, bankDetails: { ...localDetails.bankDetails, accountNo: e.target.value } })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">IFSC Code</label>
+                                <input type="text" value={localDetails.bankDetails.ifscCode} onChange={(e) => setLocalDetails({ ...localDetails, bankDetails: { ...localDetails.bankDetails, ifscCode: e.target.value } })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <h3 className="text-lg font-bold border-b pb-2 text-ssk-blue">Assets & Branding</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <div className="flex items-center gap-4">
+                                    <label className="block text-sm font-bold text-gray-700">Company Logo</label>
+                                </div>
+                                <input type="file" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} className="mt-1 block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-ssk-blue file:text-white" />
+                                {localDetails.logoUrl && (
+                                    <img src={localDetails.logoUrl} alt="Logo" className="mt-2 h-16 object-contain border p-1 rounded bg-gray-50" />
+                                )}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-4">
+                                    <label className="block text-sm font-bold text-gray-700">Authorized Signature</label>
+                                </div>
+                                <input type="file" accept="image/*" onChange={handleSignatureUpload} disabled={isUploadingSignature} className="mt-1 block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-ssk-blue file:text-white" />
+                                {localDetails.signatureImageUrl && (
+                                    <img src={localDetails.signatureImageUrl} alt="Signature" className="mt-2 h-16 object-contain border p-1 rounded bg-gray-50" />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {currentRole === 'Admin' && (
+                        <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 space-y-4">
+                            <h3 className="text-lg font-bold border-b border-blue-200 pb-2 text-ssk-blue">Role Management (RBAC)</h3>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-sm text-gray-800">Enable Role System</p>
+                                    <p className="text-xs text-gray-500">Restrict Manager access to LR creation and basic data.</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={localDetails.rbacEnabled || false}
+                                        onChange={(e) => setLocalDetails({ ...localDetails, rbacEnabled: e.target.checked })}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-ssk-blue"></div>
+                                </label>
+                            </div>
+                            {localDetails.rbacEnabled && (
+                                <div className="space-y-4 mt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700">Admin Passkey</label>
+                                            <input type="password" placeholder="Create Admin Passkey" value={localDetails.adminPasskey || ''} onChange={(e) => setLocalDetails({ ...localDetails, adminPasskey: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700">Confirm Admin Passkey</label>
+                                            <input type="password" placeholder="Confirm Admin Passkey" value={confirmAdminPasskey} onChange={(e) => setConfirmAdminPasskey(e.target.value)} className={`mt-1 block w-full border rounded-md shadow-sm p-2 bg-white ${confirmAdminPasskey && localDetails.adminPasskey !== confirmAdminPasskey ? 'border-red-500' : 'border-gray-300'}`} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700">Manager Passkey</label>
+                                            <input type="password" placeholder="Create Manager Passkey" value={localDetails.managerPasskey || ''} onChange={(e) => setLocalDetails({ ...localDetails, managerPasskey: e.target.value })} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-gray-700">Confirm Manager Passkey</label>
+                                            <input type="password" placeholder="Confirm Manager Passkey" value={confirmManagerPasskey} onChange={(e) => setConfirmManagerPasskey(e.target.value)} className={`mt-1 block w-full border rounded-md shadow-sm p-2 bg-white ${confirmManagerPasskey && localDetails.managerPasskey !== confirmManagerPasskey ? 'border-red-500' : 'border-gray-300'}`} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end pt-4 border-t border-gray-200">
+                        <button
+                            onClick={handleSaveSettings}
+                            className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-bold shadow-lg transition-all flex items-center justify-center min-w-[200px]"
+                            disabled={isSavingSettings}
+                        >
+                            {isSavingSettings ? 'Saving...' : 'Save All Settings'}
+                        </button>
+                    </div>
+                </div>
+            ) : activeTab === 'database-setup' ? (
                 <div className="space-y-6">
                     <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
                         <div className="flex">

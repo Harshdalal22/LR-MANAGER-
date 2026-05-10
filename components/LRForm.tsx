@@ -7,6 +7,7 @@ import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon 
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
+import { getNextSequence } from '../utils/sequenceUtils';
 
 
 
@@ -99,11 +100,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     setBillingPartyType('Consignor');
                 }
             } else {
-                setFormData(initialLRState);
+                let nextLrNo = '';
+                if (lorryReceipts && lorryReceipts.length > 0) {
+                    nextLrNo = getNextSequence(lorryReceipts[0].lrNo);
+                }
+                setFormData({ ...initialLRState, lrNo: nextLrNo });
                 setBillingPartyType('Consignor');
             }
         }
-    }, [existingLR]);
+    }, [existingLR, lorryReceipts]);
 
     // Auto-save draft to local storage whenever formData or billingPartyType changes
     useEffect(() => {

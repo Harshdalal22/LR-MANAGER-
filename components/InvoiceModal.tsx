@@ -3,6 +3,7 @@ import React, { useRef, forwardRef, useState, useEffect, useMemo } from 'react';
 import { LorryReceipt, CompanyDetails, PartyDetails } from '../types';
 import { DownloadIcon, XIcon, SaveIcon } from './icons';
 import { toWords } from '../utils/numberToWords';
+import { getNextSequence } from '../utils/sequenceUtils';
 
 interface InvoiceModalProps {
     isOpen: boolean;
@@ -215,39 +216,46 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
              } else {
                  // Automated numbering logic
                  
-                 // 1. Get Prefix: First 3 alphabets of company name (Uppercase)
-                 const companyName = companyDetails.name || '';
-                 // Filter out symbols, spaces, numbers - keep only A-Z
-                 const cleanName = companyName.replace(/[^a-zA-Z]/g, '');
-                 // Take first 3 chars, default to 'INV' if empty
-                 const prefix = (cleanName.substring(0, 3) || 'INV').toUpperCase();
-                 
-                 // 2. Find the highest existing sequence number for THIS prefix
-                 let maxSeq = 0;
-                 
-                 // Regex to match "PREFIX-0001" format.
-                 // We look for anything starting with the prefix, followed by strictly digits (with or without hyphen)
-                 // This ensures "ABC-0001" matches, and finds "1"
-                 const pattern = new RegExp(`^${prefix}[-_]?(\\d+)$`, 'i');
+                 let maxNum = -1;
+                 let fallbackLatestNo = '';
+                 let latestDate = 0;
 
                  allLorryReceipts.forEach(lr => {
-                     if (lr.invoiceNo) {
-                         const match = lr.invoiceNo.match(pattern);
+                     if (lr.isInvoiceGenerated && lr.invoiceNo) {
+                         // Track fallback by date
+                         const dateTime = lr.invoiceDate ? new Date(lr.invoiceDate).getTime() : 0;
+                         if (dateTime > latestDate) {
+                             latestDate = dateTime;
+                             fallbackLatestNo = lr.invoiceNo;
+                         }
+
+                         // Try to extract number
+                         const match = lr.invoiceNo.match(/(\d+)$/);
                          if (match) {
                              const num = parseInt(match[1], 10);
-                             if (!isNaN(num) && num > maxSeq) {
-                                 maxSeq = num;
+                             if (num > maxNum) {
+                                 maxNum = num;
+                                 // We keep the exact invoiceNo that gave us maxNum
+                                 // This handles the case where prefix is missing or different
+                                 fallbackLatestNo = lr.invoiceNo; // We just use fallbackLatestNo to store the absolute best match
                              }
                          }
                      }
                  });
-                 
-                 // 3. Increment and format as 4-digit number (0001, 0002, ...)
-                 const nextSeq = maxSeq + 1;
-                 const nextSeqStr = nextSeq.toString().padStart(4, '0');
-                 
-                 // Set format: ABC-0001
-                 setBillNo(`${prefix}-${nextSeqStr}`);
+
+                 if (fallbackLatestNo) {
+                     setBillNo(getNextSequence(fallbackLatestNo));
+                 } else {
+                     // 1. Get Prefix: First 3 alphabets of company name (Uppercase)
+                     const companyName = companyDetails.name || '';
+                     // Filter out symbols, spaces, numbers - keep only A-Z
+                     const cleanName = companyName.replace(/[^a-zA-Z]/g, '');
+                     // Take first 3 chars, default to 'INV' if empty
+                     const prefix = (cleanName.substring(0, 3) || 'INV').toUpperCase();
+                     
+                     // Set format: ABC-0001
+                     setBillNo(`${prefix}-0001`);
+                 }
              }
             
             setBillDate(new Date().toISOString().split('T')[0]);

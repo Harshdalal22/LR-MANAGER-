@@ -1238,6 +1238,16 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         />
                                     </div>
                                     <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Bill No</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingRegister?.bill_no || ''} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, bill_no: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Bill No"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-gray-500 uppercase">Vehicle No</label>
                                         <input 
                                             type="text" 
@@ -1248,6 +1258,16 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         />
                                     </div>
                                     <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Contact No</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingRegister?.contact_no || ''} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, contact_no: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Driver/Owner Contact"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
                                         <label className="text-[10px] font-bold text-gray-500 uppercase">Owner Name</label>
                                         <input 
                                             type="text" 
@@ -1255,6 +1275,16 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             onChange={(e) => setEditingRegister(prev => ({ ...prev, owner_name: e.target.value }))}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                                             placeholder="Truck Owner"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Ref TPT</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingRegister?.ref_tpt || ''} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, ref_tpt: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                            placeholder="Reference TPT"
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -1287,7 +1317,17 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         <input 
                                             type="number" 
                                             value={editingRegister?.driver_fare || 0} 
-                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, driver_fare: Number(e.target.value) }))}
+                                            onChange={(e) => {
+                                                const fare = Number(e.target.value);
+                                                const adv = editingRegister?.driver_advance || 0;
+                                                setEditingRegister(prev => ({ 
+                                                    ...prev, 
+                                                    driver_fare: fare,
+                                                    driver_balance: fare - adv,
+                                                    actual_balance: fare - adv,
+                                                    commission: (editingRegister?.party_fare || 0) - fare
+                                                }));
+                                            }}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-green-500 focus:border-green-500"
                                         />
                                     </div>
@@ -1296,8 +1336,26 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         <input 
                                             type="number" 
                                             value={editingRegister?.driver_advance || 0} 
-                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, driver_advance: Number(e.target.value) }))}
+                                            onChange={(e) => {
+                                                const adv = Number(e.target.value);
+                                                const fare = editingRegister?.driver_fare || 0;
+                                                setEditingRegister(prev => ({ 
+                                                    ...prev, 
+                                                    driver_advance: adv,
+                                                    driver_balance: fare - adv,
+                                                    actual_balance: fare - adv
+                                                }));
+                                            }}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-green-500 focus:border-green-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Driver Balance (Auto)</label>
+                                        <input 
+                                            type="number" 
+                                            value={editingRegister?.driver_balance || 0} 
+                                            readOnly
+                                            className="w-full text-sm p-2 rounded-lg border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
                                         />
                                     </div>
                                     <div className="space-y-1">
@@ -1324,6 +1382,16 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             <option value="Submitted">Submitted</option>
                                         </select>
                                     </div>
+                                    <div className="md:col-span-2 space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Internal Note</label>
+                                        <input 
+                                            type="text" 
+                                            value={editingRegister?.note || ''} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, note: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-green-500 focus:border-green-500"
+                                            placeholder="Add remarks for driver/vendor"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
@@ -1346,7 +1414,20 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         <input 
                                             type="number" 
                                             value={editingRegister?.party_fare || 0} 
-                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, party_fare: Number(e.target.value) }))}
+                                            onChange={(e) => {
+                                                const fare = Number(e.target.value);
+                                                const adv = editingRegister?.party_advance || 0;
+                                                const exp = editingRegister?.other_exp || 0;
+                                                const bal = fare - adv;
+                                                setEditingRegister(prev => ({ 
+                                                    ...prev, 
+                                                    party_fare: fare,
+                                                    party_balance: bal,
+                                                    party_total_balance: bal + exp,
+                                                    commission: fare - (editingRegister?.driver_fare || 0),
+                                                    total: bal + exp
+                                                }));
+                                            }}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
                                         />
                                     </div>
@@ -1355,7 +1436,19 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         <input 
                                             type="number" 
                                             value={editingRegister?.party_advance || 0} 
-                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, party_advance: Number(e.target.value) }))}
+                                            onChange={(e) => {
+                                                const adv = Number(e.target.value);
+                                                const fare = editingRegister?.party_fare || 0;
+                                                const exp = editingRegister?.other_exp || 0;
+                                                const bal = fare - adv;
+                                                setEditingRegister(prev => ({ 
+                                                    ...prev, 
+                                                    party_advance: adv,
+                                                    party_balance: bal,
+                                                    party_total_balance: bal + exp,
+                                                    total: bal + exp
+                                                }));
+                                            }}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
                                         />
                                     </div>
@@ -1364,9 +1457,67 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                         <input 
                                             type="number" 
                                             value={editingRegister?.other_exp || 0} 
-                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, other_exp: Number(e.target.value) }))}
+                                            onChange={(e) => {
+                                                const exp = Number(e.target.value);
+                                                const bal = editingRegister?.party_balance || 0;
+                                                setEditingRegister(prev => ({ 
+                                                    ...prev, 
+                                                    other_exp: exp,
+                                                    party_total_balance: bal + exp,
+                                                    total: bal + exp
+                                                }));
+                                            }}
                                             className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
                                         />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Party Balance (Auto)</label>
+                                        <input 
+                                            type="number" 
+                                            value={editingRegister?.party_total_balance || 0} 
+                                            readOnly
+                                            className="w-full text-sm p-2 rounded-lg border-gray-200 bg-gray-100 text-gray-600 cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Payment Status</label>
+                                        <select 
+                                            value={editingRegister?.party_payment_status || 'Pending'} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, party_payment_status: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-orange-500 focus:border-orange-500"
+                                        >
+                                            <option value="Pending">Pending</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Partial">Partial</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Profitability / Status Section */}
+                            <div className="md:col-span-3">
+                                <h3 className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-2">Profitability & Final Status</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-purple-50 p-4 rounded-xl border border-purple-100 shadow-sm">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Commission (Auto)</label>
+                                        <input 
+                                            type="number" 
+                                            value={editingRegister?.commission || 0} 
+                                            readOnly
+                                            className="w-full text-sm p-2 rounded-lg border-gray-200 bg-gray-100 text-purple-700 font-bold cursor-not-allowed"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-gray-500 uppercase">Status</label>
+                                        <select 
+                                            value={editingRegister?.status || 'Active'} 
+                                            onChange={(e) => setEditingRegister(prev => ({ ...prev, status: e.target.value }))}
+                                            className="w-full text-sm p-2 rounded-lg border-gray-300 focus:ring-purple-500 focus:border-purple-500"
+                                        >
+                                            <option value="Active">Active</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Cancelled">Cancelled</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>

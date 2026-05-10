@@ -201,9 +201,18 @@ export interface GPSInvoice {
     invoiceNo: string;
     date: string;
     customerName: string;
+    customerAddress?: string;
+    customerGst?: string;
     vehicleNo: string;
     gpsImei: string;
+    hsnCode?: string;
+    quantity?: number;
+    rate?: number;
     amount: number;
+    taxRate?: number;
+    cgst?: number;
+    sgst?: number;
+    igst?: number;
     status: 'Paid' | 'Unpaid';
     user_id?: string;
     created_at?: string;

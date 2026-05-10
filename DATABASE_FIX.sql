@@ -97,3 +97,23 @@ CREATE POLICY "Public Assets" ON storage.objects FOR SELECT TO public USING (buc
 
 DROP POLICY IF EXISTS "Auth Uploads" ON storage.objects;
 CREATE POLICY "Auth Uploads" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id IN ('company_assets', 'pods'));
+
+-- === STEP 7: UPDATE GPS INVOICES TABLE ===
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS customer_address TEXT;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS customer_gst TEXT;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS hsn_code TEXT;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS quantity NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS rate NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS tax_rate NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS cgst NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS sgst NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS igst NUMERIC;
+
+-- Ensure RLS is enabled and policies exist for GPS invoices
+ALTER TABLE public.gps_invoices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage their own GPS invoices" ON public.gps_invoices;
+CREATE POLICY "Users can manage their own GPS invoices" ON public.gps_invoices FOR ALL
+USING (auth.uid() = user_id);
+
+-- Refresh schema cache again
+NOTIFY pgrst, 'reload config';

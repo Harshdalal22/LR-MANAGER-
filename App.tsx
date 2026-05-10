@@ -786,7 +786,12 @@ const App: React.FC = () => {
         return (
             <div className="bg-slate-50 min-h-screen font-sans">
                 <Toaster position="top-center" />
-                <GPSPanel companyDetails={companyDetails} onSignOut={handleSignOut} />
+                <GPSPanel 
+                    companyDetails={companyDetails} 
+                    onSignOut={handleSignOut} 
+                    onUpdateDetails={handleUpdateDetails}
+                    onUploadAsset={handleUploadAsset}
+                />
             </div>
         );
     }

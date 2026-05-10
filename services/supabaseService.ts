@@ -490,7 +490,46 @@ export const deletePOD = async (path: string) => {
     if (error) throw error;
 };
 
-// --- Company Details ---
+// --- Company Details & Assets ---
+
+export const uploadCompanyAsset = async (file: File, type: 'logo' | 'signature'): Promise<string> => {
+    const effectiveUserId = await getEffectiveUserId();
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${type}_${Date.now()}.${fileExt}`;
+    const filePath = `${effectiveUserId}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+        .from('company_assets')
+        .upload(filePath, file, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('company_assets').getPublicUrl(filePath);
+    return data.publicUrl;
+};
+
+export const updateCompanyDetails = async (details: CompanyDetails): Promise<CompanyDetails> => {
+    const effectiveUserId = await getEffectiveUserId();
+    
+    // Map frontend camelCase to DB snake_case for specific fields if needed
+    // Assuming DB has columns name, logo_url, signature_image_url, etc.
+    const payload = {
+        ...details,
+        user_id: effectiveUserId,
+        // Map any mismatches here
+        logo_url: details.logoUrl,
+        signature_image_url: details.signatureImageUrl
+    };
+
+    const { data, error } = await supabase
+        .from('company_details')
+        .upsert(payload)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data;
+};
 
 export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
     const { data, error } = await supabase.from('company_details').select('*').single();
@@ -767,7 +806,28 @@ export const subscribeToVouchers = (callback: (payload: any) => void) => {
 export const getGPSInvoices = async (): Promise<GPSInvoice[]> => {
     const { data, error } = await supabase.from('gps_invoices').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
     if (error && error.code !== 'PGRST116') throw error;
-    return data || [];
+    
+    return (data || []).map(inv => ({
+        id: inv.id,
+        invoiceNo: inv.invoice_no,
+        date: inv.date,
+        customerName: inv.customer_name,
+        customerAddress: inv.customer_address,
+        customerGst: inv.customer_gst,
+        vehicleNo: inv.vehicle_no,
+        gpsImei: inv.gps_imei,
+        hsnCode: inv.hsn_code,
+        quantity: inv.quantity,
+        rate: inv.rate,
+        taxRate: inv.tax_rate,
+        cgst: inv.cgst,
+        sgst: inv.sgst,
+        igst: inv.igst,
+        amount: inv.amount,
+        status: inv.status,
+        user_id: inv.user_id,
+        created_at: inv.created_at
+    }));
 };
 
 export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> => {
@@ -782,8 +842,17 @@ export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> =
         invoice_no: payload.invoiceNo,
         date: payload.date,
         customer_name: payload.customerName,
+        customer_address: payload.customerAddress,
+        customer_gst: payload.customerGst,
         vehicle_no: payload.vehicleNo,
         gps_imei: payload.gpsImei,
+        hsn_code: payload.hsnCode,
+        quantity: payload.quantity,
+        rate: payload.rate,
+        tax_rate: payload.taxRate,
+        cgst: payload.cgst,
+        sgst: payload.sgst,
+        igst: payload.igst,
         amount: payload.amount,
         status: payload.status,
         user_id: payload.user_id
@@ -798,8 +867,17 @@ export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> =
         invoiceNo: data.invoice_no,
         date: data.date,
         customerName: data.customer_name,
+        customerAddress: data.customer_address,
+        customerGst: data.customer_gst,
         vehicleNo: data.vehicle_no,
         gpsImei: data.gps_imei,
+        hsnCode: data.hsn_code,
+        quantity: data.quantity,
+        rate: data.rate,
+        taxRate: data.tax_rate,
+        cgst: data.cgst,
+        sgst: data.sgst,
+        igst: data.igst,
         amount: data.amount,
         status: data.status,
         user_id: data.user_id,

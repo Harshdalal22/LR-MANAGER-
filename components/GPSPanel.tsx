@@ -61,16 +61,32 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
         setFormData(prev => {
             const newData = { ...prev, [name]: value };
             
-            if (name === 'quantity' || name === 'rate' || name === 'taxRate') {
+            if (name === 'quantity' || name === 'rate' || name === 'taxType') {
                 const qty = parseFloat(name === 'quantity' ? value : String(prev.quantity || 1)) || 0;
                 const rate = parseFloat(name === 'rate' ? value : String(prev.rate || 0)) || 0;
-                const taxR = parseFloat(name === 'taxRate' ? value : String(prev.taxRate || 18)) || 0;
+                const taxType = name === 'taxType' ? value : (prev.taxType || 'IGST');
+                const taxR = 18;
                 
                 const baseAmount = qty * rate;
                 const totalTax = baseAmount * (taxR / 100);
                 newData.amount = baseAmount + totalTax;
-                newData.cgst = totalTax / 2;
-                newData.sgst = totalTax / 2;
+                newData.taxRate = taxR;
+                
+                if (taxType === 'IGST') {
+                    newData.igst = totalTax;
+                    newData.cgst = 0;
+                    newData.sgst = 0;
+                } else if (taxType === 'CGST_SGST') {
+                    newData.igst = 0;
+                    newData.cgst = totalTax / 2;
+                    newData.sgst = totalTax / 2;
+                } else {
+                    newData.amount = baseAmount;
+                    newData.taxRate = 0;
+                    newData.igst = 0;
+                    newData.cgst = 0;
+                    newData.sgst = 0;
+                }
             }
             return newData;
         });
@@ -122,7 +138,7 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
             const saved = await saveGPSInvoice(formData as GPSInvoice);
             setInvoices(prev => [saved, ...prev.filter(i => i.id !== saved.id)]);
             setIsFormOpen(false);
-            setFormData({ date: new Date().toISOString().split('T')[0], status: 'Paid', quantity: 1, hsnCode: '85269190', taxRate: 18 });
+            setFormData({ date: new Date().toISOString().split('T')[0], status: 'Paid', quantity: 1, hsnCode: '85269190', taxRate: 18, taxType: 'IGST' });
             toast.success('Invoice Saved!', { id: toastId });
             generatePdf(saved);
         } catch (error) {
@@ -180,9 +196,20 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
             quantity: 1,
             hsnCode: '85269190',
             taxRate: 18,
+            taxType: 'IGST',
             cgst: 0,
-            sgst: 0
+            sgst: 0,
+            igst: 0
         });
+        setIsFormOpen(true);
+    };
+
+    const handleEdit = (invoice: GPSInvoice) => {
+        let taxType = invoice.taxType || 'IGST';
+        if (!invoice.taxType && invoice.cgst && invoice.cgst > 0) {
+            taxType = 'CGST_SGST';
+        }
+        setFormData({ ...invoice, taxType });
         setIsFormOpen(true);
     };
 
@@ -273,6 +300,7 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                                     <td className="px-6 py-4 text-right">
                                                         <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <button onClick={() => generatePdf(inv)} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Download PDF"><DownloadIcon className="w-4 h-4"/></button>
+                                                            <button onClick={() => handleEdit(inv)} className="p-2 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-600 hover:text-white transition-all shadow-sm" title="Edit"><PencilIcon className="w-4 h-4"/></button>
                                                             <button onClick={() => handleDelete(inv.id!)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm" title="Delete"><TrashIcon className="w-4 h-4"/></button>
                                                         </div>
                                                     </td>
@@ -460,13 +488,11 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                         <input type="text" name="hsnCode" value={formData.hsnCode || ''} onChange={handleInputChange} className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-ssk-blue font-bold text-slate-800" />
                                     </div>
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tax Rate (%)</label>
-                                        <select name="taxRate" value={formData.taxRate || 18} onChange={handleInputChange} className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-ssk-blue font-bold text-slate-800">
-                                            <option value="0">0% (Exempt)</option>
-                                            <option value="5">5%</option>
-                                            <option value="12">12%</option>
-                                            <option value="18">18%</option>
-                                            <option value="28">28%</option>
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Tax Type</label>
+                                        <select name="taxType" value={formData.taxType || 'IGST'} onChange={handleInputChange} className="w-full p-3 bg-slate-50 border-0 rounded-xl focus:ring-2 focus:ring-ssk-blue font-bold text-slate-800">
+                                            <option value="IGST">IGST 18%</option>
+                                            <option value="CGST_SGST">CGST 9% & SGST 9%</option>
+                                            <option value="EXEMPT">0% (Exempt)</option>
                                         </select>
                                     </div>
                                     <div>
@@ -584,8 +610,9 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                                 <p className="text-[9px] font-bold text-gray-600 italic">IMEI: {isGeneratingPdfFor.gpsImei}</p>
                                                 
                                                 <div className="mt-12 text-right space-y-1">
-                                                    {isGeneratingPdfFor.cgst ? <p className="font-black italic">OUTPUT CGST @{isGeneratingPdfFor.taxRate ? (isGeneratingPdfFor.taxRate/2) : 9}%</p> : null}
-                                                    {isGeneratingPdfFor.sgst ? <p className="font-black italic">OUTPUT SGST @{isGeneratingPdfFor.taxRate ? (isGeneratingPdfFor.taxRate/2) : 9}%</p> : null}
+                                                    {isGeneratingPdfFor.cgst && isGeneratingPdfFor.cgst > 0 ? <p className="font-black italic">OUTPUT CGST @{isGeneratingPdfFor.taxRate ? (isGeneratingPdfFor.taxRate/2) : 9}%</p> : null}
+                                                    {isGeneratingPdfFor.sgst && isGeneratingPdfFor.sgst > 0 ? <p className="font-black italic">OUTPUT SGST @{isGeneratingPdfFor.taxRate ? (isGeneratingPdfFor.taxRate/2) : 9}%</p> : null}
+                                                    {isGeneratingPdfFor.igst && isGeneratingPdfFor.igst > 0 ? <p className="font-black italic">OUTPUT IGST @{isGeneratingPdfFor.taxRate || 18}%</p> : null}
                                                 </div>
                                             </td>
                                             <td className="border-r-[1.5px] border-black p-2 text-center align-top font-bold">{isGeneratingPdfFor.hsnCode}</td>
@@ -595,8 +622,9 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                             <td className="p-2 text-right align-top">
                                                 <p className="font-black">{( (isGeneratingPdfFor.rate || 0) * (isGeneratingPdfFor.quantity || 0) ).toFixed(2)}</p>
                                                 <div className="mt-12 space-y-1">
-                                                    {isGeneratingPdfFor.cgst ? <p className="font-black">{isGeneratingPdfFor.cgst.toFixed(2)}</p> : null}
-                                                    {isGeneratingPdfFor.sgst ? <p className="font-black">{isGeneratingPdfFor.sgst.toFixed(2)}</p> : null}
+                                                    {isGeneratingPdfFor.cgst && isGeneratingPdfFor.cgst > 0 ? <p className="font-black">{isGeneratingPdfFor.cgst.toFixed(2)}</p> : null}
+                                                    {isGeneratingPdfFor.sgst && isGeneratingPdfFor.sgst > 0 ? <p className="font-black">{isGeneratingPdfFor.sgst.toFixed(2)}</p> : null}
+                                                    {isGeneratingPdfFor.igst && isGeneratingPdfFor.igst > 0 ? <p className="font-black">{isGeneratingPdfFor.igst.toFixed(2)}</p> : null}
                                                 </div>
                                             </td>
                                         </tr>

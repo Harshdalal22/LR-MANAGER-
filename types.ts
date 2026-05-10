@@ -210,6 +210,7 @@ export interface GPSInvoice {
     rate?: number;
     amount: number;
     taxRate?: number;
+    taxType?: string;
     cgst?: number;
     sgst?: number;
     igst?: number;

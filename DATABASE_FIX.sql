@@ -105,6 +105,7 @@ ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS hsn_code TEXT;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS quantity NUMERIC;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS rate NUMERIC;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS tax_rate NUMERIC;
+ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS tax_type TEXT;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS cgst NUMERIC;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS sgst NUMERIC;
 ALTER TABLE public.gps_invoices ADD COLUMN IF NOT EXISTS igst NUMERIC;

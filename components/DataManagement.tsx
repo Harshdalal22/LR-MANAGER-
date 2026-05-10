@@ -481,8 +481,14 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
     const parseNumber = (val: any): number => {
         if (val === null || val === undefined || val === '') return 0;
         if (typeof val === 'number') return val;
+        
+        const str = String(val);
+        if (str.includes('[object')) return 0; // Guard against objects being stringified
+        
         // Remove currency symbols, commas, and other formatting
-        const clean = String(val).replace(/[^\d.-]/g, '');
+        const clean = str.replace(/[^\d.-]/g, '');
+        if (!clean) return 0;
+        
         const num = parseFloat(clean);
         return isNaN(num) ? 0 : num;
     };
@@ -553,13 +559,27 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
             // Helper to find value by flexible key matching
             const getValue = (row: any, keys: string[]) => {
                 const rowKeys = Object.keys(row);
+                
+                // Helper to normalize strings for comparison (lowercase, no spaces/underscores)
+                const normalize = (s: string) => s.toLowerCase().replace(/[\s_-]/g, '').trim();
+
                 for (const key of keys) {
-                    let foundKey = rowKeys.find(k => k.toLowerCase().trim() === key.toLowerCase().trim());
-                    if (foundKey) return row[foundKey];
-                    // lenient match
-                    if (key.length > 3) {
-                        foundKey = rowKeys.find(k => k.toLowerCase().includes(key.toLowerCase().trim()));
-                        if (foundKey) return row[foundKey];
+                    const normalizedTarget = normalize(key);
+                    
+                    // 1. Exact or normalized match
+                    let foundKey = rowKeys.find(k => normalize(k) === normalizedTarget);
+                    
+                    // 2. Lenient match (includes)
+                    if (!foundKey && key.length > 3) {
+                        foundKey = rowKeys.find(k => normalize(k).includes(normalizedTarget) || normalizedTarget.includes(normalize(k)));
+                    }
+                    
+                    if (foundKey) {
+                        const val = row[foundKey];
+                        // Handle xlsx cell objects if they exist
+                        if (val !== null && typeof val === 'object' && 'v' in val) return val.v;
+                        if (val !== null && typeof val === 'object' && 'w' in val) return val.w;
+                        return val;
                     }
                 }
                 return undefined;
@@ -693,13 +713,13 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             note: String(getValue(row, ['Note', 'Remarks', 'Remark']) || ''),
                             driver_balance: parseNumber(getValue(row, ['Driver Balance', 'Balance', 'Driver Bal', 'Bal'])),
                             actual_balance: parseNumber(getValue(row, ['Actual Balance', 'Act Bal'])),
-                            party_tpt: String(getValue(row, ['Party TPT', 'Party Transporter', 'Client']) || ''),
-                            party_fare: parseNumber(getValue(row, ['Party Fare', 'Party Rate', 'Party Pay Fare'])),
-                            party_advance: parseNumber(getValue(row, ['Party Advance', 'Party Adv', 'Party Adv.'])),
-                            party_balance: parseNumber(getValue(row, ['Party Balance', 'Party Bal', 'Party Bal.'])),
-                            other_exp: parseNumber(getValue(row, ['Other Exp', 'Other Expenses', 'Other Exp.', 'Misc Exp'])),
-                            party_total_balance: parseNumber(getValue(row, ['Party Total Balance', 'Party Total Bal', 'Net Bal'])),
-                            party_payment_status: String(getValue(row, ['Party Payment Status', 'Party Pay', 'Party Payment']) || ''),
+                            party_tpt: String(getValue(row, ['Party TPT', 'Party Transporter', 'Client', 'Client TPT']) || ''),
+                            party_fare: parseNumber(getValue(row, ['Party Fare', 'Party Rate', 'Party Pay Fare', 'Client Fare', 'Client Rate', 'PTY FARE'])),
+                            party_advance: parseNumber(getValue(row, ['Party Advance', 'Party Adv', 'Party Adv.', 'Client Advance', 'Client Adv', 'PTY ADV'])),
+                            party_balance: parseNumber(getValue(row, ['Party Balance', 'Party Bal', 'Party Bal.', 'Client Balance', 'Client Bal', 'PTY BAL'])),
+                            other_exp: parseNumber(getValue(row, ['Other Exp', 'Other Expenses', 'Other Exp.', 'Misc Exp', 'Client Exp'])),
+                            party_total_balance: parseNumber(getValue(row, ['Party Total Balance', 'Party Total Bal', 'Net Bal', 'Client Total Bal', 'Total Party Bal'])),
+                            party_payment_status: String(getValue(row, ['Party Payment Status', 'Party Pay', 'Party Payment', 'Client Pay Status', 'PTY PAY']) || ''),
                             commission: parseNumber(getValue(row, ['Commission', 'Comm'])),
                             difference: parseNumber(getValue(row, ['Difference', 'Diff'])),
                             total: parseNumber(getValue(row, ['Total', 'Grand Total'])),

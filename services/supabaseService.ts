@@ -398,22 +398,57 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         is_invoice_generated: !!isInvoiceGenerated
     };
 
-    // Use a timeout to prevent hanging UI
-    const savePromise = supabase
-        .from('lorry_receipts')
-        .upsert(payload, { onConflict: 'lrNo' })
-        .select()
-        .single();
+    // Helper to run a single upsert attempt with an 8-second timeout
+    const attemptSave = () => {
+        const savePromise = supabase
+            .from('lorry_receipts')
+            .upsert(payload, { onConflict: 'lrNo' })
+            .select()
+            .single();
 
-    const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Request timed out. Please check your internet or run the Database Fix.")), 15000)
-    );
+        const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Save timed out — check your internet connection.')), 8000)
+        );
 
-    const { data, error } = await Promise.race([savePromise, timeoutPromise]) as any;
+        return Promise.race([savePromise, timeoutPromise]) as Promise<{ data: any; error: any }>;
+    };
+
+    // First attempt
+    let result = await attemptSave();
+
+    // Auto-retry once on transient network / timeout failures
+    if (result.error) {
+        const isTransient =
+            result.error.message?.includes('timed out') ||
+            result.error.message?.includes('network') ||
+            result.error.message?.includes('fetch') ||
+            result.error.code === 'PGRST000';
+
+        if (isTransient) {
+            console.warn('LR save transient error, retrying...', result.error.message);
+            await new Promise(res => setTimeout(res, 1000)); // wait 1s then retry
+            result = await attemptSave();
+        }
+    }
+
+    const { data, error } = result;
 
     if (error) {
-        console.error("Supabase Save Error:", error);
-        throw new Error(error.message || "Database error occurred while saving LR.");
+        console.error('Supabase Save Error:', error);
+        if (error.message?.includes('timed out') || error.message?.includes('network')) {
+            throw new Error('Network error: Could not reach server. Please check your internet and try again.');
+        }
+        if (error.code === '23505') {
+            throw new Error(`LR No "${lr.lrNo}" already exists. Please use a different LR number.`);
+        }
+        if (error.code === '42501' || error.message?.includes('permission')) {
+            throw new Error('Permission denied. Please sign out and sign back in.');
+        }
+        throw new Error(error.message || 'Database error occurred while saving LR.');
+    }
+
+    if (!data) {
+        throw new Error('Save appeared to succeed but no data was returned. Please refresh and check.');
     }
 
     return {

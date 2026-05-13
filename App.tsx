@@ -1,6 +1,5 @@
 
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { Session, Subscription } from '@supabase/supabase-js';
 import Auth from './components/Auth';
@@ -8,18 +7,20 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import LRList from './components/LRList';
 import LRForm from './components/LRForm';
-import VehicleHiring from './components/VehicleHiring';
-import BookingRegister from './components/BookingRegister';
-import DataManagement from './components/DataManagement';
-import PartyManagement from './components/PartyManagement';
-import TruckManagement from './components/TruckManagement';
-import InvoiceList from './components/InvoiceList';
 import AdBanner from './components/AdBanner';
-import PODUploadModal from './components/PODUploadModal';
-import PasswordResetModal from './components/PasswordResetModal';
-import RoleSelection from './components/RoleSelection';
-import AdminPanel3D from './components/AdminPanel3D';
-import GPSPanel from './components/GPSPanel';
+
+// Heavy components — lazy loaded to reduce initial bundle size
+const VehicleHiring = lazy(() => import('./components/VehicleHiring'));
+const BookingRegister = lazy(() => import('./components/BookingRegister'));
+const DataManagement = lazy(() => import('./components/DataManagement'));
+const PartyManagement = lazy(() => import('./components/PartyManagement'));
+const TruckManagement = lazy(() => import('./components/TruckManagement'));
+const InvoiceList = lazy(() => import('./components/InvoiceList'));
+const PODUploadModal = lazy(() => import('./components/PODUploadModal'));
+const PasswordResetModal = lazy(() => import('./components/PasswordResetModal'));
+const RoleSelection = lazy(() => import('./components/RoleSelection'));
+const AdminPanel3D = lazy(() => import('./components/AdminPanel3D'));
+const GPSPanel = lazy(() => import('./components/GPSPanel'));
 import {
     LorryReceipt,
     CompanyDetails,
@@ -803,12 +804,14 @@ const App: React.FC = () => {
         return (
             <div className="bg-slate-50 min-h-screen font-sans">
                 <Toaster position="top-center" />
-                <GPSPanel 
-                    companyDetails={companyDetails} 
-                    onSignOut={handleSignOut} 
-                    onUpdateDetails={handleUpdateDetails}
-                    onUploadAsset={handleUploadAsset}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
+                    <GPSPanel 
+                        companyDetails={companyDetails} 
+                        onSignOut={handleSignOut} 
+                        onUpdateDetails={handleUpdateDetails}
+                        onUploadAsset={handleUploadAsset}
+                    />
+                </Suspense>
             </div>
         );
     }
@@ -832,9 +835,12 @@ const App: React.FC = () => {
                 onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
             />
             <main className="container mx-auto p-4 md:p-6">
-                {renderContent()}
+                <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
+                    {renderContent()}
+                </Suspense>
                 <AdBanner />
             </main>
+            <Suspense fallback={null}>
             {uploadingPODFor && (
                 <PODUploadModal
                     isOpen={!!uploadingPODFor}
@@ -866,6 +872,7 @@ const App: React.FC = () => {
                     onForgotPasskey={handleForgotPasskeyTrigger}
                 />
             )}
+            </Suspense>
             {isVerifyPasswordModalOpen && (
                 <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white text-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-sm font-sans animate-fadeIn">
@@ -913,9 +920,11 @@ const App: React.FC = () => {
             )}
             
             {isAdminPanelOpen && (
-                <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
-                    <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
-                </div>
+                <Suspense fallback={null}>
+                    <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
+                        <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
+                    </div>
+                </Suspense>
             )}
         </div>
     );

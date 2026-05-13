@@ -112,20 +112,22 @@ const App: React.FC = () => {
     };
 
 
-    const handleUpdateDetails = async (details: CompanyDetails) => {
+    const handleUpdateDetails = async (details: CompanyDetails): Promise<boolean> => {
         const toastId = toast.loading('Saving settings...');
         try {
             const saved = await saveCompanyDetails(details);
             setCompanyDetails(saved);
             toast.success('Settings updated successfully', { id: toastId });
             setHeaderSettingsTrigger(prev => prev + 1);
+            return true;
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to save settings");
+            return false;
         }
     };
 
-    const handleUploadAsset = async (file: File, type: 'logo' | 'signature') => {
+    const handleUploadAsset = async (file: File, type: 'logo' | 'signature'): Promise<string | null> => {
         const toastId = toast.loading(`Uploading ${type}...`);
         try {
             const url = await uploadCompanyAsset(file, type);
@@ -134,9 +136,11 @@ const App: React.FC = () => {
             await saveCompanyDetails(updated);
             toast.success(`${type === 'logo' ? 'Logo' : 'Signature'} uploaded successfully`, { id: toastId });
             setHeaderSettingsTrigger(prev => prev + 1);
+            return url;
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Failed to upload asset");
+            return null;
         }
     };
 
@@ -474,20 +478,33 @@ const App: React.FC = () => {
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
         try {
-            // Optimistically clear local state for instant UI transition
+            // Clear remote session first
+            await signOut();
+
+            // Clear all local state
             setSession(null);
             setIsPasswordResetting(false);
+            setIsLoading(false);
+            setLorryReceipts([]);
+            setSavedParties([]);
+            setSavedTrucks([]);
+            setCompanyDetails(defaultCompanyDetails);
+            setCurrentView('dashboard');
+            setViewHistory([]);
+            setDashboardSection(null);
             sessionStorage.removeItem('roleSelected');
             sessionStorage.removeItem('currentRole');
+            sessionStorage.removeItem('adminId');
             setCurrentRole('Admin');
-            
-            // Background the remote signout call
-            signOut().catch(err => console.error("Sign out error:", err));
-            
+
             toast.success('Signed out successfully.', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
             handleError(error, "Sign out failed");
+            // Even on error, clear local state so user isn't stuck
+            setSession(null);
+            setIsLoading(false);
+            sessionStorage.clear();
         }
     };
 

@@ -220,15 +220,16 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         
         setIsSaving(true);
         try {
-            // Clear draft when successfully saved
+            await onSave(formData);
+            // Only clear draft AFTER successful save
             if (!existingLR) {
                 localStorage.removeItem('lr_draft_data');
                 localStorage.removeItem('lr_draft_billing');
             }
-            
-            await onSave(formData);
         } catch (error) {
-            console.error("Save error:", error);
+            // Re-throw so App.tsx error handler shows the toast
+            console.error("Save error in LRForm:", error);
+            throw error;
         } finally {
             setIsSaving(false);
         }

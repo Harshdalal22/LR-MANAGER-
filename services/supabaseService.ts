@@ -394,23 +394,21 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         is_invoice_generated: !!isInvoiceGenerated
     };
 
-    // Helper: run a single upsert with AbortController
+    // Helper: run a single upsert with timeout
     const attemptSave = (timeoutMs = 12000) => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-
         // We MUST chain .select().single() here to ensure the frontend receives the 'id'
         // of newly created LRs. Without this, subsequent edits would insert new rows.
         const savePromise = supabase
             .from('lorry_receipts')
             .upsert(payload)
             .select()
-            .single()
-            // @ts-ignore
-            .then((res: { data: any; error: any }) => { clearTimeout(timer); return res; })
-            .catch((err: any) => { clearTimeout(timer); throw err; });
+            .single();
 
-        return savePromise as Promise<{ data: any; error: any }>;
+        const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => {
+            setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
+        });
+
+        return Promise.race([savePromise, timeoutPromise]);
     };
 
     // First attempt

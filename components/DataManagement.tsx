@@ -1060,206 +1060,222 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
 
             return (
                 <div className="space-y-4">
-                    {/* Filter Bar */}
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">Filter by Date</label>
-                            <input 
-                                type="date" 
-                                value={filterDate}
-                                onChange={(e) => setFilterDate(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">Filter by Month</label>
-                            <input 
-                                type="text" 
-                                placeholder="e.g. January"
-                                value={filterMonth}
-                                onChange={(e) => setFilterMonth(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">Party Name</label>
-                            <input 
-                                type="text" 
-                                placeholder="Search party..."
-                                value={filterParty}
-                                onChange={(e) => setFilterParty(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold text-gray-500 uppercase">GR / LR Number</label>
-                            <input 
-                                type="text" 
-                                placeholder="Search GR..."
-                                value={filterGR}
-                                onChange={(e) => setFilterGR(e.target.value)}
-                                className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                        </div>
-                        <div className="flex items-end">
+                    {currentRole === 'Operator' ? (
+                        <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-xl shadow-sm text-center">
+                            <h3 className="text-xl font-bold text-blue-900 mb-2">Booking Register Entry</h3>
+                            <p className="text-sm text-blue-700 mb-6">You can add new entries to the Booking Register. Existing records are restricted.</p>
                             <button 
                                 onClick={() => { setEditingRegister({}); setShowRegisterForm(true); }}
-                                className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                className="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg hover:bg-blue-700 transition-colors shadow-lg active:scale-95 inline-flex items-center gap-2"
                             >
-                                <PlusIcon className="w-4 h-4" />
-                                Add New Row
+                                <PlusIcon className="w-5 h-5" />
+                                Add New Entry
                             </button>
                         </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        {selectedRegisterIds.length > 0 && (
-                            <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center sticky left-0 z-20">
-                                <span className="text-red-700 text-xs font-bold">{selectedRegisterIds.length} items selected</span>
-                                <button 
-                                    onClick={() => handleDeleteBulk('register')}
-                                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-bold transition-colors shadow-sm"
-                                >
-                                    Delete Selected
-                                </button>
+                    ) : (
+                        <>
+                            {/* Filter Bar */}
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Filter by Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={filterDate}
+                                        onChange={(e) => setFilterDate(e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Filter by Month</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="e.g. January"
+                                        value={filterMonth}
+                                        onChange={(e) => setFilterMonth(e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">Party Name</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search party..."
+                                        value={filterParty}
+                                        onChange={(e) => setFilterParty(e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold text-gray-500 uppercase">GR / LR Number</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search GR..."
+                                        value={filterGR}
+                                        onChange={(e) => setFilterGR(e.target.value)}
+                                        className="w-full text-xs p-2 rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div className="flex items-end">
+                                    <button 
+                                        onClick={() => { setEditingRegister({}); setShowRegisterForm(true); }}
+                                        className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <PlusIcon className="w-4 h-4" />
+                                        Add New Row
+                                    </button>
+                                </div>
                             </div>
-                        )}
-                        <table className="w-full text-xs text-left text-gray-700 whitespace-nowrap">
-                            <thead className="text-[10px] text-white uppercase bg-blue-700">
-                                <tr>
-                                    <th className="px-3 py-3 border-r border-blue-600 sticky left-0 bg-blue-700 z-10 text-center w-10">
-                                        <input 
-                                            type="checkbox"
-                                            className="rounded border-blue-400 text-white focus:ring-blue-300 bg-blue-800"
-                                            checked={filtered.length > 0 && selectedRegisterIds.length === filtered.length}
-                                            onChange={() => {
-                                                const ids = filtered.map(r => r.id).filter((id): id is string => !!id);
-                                                setSelectedRegisterIds(prev => prev.length === ids.length ? [] : ids);
-                                            }}
-                                        />
-                                    </th>
-                                    <th className="px-3 py-3 border-r border-blue-600 sticky left-[40px] bg-blue-700 z-10">Actions</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Month</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Date</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">GR No</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">LRC No</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Bill No</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Vehicle No</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Contact No</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Owner Name</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Ref TPT</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">From</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">To</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Fare</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Adv</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Bal</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Actual Bal</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">POD Status</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Driver Pay</th>
-                                    <th className="px-3 py-3 border-r border-blue-600">Note</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party TPT</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Fare</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Adv</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Bal</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Other Exp</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Total Bal</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Pay</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Commission</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Difference</th>
-                                    <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Total</th>
-                                    <th className="px-3 py-3 border-blue-600">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={31} className="p-8 text-center text-gray-500 italic">
-                                            No records found matching filters.
-                                        </td>
-                                    </tr>
-                                ) : filtered.map((r, idx) => (
-                                    <tr key={r.id || idx} className={`border-b hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedRegisterIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
-                                        <td className="px-3 py-2 border-r text-center sticky left-0 bg-inherit z-10">
-                                            <input 
-                                                type="checkbox"
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                checked={r.id ? selectedRegisterIds.includes(r.id) : false}
-                                                onChange={() => {
-                                                    if (!r.id) return;
-                                                    setSelectedRegisterIds(prev => 
-                                                        prev.includes(r.id!) 
-                                                            ? prev.filter(id => id !== r.id) 
-                                                            : [...prev, r.id!]
-                                                    );
-                                                }}
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2 border-r text-center sticky left-[40px] bg-inherit z-10">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button 
-                                                    onClick={() => { setEditingRegister(r); setShowRegisterForm(true); }}
-                                                    className="p-1 hover:bg-blue-100 rounded text-blue-600"
-                                                >
-                                                    <PencilIcon className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button 
-                                                    onClick={() => r.id && handleDelete(r.id, 'register')} 
-                                                    className="p-1 hover:bg-red-100 rounded text-red-500"
-                                                >
-                                                    <TrashIcon className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td className="px-3 py-2 border-r">{r.month || '-'}</td>
-                                        <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
-                                        <td className="px-3 py-2 border-r font-bold text-blue-700">{r.gr_no || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.lrc_no || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.bill_no || '-'}</td>
-                                        <td className="px-3 py-2 border-r font-mono font-bold">{r.vehicle_no || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.contact_no || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.owner_name || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.ref_tpt || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.from_loc || '-'}</td>
-                                        <td className="px-3 py-2 border-r">{r.to_loc || '-'}</td>
-                                        <td className="px-3 py-2 border-r text-right font-semibold text-green-700">₹{r.driver_fare ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_advance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_balance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-green-700">₹{r.actual_balance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.pod_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                                {r.pod_status || 'Pending'}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 border-r text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.driver_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {r.driver_payment_status || 'Pending'}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 border-r text-gray-500 italic max-w-[150px] overflow-hidden text-ellipsis">{r.note || '-'}</td>
-                                        <td className="px-3 py-2 border-r text-orange-700">{r.party_tpt || '-'}</td>
-                                        <td className="px-3 py-2 border-r text-right font-semibold text-orange-700">₹{r.party_fare ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_advance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_balance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.other_exp ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right font-bold text-orange-700">₹{r.party_total_balance ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.party_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {r.party_payment_status || 'Pending'}
-                                            </span>
-                                        </td>
-                                        <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.commission ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.difference ?? 0}</td>
-                                        <td className="px-3 py-2 border-r text-right font-bold text-purple-700">₹{r.total ?? 0}</td>
-                                        <td className="px-3 py-2 text-center">
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
-                                                {r.status || '-'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+
+                            <div className="overflow-x-auto">
+                                {selectedRegisterIds.length > 0 && (
+                                    <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center sticky left-0 z-20">
+                                        <span className="text-red-700 text-xs font-bold">{selectedRegisterIds.length} items selected</span>
+                                        <button 
+                                            onClick={() => handleDeleteBulk('register')}
+                                            className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-bold transition-colors shadow-sm"
+                                        >
+                                            Delete Selected
+                                        </button>
+                                    </div>
+                                )}
+                                <table className="w-full text-xs text-left text-gray-700 whitespace-nowrap">
+                                    <thead className="text-[10px] text-white uppercase bg-blue-700">
+                                        <tr>
+                                            <th className="px-3 py-3 border-r border-blue-600 sticky left-0 bg-blue-700 z-10 text-center w-10">
+                                                <input 
+                                                    type="checkbox"
+                                                    className="rounded border-blue-400 text-white focus:ring-blue-300 bg-blue-800"
+                                                    checked={filtered.length > 0 && selectedRegisterIds.length === filtered.length}
+                                                    onChange={() => {
+                                                        const ids = filtered.map(r => r.id).filter((id): id is string => !!id);
+                                                        setSelectedRegisterIds(prev => prev.length === ids.length ? [] : ids);
+                                                    }}
+                                                />
+                                            </th>
+                                            <th className="px-3 py-3 border-r border-blue-600 sticky left-[40px] bg-blue-700 z-10">Actions</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Month</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Date</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">GR No</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">LRC No</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Bill No</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Vehicle No</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Contact No</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Owner Name</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Ref TPT</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">From</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">To</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Fare</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Adv</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Driver Bal</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-green-700">Actual Bal</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">POD Status</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Driver Pay</th>
+                                            <th className="px-3 py-3 border-r border-blue-600">Note</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party TPT</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Fare</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Adv</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Bal</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Other Exp</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Total Bal</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-orange-600">Party Pay</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Commission</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Difference</th>
+                                            <th className="px-3 py-3 border-r border-blue-600 bg-purple-700">Total</th>
+                                            <th className="px-3 py-3 border-blue-600">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filtered.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={31} className="p-8 text-center text-gray-500 italic">
+                                                    No records found matching filters.
+                                                </td>
+                                            </tr>
+                                        ) : filtered.map((r, idx) => (
+                                            <tr key={r.id || idx} className={`border-b hover:bg-blue-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${selectedRegisterIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
+                                                <td className="px-3 py-2 border-r text-center sticky left-0 bg-inherit z-10">
+                                                    <input 
+                                                        type="checkbox"
+                                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                        checked={r.id ? selectedRegisterIds.includes(r.id) : false}
+                                                        onChange={() => {
+                                                            if (!r.id) return;
+                                                            setSelectedRegisterIds(prev => 
+                                                                prev.includes(r.id!) 
+                                                                    ? prev.filter(id => id !== r.id) 
+                                                                    : [...prev, r.id!]
+                                                            );
+                                                        }}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2 border-r text-center sticky left-[40px] bg-inherit z-10">
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button 
+                                                            onClick={() => { setEditingRegister(r); setShowRegisterForm(true); }}
+                                                            className="p-1 hover:bg-blue-100 rounded text-blue-600"
+                                                        >
+                                                            <PencilIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => r.id && handleDelete(r.id, 'register')} 
+                                                            className="p-1 hover:bg-red-100 rounded text-red-500"
+                                                        >
+                                                            <TrashIcon className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                                <td className="px-3 py-2 border-r">{r.month || '-'}</td>
+                                                <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
+                                                <td className="px-3 py-2 border-r font-bold text-blue-700">{r.gr_no || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.lrc_no || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.bill_no || '-'}</td>
+                                                <td className="px-3 py-2 border-r font-mono font-bold">{r.vehicle_no || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.contact_no || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.owner_name || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.ref_tpt || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.from_loc || '-'}</td>
+                                                <td className="px-3 py-2 border-r">{r.to_loc || '-'}</td>
+                                                <td className="px-3 py-2 border-r text-right font-semibold text-green-700">₹{r.driver_fare ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_advance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-green-700">₹{r.driver_balance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-green-700">₹{r.actual_balance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.pod_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                        {r.pod_status || 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2 border-r text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.driver_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {r.driver_payment_status || 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2 border-r text-gray-500 italic max-w-[150px] overflow-hidden text-ellipsis">{r.note || '-'}</td>
+                                                <td className="px-3 py-2 border-r text-orange-700">{r.party_tpt || '-'}</td>
+                                                <td className="px-3 py-2 border-r text-right font-semibold text-orange-700">₹{r.party_fare ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_advance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.party_balance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-orange-700">₹{r.other_exp ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right font-bold text-orange-700">₹{r.party_total_balance ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.party_payment_status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {r.party_payment_status || 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.commission ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right text-purple-700">₹{r.difference ?? 0}</td>
+                                                <td className="px-3 py-2 border-r text-right font-bold text-purple-700">₹{r.total ?? 0}</td>
+                                                <td className="px-3 py-2 text-center">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${(r.status || '').toLowerCase() === 'completed' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {r.status || '-'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
                 </div>
             );
         }

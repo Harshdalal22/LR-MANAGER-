@@ -593,13 +593,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <StatCard className="p-3 shadow-none border-b-2 bg-gray-50" icon={<XIcon />} title={t[language].cancelled} value={statusCounts['Cancelled'] || 0} color="red" />
                                 </div>
                             </div>
+                        </>
+                    )}
 
-                            {/* Chart & Recent Activity */}
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Recent Activity Card */}
-                                <div className="lg:col-span-2 bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 overflow-hidden">
-                                    <div className="p-6 border-b border-gray-100 bg-gray-50/50">
-                                        <h2 className="text-xl font-black text-gray-800 tracking-tight">{t[language].recentLRs}</h2>
+                    {/* Chart & Recent Activity */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Recent Activity Card - Visible to all roles */}
+                        <div className={`bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 overflow-hidden ${currentRole === 'Operator' ? 'lg:col-span-3' : 'lg:col-span-2'}`}>
+                            <div className="p-6 border-b border-gray-100 bg-gray-50/50">
+                                <h2 className="text-xl font-black text-gray-800 tracking-tight">{t[language].recentLRs}</h2>
                                     </div>
                                     <div className="p-0">
                                         <div className="overflow-x-auto">
@@ -639,15 +641,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
 
                                 {/* Chart Card */}
-                                <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 p-6 flex flex-col">
-                                    <h2 className="text-xl font-black text-gray-800 mb-6 tracking-tight">{t[language].weeklyTrend}</h2>
-                                    <div className="flex-grow flex items-center justify-center min-h-[200px]">
-                                        <FreightTrendChart data={chartData} />
+                                {currentRole !== 'Operator' && (
+                                    <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.1)] transition-shadow duration-300 border border-gray-100 p-6 flex flex-col">
+                                        <h2 className="text-xl font-black text-gray-800 mb-6 tracking-tight">{t[language].weeklyTrend}</h2>
+                                        <div className="flex-grow flex items-center justify-center min-h-[200px]">
+                                            <FreightTrendChart data={chartData} />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        </>
-                    )}
                 </div>
             )}
 

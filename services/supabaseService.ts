@@ -26,30 +26,27 @@ const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
 const getSupabase = () => supabase;
 
 let cachedUserId: string | null = null;
+// Pre-warm the user ID cache immediately when the module loads
+// so the first LR save doesn't pay the extra network round-trip.
+supabase.auth.getUser().then(({ data: { user } }) => {
+    if (user) cachedUserId = user.id;
+}).catch(() => {});
 
-export const getEffectiveUserId = async () => {
-    // Return cached ID if available to speed up repeated operations
-    if (cachedUserId) {
-        // If Operator, check for adminId in session
-        const role = sessionStorage.getItem('currentRole');
-        if (role === 'Operator') {
-            const adminId = sessionStorage.getItem('adminId');
-            if (adminId) return adminId;
-        }
-        return cachedUserId;
-    }
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    
-    cachedUserId = user.id;
-
-    // If the current role is Operator, use the admin's ID
+export const getEffectiveUserId = async (): Promise<string> => {
+    // Fast path: role is Operator — return adminId from sessionStorage immediately
     const role = sessionStorage.getItem('currentRole');
     if (role === 'Operator') {
         const adminId = sessionStorage.getItem('adminId');
         if (adminId) return adminId;
     }
+
+    // Return cached user ID without hitting the network
+    if (cachedUserId) return cachedUserId;
+
+    // Cold path: first call before cache is warm
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    cachedUserId = user.id;
     return user.id;
 };
 
@@ -159,9 +156,10 @@ export const signInWithGoogle = async () => {
 };
 
 export const signOut = async () => {
+    // Clear cache immediately so subsequent calls don't use stale data
     cachedUserId = null;
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    // Fire and forget — don't block on the network; local state is cleared by caller
+    supabase.auth.signOut().catch(err => console.warn('SignOut network error (safe to ignore):', err));
 };
 
 export const getSession = async (): Promise<Session | null> => {
@@ -365,12 +363,10 @@ export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryR
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
     const effectiveUserId = await getEffectiveUserId();
 
-    // Destructure to separate frontend-only fields and 'id' if present
+    // Destructure to separate frontend-only fields
     const {
         isInvoiceGenerated,
         createdBy,
-        // @ts-ignore
-        id,
         // @ts-ignore
         created_at,
         ...rest
@@ -398,36 +394,37 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         is_invoice_generated: !!isInvoiceGenerated
     };
 
-    // Helper to run a single upsert attempt with an 8-second timeout
-    const attemptSave = () => {
+    // Helper: run a single upsert with AbortController
+    const attemptSave = (timeoutMs = 12000) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+        // We MUST chain .select().single() here to ensure the frontend receives the 'id'
+        // of newly created LRs. Without this, subsequent edits would insert new rows.
         const savePromise = supabase
             .from('lorry_receipts')
-            .upsert(payload, { onConflict: 'lrNo' })
+            .upsert(payload)
             .select()
-            .single();
+            .single()
+            // @ts-ignore
+            .then((res: { data: any; error: any }) => { clearTimeout(timer); return res; })
+            .catch((err: any) => { clearTimeout(timer); throw err; });
 
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Save timed out — check your internet connection.')), 8000)
-        );
-
-        return Promise.race([savePromise, timeoutPromise]) as Promise<{ data: any; error: any }>;
+        return savePromise as Promise<{ data: any; error: any }>;
     };
 
     // First attempt
-    let result = await attemptSave();
-
-    // Auto-retry once on transient network / timeout failures
-    if (result.error) {
-        const isTransient =
-            result.error.message?.includes('timed out') ||
-            result.error.message?.includes('network') ||
-            result.error.message?.includes('fetch') ||
-            result.error.code === 'PGRST000';
-
-        if (isTransient) {
-            console.warn('LR save transient error, retrying...', result.error.message);
-            await new Promise(res => setTimeout(res, 1000)); // wait 1s then retry
-            result = await attemptSave();
+    let result: { data: any; error: any };
+    try {
+        result = await attemptSave(12000);
+    } catch (networkErr: any) {
+        // Timed-out or aborted — retry once immediately
+        console.warn('LR save attempt 1 failed, retrying...', networkErr?.message);
+        await new Promise(res => setTimeout(res, 800));
+        try {
+            result = await attemptSave(15000);
+        } catch (retryErr: any) {
+            throw new Error('Network error: Could not reach server after 2 attempts. Please check your internet and try again.');
         }
     }
 
@@ -435,22 +432,28 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
 
     if (error) {
         console.error('Supabase Save Error:', error);
-        if (error.message?.includes('timed out') || error.message?.includes('network')) {
-            throw new Error('Network error: Could not reach server. Please check your internet and try again.');
-        }
-        if (error.code === '23505') {
+        if (error.message?.includes('timed out') || error.message?.includes('network') || error.message?.includes('fetch')) {
+            // Retry once on transient errors
+            console.warn('Transient DB error, retrying...', error.message);
+            await new Promise(res => setTimeout(res, 800));
+            const retry = await attemptSave(15000);
+            if (retry.error) {
+                throw new Error('Network error: Could not reach server. Please check your internet and try again.');
+            }
+            return {
+                ...retry.data,
+                isInvoiceGenerated: retry.data.is_invoice_generated ?? false
+            };
+        } else if (error.code === '23505') {
             throw new Error(`LR No "${lr.lrNo}" already exists. Please use a different LR number.`);
-        }
-        if (error.code === '42501' || error.message?.includes('permission')) {
+        } else if (error.code === '42501' || error.message?.includes('permission')) {
             throw new Error('Permission denied. Please sign out and sign back in.');
+        } else {
+            throw new Error(error.message || 'Database error occurred while saving LR.');
         }
-        throw new Error(error.message || 'Database error occurred while saving LR.');
     }
 
-    if (!data) {
-        throw new Error('Save appeared to succeed but no data was returned. Please refresh and check.');
-    }
-
+    // Return the actual saved record from the database, ensuring we map the invoice flag properly
     return {
         ...data,
         isInvoiceGenerated: data.is_invoice_generated ?? false

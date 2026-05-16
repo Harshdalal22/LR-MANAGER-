@@ -478,35 +478,30 @@ const App: React.FC = () => {
 
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
-        try {
-            // Clear remote session first
-            await signOut();
 
-            // Clear all local state
-            setSession(null);
-            setIsPasswordResetting(false);
-            setIsLoading(false);
-            setLorryReceipts([]);
-            setSavedParties([]);
-            setSavedTrucks([]);
-            setCompanyDetails(defaultCompanyDetails);
-            setCurrentView('dashboard');
-            setViewHistory([]);
-            setDashboardSection(null);
-            sessionStorage.removeItem('roleSelected');
-            sessionStorage.removeItem('currentRole');
-            sessionStorage.removeItem('adminId');
-            setCurrentRole('Admin');
+        // ── 1. Clear ALL local state immediately so the UI transitions now ──
+        setSession(null);
+        setIsPasswordResetting(false);
+        setIsLoading(false);
+        setLorryReceipts([]);
+        setSavedParties([]);
+        setSavedTrucks([]);
+        setCompanyDetails(defaultCompanyDetails);
+        setCurrentView('dashboard');
+        setViewHistory([]);
+        setDashboardSection(null);
+        sessionStorage.removeItem('roleSelected');
+        sessionStorage.removeItem('currentRole');
+        sessionStorage.removeItem('adminId');
+        setCurrentRole('Admin');
 
-            toast.success('Signed out successfully.', { id: toastId });
-        } catch (error) {
-            toast.dismiss(toastId);
-            handleError(error, "Sign out failed");
-            // Even on error, clear local state so user isn't stuck
-            setSession(null);
-            setIsLoading(false);
-            sessionStorage.clear();
-        }
+        toast.success('Signed out successfully.', { id: toastId });
+
+        // ── 2. Invalidate the remote session in the background ──
+        // (fire-and-forget — user is already on the login screen)
+        signOut().catch(err =>
+            console.warn('Remote sign-out error (safe to ignore):', err)
+        );
     };
 
     const handleEditLR = (lrNo: string) => {

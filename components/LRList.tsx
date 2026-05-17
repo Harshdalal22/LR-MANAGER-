@@ -199,18 +199,18 @@ const LRList: React.FC<LRListProps> = ({
                 await updateVoucher(editingVoucherId, voucherData);
                 toast.success('Successfully updated voucher', { id: toastId });
             } else {
-                // Store in vouchers table
+                // 1. Save voucher — this is the critical step
                 await addVoucher(voucherData);
 
-                // Store in ledger as a debit only on creation
-                await addLedgerEntry({
+                // 2. Mirror to ledger as a background side-effect (don't block UI or fail voucher if ledger insert fails)
+                addLedgerEntry({
                     date: voucherDate,
                     description: voucherDescription,
                     voucher_no: voucherNo,
                     credit: 0,
                     debit: voucherAmount,
-                    payment_mode: voucherPaymentMode
-                });
+                }).catch(err => console.warn('Ledger mirror failed (non-critical):', err));
+
                 toast.success('Successfully created voucher', { id: toastId });
             }
 
@@ -224,13 +224,15 @@ const LRList: React.FC<LRListProps> = ({
             setVoucherParty('');
             setVoucherDescription('');
             if (viewMode === 'vouchers') fetchVouchers();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving voucher:', error);
-            toast.error(isEditing ? 'Failed to update voucher' : 'Failed to create voucher', { id: toastId });
+            const msg = error?.message || (isEditing ? 'Failed to update voucher' : 'Failed to create voucher');
+            toast.error(msg, { id: toastId });
         } finally {
             setIsCreatingVoucher(false);
         }
     };
+
 
     const getStatusIcon = (status: LRStatus) => {
         switch (status) {

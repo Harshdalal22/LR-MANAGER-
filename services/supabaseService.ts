@@ -25,6 +25,13 @@ const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
 
 const getSupabase = () => supabase;
 
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
+    return Promise.race([
+        promise,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Network timeout: The server took too long to respond. Please check your connection and try again.')), timeoutMs))
+    ]);
+};
+
 let cachedUserId: string | null = null;
 // Pre-warm the user ID cache immediately when the module loads
 // so the first LR save doesn't pay the extra network round-trip.
@@ -44,7 +51,7 @@ export const getEffectiveUserId = async (): Promise<string> => {
     if (cachedUserId) return cachedUserId;
 
     // Cold path: first call before cache is warm
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await withTimeout(supabase.auth.getUser());
     if (!user) throw new Error('User not authenticated');
     cachedUserId = user.id;
     return user.id;
@@ -178,7 +185,7 @@ export const sendPasswordReset = async (email: string) => {
 };
 
 export const updateUserPassword = async (password: string) => {
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await withTimeout(supabase.auth.updateUser({ password }));
     if (error) throw error;
 };
 
@@ -395,54 +402,14 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     };
 
     // Helper: run a single upsert with timeout
-    const attemptSave = (timeoutMs = 12000) => {
-        // We MUST chain .select().single() here to ensure the frontend receives the 'id'
-        // of newly created LRs. Without this, subsequent edits would insert new rows.
-        const savePromise = supabase
-            .from('lorry_receipts')
-            .upsert(payload)
-            .select()
-            .single();
-
-        const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) => {
-            setTimeout(() => reject(new Error('Request timed out')), timeoutMs);
-        });
-
-        return Promise.race([savePromise, timeoutPromise]);
-    };
-
-    // First attempt
-    let result: { data: any; error: any };
-    try {
-        result = await attemptSave(12000);
-    } catch (networkErr: any) {
-        // Timed-out or aborted — retry once immediately
-        console.warn('LR save attempt 1 failed, retrying...', networkErr?.message);
-        await new Promise(res => setTimeout(res, 800));
-        try {
-            result = await attemptSave(15000);
-        } catch (retryErr: any) {
-            throw new Error('Network error: Could not reach server after 2 attempts. Please check your internet and try again.');
-        }
-    }
-
-    const { data, error } = result;
+    const { data, error } = await withTimeout(
+        supabase.from('lorry_receipts').upsert(payload).select().single(),
+        8000
+    );
 
     if (error) {
         console.error('Supabase Save Error:', error);
-        if (error.message?.includes('timed out') || error.message?.includes('network') || error.message?.includes('fetch')) {
-            // Retry once on transient errors
-            console.warn('Transient DB error, retrying...', error.message);
-            await new Promise(res => setTimeout(res, 800));
-            const retry = await attemptSave(15000);
-            if (retry.error) {
-                throw new Error('Network error: Could not reach server. Please check your internet and try again.');
-            }
-            return {
-                ...retry.data,
-                isInvoiceGenerated: retry.data.is_invoice_generated ?? false
-            };
-        } else if (error.code === '23505') {
+        if (error.code === '23505') {
             throw new Error(`LR No "${lr.lrNo}" already exists. Please use a different LR number.`);
         } else if (error.code === '42501' || error.message?.includes('permission')) {
             throw new Error('Permission denied. Please sign out and sign back in.');
@@ -459,27 +426,27 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
 };
 
 export const deleteLorryReceipt = async (lrNo: string) => {
-    const { error } = await supabase.from('lorry_receipts').delete().eq('lrNo', lrNo);
+    const { error } = await withTimeout(supabase.from('lorry_receipts').delete().eq('lrNo', lrNo));
     if (error) throw error;
 };
 
 export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus) => {
-    const { error } = await supabase
+    const { error } = await withTimeout(supabase
         .from('lorry_receipts')
         .update({ status, status_updated_at: new Date().toISOString() })
-        .eq('lrNo', lrNo);
+        .eq('lrNo', lrNo));
     if (error) throw error;
 };
 
 export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
-    const { error } = await supabase
+    const { error } = await withTimeout(supabase
         .from('lorry_receipts')
         .update({
             invoiceNo,
             invoiceDate: invoiceDate || null, // Ensure empty string becomes null
             is_invoice_generated: true // Must be snake_case based on DB fix script
         })
-        .in('lrNo', lrNos);
+        .in('lrNo', lrNos));
     if (error) throw error;
 }
 
@@ -557,11 +524,11 @@ export const updateCompanyDetails = async (details: CompanyDetails): Promise<Com
         signature_image_url: details.signatureImageUrl
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await withTimeout(supabase
         .from('company_details')
         .upsert(payload)
         .select()
-        .single();
+        .single());
 
     if (error) throw error;
     return data;
@@ -614,11 +581,11 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
 
     // Use upsert to handle both insert and update scenarios and avoid Primary Key violations
     // We specify onConflict: 'user_id' to ensure we update if the user already has a record
-    let result = await supabase
+    let result = await withTimeout(supabase
         .from('company_details')
         .upsert(payload, { onConflict: 'user_id' })
         .select()
-        .single();
+        .single());
 
     if (result.error) {
         console.error('❌ Supabase error details:', {
@@ -637,11 +604,11 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
             delete (fallbackPayload as any).admin_passkey;
             delete (fallbackPayload as any).manager_passkey;
 
-            const fallbackResult = await supabase
+            const fallbackResult = await withTimeout(supabase
                 .from('company_details')
                 .upsert(fallbackPayload, { onConflict: 'user_id' })
                 .select()
-                .single();
+                .single());
 
             if (!fallbackResult.error) {
                 // Fallback succeeded!
@@ -762,14 +729,9 @@ export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
 };
 
 export const addLedgerEntry = async (entry: Partial<LedgerEntry>) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("No authenticated user");
+    const finalUserId = await getEffectiveUserId();
 
-    // For operators, assign to admin's account
-    const { data: appUser } = await supabase.from('app_users').select('admin_id').eq('operator_id', user.id).single();
-    const finalUserId = appUser?.admin_id || user.id;
-
-    const { data, error } = await supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select();
+    const { data, error } = await withTimeout(supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select());
     if (error) throw error;
     return data[0];
 };
@@ -793,19 +755,15 @@ export const getVouchers = async (): Promise<Voucher[]> => {
 };
 
 export const addVoucher = async (voucher: Partial<Voucher>) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("No authenticated user");
+    const finalUserId = await getEffectiveUserId();
 
-    const { data: appUser } = await supabase.from('app_users').select('admin_id').eq('operator_id', user.id).single();
-    const finalUserId = appUser?.admin_id || user.id;
-
-    const { data, error } = await supabase.from('vouchers').insert([{ ...voucher, user_id: finalUserId }]).select();
+    const { data, error } = await withTimeout(supabase.from('vouchers').insert([{ ...voucher, user_id: finalUserId }]).select());
     if (error) throw error;
     return data[0];
 };
 
 export const updateVoucher = async (id: string, voucherUpdates: Partial<Voucher>) => {
-    const { data, error } = await supabase.from('vouchers').update(voucherUpdates).eq('id', id).select();
+    const { data, error } = await withTimeout(supabase.from('vouchers').update(voucherUpdates).eq('id', id).select());
     if (error) throw error;
     return data[0];
 };
@@ -851,10 +809,9 @@ export const getGPSInvoices = async (): Promise<GPSInvoice[]> => {
 };
 
 export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("No authenticated user");
+    const finalUserId = await getEffectiveUserId();
 
-    const payload = { ...invoice, user_id: user.id };
+    const payload = { ...invoice, user_id: finalUserId };
     
     // Map camelCase to snake_case
     const dbPayload = {
@@ -879,7 +836,7 @@ export const saveGPSInvoice = async (invoice: GPSInvoice): Promise<GPSInvoice> =
         user_id: payload.user_id
     };
 
-    const { data, error } = await supabase.from('gps_invoices').upsert(dbPayload).select().single();
+    const { data, error } = await withTimeout(supabase.from('gps_invoices').upsert(dbPayload).select().single());
     if (error) throw error;
     
     // Map snake_case back to camelCase

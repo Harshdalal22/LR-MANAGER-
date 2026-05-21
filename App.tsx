@@ -422,9 +422,11 @@ const App: React.FC = () => {
             } else {
                 navigateTo('list');
             }
-        } catch (error) {
+        } catch (error: any) {
             toast.dismiss(toastId);
-            handleError(error, "Failed to save LR");
+            const msg = error?.message || 'Unknown error';
+            console.error('LR Save Failed:', msg);
+            toast.error(`Failed to save LR: ${msg}`, { duration: 8000 });
         }
     };
 

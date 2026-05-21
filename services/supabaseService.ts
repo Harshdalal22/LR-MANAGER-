@@ -25,11 +25,33 @@ const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
 
 const getSupabase = () => supabase;
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 8000): Promise<T> => {
+const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 30000): Promise<T> => {
     return Promise.race([
         promise,
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Network timeout: The server took too long to respond. Please check your connection and try again.')), timeoutMs))
     ]);
+};
+
+// Retry a database call up to `attempts` times with exponential backoff
+const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500): Promise<T> => {
+    let lastError: any;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            return await fn();
+        } catch (err: any) {
+            lastError = err;
+            // Don't retry on known permanent errors
+            const msg = err?.message || '';
+            if (msg.includes('23505') || msg.includes('already exists') || msg.includes('not authenticated') || msg.includes('permission')) {
+                throw err;
+            }
+            if (i < attempts - 1) {
+                console.warn(`Supabase call failed (attempt ${i + 1}/${attempts}), retrying in ${delayMs * (i + 1)}ms...`, err.message);
+                await new Promise(res => setTimeout(res, delayMs * (i + 1)));
+            }
+        }
+    }
+    throw lastError;
 };
 
 let cachedUserId: string | null = null;
@@ -50,11 +72,12 @@ export const getEffectiveUserId = async (): Promise<string> => {
     // Return cached user ID without hitting the network
     if (cachedUserId) return cachedUserId;
 
-    // Cold path: first call before cache is warm
-    const { data: { user } } = await withTimeout(supabase.auth.getUser());
-    if (!user) throw new Error('User not authenticated');
-    cachedUserId = user.id;
-    return user.id;
+    // Cold path: fetch from local session instead of making a network request
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) throw new Error('User not authenticated');
+    
+    cachedUserId = session.user.id;
+    return session.user.id;
 };
 
 export const checkOperatorRole = async () => {
@@ -401,22 +424,26 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         is_invoice_generated: !!isInvoiceGenerated
     };
 
-    // Helper: run a single upsert with timeout
-    const { data, error } = await withTimeout(
-        supabase.from('lorry_receipts').upsert(payload).select().single(),
-        8000
-    );
+    // Retry up to 3 times with exponential backoff — handles cold-start & transient errors
+    const data = await withRetry(async () => {
+        const { data, error } = await supabase
+            .from('lorry_receipts')
+            .upsert(payload)
+            .select()
+            .single();
 
-    if (error) {
-        console.error('Supabase Save Error:', error);
-        if (error.code === '23505') {
-            throw new Error(`LR No "${lr.lrNo}" already exists. Please use a different LR number.`);
-        } else if (error.code === '42501' || error.message?.includes('permission')) {
-            throw new Error('Permission denied. Please sign out and sign back in.');
-        } else {
-            throw new Error(error.message || 'Database error occurred while saving LR.');
+        if (error) {
+            console.error('Supabase LR Save Error:', JSON.stringify(error));
+            if (error.code === '23505') {
+                throw new Error(`LR No "${lr.lrNo}" already exists. Please use a different LR number.`);
+            } else if (error.code === '42501' || error.message?.includes('permission')) {
+                throw new Error('Permission denied. Please sign out and sign back in.');
+            } else {
+                throw new Error(`DB Error [${error.code}]: ${error.message || 'Unknown database error while saving LR.'}`);
+            }
         }
-    }
+        return data;
+    }, 3, 2000);
 
     // Return the actual saved record from the database, ensuring we map the invoice flag properly
     return {
@@ -731,7 +758,7 @@ export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
 export const addLedgerEntry = async (entry: Partial<LedgerEntry>) => {
     const finalUserId = await getEffectiveUserId();
 
-    const { data, error } = await withTimeout(supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select());
+    const { data, error } = await supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select();
     if (error) throw error;
     return data[0];
 };
@@ -757,15 +784,32 @@ export const getVouchers = async (): Promise<Voucher[]> => {
 export const addVoucher = async (voucher: Partial<Voucher>) => {
     const finalUserId = await getEffectiveUserId();
 
-    const { data, error } = await withTimeout(supabase.from('vouchers').insert([{ ...voucher, user_id: finalUserId }]).select());
-    if (error) throw error;
-    return data[0];
+    return withRetry(async () => {
+        const { data, error } = await supabase
+            .from('vouchers')
+            .insert([{ ...voucher, user_id: finalUserId }])
+            .select();
+        if (error) {
+            console.error('SUPABASE VOUCHER INSERT ERROR:', JSON.stringify(error));
+            throw new Error(`Voucher DB Error [${error.code}]: ${error.message}`);
+        }
+        return data[0];
+    }, 3, 2000);
 };
 
 export const updateVoucher = async (id: string, voucherUpdates: Partial<Voucher>) => {
-    const { data, error } = await withTimeout(supabase.from('vouchers').update(voucherUpdates).eq('id', id).select());
-    if (error) throw error;
-    return data[0];
+    return withRetry(async () => {
+        const { data, error } = await supabase
+            .from('vouchers')
+            .update(voucherUpdates)
+            .eq('id', id)
+            .select();
+        if (error) {
+            console.error('SUPABASE VOUCHER UPDATE ERROR:', JSON.stringify(error));
+            throw new Error(`Voucher Update DB Error [${error.code}]: ${error.message}`);
+        }
+        return data[0];
+    }, 3, 2000);
 };
 
 export const subscribeToVouchers = (callback: (payload: any) => void) => {

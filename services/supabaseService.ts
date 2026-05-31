@@ -55,13 +55,6 @@ const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500):
     throw lastError;
 };
 
-let cachedUserId: string | null = null;
-// Pre-warm the user ID cache immediately when the module loads
-// so the first LR save doesn't pay the extra network round-trip.
-supabase.auth.getUser().then(({ data: { user } }) => {
-    if (user) cachedUserId = user.id;
-}).catch(() => {});
-
 export const getEffectiveUserId = async (): Promise<string> => {
     // Fast path: role is Operator — return adminId from sessionStorage immediately
     const role = sessionStorage.getItem('currentRole');
@@ -70,14 +63,10 @@ export const getEffectiveUserId = async (): Promise<string> => {
         if (adminId) return adminId;
     }
 
-    // Return cached user ID without hitting the network
-    if (cachedUserId) return cachedUserId;
-
-    // Cold path: fetch from local session instead of making a network request
+    // Always fetch from local session (instant, memory-cached in SDK, zero network cost)
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) throw new Error('User not authenticated');
     
-    cachedUserId = session.user.id;
     return session.user.id;
 };
 
@@ -368,10 +357,10 @@ export const applySession = async (sessionData: any) => {
 // --- Lorry Receipts ---
 
 export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
-    const { data, error } = await supabase
-        .from('lorry_receipts')
-        .select('*')
-        .order('date', { ascending: false });
+    const { data, error } = await withTimeout(
+        supabase.from('lorry_receipts').select('*').order('date', { ascending: false }),
+        15000
+    );
     if (error) throw error;
 
     // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated for frontend
@@ -757,7 +746,10 @@ export const deleteBookingRecord = async (id: string) => {
 // --- Ledger Entries ---
 
 export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
-    const { data, error } = await supabase.from('ledger_entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data, error } = await withTimeout(
+        supabase.from('ledger_entries').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+        15000
+    );
     if (error && error.code !== 'PGRST116') throw error;
     return data || [];
 };
@@ -765,7 +757,10 @@ export const getLedgerEntries = async (): Promise<LedgerEntry[]> => {
 export const addLedgerEntry = async (entry: Partial<LedgerEntry>) => {
     const finalUserId = await getEffectiveUserId();
 
-    const { data, error } = await supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select();
+    const { data, error } = await withTimeout(
+        supabase.from('ledger_entries').insert([{ ...entry, user_id: finalUserId }]).select(),
+        15000
+    );
     if (error) throw error;
     return data[0];
 };
@@ -783,7 +778,10 @@ export const subscribeToLedgerEntries = (callback: (payload: any) => void) => {
 // --- Vouchers ---
 
 export const getVouchers = async (): Promise<Voucher[]> => {
-    const { data, error } = await supabase.from('vouchers').select('*').order('date', { ascending: false }).order('created_at', { ascending: false });
+    const { data, error } = await withTimeout(
+        supabase.from('vouchers').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+        15000
+    );
     if (error && error.code !== 'PGRST116') throw error;
     return data || [];
 };

@@ -37,7 +37,8 @@ const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500):
     let lastError: any;
     for (let i = 0; i < attempts; i++) {
         try {
-            return await fn();
+            // Ensure each attempt times out after 15 seconds to prevent indefinite hangs
+            return await withTimeout(fn(), 15000);
         } catch (err: any) {
             lastError = err;
             // Don't retry on known permanent errors
@@ -428,7 +429,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
     const data = await withRetry(async () => {
         const { data, error } = await supabase
             .from('lorry_receipts')
-            .upsert(payload)
+            .upsert(payload, { onConflict: 'lrNo' })
             .select()
             .single();
 
@@ -676,7 +677,10 @@ export const getSavedParties = async (): Promise<SavedParty[]> => {
 export const saveSavedParty = async (party: SavedParty): Promise<SavedParty> => {
     const effectiveUserId = await getEffectiveUserId();
     const payload = { ...party, user_id: effectiveUserId };
-    const { data, error } = await supabase.from('saved_parties').upsert(payload).select().single();
+    const { data, error } = await withTimeout(
+        supabase.from('saved_parties').upsert(payload).select().single(),
+        15000
+    );
     if (error) throw error;
     return data;
 };
@@ -695,7 +699,10 @@ export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
 export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
     const effectiveUserId = await getEffectiveUserId();
     const payload = { ...truck, user_id: effectiveUserId };
-    const { data, error } = await supabase.from('saved_trucks').upsert(payload).select().single();
+    const { data, error } = await withTimeout(
+        supabase.from('saved_trucks').upsert(payload).select().single(),
+        15000
+    );
     if (error) throw error;
     return data;
 };

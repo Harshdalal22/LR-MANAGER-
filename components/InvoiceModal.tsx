@@ -22,9 +22,10 @@ interface InvoiceContentProps {
     billNo: string;
     billDate: string;
     taxType: 'intra' | 'inter';
+    showGst: boolean;  // NEW: toggle GST on/off
 }
 
-const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryReceipts, companyDetails, billNo, billDate, taxType }, ref) => {
+const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryReceipts, companyDetails, billNo, billDate, taxType, showGst }, ref) => {
     // Sort LRs by LR Number ascending for the PDF/Preview
     const sortedLorryReceipts = useMemo(() => {
         return [...lorryReceipts].sort((a, b) => 
@@ -37,9 +38,10 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
         return sum + (Number(lr.freight) || 0) + totalCharges;
     }, 0);
 
-    const totalCgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
-    const totalSgst = taxType === 'intra' ? totalAmount * 0.09 : 0;
-    const totalIgst = taxType === 'inter' ? totalAmount * 0.18 : 0;
+    // GST amounts — only applied when showGst is true
+    const totalCgst = (showGst && taxType === 'intra') ? totalAmount * 0.09 : 0;
+    const totalSgst = (showGst && taxType === 'intra') ? totalAmount * 0.09 : 0;
+    const totalIgst = (showGst && taxType === 'inter') ? totalAmount * 0.18 : 0;
     
     const netAmount = totalAmount + totalCgst + totalSgst + totalIgst;
     const amountInWords = toWords(Math.round(netAmount));
@@ -52,7 +54,9 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
     return (
         <div ref={ref} className="printable-area p-4 bg-white text-black font-['Calibri',sans-serif] w-[680px] mx-auto border border-gray-600 text-sm">
             <div className="text-center text-black">
-                <h2 className="font-bold text-xl underline tracking-wider mb-1">TAX INVOICE</h2>
+                <h2 className="font-bold text-xl underline tracking-wider mb-1">
+                    {showGst ? 'TAX INVOICE' : 'INVOICE'}
+                </h2>
                 {companyDetails.jurisdictionCity && <p className="text-xs">SUBJECT TO {companyDetails.jurisdictionCity.toUpperCase()} JURISDICTION</p>}
             </div>
             
@@ -65,7 +69,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                 </div>
                 <div className="w-1/2 text-center text-black">
                     <h1 className="text-3xl font-bold text-red-600 whitespace-nowrap">{companyDetails.name}</h1>
-                    <p className="font-bold text-base">(Fleet Owner & Contractor)</p>
+                    <p className="font-bold text-base">(Fleet Owner &amp; Contractor)</p>
                     <p className="text-xs mt-1">{companyDetails.address}</p>
                     <p className="text-xs">
                         Mail-{companyDetails.email}, Web-{companyDetails.web}
@@ -87,7 +91,11 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     <p className="font-bold">DATE : {formattedBillDate}</p>
                 </div>
             </div>
-            <p className="font-bold text-black mt-2">GST :- {billedTo.gst}</p>
+
+            {/* GST line — only shown when showGst is ON */}
+            {showGst && (
+                <p className="font-bold text-black mt-2">GST :- {billedTo.gst}</p>
+            )}
 
             {/* Table */}
             <table className="w-full border-collapse border border-gray-600 mt-2 text-xs text-black">
@@ -130,8 +138,9 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                 <tfoot className="text-black font-bold text-xs">
                     <tr>
                         <td colSpan={6} className="border border-gray-600 p-1 align-top">
-                            <p>GSTIN : {companyDetails.gstn}</p>
-                            <p className="mt-1">
+                            {/* GSTIN only when GST is enabled */}
+                            {showGst && <p>GSTIN : {companyDetails.gstn}</p>}
+                            <p className={showGst ? 'mt-1' : ''}>
                                 <span>PAN No. : {companyDetails.pan}</span>
                                 {companyDetails.sacCode && <span className="ml-4 font-bold">SAC CODE - {companyDetails.sacCode}</span>}
                             </p>
@@ -150,7 +159,8 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                                         <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">AMOUNT</td>
                                         <td className="border-b border-gray-600 p-1 text-right bg-blue-100 text-black">{totalAmount.toFixed(2)}</td>
                                     </tr>
-                                    {taxType === 'intra' && (
+                                    {/* GST rows — only shown when showGst is ON */}
+                                    {showGst && taxType === 'intra' && (
                                         <>
                                             <tr>
                                                 <td className="border-b border-gray-600 p-1 bg-blue-100 text-black">CGST (9%)</td>
@@ -162,7 +172,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                                             </tr>
                                         </>
                                     )}
-                                    {taxType === 'inter' && (
+                                    {showGst && taxType === 'inter' && (
                                          <tr>
                                             <td className="p-1 border-b border-gray-600 bg-blue-100 text-black">IGST (18%)</td>
                                             <td className="p-1 text-right border-b border-gray-600 bg-blue-100 text-black">{totalIgst.toFixed(2)}</td>
@@ -205,6 +215,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
     const [billNo, setBillNo] = useState('');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
     const [taxType, setTaxType] = useState<'intra' | 'inter'>('intra');
+    const [showGst, setShowGst] = useState(true);   // NEW: default ON
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
@@ -235,9 +246,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                              const num = parseInt(match[1], 10);
                              if (num > maxNum) {
                                  maxNum = num;
-                                 // We keep the exact invoiceNo that gave us maxNum
-                                 // This handles the case where prefix is missing or different
-                                 fallbackLatestNo = lr.invoiceNo; // We just use fallbackLatestNo to store the absolute best match
+                                 fallbackLatestNo = lr.invoiceNo;
                              }
                          }
                      }
@@ -246,14 +255,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                  if (fallbackLatestNo) {
                      setBillNo(getNextSequence(fallbackLatestNo));
                  } else {
-                     // 1. Get Prefix: First 3 alphabets of company name (Uppercase)
                      const companyName = companyDetails.name || '';
-                     // Filter out symbols, spaces, numbers - keep only A-Z
                      const cleanName = companyName.replace(/[^a-zA-Z]/g, '');
-                     // Take first 3 chars, default to 'INV' if empty
                      const prefix = (cleanName.substring(0, 3) || 'INV').toUpperCase();
-                     
-                     // Set format: ABC-0001
                      setBillNo(`${prefix}-0001`);
                  }
              }
@@ -329,11 +333,34 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                                 value={taxType}
                                 onChange={(e) => setTaxType(e.target.value as 'intra' | 'inter')}
                                 className="p-1 border rounded-md text-sm"
+                                disabled={!showGst}
                             >
-                                <option value="intra">CGST & SGST</option>
+                                <option value="intra">CGST &amp; SGST</option>
                                 <option value="inter">IGST</option>
                             </select>
                         </div>
+
+                        {/* ── NEW: GST Toggle ── */}
+                        <div className="flex flex-col items-center justify-center">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Include GST</label>
+                            <button
+                                type="button"
+                                onClick={() => setShowGst(prev => !prev)}
+                                title={showGst ? 'Click to hide GST' : 'Click to show GST'}
+                                className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 ${
+                                    showGst ? 'bg-green-500' : 'bg-gray-300'
+                                }`}
+                            >
+                                <span className={`inline-block w-5 h-5 bg-white rounded-full shadow transform transition-transform duration-300 ${
+                                    showGst ? 'translate-x-6' : 'translate-x-1'
+                                }`} />
+                            </button>
+                            <span className={`text-[11px] font-bold mt-0.5 ${showGst ? 'text-green-600' : 'text-gray-400'}`}>
+                                {showGst ? '✓ With GST' : '✗ No GST'}
+                            </span>
+                        </div>
+                        {/* ── END GST Toggle ── */}
+
                     </div>
                     <div className="flex items-center space-x-2">
                         {onSaveInvoiceDetails && (
@@ -355,7 +382,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({ isOpen, onClose, lorryRecei
                     </div>
                 </div>
                 <div className="p-2 sm:p-4 overflow-x-auto">
-                    <InvoiceContent ref={previewRef} lorryReceipts={lorryReceipts} companyDetails={companyDetails} billNo={billNo} billDate={billDate} taxType={taxType} />
+                    <InvoiceContent
+                        ref={previewRef}
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        billNo={billNo}
+                        billDate={billDate}
+                        taxType={taxType}
+                        showGst={showGst}
+                    />
                 </div>
             </div>
         </div>

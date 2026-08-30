@@ -363,11 +363,25 @@ export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
     );
     if (error) throw error;
 
-    // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated for frontend
-    return (data || []).map((item: any) => ({
-        ...item,
-        isInvoiceGenerated: item.isInvoiceGenerated ?? item.is_invoice_generated ?? false
-    }));
+    // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated and unwrap metadata from JSONB
+    return (data || []).map((item: any) => {
+        const charges = item.charges || {};
+        return {
+            ...item,
+            isInvoiceGenerated: item.isInvoiceGenerated ?? item.is_invoice_generated ?? false,
+            driverName: item.driverName ?? charges.driverName ?? '',
+            driverContact: item.driverContact ?? charges.driverContact ?? '',
+            vehicleType: item.vehicleType ?? charges.vehicleType ?? '',
+            advancePaid: Number(item.advancePaid ?? charges.advancePaid ?? 0),
+            freightBasis: item.freightBasis ?? charges.freightBasis ?? 'TO PAY',
+            insuranceCompany: item.insuranceCompany ?? charges.insuranceCompany ?? '',
+            insurancePolicyNo: item.insurancePolicyNo ?? charges.insurancePolicyNo ?? '',
+            transitRisk: item.transitRisk ?? charges.transitRisk ?? "Owner's Risk",
+            hsnCode: item.hsnCode ?? charges.hsnCode ?? '',
+            templateStyle: item.templateStyle ?? charges.templateStyle ?? 'modern-gst',
+            copyType: item.copyType ?? charges.copyType ?? 'CONSIGNOR COPY',
+        };
+    });
 };
 
 export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryReceipt[]> => {
@@ -389,6 +403,17 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         createdBy,
         // @ts-ignore
         created_at,
+        driverName,
+        driverContact,
+        vehicleType,
+        advancePaid,
+        freightBasis,
+        insuranceCompany,
+        insurancePolicyNo,
+        transitRisk,
+        hsnCode,
+        templateStyle,
+        copyType,
         ...rest
     } = lr;
 
@@ -407,6 +432,22 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
             sanitizedRest[field] = Number(sanitizedRest[field]) || 0;
         }
     });
+
+    // Embed extended metadata inside charges JSONB for zero-migration safety
+    sanitizedRest.charges = {
+        ...(sanitizedRest.charges || {}),
+        driverName: driverName || '',
+        driverContact: driverContact || '',
+        vehicleType: vehicleType || '',
+        advancePaid: Number(advancePaid) || 0,
+        freightBasis: freightBasis || 'TO PAY',
+        insuranceCompany: insuranceCompany || '',
+        insurancePolicyNo: insurancePolicyNo || '',
+        transitRisk: transitRisk || "Owner's Risk",
+        hsnCode: hsnCode || '',
+        templateStyle: templateStyle || 'modern-gst',
+        copyType: copyType || 'CONSIGNOR COPY',
+    };
 
     const payload = {
         ...sanitizedRest,
@@ -435,10 +476,23 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         return data;
     }, 3, 2000);
 
+    const charges = data.charges || {};
+
     // Return the actual saved record from the database, ensuring we map the invoice flag properly
     return {
         ...data,
-        isInvoiceGenerated: data.is_invoice_generated ?? false
+        isInvoiceGenerated: data.is_invoice_generated ?? false,
+        driverName: data.driverName ?? charges.driverName ?? driverName ?? '',
+        driverContact: data.driverContact ?? charges.driverContact ?? driverContact ?? '',
+        vehicleType: data.vehicleType ?? charges.vehicleType ?? vehicleType ?? '',
+        advancePaid: Number(data.advancePaid ?? charges.advancePaid ?? advancePaid ?? 0),
+        freightBasis: data.freightBasis ?? charges.freightBasis ?? freightBasis ?? 'TO PAY',
+        insuranceCompany: data.insuranceCompany ?? charges.insuranceCompany ?? insuranceCompany ?? '',
+        insurancePolicyNo: data.insurancePolicyNo ?? charges.insurancePolicyNo ?? insurancePolicyNo ?? '',
+        transitRisk: data.transitRisk ?? charges.transitRisk ?? transitRisk ?? "Owner's Risk",
+        hsnCode: data.hsnCode ?? charges.hsnCode ?? hsnCode ?? '',
+        templateStyle: data.templateStyle ?? charges.templateStyle ?? templateStyle ?? 'modern-gst',
+        copyType: data.copyType ?? charges.copyType ?? copyType ?? 'CONSIGNOR COPY',
     };
 };
 

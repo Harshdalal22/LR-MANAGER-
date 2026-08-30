@@ -12,6 +12,11 @@ export interface Item {
     description: string;
     pcs: number;
     weight: number;
+    hsn?: string;
+    packingDetails?: string;
+    chargedWeight?: number;
+    rate?: number;
+    unit?: string;
 }
 
 export interface BankDetails {
@@ -29,6 +34,9 @@ export interface DetailedCharges {
     ddCharge: number;
     otherCharge: number;
     riskCharge: number;
+    tollTax?: number;
+    advancePaid?: number;
+    [key: string]: any;
 }
 
 export type LRStatus = 'Booked' | 'In Transit' | 'Out for Delivery' | 'Delivered' | 'Cancelled';
@@ -83,6 +91,19 @@ export interface LorryReceipt {
     user_id?: string;
     // Fix: Added missing property to satisfy TypeScript in service functions
     isInvoiceGenerated?: boolean;
+
+    // Modern GST BiltyBook extended fields
+    driverName?: string;
+    driverContact?: string;
+    vehicleType?: string;
+    advancePaid?: number;
+    freightBasis?: 'TO PAY' | 'PAID' | 'TO BE BILLED' | string;
+    insuranceCompany?: string;
+    insurancePolicyNo?: string;
+    transitRisk?: string;
+    hsnCode?: string;
+    templateStyle?: 'modern-gst' | 'classic';
+    copyType?: 'CONSIGNOR COPY' | 'CONSIGNEE COPY' | 'TRANSPORTER COPY' | 'DRIVER COPY' | string;
 }
 
 export interface CompanyDetails {

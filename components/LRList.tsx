@@ -831,6 +831,8 @@ const LRList: React.FC<LRListProps> = ({
                                         companyDetails={companyDetails}
                                         showCompanyDetails={true}
                                         showAmounts={bulkPrintShowAmounts}
+                                        templateStyle={lr.templateStyle || 'modern-gst'}
+                                        copyType={lr.copyType || 'CONSIGNOR COPY'}
                                     />
                                     {index < selectedLRs.size - 1 && <div className="page-break" />}
                                 </div>

@@ -155,22 +155,29 @@ const Header: React.FC<HeaderProps> = ({
 
 
     return (
-        <header className="bg-ssk-blue text-white shadow-lg sticky top-0 z-30">
-            <div className="container mx-auto p-2 sm:p-4 flex flex-row justify-between items-center gap-1 sm:gap-4">
-                <div className="flex items-center space-x-1.5 sm:space-x-4 flex-1 mr-1">
-                    {companyDetails.logoUrl && (
-                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-8 sm:h-12 w-auto max-w-[48px] sm:max-w-[96px] object-contain bg-white p-0.5 sm:p-1 rounded-sm shrink-0" />
+        <header className="bg-slate-100/90 backdrop-blur-md text-slate-800 border-b border-slate-200 shadow-xs sticky top-0 z-30 transition-all">
+            <div className="container mx-auto px-3 sm:px-6 py-2.5 flex flex-row justify-between items-center gap-2 sm:gap-4">
+                {/* Brand Logo & Name */}
+                <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                    {companyDetails.logoUrl ? (
+                        <img src={companyDetails.logoUrl} alt="Logo" className="h-8 sm:h-10 w-auto max-w-[40px] sm:max-w-[60px] object-contain rounded-xl shadow-xs" />
+                    ) : (
+                        <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-400 text-white font-black flex items-center justify-center text-xs shadow-xs">
+                            🚛
+                        </div>
                     )}
-                    <h1 className="text-[9px] min-[380px]:text-[10px] sm:text-xl md:text-2xl font-black uppercase leading-tight break-words" style={{ lineHeight: '1.2' }}>
-                        {companyDetails.name}
+                    <h1 className="text-sm sm:text-lg md:text-xl font-black italic tracking-tight text-slate-900 truncate font-serif">
+                        {companyDetails.name || 'SSK Cargo Services Pvt'}
                     </h1>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-4 shrink-0">
 
+                {/* Right Actions & User Controls */}
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    {/* Role Tag */}
                     {!isOperator && companyDetails.rbacEnabled && (
-                        <div className="flex items-center bg-white/10 rounded-lg p-0.5 sm:p-1 border border-white/20">
-                            <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold rounded ${currentRole === 'Admin' ? 'bg-ssk-red text-white' : 'bg-gray-500 text-white'}`}>
-                                {currentRole === 'Admin' ? 'Adm' : currentRole}
+                        <div className="flex items-center bg-white rounded-xl p-1 border border-slate-200 shadow-xs">
+                            <span className={`px-2 py-0.5 text-[10px] sm:text-xs font-black rounded-lg ${currentRole === 'Admin' ? 'bg-rose-500 text-white' : 'bg-slate-600 text-white'}`}>
+                                {currentRole === 'Admin' ? 'Admin' : currentRole}
                             </span>
                             <button
                                 onClick={() => {
@@ -180,58 +187,70 @@ const Header: React.FC<HeaderProps> = ({
                                         setIsPasskeyModalOpen(true);
                                     }
                                 }}
-                                className="ml-1 sm:ml-2 px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-semibold bg-white text-ssk-blue rounded hover:bg-gray-100"
+                                className="ml-1 px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
                             >
-                                Sw
+                                Switch
                             </button>
                         </div>
                     )}
-                    
+
                     {isOperator && (
-                        <div className="flex items-center bg-white/10 rounded-lg p-0.5 sm:p-1 border border-white/20">
-                            <span className="px-1.5 py-0.5 sm:px-2 sm:py-1 text-[10px] sm:text-xs font-bold rounded bg-green-500 text-white">
+                        <div className="flex items-center bg-white rounded-xl p-1 border border-slate-200 shadow-xs">
+                            <span className="px-2 py-0.5 text-[10px] font-black rounded-lg bg-emerald-500 text-white">
                                 Operator
                             </span>
                         </div>
                     )}
 
-                    {/* Language Switcher */}
-                    <div className="flex items-center bg-blue-800 rounded-full p-0.5 sm:p-1 border border-blue-600">
+                    {/* Notification Bell */}
+                    <button className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 shadow-xs transition-colors" title="Notifications">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                    </button>
+
+                    {/* Language Switcher Pill */}
+                    <div className="flex items-center bg-white rounded-full p-0.5 border border-slate-200 shadow-xs">
                         <button
                             onClick={() => setLanguage('en')}
-                            className={`px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all ${language === 'en' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${language === 'en' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                         >
                             EN
                         </button>
                         <button
                             onClick={() => setLanguage('hi')}
-                            className={`px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold transition-all ${language === 'hi' ? 'bg-white text-ssk-blue shadow-sm' : 'text-blue-200 hover:text-white'}`}
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${language === 'hi' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
                         >
                             HI
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2 sm:gap-4">
-                        {userEmail && <span className="hidden md:inline-block text-sm font-medium">{userEmail}</span>}
+                    {/* User Profile / Email */}
+                    <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-xs text-xs font-semibold text-slate-700">
+                        {userEmail && <span className="hidden sm:inline-block font-mono text-[11px] text-slate-600">{userEmail}</span>}
                         {onSignOut && (
                             <button
                                 onClick={onSignOut}
-                                className="bg-ssk-red text-white px-2 py-1 sm:px-3 sm:py-1.5 rounded text-[10px] sm:text-sm font-semibold hover:bg-red-700 transition-colors whitespace-nowrap"
+                                className="text-slate-400 hover:text-rose-600 transition-colors"
+                                title="Sign Out"
                             >
-                                Sign Out
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
                             </button>
                         )}
                     </div>
+
+                    {/* Admin / Settings Controls */}
                     {!isOperator && (
-                        <div className="flex gap-1 sm:gap-2">
+                        <div className="flex gap-1">
                             {currentRole === 'Admin' && onOpenAdminPanel && (
                                 <button
                                     onClick={onOpenAdminPanel}
-                                    className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
+                                    className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 shadow-xs transition-colors"
                                     title="Admin Control Center"
-                                    aria-label="Open Admin Control Center"
                                 >
-                                    <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                    <UsersIcon className="w-4 h-4" />
                                 </button>
                             )}
                             <button
@@ -239,10 +258,10 @@ const Header: React.FC<HeaderProps> = ({
                                     setLocalDetails(companyDetails);
                                     setIsSettingsOpen(true);
                                 }}
-                                className="p-1 sm:p-2 rounded-full hover:bg-white/20 transition-colors"
-                                aria-label="Open Settings"
+                                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 shadow-xs transition-colors"
+                                title="Settings"
                             >
-                                <CogIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                                <CogIcon className="w-4 h-4" />
                             </button>
                         </div>
                     )}

@@ -294,10 +294,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                 <tr key={idx} className="hover:bg-slate-50">
                                     <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">{idx + 1}</td>
                                     <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">
-                                        {item.pcs} {item.packingDetails || 'Pkgs'}
+                                        {item.pcs > 0 ? `${item.pcs} ${item.packingDetails || 'Pkgs'}` : (item.packingDetails ? item.packingDetails : '--')}
                                     </td>
                                     <td className="p-1 border-r border-slate-200 align-top">
-                                        <div className="font-black text-slate-900 uppercase">{item.description}</div>
+                                        <div className="font-black text-slate-900 uppercase">{item.description || '---'}</div>
                                         {item.packingDetails && (
                                             <div className="text-[7.5px] text-slate-500 font-medium">Packing: {item.packingDetails}</div>
                                         )}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
-import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon } from './icons';
+import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon, DownloadIcon, WhatsAppIcon, PrintIcon } from './icons';
 import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
@@ -24,6 +24,7 @@ const initialChargesState: DetailedCharges = {
     hamail: 0, surCharge: 0, stCharge: 0, collectionCharge: 0, ddCharge: 0, otherCharge: 0, riskCharge: 0, tollTax: 0, advancePaid: 0
 };
 
+// 100% CLEAN, ZEROED OUT FRESH STATE
 const initialLRState: LorryReceipt = {
     lrNo: '',
     lrType: 'Original',
@@ -45,7 +46,7 @@ const initialLRState: LorryReceipt = {
     consignor: { ...initialPartyState },
     consignee: { ...initialPartyState },
     billingTo: { ...initialPartyState },
-    items: [{ description: 'High Precision Engine Gaskets & Auto Parts', pcs: 140, weight: 4250, chargedWeight: 4500, packingDetails: 'Boxes', rate: 7.5, unit: 'Kg', hsn: '87082900' }],
+    items: [{ description: '', pcs: 0, weight: 0, chargedWeight: 0, packingDetails: '', rate: 0, unit: 'Kg', hsn: '' }],
     weight: 0,
     actualWeightMT: 0,
     freight: 0,
@@ -56,25 +57,19 @@ const initialLRState: LorryReceipt = {
     status: 'Booked',
     driverName: '',
     driverContact: '',
-    vehicleType: '32 Ft MXL',
+    vehicleType: '',
     advancePaid: 0,
     freightBasis: 'TO PAY',
     insuranceCompany: '',
     insurancePolicyNo: '',
     transitRisk: "Owner's Risk (Consignor Insured)",
-    hsnCode: '87082900',
+    hsnCode: '',
     templateStyle: 'modern-gst',
     copyType: 'CONSIGNOR COPY'
 };
 
-const Fieldset: React.FC<{ legend: string; children: React.ReactNode; className?: string }> = ({ legend, children, className = '' }) => (
-    <fieldset className="border border-gray-300 p-4 rounded-xl mb-6 shadow-lg bg-white/50 backdrop-blur-sm">
-        <legend className="px-2 font-bold text-base text-ssk-blue">{legend}</legend>
-        <div className={className}>
-            {children}
-        </div>
-    </fieldset>
-);
+const VEHICLE_PRESETS = ['14 Ft Open', '19 Ft Container', '20 Ft Container', '32 Ft SXL', '32 Ft MXL', '40 Ft Trailer', 'Taurus 10-Wheeler'];
+const PACKING_PRESETS = ['Boxes', 'Cartons', 'Drums', 'Bags', 'Wooden Cases', 'Pallets', 'Loose Units'];
 
 const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDetails, lorryReceipts, savedParties = [], savedTrucks = [], language }) => {
     const [formData, setFormData] = useState<LorryReceipt>(initialLRState);
@@ -83,6 +78,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [livePreviewTemplate, setLivePreviewTemplate] = useState<'modern-gst' | 'classic'>('modern-gst');
     const [livePreviewCopy, setLivePreviewCopy] = useState<string>('CONSIGNOR COPY');
+    const [previewScale, setPreviewScale] = useState<number>(0.82);
 
     useEffect(() => {
         if (existingLR) {
@@ -108,19 +104,22 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                     setBillingPartyType(savedBilling || 'Consignor');
                 } catch (e) {
                     console.error('Failed to parse draft LR data');
-                    setFormData(initialLRState);
-                    setBillingPartyType('Consignor');
+                    resetToCleanState();
                 }
             } else {
-                let nextLrNo = '';
-                if (lorryReceipts && lorryReceipts.length > 0) {
-                    nextLrNo = getNextSequence(lorryReceipts[0].lrNo);
-                }
-                setFormData({ ...initialLRState, lrNo: nextLrNo });
-                setBillingPartyType('Consignor');
+                resetToCleanState();
             }
         }
     }, [existingLR, lorryReceipts]);
+
+    const resetToCleanState = () => {
+        let nextLrNo = '';
+        if (lorryReceipts && lorryReceipts.length > 0) {
+            nextLrNo = getNextSequence(lorryReceipts[0].lrNo);
+        }
+        setFormData({ ...initialLRState, lrNo: nextLrNo });
+        setBillingPartyType('Consignor');
+    };
 
     // Auto-save draft to local storage whenever formData or billingPartyType changes
     useEffect(() => {
@@ -206,7 +205,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const addItem = () => {
         setFormData(prev => ({
             ...prev,
-            items: [...prev.items, { description: '', pcs: 0, weight: 0, packingDetails: 'Boxes', hsn: prev.hsnCode || '996511' }]
+            items: [...prev.items, { description: '', pcs: 0, weight: 0, chargedWeight: 0, packingDetails: '', rate: 0, unit: 'Kg', hsn: prev.hsnCode || '996511' }]
         }));
     };
 
@@ -233,7 +232,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.lrNo || !formData.truckNo || !formData.fromPlace || !formData.toPlace || !formData.consignor.name || !formData.consignee.name) {
-            toast.error('Please fill all required fields marked with *.');
+            toast.error('Please fill all required fields marked with * (LR No, Truck No, From, To, Consignor, Consignee).');
             return;
         }
 
@@ -257,17 +256,13 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         }
     };
 
-    const handleCreateNew = () => {
-        if (window.confirm('Are you sure you want to discard current changes and create a new LR?')) {
+    // Clean Fresh Reset
+    const handleResetFresh = () => {
+        if (window.confirm('Reset all fields to a fresh, clean LR with zero values?')) {
             localStorage.removeItem('lr_draft_data');
             localStorage.removeItem('lr_draft_billing');
-
-            let nextLrNo = '';
-            if (lorryReceipts && lorryReceipts.length > 0) {
-                nextLrNo = getNextSequence(lorryReceipts[0].lrNo);
-            }
-            setFormData({ ...initialLRState, lrNo: nextLrNo });
-            setBillingPartyType('Consignor');
+            resetToCleanState();
+            toast.success('Form reset to fresh clean state!');
         }
     };
 
@@ -371,7 +366,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         setFormData(sampleLR);
         setBillingPartyType('Consignor');
         setLivePreviewTemplate('modern-gst');
-        toast.success('Loaded Speedway / Apex Sample GST LR!');
+        toast.success('Loaded Speedway / Apex Sample GST Bilty!');
     };
 
     const handleAiAutofill = async () => {
@@ -417,80 +412,111 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         }
     };
 
-    const renderPartySection = (title: string, partyKey: 'consignor' | 'consignee' | 'billingTo') => {
+    const renderPartySection = (title: string, icon: string, partyKey: 'consignor' | 'consignee' | 'billingTo') => {
         const isDisabled = partyKey === 'billingTo' && billingPartyType !== 'Other';
-        const disabledClass = isDisabled ? 'bg-gray-100 cursor-not-allowed' : 'text-gray-900 placeholder-gray-500';
+        const disabledClass = isDisabled ? 'bg-slate-100/70 text-slate-500 cursor-not-allowed border-slate-200' : 'bg-white text-slate-900 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
         const relevantParties = savedParties;
 
         return (
-            <div className="border border-gray-300 rounded-lg overflow-hidden shadow-sm">
-                <h3 className="bg-ssk-red text-white p-2 font-bold text-sm uppercase">{title}</h3>
-                <div className="p-2 space-y-1.5 bg-white">
-                    <input
-                        list={`list-${partyKey}`}
-                        name="name"
-                        value={formData[partyKey].name}
-                        onChange={(e) => handlePartyChange(partyKey, e)}
-                        placeholder="NAME *"
-                        className={`w-full text-xs p-1.5 border rounded-md ${disabledClass}`}
-                        disabled={isDisabled}
-                        autoComplete="off"
-                        required={partyKey !== 'billingTo'}
-                    />
-                    <datalist id={`list-${partyKey}`}>
-                        {relevantParties.map(p => (
-                            <option key={p.id || p.name} value={p.name} />
-                        ))}
-                    </datalist>
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 hover:shadow-md transition-all duration-200">
+                <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">{icon}</span>
+                        <h4 className="font-extrabold text-sm text-slate-800 tracking-wide uppercase">{title}</h4>
+                    </div>
+                    {partyKey !== 'billingTo' && (
+                        <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100">
+                            Required *
+                        </span>
+                    )}
+                </div>
 
-                    <textarea
-                        name="address"
-                        value={formData[partyKey].address}
-                        onChange={(e) => handlePartyChange(partyKey, e)}
-                        placeholder="ADDRESS"
-                        className={`w-full text-xs p-1.5 border rounded-md ${disabledClass}`}
-                        rows={2}
-                        disabled={isDisabled}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2.5">
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Company / Party Name *</label>
                         <input
-                            type="text"
-                            name="city"
-                            value={formData[partyKey].city}
+                            list={`list-${partyKey}`}
+                            name="name"
+                            value={formData[partyKey].name}
                             onChange={(e) => handlePartyChange(partyKey, e)}
-                            placeholder="CITY"
-                            className={`w-full text-xs p-1.5 border rounded-md ${disabledClass}`}
+                            placeholder="Enter or select party name..."
+                            className={`w-full text-xs p-2 rounded-xl font-bold uppercase ${disabledClass}`}
                             disabled={isDisabled}
+                            autoComplete="off"
+                            required={partyKey !== 'billingTo'}
                         />
-                        <input
-                            type="text"
-                            name="contact"
-                            value={formData[partyKey].contact}
+                        <datalist id={`list-${partyKey}`}>
+                            {relevantParties.map(p => (
+                                <option key={p.id || p.name} value={p.name} />
+                            ))}
+                        </datalist>
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Address</label>
+                        <textarea
+                            name="address"
+                            value={formData[partyKey].address}
                             onChange={(e) => handlePartyChange(partyKey, e)}
-                            placeholder="CONTACT / PHONE"
-                            className={`w-full text-xs p-1.5 border rounded-md ${disabledClass}`}
+                            placeholder="Street, Industrial Area, Sector..."
+                            className={`w-full text-xs p-2 rounded-xl ${disabledClass}`}
+                            rows={2}
                             disabled={isDisabled}
                         />
                     </div>
+
                     <div className="grid grid-cols-2 gap-2">
-                        <input
-                            type="text"
-                            name="gst"
-                            value={formData[partyKey].gst}
-                            onChange={(e) => handlePartyChange(partyKey, e)}
-                            placeholder="GSTIN"
-                            className={`w-full text-xs p-1.5 border rounded-md uppercase font-mono ${disabledClass}`}
-                            disabled={isDisabled}
-                        />
-                        <input
-                            type="text"
-                            name="pan"
-                            value={formData[partyKey].pan}
-                            onChange={(e) => handlePartyChange(partyKey, e)}
-                            placeholder="PAN NO"
-                            className={`w-full text-xs p-1.5 border rounded-md uppercase font-mono ${disabledClass}`}
-                            disabled={isDisabled}
-                        />
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">City / State</label>
+                            <input
+                                type="text"
+                                name="city"
+                                value={formData[partyKey].city}
+                                onChange={(e) => handlePartyChange(partyKey, e)}
+                                placeholder="e.g. Pune, MH"
+                                className={`w-full text-xs p-2 rounded-xl ${disabledClass}`}
+                                disabled={isDisabled}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Phone / Mobile</label>
+                            <input
+                                type="text"
+                                name="contact"
+                                value={formData[partyKey].contact}
+                                onChange={(e) => handlePartyChange(partyKey, e)}
+                                placeholder="9876543210"
+                                className={`w-full text-xs p-2 rounded-xl ${disabledClass}`}
+                                disabled={isDisabled}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">GSTIN</label>
+                            <input
+                                type="text"
+                                name="gst"
+                                value={formData[partyKey].gst}
+                                onChange={(e) => handlePartyChange(partyKey, e)}
+                                placeholder="27AABCM7788P1Z9"
+                                className={`w-full text-xs p-2 rounded-xl font-mono uppercase font-semibold ${disabledClass}`}
+                                disabled={isDisabled}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">PAN No</label>
+                            <input
+                                type="text"
+                                name="pan"
+                                value={formData[partyKey].pan}
+                                onChange={(e) => handlePartyChange(partyKey, e)}
+                                placeholder="AABCM7788P"
+                                className={`w-full text-xs p-2 rounded-xl font-mono uppercase ${disabledClass}`}
+                                disabled={isDisabled}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -511,413 +537,626 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const advancePaid = Number(formData.advancePaid ?? charges.advancePaid ?? 0);
     const netBalanceToPay = Math.max(0, totalFreight - advancePaid);
 
-    const inputClass = "w-full p-2 border border-gray-300 bg-white rounded-md text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-ssk-blue focus:border-transparent transition-all duration-200";
-    const labelClass = "block text-xs font-bold text-gray-600 uppercase mb-1";
+    const inputBase = "w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 shadow-xs";
+    const labelBase = "block text-[11px] font-bold text-slate-700 uppercase mb-1 tracking-wider";
 
     return (
-        <div className="flex flex-col xl:flex-row gap-8 items-start">
-            {/* Form Section */}
-            <div className="w-full xl:w-3/5">
-                <div className="flex items-center gap-4 mb-6 border-b pb-4 justify-between flex-wrap">
+        <div className="flex flex-col xl:flex-row gap-6 items-start max-w-[1700px] mx-auto pb-12">
+            {/* Main Form Section */}
+            <div className="w-full xl:w-7/12 space-y-6">
+                {/* God-Tier Top Glassmorphism Navigation Bar */}
+                <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl p-4 rounded-2xl border border-slate-200/80 shadow-md flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <button onClick={onCancel} className="p-2 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-600 hover:text-blue-600 transition-all group" title="Back">
-                            <ArrowLeftIcon className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" />
+                        <button
+                            onClick={onCancel}
+                            className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shadow-xs"
+                            title="Back"
+                        >
+                            <ArrowLeftIcon className="w-5 h-5" />
                         </button>
                         <div>
-                            <h2 className="text-xl font-extrabold text-slate-800">
-                                {existingLR ? 'Edit Lorry Receipt / Bilty' : 'Create GST Bilty (Lorry Receipt)'}
-                            </h2>
-                            <p className="text-xs text-slate-500 font-medium">Generate compliant Consignment Notes</p>
+                            <div className="flex items-center gap-2">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                                <h1 className="text-lg font-black text-slate-900 tracking-tight">
+                                    {existingLR ? 'Edit Consignment Note' : 'Create GST Bilty (Lorry Receipt)'}
+                                </h1>
+                            </div>
+                            <p className="text-xs text-slate-500 font-medium">Clean, fresh, and zero-error GST logistics workflow</p>
                         </div>
                     </div>
 
+                    {/* Quick Action Buttons */}
                     <div className="flex items-center flex-wrap gap-2">
+                        {/* Reset / Fresh Button */}
+                        <button
+                            type="button"
+                            onClick={handleResetFresh}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors border border-slate-200"
+                            title="Reset all fields to 0 / empty"
+                        >
+                            <span>🔄</span> Reset Clean
+                        </button>
+
                         {/* 1-Click Speedway Sample Generator */}
                         <button
                             type="button"
                             onClick={handleLoadSampleLR}
-                            className="flex items-center bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-2 rounded-md font-bold hover:from-amber-600 hover:to-orange-600 transition-all text-xs sm:text-sm shadow-md"
-                            title="Instantly fills the form with Speedway Logistics / Apex Automotive sample data"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs shadow-sm transition-all"
+                            title="Load realistic sample data matching reference design"
                         >
-                            <span className="mr-1">⚡</span>
-                            Load Sample LR
+                            <span>⚡</span> Load Sample LR
                         </button>
-                        <button onClick={onCancel} className="flex items-center bg-white text-gray-700 px-3 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-xs sm:text-sm shadow-sm border">
-                            <ListIcon className="w-4 h-4 mr-1.5" />
-                            {t[language].viewList}
-                        </button>
-                        <button onClick={handleCreateNew} className="flex items-center bg-white text-gray-700 px-3 py-2 rounded-md font-semibold hover:bg-gray-100 transition-colors text-xs sm:text-sm shadow-sm border">
-                            <CreateIcon className="w-4 h-4 mr-1.5" />
-                            {t[language].createLR}
-                        </button>
+
+                        {/* AI Autofill */}
                         <button
+                            type="button"
                             onClick={handleAiAutofill}
                             disabled={isAiLoading || !formData.truckNo || !formData.fromPlace || !formData.toPlace}
-                            className="flex items-center bg-purple-600 text-white px-3 py-2 rounded-md font-semibold hover:bg-purple-700 transition-colors text-xs sm:text-sm disabled:bg-gray-400 disabled:cursor-not-allowed shadow-md"
+                            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs disabled:bg-slate-300 disabled:cursor-not-allowed shadow-sm transition-all"
                         >
-                            <SparklesIcon className="w-4 h-4 mr-1.5" />
-                            {isAiLoading ? 'Thinking...' : t[language].aiAutofill}
+                            <SparklesIcon className="w-4 h-4" />
+                            {isAiLoading ? 'Analyzing...' : 'AI Autofill'}
                         </button>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    {/* 1. Core Route & LR Details */}
-                    <Fieldset legend={t[language].coreDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-x-4 gap-y-3">
-                        <div>
-                            <label className={labelClass}>{t[language].lrType}*</label>
-                            <div className="flex items-center space-x-3 h-10">
-                                <label className="flex items-center text-xs font-semibold cursor-pointer">
-                                    <input type="radio" name="lrType" value="Original" checked={formData.lrType === 'Original'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue" />
-                                    <span className="ml-1 text-slate-800">Original</span>
-                                </label>
-                                <label className="flex items-center text-xs font-semibold cursor-pointer">
-                                    <input type="radio" name="lrType" value="Dummy" checked={formData.lrType === 'Dummy'} onChange={handleChange} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue" />
-                                    <span className="ml-1 text-slate-800">Dummy</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>{t[language].truckNo}*</label>
-                            <input
-                                list="trucks-list"
-                                type="text"
-                                name="truckNo"
-                                placeholder="HR-12-AU-2864"
-                                value={formData.truckNo}
-                                onChange={handleChange}
-                                className={`${inputClass} font-bold font-mono uppercase`}
-                                required
-                                autoComplete="off"
-                            />
-                            <datalist id="trucks-list">
-                                {savedTrucks.map(t => <option key={t.id || t.truckNo} value={t.truckNo} />)}
-                            </datalist>
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>Vehicle Type / Dim</label>
-                            <input
-                                type="text"
-                                name="vehicleType"
-                                placeholder="32 Ft MXL / Open"
-                                value={formData.vehicleType || ''}
-                                onChange={handleChange}
-                                className={inputClass}
-                            />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>{t[language].cNoteNo}*</label>
-                            <input
-                                type="text"
-                                name="lrNo"
-                                placeholder="SWL-2026-0892"
-                                value={formData.lrNo}
-                                onChange={handleChange}
-                                className={`${inputClass} font-black font-mono text-blue-700`}
-                                required
-                                disabled={!!existingLR}
-                            />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>{t[language].date}*</label>
-                            <input type="date" name="date" value={formData.date} onChange={handleChange} className={inputClass} required />
-                        </div>
-
-                        <div>
-                            <label className={labelClass}>Freight Basis</label>
-                            <select
-                                name="freightBasis"
-                                value={formData.freightBasis || 'TO PAY'}
-                                onChange={handleChange}
-                                className={`${inputClass} font-bold`}
-                            >
-                                <option value="TO PAY">TO PAY (Consignee)</option>
-                                <option value="PAID">PAID (Consignor)</option>
-                                <option value="TO BE BILLED">TO BE BILLED (TBB)</option>
-                            </select>
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className={labelClass}>{t[language].fromPlace} (Source/Origin)*</label>
-                            <input type="text" name="fromPlace" placeholder="GURGAON (HR)" value={formData.fromPlace} onChange={handleChange} className={`${inputClass} font-bold uppercase`} required />
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className={labelClass}>{t[language].toPlace} (Destination)*</label>
-                            <input type="text" name="toPlace" placeholder="MUMBAI (MH)" value={formData.toPlace} onChange={handleChange} className={`${inputClass} font-bold uppercase`} required />
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className={labelClass}>Driver Name</label>
-                            <input type="text" name="driverName" placeholder="Rajesh Kumar" value={formData.driverName || ''} onChange={handleChange} className={inputClass} />
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className={labelClass}>Driver Contact / Mobile</label>
-                            <input type="text" name="driverContact" placeholder="9876543210" value={formData.driverContact || ''} onChange={handleChange} className={inputClass} />
-                        </div>
-                    </Fieldset>
-
-                    {/* 2. Shipment & Statutory Details */}
-                    <Fieldset legend={t[language].shipmentDetails} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">
-                        <div><label className={labelClass}>{t[language].invoice}</label><input type="text" name="invoiceNo" placeholder="AAC/26-27/0419" value={formData.invoiceNo} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>{t[language].invoiceAmount}</label><input type="number" name="invoiceAmount" placeholder="1485000" value={formData.invoiceAmount || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>{t[language].invoiceDate}</label><input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>HSN / SAC Code</label><input type="text" name="hsnCode" placeholder="87082900" value={formData.hsnCode || ''} onChange={handleChange} className={inputClass} /></div>
-
-                        <div><label className={labelClass}>{t[language].ewayBillNo}</label><input type="text" name="ewayBillNo" placeholder="5819 2840 1928" value={formData.ewayBillNo} onChange={handleChange} className={`${inputClass} font-mono`} /></div>
-                        <div><label className={labelClass}>{t[language].ewayBillDate}</label><input type="date" name="ewayBillDate" value={formData.ewayBillDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>E-Way Valid Upto</label><input type="date" name="ewayExDate" value={formData.ewayExDate || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div><label className={labelClass}>{t[language].poNo}</label><input type="text" name="poNo" placeholder="PO-PUN-9821" value={formData.poNo} onChange={handleChange} className={inputClass} /></div>
-
-                        <div className="md:col-span-2"><label className={labelClass}>Insurance Policy No / Insurer</label><input type="text" name="insurancePolicyNo" placeholder="ICICI-LOMB-77210940 • ICICI Lombard" value={formData.insurancePolicyNo || ''} onChange={handleChange} className={inputClass} /></div>
-                        <div className="md:col-span-2"><label className={labelClass}>{t[language].addressOfDelivery}</label><input type="text" name="addressOfDelivery" placeholder="Gate 3, MIDC Chakan, Pune" value={formData.addressOfDelivery} onChange={handleChange} className={inputClass} /></div>
-                    </Fieldset>
-
-                    {/* 3. Billing Selection */}
-                    <Fieldset legend={t[language].billingDetails} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className={labelClass}>{t[language].billingParty}</label>
-                            <div className="flex items-center space-x-4 mt-2">
-                                <label className="flex items-center text-xs font-semibold cursor-pointer">
-                                    <input id="bill_consignor" type="radio" name="billingPartyType" value="Consignor" checked={billingPartyType === 'Consignor'} onChange={() => setBillingPartyType('Consignor')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue" />
-                                    <span className="ml-1.5">{t[language].consignor}</span>
-                                </label>
-                                <label className="flex items-center text-xs font-semibold cursor-pointer">
-                                    <input id="bill_consignee" type="radio" name="billingPartyType" value="Consignee" checked={billingPartyType === 'Consignee'} onChange={() => setBillingPartyType('Consignee')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue" />
-                                    <span className="ml-1.5">{t[language].consignee}</span>
-                                </label>
-                                <label className="flex items-center text-xs font-semibold cursor-pointer">
-                                    <input id="bill_other" type="radio" name="billingPartyType" value="Other" checked={billingPartyType === 'Other'} onChange={() => setBillingPartyType('Other')} className="h-4 w-4 text-ssk-blue focus:ring-ssk-blue" />
-                                    <span className="ml-1.5">{t[language].other}</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div>
-                            <label className={labelClass}>{t[language].gstPaidBy}</label>
-                            <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputClass}>
-                                <option value="Consignor">{t[language].consignor} (RCM)</option>
-                                <option value="Consignee">{t[language].consignee} (RCM)</option>
-                                <option value="Transporter">{t[language].transporter} (Forward Charge)</option>
-                            </select>
-                        </div>
-                    </Fieldset>
-
-                    {/* 4. Parties Grid */}
-                    <Fieldset legend={t[language].partyDetails} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {renderPartySection(t[language].consignor, 'consignor')}
-                        {renderPartySection(t[language].consignee, 'consignee')}
-                        {billingPartyType === 'Other' && renderPartySection(t[language].billingParty, 'billingTo')}
-                    </Fieldset>
-
-                    {/* 5. Goods / Items Details */}
-                    <div className="border border-gray-300 p-3 rounded-xl shadow-lg bg-white/50 backdrop-blur-sm mb-6">
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="font-bold text-base text-gray-800">{t[language].itemDetails}</h3>
-                            <button type="button" onClick={addItem} className="flex items-center bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors shadow-sm border border-blue-200">
-                                <PlusIcon className="w-4 h-4 mr-1" />
-                                {t[language].addRow}
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-12 gap-2 bg-slate-100 p-2 rounded-t-md font-bold text-slate-700 text-left text-xs">
-                            <div className="col-span-1 text-center">#</div>
-                            <div className="col-span-4">{t[language].description} & Packing</div>
-                            <div className="col-span-2">Pkgs / Units</div>
-                            <div className="col-span-2">Actual Wt (Kg)</div>
-                            <div className="col-span-2">Charged Wt (Kg)</div>
-                            <div className="col-span-1"></div>
-                        </div>
-                        <div className="border-l border-r border-b border-gray-200 rounded-b-md bg-white divide-y divide-gray-100">
-                            {formData.items.map((item, index) => (
-                                <div key={index} className="grid grid-cols-12 gap-2 items-center p-2">
-                                    <div className="col-span-1 text-center font-bold text-gray-500">{index + 1}</div>
-                                    <div className="col-span-4 space-y-1">
-                                        <input
-                                            type="text"
-                                            value={item.description}
-                                            onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                                            className="w-full p-1.5 border rounded-md text-xs font-bold uppercase"
-                                            placeholder="Description of Goods"
-                                        />
-                                        <div className="grid grid-cols-2 gap-1">
-                                            <input
-                                                type="text"
-                                                value={item.packingDetails || ''}
-                                                onChange={(e) => handleItemChange(index, 'packingDetails', e.target.value)}
-                                                className="w-full p-1 border rounded-md text-[11px]"
-                                                placeholder="Packing (e.g. Boxes, Drums)"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={item.hsn || ''}
-                                                onChange={(e) => handleItemChange(index, 'hsn', e.target.value)}
-                                                className="w-full p-1 border rounded-md text-[11px] font-mono"
-                                                placeholder="HSN Code"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <input
-                                            type="number"
-                                            value={item.pcs || ''}
-                                            onChange={(e) => handleItemChange(index, 'pcs', parseInt(e.target.value) || 0)}
-                                            className="w-full p-1.5 border rounded-md text-xs font-bold text-center"
-                                            placeholder="140"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <input
-                                            type="number"
-                                            value={item.weight || ''}
-                                            onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)}
-                                            className="w-full p-1.5 border rounded-md text-xs font-bold text-right"
-                                            placeholder="4250"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <input
-                                            type="number"
-                                            value={item.chargedWeight || ''}
-                                            onChange={(e) => handleItemChange(index, 'chargedWeight', parseFloat(e.target.value) || 0)}
-                                            className="w-full p-1.5 border rounded-md text-xs font-bold text-right"
-                                            placeholder="4500"
-                                        />
-                                    </div>
-                                    <div className="col-span-1 text-right">
-                                        {formData.items.length > 1 && (
-                                            <button type="button" onClick={() => removeItem(index)} className="p-1 text-red-500 hover:text-red-700 rounded-full hover:bg-red-50">
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* SECTION 1: ROUTE & VEHICLE LOGISTICS */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                                <span className="p-2 rounded-xl bg-blue-50 text-blue-700 font-bold text-base">🚚</span>
+                                <div>
+                                    <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">1. Route & Vehicle Logistics</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium">Source, destination, vehicle number & driver contact</p>
                                 </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="flex items-center text-xs font-bold text-slate-700 cursor-pointer">
+                                    <input type="radio" name="lrType" value="Original" checked={formData.lrType === 'Original'} onChange={handleChange} className="h-4 w-4 text-blue-600 focus:ring-blue-500 mr-1.5" />
+                                    Original
+                                </label>
+                                <label className="flex items-center text-xs font-bold text-slate-700 cursor-pointer">
+                                    <input type="radio" name="lrType" value="Dummy" checked={formData.lrType === 'Dummy'} onChange={handleChange} className="h-4 w-4 text-blue-600 focus:ring-blue-500 mr-1.5" />
+                                    Dummy
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            {/* LR Number */}
+                            <div className="lg:col-span-2">
+                                <label className={labelBase}>LR / C Note No *</label>
+                                <input
+                                    type="text"
+                                    name="lrNo"
+                                    placeholder="e.g. SWL-2026-0892"
+                                    value={formData.lrNo}
+                                    onChange={handleChange}
+                                    className={`${inputBase} font-mono font-black text-blue-700 text-sm`}
+                                    required
+                                />
+                            </div>
+
+                            {/* LR Date */}
+                            <div className="lg:col-span-2">
+                                <label className={labelBase}>LR Date *</label>
+                                <input
+                                    type="date"
+                                    name="date"
+                                    value={formData.date}
+                                    onChange={handleChange}
+                                    className={inputBase}
+                                    required
+                                />
+                            </div>
+
+                            {/* Freight Basis */}
+                            <div className="lg:col-span-2">
+                                <label className={labelBase}>Freight Basis *</label>
+                                <select
+                                    name="freightBasis"
+                                    value={formData.freightBasis || 'TO PAY'}
+                                    onChange={handleChange}
+                                    className={`${inputBase} font-bold`}
+                                >
+                                    <option value="TO PAY">TO PAY (Consignee)</option>
+                                    <option value="PAID">PAID (Consignor)</option>
+                                    <option value="TO BE BILLED">TO BE BILLED (TBB)</option>
+                                </select>
+                            </div>
+
+                            {/* Origin / Source */}
+                            <div className="lg:col-span-3">
+                                <label className={labelBase}>Origin / Source City *</label>
+                                <input
+                                    type="text"
+                                    name="fromPlace"
+                                    placeholder="e.g. GURGAON (HR)"
+                                    value={formData.fromPlace}
+                                    onChange={handleChange}
+                                    className={`${inputBase} uppercase font-bold text-slate-800`}
+                                    required
+                                />
+                            </div>
+
+                            {/* Destination */}
+                            <div className="lg:col-span-3">
+                                <label className={labelBase}>Destination / Delivery City *</label>
+                                <input
+                                    type="text"
+                                    name="toPlace"
+                                    placeholder="e.g. MUMBAI (MH)"
+                                    value={formData.toPlace}
+                                    onChange={handleChange}
+                                    className={`${inputBase} uppercase font-bold text-slate-800`}
+                                    required
+                                />
+                            </div>
+
+                            {/* Vehicle Number */}
+                            <div className="lg:col-span-2">
+                                <label className={labelBase}>Vehicle / Truck No *</label>
+                                <input
+                                    list="trucks-list"
+                                    type="text"
+                                    name="truckNo"
+                                    placeholder="HR-12-AU-2864"
+                                    value={formData.truckNo}
+                                    onChange={handleChange}
+                                    className={`${inputBase} font-mono uppercase font-black tracking-wider text-slate-900`}
+                                    required
+                                    autoComplete="off"
+                                />
+                                <datalist id="trucks-list">
+                                    {savedTrucks.map(t => <option key={t.id || t.truckNo} value={t.truckNo} />)}
+                                </datalist>
+                            </div>
+
+                            {/* Vehicle Type / Dimension */}
+                            <div className="lg:col-span-2">
+                                <label className={labelBase}>Vehicle Dimension / Type</label>
+                                <input
+                                    type="text"
+                                    name="vehicleType"
+                                    placeholder="32 Ft MXL / Container"
+                                    value={formData.vehicleType || ''}
+                                    onChange={handleChange}
+                                    className={inputBase}
+                                />
+                            </div>
+
+                            {/* Driver Name */}
+                            <div className="lg:col-span-1">
+                                <label className={labelBase}>Driver Name</label>
+                                <input
+                                    type="text"
+                                    name="driverName"
+                                    placeholder="Rajesh Kumar"
+                                    value={formData.driverName || ''}
+                                    onChange={handleChange}
+                                    className={inputBase}
+                                />
+                            </div>
+
+                            {/* Driver Phone */}
+                            <div className="lg:col-span-1">
+                                <label className={labelBase}>Driver Phone</label>
+                                <input
+                                    type="text"
+                                    name="driverContact"
+                                    placeholder="9876543210"
+                                    value={formData.driverContact || ''}
+                                    onChange={handleChange}
+                                    className={inputBase}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Quick Vehicle Type Chips */}
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase mr-1">Quick Select:</span>
+                            {VEHICLE_PRESETS.map(type => (
+                                <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => setFormData(prev => ({ ...prev, vehicleType: type }))}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold border transition-all ${formData.vehicleType === type ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                                >
+                                    {type}
+                                </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* 6. Weight & Rate Section */}
-                    <Fieldset legend={t[language].weightRate} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <label className={labelClass}>{t[language].totalPkgsWeight} (Kg)</label>
-                            <input type="number" name="weight" value={formData.weight} readOnly placeholder="Auto-calculated" className={`${inputClass} bg-gray-100 cursor-not-allowed font-bold`} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>Charged Weight (Kg)</label>
-                            <input type="number" name="chargedWeight" placeholder="4500" value={formData.chargedWeight || ''} onChange={handleChange} className={`${inputClass} font-bold`} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>{t[language].rate}</label>
-                            <input type="number" step="0.01" name="rate" value={formData.rate || ''} onChange={handleChange} placeholder="7.50" className={`${inputClass} font-bold text-blue-700`} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>{t[language].calcBasis}</label>
-                            <select name="rateOn" value={formData.rateOn} onChange={handleChange} className={`${inputClass} font-semibold`}>
-                                <option value="Kg">Per Kg</option>
-                                <option value="Ton">Per Ton (MT)</option>
-                                <option value="Fixed">Fixed Amount (Manual)</option>
-                            </select>
-                        </div>
-                    </Fieldset>
+                    {/* SECTION 2: CONSIGNOR & CONSIGNEE PARTIES */}
+                    <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-3 flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="p-2 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-base">🏢</span>
+                                <div>
+                                    <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">2. Consignor & Consignee Parties</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium">Sender and receiver company credentials</p>
+                                </div>
+                            </div>
 
-                    {/* 7. Charges Breakdown */}
-                    <Fieldset legend={t[language].chargesBreakdown} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        <div><label className={labelClass}>Loading / Hamali</label><input type="number" name="hamail" value={formData.charges.hamail || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                        <div><label className={labelClass}>Door Delivery</label><input type="number" name="ddCharge" value={formData.charges.ddCharge || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                        <div><label className={labelClass}>Statistical / LR</label><input type="number" name="stCharge" value={formData.charges.stCharge || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                        <div><label className={labelClass}>Toll / Green Tax</label><input type="number" name="tollTax" value={formData.charges.tollTax || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                        <div><label className={labelClass}>Surcharge / Risk</label><input type="number" name="surCharge" value={formData.charges.surCharge || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                        <div><label className={labelClass}>Other Charges</label><input type="number" name="otherCharge" value={formData.charges.otherCharge || ''} onChange={handleChargeChange} placeholder="0" className={inputClass} /></div>
-                    </Fieldset>
+                            {/* Billing Party Selection */}
+                            <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold">
+                                <span className="text-slate-500 font-bold">Billing Party:</span>
+                                <label className="flex items-center cursor-pointer">
+                                    <input type="radio" name="billingPartyType" value="Consignor" checked={billingPartyType === 'Consignor'} onChange={() => setBillingPartyType('Consignor')} className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 mr-1" />
+                                    Consignor
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input type="radio" name="billingPartyType" value="Consignee" checked={billingPartyType === 'Consignee'} onChange={() => setBillingPartyType('Consignee')} className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 mr-1" />
+                                    Consignee
+                                </label>
+                                <label className="flex items-center cursor-pointer">
+                                    <input type="radio" name="billingPartyType" value="Other" checked={billingPartyType === 'Other'} onChange={() => setBillingPartyType('Other')} className="h-3.5 w-3.5 text-blue-600 focus:ring-blue-500 mr-1" />
+                                    Other Party
+                                </label>
+                            </div>
+                        </div>
 
-                    {/* 8. Totals & Advance Breakdown */}
-                    <Fieldset legend={t[language].totals} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div>
-                            <label className={labelClass}>{t[language].freight}</label>
-                            <input
-                                type="number"
-                                name="freight"
-                                value={formData.freight || ''}
-                                onChange={handleChange}
-                                placeholder="51350"
-                                className={`${inputClass} font-bold text-slate-800`}
-                            />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {renderPartySection('Consignor (Sender)', '📦', 'consignor')}
+                            {renderPartySection('Consignee (Receiver)', '🏢', 'consignee')}
+                            {billingPartyType === 'Other' && renderPartySection('Billing Party (Third Party)', '💳', 'billingTo')}
                         </div>
-                        <div>
-                            <label className={labelClass}>{t[language].grandTotal}</label>
-                            <input type="number" value={totalFreight} readOnly className={`${inputClass} bg-blue-50 border-blue-300 font-extrabold text-blue-900 cursor-not-allowed`} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>Advance Paid (₹)</label>
-                            <input
-                                type="number"
-                                name="advancePaid"
-                                value={formData.advancePaid || ''}
-                                onChange={handleChange}
-                                placeholder="15000"
-                                className={`${inputClass} font-bold text-emerald-700 border-emerald-300`}
-                            />
-                        </div>
-                        <div>
-                            <label className={labelClass}>Net Balance To Pay</label>
-                            <input
-                                type="number"
-                                value={netBalanceToPay}
-                                readOnly
-                                className={`${inputClass} bg-emerald-50 border-emerald-400 font-black text-emerald-950 text-base cursor-not-allowed`}
-                            />
-                        </div>
-                    </Fieldset>
-
-                    {/* Remarks */}
-                    <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl shadow-lg border mb-6">
-                        <label className={labelClass}>{t[language].remark}</label>
-                        <textarea name="remark" value={formData.remark} onChange={handleChange} placeholder="Enter any shipment instructions or remarks..." className={`${inputClass} h-20`}></textarea>
                     </div>
 
-                    {/* Submit Actions */}
-                    <div className="flex flex-col sm:flex-row sm:justify-center gap-4 pt-4 border-t">
+                    {/* SECTION 3: CONSIGNMENT ITEMS & GOODS TABLE */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                                <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-base">📦</span>
+                                <div>
+                                    <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">3. Consignment Items & Goods</h3>
+                                    <p className="text-[11px] text-slate-500 font-medium">Itemized goods description, packages, HSN & weights</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={addItem}
+                                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-sm transition-all"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Add Item Row
+                            </button>
+                        </div>
+
+                        {/* Items Table */}
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                            <div className="grid grid-cols-12 gap-2 bg-slate-100 p-2.5 font-black text-slate-700 text-xs uppercase tracking-wider">
+                                <div className="col-span-1 text-center">#</div>
+                                <div className="col-span-4">Description of Goods & Packing</div>
+                                <div className="col-span-2 text-center">Packages (Pcs)</div>
+                                <div className="col-span-2 text-right">Actual Wt (Kg)</div>
+                                <div className="col-span-2 text-right">Charged Wt (Kg)</div>
+                                <div className="col-span-1 text-center">Action</div>
+                            </div>
+
+                            <div className="divide-y divide-slate-100 bg-white">
+                                {formData.items.map((item, index) => (
+                                    <div key={index} className="grid grid-cols-12 gap-2 items-center p-2.5 hover:bg-slate-50/50 transition-colors">
+                                        <div className="col-span-1 text-center font-bold text-slate-400 text-xs">
+                                            {index + 1}
+                                        </div>
+                                        <div className="col-span-4 space-y-1.5">
+                                            <input
+                                                type="text"
+                                                value={item.description}
+                                                onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold uppercase focus:border-blue-500 outline-none"
+                                                placeholder="e.g. High Precision Engine Parts"
+                                            />
+                                            <div className="grid grid-cols-2 gap-1.5">
+                                                <input
+                                                    type="text"
+                                                    value={item.packingDetails || ''}
+                                                    onChange={(e) => handleItemChange(index, 'packingDetails', e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-200 rounded-lg text-[11px] text-slate-700 outline-none"
+                                                    placeholder="Packing: Boxes, Drums..."
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={item.hsn || ''}
+                                                    onChange={(e) => handleItemChange(index, 'hsn', e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-200 rounded-lg text-[11px] font-mono text-slate-800 outline-none"
+                                                    placeholder="HSN Code (87082900)"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                value={item.pcs === 0 ? '' : item.pcs}
+                                                onChange={(e) => handleItemChange(index, 'pcs', parseInt(e.target.value) || 0)}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-center focus:border-blue-500 outline-none"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                value={item.weight === 0 ? '' : item.weight}
+                                                onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-right focus:border-blue-500 outline-none"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <input
+                                                type="number"
+                                                value={item.chargedWeight === 0 ? '' : item.chargedWeight}
+                                                onChange={(e) => handleItemChange(index, 'chargedWeight', parseFloat(e.target.value) || 0)}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-right focus:border-blue-500 outline-none"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 text-center">
+                                            {formData.items.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeItem(index)}
+                                                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete row"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Weight & Rate Controls */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                            <div>
+                                <label className={labelBase}>Total Actual Weight (Kg)</label>
+                                <input
+                                    type="number"
+                                    name="weight"
+                                    value={formData.weight || ''}
+                                    readOnly
+                                    placeholder="0"
+                                    className={`${inputBase} bg-slate-100 cursor-not-allowed font-bold text-slate-700`}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelBase}>Total Charged Weight (Kg)</label>
+                                <input
+                                    type="number"
+                                    name="chargedWeight"
+                                    value={formData.chargedWeight === 0 ? '' : formData.chargedWeight}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className={`${inputBase} font-bold text-slate-900`}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelBase}>Freight Rate</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    name="rate"
+                                    value={formData.rate === 0 ? '' : formData.rate}
+                                    onChange={handleChange}
+                                    placeholder="0.00"
+                                    className={`${inputBase} font-black text-blue-700`}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelBase}>Calculation Basis</label>
+                                <select
+                                    name="rateOn"
+                                    value={formData.rateOn}
+                                    onChange={handleChange}
+                                    className={`${inputBase} font-semibold`}
+                                >
+                                    <option value="Kg">Per Kg</option>
+                                    <option value="Ton">Per Ton (MT)</option>
+                                    <option value="Fixed">Fixed Amount (Manual)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION 4: STATUTORY, INVOICE & E-WAY DETAILS */}
+                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <span className="p-2 rounded-xl bg-amber-50 text-amber-700 font-bold text-base">📄</span>
+                            <div>
+                                <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">4. Invoice, E-Way Bill & Statutory Compliance</h3>
+                                <p className="text-[11px] text-slate-500 font-medium">Invoice amount, EWB validity, insurance and RCM</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                                <label className={labelBase}>Invoice No</label>
+                                <input type="text" name="invoiceNo" placeholder="AAC/26-27/0419" value={formData.invoiceNo} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>Invoice Amount (₹)</label>
+                                <input type="number" name="invoiceAmount" placeholder="0" value={formData.invoiceAmount === 0 ? '' : formData.invoiceAmount} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>Invoice Date</label>
+                                <input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>GST Paid By (RCM)</label>
+                                <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputBase}>
+                                    <option value="Consignor">Consignor (RCM)</option>
+                                    <option value="Consignee">Consignee (RCM)</option>
+                                    <option value="Transporter">Transporter (Forward Charge)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className={labelBase}>E-Way Bill No</label>
+                                <input type="text" name="ewayBillNo" placeholder="5819 2840 1928" value={formData.ewayBillNo} onChange={handleChange} className={`${inputBase} font-mono`} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>EWB Date</label>
+                                <input type="date" name="ewayBillDate" value={formData.ewayBillDate || ''} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>EWB Valid Upto</label>
+                                <input type="date" name="ewayExDate" value={formData.ewayExDate || ''} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div>
+                                <label className={labelBase}>PO / Ref No</label>
+                                <input type="text" name="poNo" placeholder="PO-PUN-9821" value={formData.poNo} onChange={handleChange} className={inputBase} />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <label className={labelBase}>Insurance Policy & Insurer</label>
+                                <input type="text" name="insurancePolicyNo" placeholder="e.g. ICICI-LOMB-77210940 • ICICI Lombard" value={formData.insurancePolicyNo || ''} onChange={handleChange} className={inputBase} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={labelBase}>Delivery Address / Unloading Gate</label>
+                                <input type="text" name="addressOfDelivery" placeholder="e.g. Gate 3, MIDC Industrial Area, Chakan" value={formData.addressOfDelivery} onChange={handleChange} className={inputBase} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION 5: FREIGHT CHARGES & FINANCIAL CALCULATOR */}
+                    <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-xl space-y-4">
+                        <div className="flex justify-between items-center border-b border-slate-700/80 pb-3 flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                                <span className="p-2 rounded-xl bg-blue-600/30 text-cyan-300 font-bold text-base">💰</span>
+                                <div>
+                                    <h3 className="font-black text-sm text-white uppercase tracking-wide">5. Freight & Charges Calculator</h3>
+                                    <p className="text-[11px] text-slate-300">Live breakdown with automatic advance deduction</p>
+                                </div>
+                            </div>
+                            <span className="text-xs bg-cyan-500/20 text-cyan-300 font-bold px-3 py-1 rounded-full border border-cyan-500/30">
+                                Real-Time Balance
+                            </span>
+                        </div>
+
+                        {/* Charges Input Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Hamali / Loading</label>
+                                <input type="number" name="hamail" value={charges.hamail === 0 ? '' : charges.hamail} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Door Delivery</label>
+                                <input type="number" name="ddCharge" value={charges.ddCharge === 0 ? '' : charges.ddCharge} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Statistical / LR</label>
+                                <input type="number" name="stCharge" value={charges.stCharge === 0 ? '' : charges.stCharge} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Toll / Green Tax</label>
+                                <input type="number" name="tollTax" value={charges.tollTax === 0 ? '' : charges.tollTax} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Surcharge / Risk</label>
+                                <input type="number" name="surCharge" value={charges.surCharge === 0 ? '' : charges.surCharge} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-300 uppercase mb-1">Other Charges</label>
+                                <input type="number" name="otherCharge" value={charges.otherCharge === 0 ? '' : charges.otherCharge} onChange={handleChargeChange} placeholder="0" className="w-full p-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:ring-1 focus:ring-cyan-400 outline-none" />
+                            </div>
+                        </div>
+
+                        {/* Grand Totals Highlights Bar */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2">
+                            <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase">Basic Freight (₹)</label>
+                                <input
+                                    type="number"
+                                    name="freight"
+                                    value={formData.freight === 0 ? '' : formData.freight}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className="w-full bg-transparent font-black text-xl text-white outline-none"
+                                />
+                            </div>
+                            <div className="bg-blue-900/50 p-3 rounded-xl border border-blue-700/50">
+                                <label className="block text-[10px] font-bold text-cyan-300 uppercase">Grand Total Freight (₹)</label>
+                                <div className="font-black text-xl text-cyan-200">
+                                    ₹ {totalFreight.toLocaleString('en-IN')}
+                                </div>
+                            </div>
+                            <div className="bg-emerald-950/60 p-3 rounded-xl border border-emerald-700/50">
+                                <label className="block text-[10px] font-bold text-emerald-300 uppercase">Advance Paid (₹)</label>
+                                <input
+                                    type="number"
+                                    name="advancePaid"
+                                    value={formData.advancePaid === 0 ? '' : formData.advancePaid}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className="w-full bg-transparent font-black text-xl text-emerald-300 outline-none"
+                                />
+                            </div>
+                            <div className="bg-gradient-to-r from-cyan-500 to-blue-600 p-3 rounded-xl shadow-lg">
+                                <label className="block text-[10px] font-black text-slate-950 uppercase">Net Balance to Pay</label>
+                                <div className="font-black text-2xl text-slate-950">
+                                    ₹ {netBalanceToPay.toLocaleString('en-IN')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Remarks Card */}
+                    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm">
+                        <label className={labelBase}>Shipment Instructions / Remarks</label>
+                        <textarea
+                            name="remark"
+                            value={formData.remark}
+                            onChange={handleChange}
+                            placeholder="Enter any delivery instructions or remarks..."
+                            className={`${inputBase} h-20`}
+                        />
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t border-slate-200">
                         <button
-                            type="submit"
-                            disabled={isSaving}
-                            className={`w-full sm:w-auto bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 font-bold text-base shadow-lg transition-all transform ${isSaving ? 'opacity-70 cursor-not-allowed scale-95' : 'hover:scale-105'}`}
+                            type="button"
+                            onClick={onCancel}
+                            className="px-6 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-colors"
                         >
-                            {isSaving ? 'Saving LR...' : (existingLR ? t[language].updateLR : t[language].saveLR)}
+                            Cancel
                         </button>
                         <button
                             type="button"
                             onClick={() => setShowPreviewModal(true)}
-                            className="w-full sm:w-auto bg-slate-800 text-white px-8 py-3 rounded-xl hover:bg-slate-900 font-bold text-base shadow-lg transition-transform transform hover:scale-105"
+                            className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm shadow-md transition-all"
                         >
-                            {t[language].preview} & Compare
+                            Preview & Compare Layouts
                         </button>
                         <button
-                            type="button"
-                            onClick={onCancel}
-                            className="w-full sm:w-auto bg-red-600 text-white px-8 py-3 rounded-xl hover:bg-red-700 font-bold text-base shadow-lg transition-transform transform hover:scale-105"
+                            type="submit"
+                            disabled={isSaving}
+                            className="px-8 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-base shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            {t[language].cancel}
+                            {isSaving ? 'Saving LR...' : (existingLR ? 'Update Lorry Receipt' : 'Save & Print LR')}
                         </button>
                     </div>
                 </form>
             </div>
 
-            {/* Live Preview Section (Desktop) */}
-            <div className="hidden xl:block w-2/5 sticky top-24" style={{ maxHeight: 'calc(100vh - 7rem)' }}>
-                <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl p-4 border border-slate-200 overflow-y-auto flex flex-col" style={{ maxHeight: 'calc(100vh - 7rem)' }}>
+            {/* Desktop Sticky Live Preview Panel */}
+            <div className="hidden xl:block w-5/12 sticky top-4" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+                <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-xl p-4 border border-slate-200/80 overflow-y-auto flex flex-col" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
                     {/* Live Preview Controls */}
-                    <div className="flex justify-between items-center mb-2 pb-2 border-b border-slate-200 gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-                            <h3 className="font-extrabold text-slate-800 text-sm">
+                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-100 flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                            <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <h3 className="font-black text-slate-900 text-sm">
                                 Live Bilty Preview
                             </h3>
                         </div>
 
-                        {/* Template Switcher with Recommendation */}
+                        {/* Template Switcher */}
                         <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold">
                             <button
                                 type="button"
@@ -937,15 +1176,33 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         </div>
                     </div>
 
-                    {/* Recommendation Hint */}
-                    <div className="bg-blue-50/80 border border-blue-200 rounded-lg px-2.5 py-1.5 mb-2 text-[10px] text-blue-900 flex justify-between items-center">
-                        <span>
-                            💡 <strong>Modern GST</strong> is recommended for GST RCM compliance, vehicle/driver details, and WhatsApp sharing.
-                        </span>
+                    {/* Copy Selector & Quick Actions */}
+                    <div className="flex justify-between items-center gap-2 mb-3 bg-slate-50 p-2 rounded-xl border border-slate-200 text-xs">
+                        <select
+                            value={livePreviewCopy}
+                            onChange={(e) => setLivePreviewCopy(e.target.value)}
+                            className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-lg px-2 py-1 outline-none shadow-xs"
+                        >
+                            <option value="CONSIGNOR COPY">Consignor Copy</option>
+                            <option value="CONSIGNEE COPY">Consignee Copy</option>
+                            <option value="TRANSPORTER COPY">Transporter Copy</option>
+                            <option value="DRIVER COPY">Driver Copy</option>
+                        </select>
+
+                        <div className="flex items-center gap-1">
+                            <button
+                                type="button"
+                                onClick={() => setShowPreviewModal(true)}
+                                className="bg-blue-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg hover:bg-blue-700"
+                            >
+                                Fullscreen / PDF ↗
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="overflow-x-auto bg-slate-100 p-2 rounded-xl border border-slate-200">
-                        <div className="origin-top scale-[0.82] -my-10">
+                    {/* Live Sheet Container */}
+                    <div className="overflow-x-auto bg-slate-100/80 p-2 rounded-xl border border-slate-200 flex justify-center">
+                        <div className="origin-top scale-[0.78] -my-14">
                             <LRContent
                                 lr={formData}
                                 companyDetails={companyDetails}
@@ -959,6 +1216,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 </div>
             </div>
 
+            {/* Modal */}
             {showPreviewModal && (
                 <LRPreviewModal
                     isOpen={showPreviewModal}

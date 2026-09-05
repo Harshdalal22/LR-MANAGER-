@@ -70,16 +70,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
         return Array.from(names).sort();
     }, [lorryReceipts]);
 
-    // LRs for the selected party that are NOT generated
+    // Toggle to show already-invoiced LRs
+    const [showAllLRs, setShowAllLRs] = useState(false);
+
+    // LRs for the selected party (show all or only pending)
     const pendingLRsForParty = useMemo(() => {
         if (!selectedPartyName) return [];
         return lorryReceipts.filter(lr => 
-            !lr.isInvoiceGenerated && 
+            (showAllLRs || !lr.isInvoiceGenerated) &&
             (lr.consignor.name === selectedPartyName || 
              lr.consignee.name === selectedPartyName || 
              lr.billingTo?.name === selectedPartyName)
         );
-    }, [lorryReceipts, selectedPartyName]);
+    }, [lorryReceipts, selectedPartyName, showAllLRs]);
 
     const handleSelectLR = (lrNo: string) => {
         const newSelected = new Set(selectedLRs);
@@ -144,12 +147,23 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                                     <option value="">-- Choose Party --</option>
                                     {allParties.map(name => <option key={name} value={name}>{name}</option>)}
                                 </select>
-                                <p className="mt-2 text-[10px] text-blue-600 font-medium italic">Shows parties with pending LRs</p>
+                                <p className="mt-2 text-[10px] text-blue-600 font-medium italic">Shows all parties</p>
                             </div>
 
                             {/* Step 2: Select LRs */}
                             <div className="md:col-span-3">
-                                <label className="block text-xs font-bold text-blue-700 uppercase mb-2">2. Select Pending LRs ({pendingLRsForParty.length})</label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-xs font-bold text-blue-700 uppercase">2. Select LRs ({pendingLRsForParty.length})</label>
+                                    <label className="flex items-center gap-2 text-xs text-blue-700 cursor-pointer font-semibold">
+                                        <input
+                                            type="checkbox"
+                                            checked={showAllLRs}
+                                            onChange={e => setShowAllLRs(e.target.checked)}
+                                            className="w-4 h-4 text-blue-600 rounded"
+                                        />
+                                        Already Invoiced LRs bhi dikhao
+                                    </label>
+                                </div>
                                 <div className="bg-white border border-blue-200 rounded-lg overflow-hidden shadow-sm max-h-[300px] overflow-y-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-blue-100 text-blue-800 text-[10px] uppercase font-bold sticky top-0">
@@ -166,7 +180,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                                             {pendingLRsForParty.length === 0 ? (
                                                 <tr>
                                                     <td colSpan={6} className="p-8 text-center text-gray-400 italic">
-                                                        {selectedPartyName ? "No pending LRs found for this party." : "Please select a party first."}
+                                                        {selectedPartyName ? (showAllLRs ? "Is party ke liye koi LR nahi mili." : "Koi pending LR nahi. 'Already Invoiced LRs bhi dikhao' check karein.") : "Pehle party select karein."}
                                                     </td>
                                                 </tr>
                                             ) : (
@@ -180,7 +194,12 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                                                                 className="w-4 h-4 text-blue-600 rounded"
                                                             />
                                                         </td>
-                                                        <td className="p-3 font-bold">{lr.lrNo}</td>
+                                                        <td className="p-3 font-bold">
+                                                            {lr.lrNo}
+                                                            {lr.isInvoiceGenerated && (
+                                                                <span className="ml-1 text-[9px] bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded font-bold">Invoiced</span>
+                                                            )}
+                                                        </td>
                                                         <td className="p-3">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
                                                         <td className="p-3 font-mono text-xs">{lr.truckNo}</td>
                                                         <td className="p-3 text-xs">{lr.fromPlace} → {lr.toPlace}</td>
@@ -285,7 +304,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                 )}
             </div>
 
-            {/* Modal for viewing already generated invoices */}
+            {/* Modal for viewing/editing already generated invoices */}
             {selectedInvoice && (
                 <InvoiceModal
                     isOpen={!!selectedInvoice}
@@ -293,7 +312,10 @@ const InvoiceList: React.FC<InvoiceListProps> = ({ lorryReceipts, companyDetails
                     lorryReceipts={selectedInvoice.lrs}
                     allLorryReceipts={lorryReceipts}
                     companyDetails={companyDetails}
-                    onSaveInvoiceDetails={undefined} 
+                    onSaveInvoiceDetails={onUpdateInvoiceDetails ? async (lrNos, invNo, invDate) => {
+                        await onUpdateInvoiceDetails(lrNos, invNo, invDate);
+                        setSelectedInvoice(null);
+                    } : undefined}
                 />
             )}
 

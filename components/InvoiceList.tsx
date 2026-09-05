@@ -72,7 +72,10 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
             const date = firstLR.invoiceDate || firstLR.date;
             const customer = firstLR.billingTo?.name || firstLR.consignor.name;
             const totalAmount = lrs.reduce((sum, lr) => {
-                const charges = (Object.values(lr.charges || {}) as number[]).reduce((a, b) => a + (b || 0), 0);
+                const charges = Object.values(lr.charges || {}).reduce((a: number, b: any) => {
+                    const n = Number(b);
+                    return a + (isFinite(n) ? n : 0);
+                }, 0);
                 return sum + (Number(lr.freight) || 0) + charges;
             }, 0);
             return { invoiceNo, date, customer, count: lrs.length, totalAmount, lrs };

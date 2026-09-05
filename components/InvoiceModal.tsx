@@ -33,8 +33,15 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
         );
     }, [lorryReceipts]);
 
+    // Helper: sum only numeric values from charges (string fields like driverName, vehicleType etc. are ignored)
+    const safeChargesSum = (charges: Record<string, any>) =>
+        Object.values(charges || {}).reduce((sum: number, val: any) => {
+            const n = Number(val);
+            return sum + (isFinite(n) ? n : 0);
+        }, 0);
+
     const totalAmount = sortedLorryReceipts.reduce((sum, lr) => {
-        const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
+        const totalCharges = safeChargesSum(lr.charges);
         return sum + (Number(lr.freight) || 0) + totalCharges;
     }, 0);
 
@@ -114,7 +121,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                 </thead>
                 <tbody>
                     {sortedLorryReceipts.map((lr, index) => {
-                        const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((chargeSum: number, charge: number) => chargeSum + (charge || 0), 0);
+                        const totalCharges = safeChargesSum(lr.charges);
                         return (
                             <tr key={lr.lrNo} style={{ height: '24px' }}>
                                 <td className="border border-gray-600 p-1 text-center">{index + 1}</td>

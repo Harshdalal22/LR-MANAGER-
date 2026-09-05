@@ -1,6 +1,8 @@
 import React, { useRef, forwardRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 import { LorryReceipt, CompanyDetails } from '../types';
 import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon, PhoneIcon } from './icons';
 
@@ -13,8 +15,6 @@ interface LRPreviewModalProps {
     isReadOnly?: boolean;
     initialTemplateStyle?: 'modern-gst' | 'classic';
 }
-
-declare const html2pdf: any;
 
 // Helper to format date like '29-Aug-2026'
 export const formatBiltyDate = (dateStr: string | null | undefined): string => {
@@ -122,15 +122,15 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'max-w-[1040px] p-3 text-[9px]' 
+        ? 'w-[1040px] max-w-full p-3 text-[9px]' 
         : paperSize === 'a5' 
-            ? 'max-w-[580px] p-2 text-[8px]' 
-            : 'max-w-[760px] p-4 text-[9.5px]';
+            ? 'w-[580px] max-w-full p-2 text-[8px]' 
+            : 'w-[760px] max-w-full p-4 text-[9.5px]';
 
     return (
         <div
             ref={ref}
-            className={`printable-area bg-white text-slate-900 font-sans w-full mx-auto border border-slate-800 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
+            className={`printable-area bg-white text-slate-900 font-sans mx-auto border border-slate-800 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
             style={{ boxSizing: 'border-box' }}
         >
             {/* Header Section */}
@@ -968,107 +968,100 @@ Carrier: *${companyDetails.name || 'Speedway Logistics'}*
 ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
     };
 
-    // PDF Generator Guaranteed on Single Page
+    // Helper to generate a configured jsPDF instance with the bilty captured on a single page
+    const generateBiltyPdfDoc = async (targetEl: HTMLElement): Promise<{ pdf: jsPDF; filename: string }> => {
+        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
+
+        const pdf = new jsPDF({
+            orientation: printOrientation,
+            unit: 'mm',
+            format: paperSize.toLowerCase(),
+            compress: true
+        });
+
+        const pdfW = pdf.internal.pageSize.getWidth();
+        const pdfH = pdf.internal.pageSize.getHeight();
+
+        const margin = paperSize === 'a5' ? 3.5 : 4.5;
+        const maxW = pdfW - (margin * 2);
+        const maxH = pdfH - (margin * 2);
+
+        // Check for multi-copy mode in printRoot
+        const printCopiesEl = printRoot?.querySelectorAll<HTMLElement>('.print-page-wrapper .printable-area');
+        const isMulti = multiCopyMode !== 'single' && printCopiesEl && printCopiesEl.length > 1;
+
+        if (isMulti) {
+            for (let i = 0; i < printCopiesEl.length; i++) {
+                if (i > 0) {
+                    pdf.addPage(paperSize.toLowerCase(), printOrientation);
+                }
+                const cCanvas = await html2canvas(printCopiesEl[i], {
+                    scale: 2.2,
+                    useCORS: true,
+                    allowTaint: false,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+                const cRatio = cCanvas.width / cCanvas.height;
+                let cW = maxW;
+                let cH = cW / cRatio;
+                if (singlePageFit && cH > maxH) {
+                    cH = maxH;
+                    cW = cH * cRatio;
+                }
+                const cX = margin + (maxW - cW) / 2;
+                const cY = margin + (maxH - cH) / 2;
+                const cImg = cCanvas.toDataURL('image/jpeg', 0.98);
+                pdf.addImage(cImg, 'JPEG', cX, cY, cW, cH, undefined, 'FAST');
+            }
+        } else {
+            const canvas = await html2canvas(targetEl, {
+                scale: 2.2,
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0
+            });
+
+            const imgRatio = canvas.width / canvas.height;
+            let renderW = maxW;
+            let renderH = renderW / imgRatio;
+
+            if (singlePageFit && renderH > maxH) {
+                renderH = maxH;
+                renderW = renderH * imgRatio;
+            }
+
+            const posX = margin + (maxW - renderW) / 2;
+            const posY = margin + (maxH - renderH) / 2;
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.98);
+            pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH, undefined, 'FAST');
+        }
+
+        return { pdf, filename };
+    };
+
+    // PDF Generator Guaranteed on Single Page (Fits whole page, no blank, no overflow)
     const handleDownloadPDF = async () => {
-        const element = previewRef.current;
-        if (!element) return;
+        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
+        if (!element) {
+            toast.error('Preview not found');
+            return;
+        }
 
         setIsExporting(true);
         const toastId = toast.loading('Generating Perfect Single-Page PDF...');
 
         try {
-            const isLandscape = printOrientation === 'landscape';
-            const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
-
-            // Page dimensions in mm for jsPDF
-            const pageDims: Record<string, [number, number]> = {
-                a4:     [210, 297],
-                a5:     [148, 210],
-                letter: [215.9, 279.4],
-                legal:  [215.9, 355.6],
-            };
-            const [pw, ph] = pageDims[paperSize] || pageDims['a4'];
-            // Swap for landscape
-            const pageW = isLandscape ? ph : pw;  // mm
-            const pageH = isLandscape ? pw : ph;  // mm
-
-            // Pixel dimensions at 96dpi (1mm = 3.7795px)
-            const PX_PER_MM = 3.7795275591;
-            const pageWpx = Math.round(pageW * PX_PER_MM);
-            const pageHpx = Math.round(pageH * PX_PER_MM);
-
-            // Margin in px (6mm each side)
-            const marginMm = 6;
-            const marginPx = Math.round(marginMm * PX_PER_MM);
-            const contentWpx = pageWpx - marginPx * 2;
-            const contentHpx = pageHpx - marginPx * 2;
-
-            // Clone the element and fix it to exactly the content area size
-            const clone = element.cloneNode(true) as HTMLElement;
-            clone.style.cssText = [
-                `position: fixed`,
-                `top: -99999px`,
-                `left: -99999px`,
-                `width: ${contentWpx}px`,
-                `min-width: ${contentWpx}px`,
-                `max-width: ${contentWpx}px`,
-                `height: auto`,
-                `max-height: none`,
-                `overflow: visible`,
-                `transform: none`,
-                `box-shadow: none`,
-                `margin: 0`,
-                `padding: ${element.style.padding || '16px'}`,
-                `background: white`,
-                `z-index: -9999`,
-            ].join(';');
-            document.body.appendChild(clone);
-
-            // Wait for layout
-            await new Promise(r => requestAnimationFrame(r));
-            await new Promise(r => setTimeout(r, 150));
-
-            const cloneH = clone.scrollHeight;
-
-            // Determine scale: scale down content to fit page height if needed
-            const scaleToFit = singlePageFit && cloneH > contentHpx
-                ? contentHpx / cloneH
-                : 1.0;
-
-            const opt = {
-                margin: marginMm,
-                filename,
-                image: { type: 'jpeg', quality: 0.99 },
-                html2canvas: {
-                    scale: 2,
-                    useCORS: true,
-                    letterRendering: true,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: contentWpx,
-                    width: contentWpx,
-                    height: singlePageFit ? Math.round(contentHpx / scaleToFit) : cloneH,
-                    onclone: (clonedDoc: Document) => {
-                        // Ensure clone renders correctly
-                        const body = clonedDoc.body;
-                        body.style.margin = '0';
-                        body.style.padding = '0';
-                    }
-                },
-                jsPDF: {
-                    unit: 'mm',
-                    format: [pageW, pageH] as any,
-                    orientation: printOrientation,
-                    compress: true
-                },
-            };
-
-            await html2pdf().from(clone).set(opt).save();
-            document.body.removeChild(clone);
+            const { pdf, filename } = await generateBiltyPdfDoc(element);
+            pdf.save(filename);
             toast.success('PDF downloaded! Perfect single-page fit ✅', { id: toastId });
         } catch (err: any) {
             console.error('PDF error:', err);
-            toast.error('PDF error — opening print dialog as fallback.', { id: toastId });
+            toast.error('Direct PDF error. Opening Print dialog...', { id: toastId });
             handlePrint();
         } finally {
             setIsExporting(false);
@@ -1112,25 +1105,24 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
     // PNG Image Export
     const handleDownloadImage = async () => {
-        const element = previewRef.current;
+        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
         if (!element) return;
         setIsExporting(true);
         const toastId = toast.loading('Exporting High-Res Image...');
         try {
-            const isLandscape = printOrientation === 'landscape';
             const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.png`;
 
-            const imgData = await html2pdf().from(element).set({
-                image: { type: 'png', quality: 1.0 },
-                html2canvas: {
-                    scale: 2.5,
-                    useCORS: true,
-                    scrollX: 0,
-                    scrollY: 0,
-                    windowWidth: isLandscape ? 1120 : paperSize === 'a5' ? 620 : 794
-                }
-            }).outputImg('datauristring');
+            const canvas = await html2canvas(element, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0
+            });
 
+            const imgData = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.href = imgData;
             link.download = filename;
@@ -1151,18 +1143,11 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         const summary = generateBiltyText();
         const encodedText = encodeURIComponent(summary);
 
-        const element = previewRef.current;
+        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
         if (navigator.share && navigator.canShare && element) {
             try {
-                const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
-                const pdfBlob = await html2pdf().from(element).set({
-                    margin: [3, 3, 3, 3],
-                    filename,
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true },
-                    jsPDF: { unit: 'mm', format: paperSize.toLowerCase(), orientation: printOrientation }
-                }).output('blob');
-
+                const { pdf, filename } = await generateBiltyPdfDoc(element);
+                const pdfBlob = pdf.output('blob');
                 const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
                 if (navigator.canShare({ files: [pdfFile] })) {
                     await navigator.share({

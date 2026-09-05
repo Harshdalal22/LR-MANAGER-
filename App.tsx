@@ -44,6 +44,7 @@ import {
     uploadCompanyAsset,
     getPodSignedUrl,
     updateLorryReceiptInvoiceDetails,
+    clearLRInvoiceDetails,
     getSavedParties,
     saveSavedParty,
     deleteSavedParty,
@@ -452,6 +453,18 @@ const App: React.FC = () => {
         }
     };
 
+    const handleClearLRInvoiceDetails = async (lrNos: string[]) => {
+        const toastId = toast.loading('Removing LRs from invoice...');
+        try {
+            await clearLRInvoiceDetails(lrNos);
+            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { ...lr, invoiceNo: '', invoiceDate: null, isInvoiceGenerated: false } : lr));
+            toast.success('LRs removed from invoice', { id: toastId });
+        } catch (error) {
+            toast.dismiss(toastId);
+            handleError(error, "Failed to remove LRs from invoice");
+        }
+    };
+
     const handleDeleteLR = async (lrNo: string) => {
         if (!confirm("Are you sure you want to delete this LR?")) return;
         const toastId = toast.loading('Deleting LR...');
@@ -772,6 +785,7 @@ const App: React.FC = () => {
                         companyDetails={companyDetails}
                         onBack={() => setCurrentView('dashboard')}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
+                        onRemoveLRsFromInvoice={handleClearLRInvoiceDetails}
                     />
                 );
             default:

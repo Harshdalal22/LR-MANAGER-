@@ -521,6 +521,20 @@ export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceN
     if (error) throw error;
 }
 
+// Remove LRs from an invoice (un-invoice them)
+export const clearLRInvoiceDetails = async (lrNos: string[]) => {
+    if (!lrNos.length) return;
+    const { error } = await withTimeout(supabase
+        .from('lorry_receipts')
+        .update({
+            invoiceNo: '',
+            invoiceDate: null,
+            is_invoice_generated: false
+        })
+        .in('lrNo', lrNos));
+    if (error) throw error;
+};
+
 // --- PODs ---
 
 export const uploadPOD = async (file: File, lrNo: string): Promise<LorryReceipt> => {

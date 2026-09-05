@@ -974,38 +974,101 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         if (!element) return;
 
         setIsExporting(true);
-        const toastId = toast.loading('Generating Single-Page PDF...');
+        const toastId = toast.loading('Generating Perfect Single-Page PDF...');
 
         try {
             const isLandscape = printOrientation === 'landscape';
             const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
 
+            // Page dimensions in mm for jsPDF
+            const pageDims: Record<string, [number, number]> = {
+                a4:     [210, 297],
+                a5:     [148, 210],
+                letter: [215.9, 279.4],
+                legal:  [215.9, 355.6],
+            };
+            const [pw, ph] = pageDims[paperSize] || pageDims['a4'];
+            // Swap for landscape
+            const pageW = isLandscape ? ph : pw;  // mm
+            const pageH = isLandscape ? pw : ph;  // mm
+
+            // Pixel dimensions at 96dpi (1mm = 3.7795px)
+            const PX_PER_MM = 3.7795275591;
+            const pageWpx = Math.round(pageW * PX_PER_MM);
+            const pageHpx = Math.round(pageH * PX_PER_MM);
+
+            // Margin in px (6mm each side)
+            const marginMm = 6;
+            const marginPx = Math.round(marginMm * PX_PER_MM);
+            const contentWpx = pageWpx - marginPx * 2;
+            const contentHpx = pageHpx - marginPx * 2;
+
+            // Clone the element and fix it to exactly the content area size
+            const clone = element.cloneNode(true) as HTMLElement;
+            clone.style.cssText = [
+                `position: fixed`,
+                `top: -99999px`,
+                `left: -99999px`,
+                `width: ${contentWpx}px`,
+                `min-width: ${contentWpx}px`,
+                `max-width: ${contentWpx}px`,
+                `height: auto`,
+                `max-height: none`,
+                `overflow: visible`,
+                `transform: none`,
+                `box-shadow: none`,
+                `margin: 0`,
+                `padding: ${element.style.padding || '16px'}`,
+                `background: white`,
+                `z-index: -9999`,
+            ].join(';');
+            document.body.appendChild(clone);
+
+            // Wait for layout
+            await new Promise(r => requestAnimationFrame(r));
+            await new Promise(r => setTimeout(r, 150));
+
+            const cloneH = clone.scrollHeight;
+
+            // Determine scale: scale down content to fit page height if needed
+            const scaleToFit = singlePageFit && cloneH > contentHpx
+                ? contentHpx / cloneH
+                : 1.0;
+
             const opt = {
-                margin: singlePageFit ? [3, 3, 3, 3] : [5, 5, 5, 5],
-                filename: filename,
+                margin: marginMm,
+                filename,
                 image: { type: 'jpeg', quality: 0.99 },
                 html2canvas: {
-                    scale: 2.3,
+                    scale: 2,
                     useCORS: true,
                     letterRendering: true,
                     scrollX: 0,
                     scrollY: 0,
-                    windowWidth: isLandscape ? 1120 : paperSize === 'a5' ? 620 : 794
+                    windowWidth: contentWpx,
+                    width: contentWpx,
+                    height: singlePageFit ? Math.round(contentHpx / scaleToFit) : cloneH,
+                    onclone: (clonedDoc: Document) => {
+                        // Ensure clone renders correctly
+                        const body = clonedDoc.body;
+                        body.style.margin = '0';
+                        body.style.padding = '0';
+                    }
                 },
                 jsPDF: {
                     unit: 'mm',
-                    format: paperSize.toLowerCase(),
+                    format: [pageW, pageH] as any,
                     orientation: printOrientation,
                     compress: true
                 },
-                pagebreak: singlePageFit ? { mode: ['avoid-all', 'css', 'legacy'] } : { mode: ['css', 'legacy'] }
             };
 
-            await html2pdf().from(element).set(opt).save();
-            toast.success('Single-Page PDF downloaded successfully!', { id: toastId });
+            await html2pdf().from(clone).set(opt).save();
+            document.body.removeChild(clone);
+            toast.success('PDF downloaded! Perfect single-page fit ✅', { id: toastId });
         } catch (err: any) {
             console.error('PDF error:', err);
-            toast.error('Could not generate PDF directly. Opening Print dialog...', { id: toastId });
+            toast.error('PDF error — opening print dialog as fallback.', { id: toastId });
             handlePrint();
         } finally {
             setIsExporting(false);

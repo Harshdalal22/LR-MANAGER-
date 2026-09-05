@@ -54,6 +54,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
     const [addingLrNos, setAddingLrNos] = useState<Set<string>>(new Set());
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [showAddMore, setShowAddMore] = useState(false);
+    const [editAddParty, setEditAddParty] = useState(''); // party selector in Add More LRs
 
     // ── Computed: generated invoices grouped ──
     const generatedInvoices = useMemo(() => {
@@ -108,20 +109,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
         );
     }, [lorryReceipts, selectedPartyName, showAllLRs]);
 
-    // ── Computed: LRs available to add when editing ──
+    // ── Computed: LRs available to add when editing (filtered by editAddParty) ──
     const availableLRsToAdd = useMemo(() => {
         if (!editingInvoice) return [];
         const currentLrNos = new Set(editingInvoice.lrs.map(lr => lr.lrNo));
-        const party =
-            editingInvoice.lrs[0]?.billingTo?.name ||
-            editingInvoice.lrs[0]?.consignor?.name || '';
+        const filterParty = editAddParty; // user-selected party in Add More section
+        if (!filterParty) return [];
         return lorryReceipts.filter(lr =>
             !currentLrNos.has(lr.lrNo) &&
-            (lr.consignor.name === party ||
-                lr.consignee.name === party ||
-                lr.billingTo?.name === party)
+            (lr.consignor.name === filterParty ||
+                lr.consignee.name === filterParty ||
+                lr.billingTo?.name === filterParty)
         );
-    }, [editingInvoice, lorryReceipts]);
+    }, [editingInvoice, lorryReceipts, editAddParty]);
 
     // ── Filtered invoices for search ──
     const filteredInvoices = generatedInvoices.filter(inv =>
@@ -150,6 +150,11 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
         setRemovingLrNos(new Set());
         setAddingLrNos(new Set());
         setShowAddMore(false);
+        // Default add-party to the invoice's own party
+        const defaultParty =
+            inv.lrs[0]?.billingTo?.name ||
+            inv.lrs[0]?.consignor?.name || '';
+        setEditAddParty(defaultParty);
     };
 
     const toggleRemoveLR = (lrNo: string) => {
@@ -327,6 +332,21 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                             </button>
 
                             {showAddMore && (
+                                <>
+                                    {/* Party Selector for Add More */}
+                                    <div className="mb-3">
+                                        <label className="block text-xs font-bold text-amber-700 uppercase mb-1">Party Select karo (Jis party ke LR add karne hain)</label>
+                                        <select
+                                            value={editAddParty}
+                                            onChange={e => { setEditAddParty(e.target.value); setAddingLrNos(new Set()); }}
+                                            className="w-full sm:w-72 p-2 bg-white border border-amber-300 rounded-lg font-semibold text-gray-800 focus:ring-2 focus:ring-amber-400 text-sm"
+                                        >
+                                            <option value="">-- Party Select Karo --</option>
+                                            {allParties.map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 <div className="bg-white border border-amber-200 rounded-lg overflow-hidden shadow-sm max-h-[220px] overflow-y-auto">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-green-50 text-green-900 text-[10px] uppercase font-bold sticky top-0">
@@ -379,7 +399,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                             )}
                                         </tbody>
                                     </table>
-                                </div>
+                                    </div>
+                                </>
                             )}
                             {addingLrNos.size > 0 && (
                                 <p className="mt-1 text-xs text-green-700 font-semibold">

@@ -76,7 +76,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                     </p>
                 </div>
                 <div className="w-1/4 text-right font-bold text-xs text-black">
-                    {companyDetails.contact.map(c => <p key={c}>{c}</p>)}
+                    {(companyDetails.contact || []).map(c => <p key={c}>{c}</p>)}
                 </div>
             </div>
 
@@ -146,10 +146,10 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
                             </p>
                             <div className="mt-2">
                                 <p>BANK DETAILS</p>
-                                <p>BANK NAME : {companyDetails.bankDetails.name}</p>
-                                <p>BRANCH : {companyDetails.bankDetails.branch}</p>
-                                <p>A/C NO. : {companyDetails.bankDetails.accountNo}</p>
-                                <p>IFSCCODE : {companyDetails.bankDetails.ifscCode}</p>
+                                <p>BANK NAME : {companyDetails.bankDetails?.name}</p>
+                                <p>BRANCH : {companyDetails.bankDetails?.branch}</p>
+                                <p>A/C NO. : {companyDetails.bankDetails?.accountNo}</p>
+                                <p>IFSCCODE : {companyDetails.bankDetails?.ifscCode}</p>
                             </div>
                         </td>
                         <td colSpan={3} className="border border-gray-600 p-0 align-top">

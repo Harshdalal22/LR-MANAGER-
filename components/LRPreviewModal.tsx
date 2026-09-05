@@ -2,7 +2,7 @@ import React, { useRef, forwardRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'react-hot-toast';
 import { LorryReceipt, CompanyDetails } from '../types';
-import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon } from './icons';
+import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon, PhoneIcon } from './icons';
 
 interface LRPreviewModalProps {
     isOpen: boolean;
@@ -58,7 +58,19 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     showCompanyDetails?: boolean;
     showAmounts?: boolean;
     copyType?: string;
-}>(({ lr, companyDetails, showCompanyDetails = true, showAmounts = true, copyType = 'CONSIGNOR COPY' }, ref) => {
+    orientation?: 'portrait' | 'landscape';
+    paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
+    singlePageFit?: boolean;
+}>(({ 
+    lr, 
+    companyDetails, 
+    showCompanyDetails = true, 
+    showAmounts = true, 
+    copyType = 'CONSIGNOR COPY',
+    orientation = 'portrait',
+    paperSize = 'a4',
+    singlePageFit = true
+}, ref) => {
 
     const charges = lr.charges || ({} as any);
     const hamali = Number(charges.hamail || 0);
@@ -81,14 +93,15 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     const consigneeGst = lr.consignee?.gst || '';
     const consignorStateCode = getStateCodeFromGst(consignorGst);
     const consigneeStateCode = getStateCodeFromGst(consigneeGst);
-    const companyStateCode = getStateCodeFromGst(companyDetails.gstn);
 
     // Calculate item total quantities and weights
     const totalPcs = (lr.items || []).reduce((sum, it) => sum + (Number(it.pcs) || 0), 0);
     const totalActualWeight = Number(lr.actualWeightMT) > 0 
-        ? `${lr.actualWeightMT} MT` 
+        ? (Number(lr.weight) > 0 ? `${lr.weight.toLocaleString('en-IN')} Kg (${lr.actualWeightMT} MT)` : `${lr.actualWeightMT} MT`)
         : (Number(lr.weight) > 0 ? `${lr.weight.toLocaleString('en-IN')} Kg` : (totalPcs > 0 ? `${totalPcs} Units` : '--'));
-    const totalChargedWeight = Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg` : '--';
+    const totalChargedWeight = Number(lr.chargedWeight) > 0 
+        ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg (${(Number(lr.chargedWeight) / 1000).toFixed(3)} MT)` 
+        : '--';
 
     const activeCopy = copyType || lr.copyType || 'CONSIGNOR COPY';
     const freightBasis = lr.freightBasis || (lr.gstPaidBy === 'Consignor' ? 'PAID (Consignor)' : 'TO PAY (Consignee)');
@@ -101,10 +114,23 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     const driverContact = lr.driverContact || (charges.driverContact) || '';
     const vehicleType = lr.vehicleType || (charges.vehicleType) || '';
 
+    const formatDisplayDate = (d: string | null | undefined) => formatBiltyDate(d);
+
+    const isBillingPartySeparate = lr.billingTo && lr.billingTo.name &&
+        (lr.billingTo.name !== lr.consignor?.name || lr.billingTo.address !== lr.consignor?.address) &&
+        (lr.billingTo.name !== lr.consignee?.name || lr.billingTo.address !== lr.consignee?.address);
+
+    const isLandscape = orientation === 'landscape';
+    const containerClass = isLandscape 
+        ? 'max-w-[1040px] p-3 text-[9px]' 
+        : paperSize === 'a5' 
+            ? 'max-w-[580px] p-2 text-[8px]' 
+            : 'max-w-[760px] p-4 text-[9.5px]';
+
     return (
         <div
             ref={ref}
-            className="printable-area bg-white text-slate-900 font-sans w-full max-w-[760px] mx-auto border border-slate-800 shadow-md p-4 text-[9.5px] leading-snug relative selection:bg-blue-100"
+            className={`printable-area bg-white text-slate-900 font-sans w-full mx-auto border border-slate-800 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
             style={{ boxSizing: 'border-box' }}
         >
             {/* Header Section */}
@@ -138,144 +164,183 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             <p className="font-bold text-slate-900">
                                 GSTIN: <span className="font-mono">{companyDetails.gstn || 'N/A'}</span>
                                 {companyDetails.pan && <> • PAN: <span className="font-mono">{companyDetails.pan}</span></>}
-                                {companyStateCode && <> • State Code: <span className="font-mono">{companyStateCode}</span></>}
                             </p>
                         )}
                         <p className="text-slate-600">
-                            {companyDetails.email && <>Email: <span className="font-medium text-slate-800">{companyDetails.email}</span></>}
                             {companyDetails.contact && companyDetails.contact.length > 0 && (
-                                <> • Helpline: <span className="font-semibold text-slate-800">{companyDetails.contact.join(', ')}</span></>
+                                <>Ph: <span className="font-medium text-slate-800">{companyDetails.contact.join(', ')}</span></>
                             )}
+                            {companyDetails.email && <> • Email: <span className="font-medium text-slate-800">{companyDetails.email}</span></>}
                         </p>
                     </div>
                 </div>
 
-                {/* Right: Consignment Note Card */}
-                <div className="w-[240px] flex-shrink-0 border border-slate-900 rounded-sm overflow-hidden bg-white">
-                    <div className="bg-[#0f2439] text-white text-center font-black text-[11px] py-0.5 tracking-wider uppercase">
-                        CONSIGNMENT NOTE / LR
-                    </div>
-                    <div className="bg-slate-100 text-center font-black text-[9px] text-blue-900 border-b border-slate-300 py-0.5 uppercase tracking-wider">
-                        {activeCopy}
-                    </div>
-                    <div className="p-1.5 space-y-0.5 text-[8.5px]">
-                        <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">LR / Bilty No:</span>
-                            <span className="font-black text-blue-700 text-[11px] font-mono">{lr.lrNo}</span>
+                {/* Right: Modern Compact Doc Details Box */}
+                <div className="w-[280px] bg-slate-50 border border-slate-300 rounded-sm p-2 flex flex-col justify-between">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="bg-slate-900 text-white font-extrabold px-1.5 py-0.5 rounded text-[8px] tracking-wider uppercase">
+                            {activeCopy}
+                        </span>
+                        <div className="text-right">
+                            <span className="text-[8px] text-slate-500 font-bold block">LR / BILTY NO.</span>
+                            <span className="font-mono font-black text-sm text-blue-900 leading-none">
+                                {lr.lrNo || 'DRAFT-001'}
+                            </span>
                         </div>
-                        <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">LR Date:</span>
-                            <span className="font-bold text-slate-900">{formatBiltyDate(lr.date)}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1 mt-1 text-[8.5px]">
+                        <div>
+                            <span className="text-slate-500 font-semibold block">Date:</span>
+                            <span className="font-bold text-slate-900">{formatDisplayDate(lr.date)}</span>
                         </div>
-                        {lr.ewayBillNo && (
-                            <div className="flex justify-between items-center">
-                                <span className="text-slate-600 font-semibold">E-Way Bill No:</span>
-                                <span className="font-bold text-slate-900 font-mono text-[8px]">{lr.ewayBillNo}</span>
+                        <div>
+                            <span className="text-slate-500 font-semibold block">Truck / Vehicle:</span>
+                            <span className="font-mono font-black text-slate-900 uppercase">{lr.truckNo || 'N/A'}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500 font-semibold block">Vehicle Type:</span>
+                            <span className="font-bold text-slate-800">{vehicleType || 'Standard'}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500 font-semibold block">Driver Name/Mob:</span>
+                            <span className="font-medium text-slate-800">
+                                {driverName ? `${driverName} ${driverContact ? `(${driverContact})` : ''}` : '--'}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="mt-1 pt-1 border-t border-slate-200 flex justify-between items-center bg-blue-50/60 px-1.5 py-0.5 rounded-sm">
+                        <span className="font-bold text-[8px] text-blue-950 uppercase">Freight Basis:</span>
+                        <span className="font-black text-[9px] text-blue-900 uppercase tracking-wide">{freightBasis}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Route Banner */}
+            <div className="bg-[#0f2439] text-white flex justify-between items-center px-3 py-1.5 my-1.5 rounded-sm shadow-xs">
+                <div className="flex items-center gap-2">
+                    <span className="text-slate-300 font-medium text-[8px] uppercase tracking-wider">Origin Station:</span>
+                    <span className="font-black text-xs uppercase tracking-wide text-cyan-300">{lr.fromPlace || 'ORIGIN'}</span>
+                </div>
+                <div className="text-cyan-400 font-bold text-sm tracking-widest">
+                    ━━━━━►
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-slate-300 font-medium text-[8px] uppercase tracking-wider">Destination:</span>
+                    <span className="font-black text-xs uppercase tracking-wide text-yellow-300">{lr.toPlace || 'DESTINATION'}</span>
+                </div>
+            </div>
+
+            {/* Two-Column Party Box: Consignor & Consignee */}
+            <div className="grid grid-cols-2 gap-2 my-1.5">
+                {/* Consignor Details */}
+                <div className="border border-slate-300 rounded-sm p-2 bg-slate-50/60 relative">
+                    <div className="bg-[#0f2439] text-white text-[7.5px] font-extrabold px-1.5 py-0.2 rounded-xs inline-block uppercase tracking-wider mb-1">
+                        CONSIGNOR (DISPATCH FROM)
+                    </div>
+                    <h3 className="font-black text-[10px] text-slate-900 uppercase leading-tight">
+                        {lr.consignor?.name || '---'}
+                    </h3>
+                    <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
+                        {lr.consignor?.address || '---'}
+                        {lr.consignor?.city ? `, ${lr.consignor.city}` : ''}
+                    </p>
+                    <div className="mt-1 pt-1 border-t border-slate-200 grid grid-cols-2 gap-1 text-[8px]">
+                        <div>
+                            <span className="text-slate-500 font-bold">GSTIN:</span>{' '}
+                            <span className="font-mono font-bold text-slate-900">{consignorGst || 'UNREGISTERED'}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500 font-bold">State Code:</span>{' '}
+                            <span className="font-mono font-bold text-slate-900">{consignorStateCode || '--'}</span>
+                        </div>
+                        {lr.consignor?.contact && (
+                            <div className="col-span-2">
+                                <span className="text-slate-500 font-bold">Contact:</span>{' '}
+                                <span className="text-slate-800">{lr.consignor.contact}</span>
                             </div>
                         )}
-                        {lr.ewayExDate && (
-                            <div className="flex justify-between items-center">
-                                <span className="text-slate-600 font-semibold">EWB Valid Upto:</span>
-                                <span className="font-bold text-slate-900 text-[8px]">{formatBiltyDate(lr.ewayExDate)} (23:59)</span>
+                    </div>
+                </div>
+
+                {/* Consignee Details */}
+                <div className="border border-slate-300 rounded-sm p-2 bg-slate-50/60 relative">
+                    <div className="bg-[#0f2439] text-white text-[7.5px] font-extrabold px-1.5 py-0.2 rounded-xs inline-block uppercase tracking-wider mb-1">
+                        CONSIGNEE (DELIVER TO)
+                    </div>
+                    <h3 className="font-black text-[10px] text-slate-900 uppercase leading-tight">
+                        {lr.consignee?.name || '---'}
+                    </h3>
+                    <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
+                        {lr.consignee?.address || '---'}
+                        {lr.consignee?.city ? `, ${lr.consignee.city}` : ''}
+                    </p>
+                    <div className="mt-1 pt-1 border-t border-slate-200 grid grid-cols-2 gap-1 text-[8px]">
+                        <div>
+                            <span className="text-slate-500 font-bold">GSTIN:</span>{' '}
+                            <span className="font-mono font-bold text-slate-900">{consigneeGst || 'UNREGISTERED'}</span>
+                        </div>
+                        <div>
+                            <span className="text-slate-500 font-bold">State Code:</span>{' '}
+                            <span className="font-mono font-bold text-slate-900">{consigneeStateCode || '--'}</span>
+                        </div>
+                        {lr.consignee?.contact && (
+                            <div className="col-span-2">
+                                <span className="text-slate-500 font-bold">Contact:</span>{' '}
+                                <span className="text-slate-800">{lr.consignee.contact}</span>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Route & Vehicle Banner (Dark Navy) */}
-            <div className="bg-[#0f2439] text-white my-1.5 px-3 py-1.5 rounded-sm flex flex-row justify-between items-center">
-                <div className="flex items-center gap-3">
+            {/* Separate Billing Party if Applicable */}
+            {isBillingPartySeparate && (
+                <div className="border border-amber-300 bg-amber-50/60 rounded-sm p-1.5 my-1 flex justify-between items-center text-[8.5px]">
                     <div>
-                        <div className="text-cyan-300 text-[7px] font-extrabold uppercase tracking-widest">SOURCE • ORIGIN</div>
-                        <div className="text-xs font-black tracking-wide uppercase text-white">{lr.fromPlace || 'ORIGIN'}</div>
+                        <span className="font-black text-amber-900 uppercase text-[8px] mr-1">BILLING PARTY (3rd Party):</span>
+                        <span className="font-bold text-slate-900 uppercase">{lr.billingTo.name}</span>
+                        <span className="text-slate-600"> • {lr.billingTo.address}, {lr.billingTo.city}</span>
                     </div>
-                    <div className="text-cyan-400 font-black text-sm px-1">➔</div>
-                    <div>
-                        <div className="text-cyan-300 text-[7px] font-extrabold uppercase tracking-widest">DESTINATION • DELIVERY POINT</div>
-                        <div className="text-xs font-black tracking-wide uppercase text-white">{lr.toPlace || 'DESTINATION'}</div>
-                    </div>
-                </div>
-
-                <div className="text-right">
-                    <div className="text-cyan-300 text-[7px] font-extrabold uppercase tracking-widest">VEHICLE & DRIVER DETAILS</div>
-                    <div className="text-xs font-black uppercase text-white tracking-wider">
-                        {lr.truckNo} {vehicleType ? `• ${vehicleType}` : ''}
-                    </div>
-                    {(driverName || driverContact) && (
-                        <div className="text-[8px] text-slate-300 font-medium">
-                            Driver: {driverName || 'Assigned'} {driverContact ? `(+91 ${driverContact})` : ''}
+                    {lr.billingTo.gst && (
+                        <div className="font-mono font-bold text-slate-900">
+                            GSTIN: {lr.billingTo.gst}
                         </div>
                     )}
                 </div>
-            </div>
-
-            {/* Consignor & Consignee 2-Column Grid */}
-            <div className="grid grid-cols-2 gap-2 my-1.5">
-                {/* Consignor Box */}
-                <div className="border border-slate-400 p-2 rounded-sm bg-slate-50/40 flex flex-col justify-between min-h-[90px]">
-                    <div>
-                        <div className="font-extrabold text-[8.5px] text-[#0f2439] uppercase flex items-center gap-1 border-b border-slate-300 pb-0.5 mb-1">
-                            <span>📦</span> CONSIGNOR (BILLED & DISPATCHED FROM)
-                        </div>
-                        <p className="font-black text-slate-900 text-[10.5px] uppercase">{lr.consignor?.name || 'CONSIGNOR NAME'}</p>
-                        <p className="text-[8.5px] text-slate-700 mt-0.5 leading-tight">
-                            {lr.consignor?.address}{lr.consignor?.city ? `, ${lr.consignor.city}` : ''}
-                        </p>
-                    </div>
-                    <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
-                        {consignorGst && (
-                            <p className="font-bold text-slate-800">
-                                GSTIN: <span className="font-mono">{consignorGst}</span>
-                                {consignorStateCode && <> • State Code: <span className="font-mono">{consignorStateCode}</span></>}
-                            </p>
-                        )}
-                        <p className="text-slate-700">
-                            {lr.consignor?.contact && <>Contact: <span className="font-medium">{lr.consignor.contact}</span></>}
-                            {lr.invoiceNo && <> • Inv No: <span className="font-bold text-slate-900">{lr.invoiceNo}</span></>}
-                            {lr.invoiceDate && <> ({formatBiltyDate(lr.invoiceDate)})</>}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Consignee Box */}
-                <div className="border border-slate-400 p-2 rounded-sm bg-slate-50/40 flex flex-col justify-between min-h-[90px]">
-                    <div>
-                        <div className="font-extrabold text-[8.5px] text-[#0f2439] uppercase flex items-center gap-1 border-b border-slate-300 pb-0.5 mb-1">
-                            <span>🏢</span> CONSIGNEE (SHIP & DELIVERY TO)
-                        </div>
-                        <p className="font-black text-slate-900 text-[10.5px] uppercase">{lr.consignee?.name || 'CONSIGNEE NAME'}</p>
-                        <p className="text-[8.5px] text-slate-700 mt-0.5 leading-tight">
-                            {lr.consignee?.address}{lr.consignee?.city ? `, ${lr.consignee.city}` : ''}
-                        </p>
-                    </div>
-                    <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
-                        {consigneeGst && (
-                            <p className="font-bold text-slate-800">
-                                GSTIN: <span className="font-mono">{consigneeGst}</span>
-                                {consigneeStateCode && <> • State Code: <span className="font-mono">{consigneeStateCode}</span></>}
-                            </p>
-                        )}
-                        <p className="text-slate-700">
-                            {lr.consignee?.contact && <>Contact: <span className="font-medium">{lr.consignee.contact}</span></>}
-                            {lr.poNo && <> • PO No: <span className="font-bold text-slate-900">{lr.poNo}</span></>}
-                            {lr.addressOfDelivery && <> • Del: {lr.addressOfDelivery}</>}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Separate Billing Party Banner (If different) */}
-            {lr.billingTo?.name && (lr.billingTo.name !== lr.consignor.name && lr.billingTo.name !== lr.consignee.name) && (
-                <div className="bg-amber-50 border border-amber-300 px-2 py-1 rounded-sm my-1 text-[8.5px]">
-                    <span className="font-black text-amber-900 uppercase">BILLING PARTY: </span>
-                    <span className="font-bold text-slate-900">{lr.billingTo.name}</span>
-                    <span> — {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}</span>
-                </div>
             )}
 
-            {/* Goods & Packages Table */}
-            <div className="my-1.5 border border-slate-800 rounded-sm overflow-hidden">
+            {/* Invoice & E-Way Bill Details Strip */}
+            <div className="grid grid-cols-4 gap-1.5 my-1.5 bg-slate-100 border border-slate-300 p-1.5 rounded-sm text-[8px]">
+                <div>
+                    <span className="text-slate-500 font-bold block">INVOICE NO & DATE:</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                        {lr.invoiceNo || '---'} {lr.invoiceDate ? `• ${formatDisplayDate(lr.invoiceDate)}` : ''}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-slate-500 font-bold block">E-WAY BILL NO:</span>
+                    <span className="font-mono font-black text-blue-900">
+                        {lr.ewayBillNo || '---'}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-slate-500 font-bold block">EWB EXPIRY DATE:</span>
+                    <span className="font-bold text-slate-900">
+                        {lr.ewayExDate ? formatDisplayDate(lr.ewayExDate) : (lr.ewayBillDate ? formatDisplayDate(lr.ewayBillDate) : '---')}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-slate-500 font-bold block">PO / REF NO:</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                        {lr.poNo || '---'} {lr.poDate ? `• ${formatDisplayDate(lr.poDate)}` : ''}
+                    </span>
+                </div>
+            </div>
+
+            {/* Goods Description & Packages Itemized Table */}
+            <div className="border border-slate-300 rounded-sm overflow-hidden my-1.5">
                 <table className="w-full text-left border-collapse text-[8.5px]">
                     <thead>
                         <tr className="bg-[#0f2439] text-white text-[8px] uppercase tracking-wider font-bold">
@@ -402,105 +467,113 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                     {/* 3 Signatures Area */}
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-300 text-center text-[7.5px]">
                         <div className="flex flex-col justify-end h-14">
-                            <div className="border-t border-slate-400 pt-0.5 font-bold text-slate-700">
-                                Consignor / Loader Sign
-                            </div>
+                            <div className="border-b border-dashed border-slate-400 mb-1 w-3/4 mx-auto"></div>
+                            <span className="font-bold text-slate-700 uppercase">Consignor's Signature</span>
                         </div>
                         <div className="flex flex-col justify-end h-14">
-                            <div className="border-t border-slate-400 pt-0.5 font-bold text-slate-700">
-                                Driver Sign / Thumb Impression
-                            </div>
+                            <div className="border-b border-dashed border-slate-400 mb-1 w-3/4 mx-auto"></div>
+                            <span className="font-bold text-slate-700 uppercase">Driver / Broker Sign</span>
                         </div>
-                        <div className="flex flex-col justify-end items-center h-14">
-                            {companyDetails.signatureImageUrl && (
+                        <div className="flex flex-col justify-end h-14 items-center">
+                            {companyDetails.signatureImageUrl ? (
                                 <img
                                     src={companyDetails.signatureImageUrl}
                                     alt="Sign"
-                                    className="h-8 w-auto object-contain mb-0.5"
+                                    className="h-9 w-auto object-contain mb-0.5"
                                 />
+                            ) : (
+                                <div className="border-b border-dashed border-slate-400 mb-1 w-3/4 mx-auto"></div>
                             )}
-                            <div className="border-t border-slate-400 pt-0.5 font-bold text-slate-900 w-full">
-                                For {companyDetails.name || 'Logistics Co.'}
-                            </div>
+                            <span className="font-black text-slate-900 uppercase">For {companyDetails.name || 'Carrier'}</span>
+                            <span className="text-[6.5px] text-slate-500 font-semibold">(Authorized Signatory)</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Right 5 Columns: FREIGHT & CHARGES BREAKDOWN */}
-                <div className="col-span-5 border border-slate-400 rounded-sm bg-slate-50/50 p-2 flex flex-col justify-between">
-                    <div className="space-y-1">
-                        {/* Freight Basis Badge */}
-                        <div className="flex justify-between items-center bg-blue-100 border border-blue-300 p-1 rounded-sm">
-                            <span className="font-bold text-[8px] text-blue-900 uppercase">Freight Basis:</span>
-                            <span className="font-black text-[9px] text-blue-800 uppercase">{freightBasis}</span>
-                        </div>
+                {/* Right 5 Columns: FINANCIAL CHARGES & NET PAYABLE */}
+                <div className="col-span-5 border border-slate-800 rounded-sm bg-slate-50/50 overflow-hidden shadow-xs">
+                    <div className="bg-[#0f2439] text-white p-1 text-center font-black text-[9px] uppercase tracking-wider">
+                        FREIGHT & CHARGES BREAKDOWN
+                    </div>
 
-                        {/* Charges Lines */}
-                        <div className="divide-y divide-slate-200 text-[8.5px] pt-1">
-                            <div className="flex justify-between py-0.5">
-                                <span className="text-slate-600 font-medium">Basic Freight (Charged Wt):</span>
-                                <span className="font-bold text-slate-900">{formatINR(showAmounts ? basicFreight : 0)}</span>
-                            </div>
-                            {hamali > 0 && (
-                                <div className="flex justify-between py-0.5">
-                                    <span className="text-slate-600 font-medium">Loading & Handling Hamali:</span>
-                                    <span className="font-bold text-slate-900">{formatINR(showAmounts ? hamali : 0)}</span>
-                                </div>
-                            )}
-                            {doorDelivery > 0 && (
-                                <div className="flex justify-between py-0.5">
-                                    <span className="text-slate-600 font-medium">Door Pickup & Delivery:</span>
-                                    <span className="font-bold text-slate-900">{formatINR(showAmounts ? doorDelivery : 0)}</span>
-                                </div>
-                            )}
-                            {statistical > 0 && (
-                                <div className="flex justify-between py-0.5">
-                                    <span className="text-slate-600 font-medium">Statistical & LR Surcharge:</span>
-                                    <span className="font-bold text-slate-900">{formatINR(showAmounts ? statistical : 0)}</span>
-                                </div>
-                            )}
-                            {tollTax > 0 && (
-                                <div className="flex justify-between py-0.5">
-                                    <span className="text-slate-600 font-medium">Toll & Green Tax Surcharge:</span>
-                                    <span className="font-bold text-slate-900">{formatINR(showAmounts ? tollTax : 0)}</span>
-                                </div>
-                            )}
-                            {otherSum > 0 && (
-                                <div className="flex justify-between py-0.5">
-                                    <span className="text-slate-600 font-medium">Other Charges / Risk:</span>
-                                    <span className="font-bold text-slate-900">{formatINR(showAmounts ? otherSum : 0)}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between py-0.5 text-slate-500 text-[8px]">
-                                <span>GST on Freight (5% RCM):</span>
-                                <span className="font-bold text-slate-700">{formatINR(0)} (by Recipient)</span>
-                            </div>
+                    <div className="divide-y divide-slate-200 text-[8.5px]">
+                        <div className="flex justify-between p-1 bg-white font-bold">
+                            <span className="text-slate-800">Basic Freight Charge:</span>
+                            <span className="font-mono text-slate-900 font-extrabold">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
                         </div>
+                        {hamali > 0 && (
+                            <div className="flex justify-between p-1 bg-slate-50">
+                                <span className="text-slate-700">Hamali / Loading Charges:</span>
+                                <span className="font-mono text-slate-800">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
+                            </div>
+                        )}
+                        {doorDelivery > 0 && (
+                            <div className="flex justify-between p-1 bg-white">
+                                <span className="text-slate-700">Door Delivery Charges:</span>
+                                <span className="font-mono text-slate-800">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
+                            </div>
+                        )}
+                        {statistical > 0 && (
+                            <div className="flex justify-between p-1 bg-slate-50">
+                                <span className="text-slate-700">Statistical & Bilty Charges:</span>
+                                <span className="font-mono text-slate-800">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
+                            </div>
+                        )}
+                        {tollTax > 0 && (
+                            <div className="flex justify-between p-1 bg-white">
+                                <span className="text-slate-700">Toll Tax / Crossing:</span>
+                                <span className="font-mono text-slate-800">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
+                            </div>
+                        )}
+                        {otherSum > 0 && (
+                            <div className="flex justify-between p-1 bg-slate-50">
+                                <span className="text-slate-700">Surcharge / Collection / Other:</span>
+                                <span className="font-mono text-slate-800">{showAmounts ? formatINR(otherSum) : '₹ 0.00'}</span>
+                            </div>
+                        )}
 
-                        {/* Total Freight Banner */}
-                        <div className="bg-[#0f2439] text-white p-1.5 rounded-sm flex justify-between items-center my-1">
-                            <span className="font-bold text-[9px] uppercase tracking-wider">TOTAL FREIGHT AMOUNT:</span>
-                            <span className="font-black text-sm">{formatINR(showAmounts ? totalFreight : 0)}</span>
+                        {/* Total Freight Row */}
+                        <div className="flex justify-between p-1 bg-blue-100 font-extrabold text-blue-950 border-t border-blue-300">
+                            <span>TOTAL FREIGHT CHARGES:</span>
+                            <span className="font-mono text-[9.5px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Advance Paid */}
-                        <div className="flex justify-between items-center py-0.5 text-[8.5px] px-1">
-                            <span className="text-slate-600 font-semibold">Advance Paid (by Cash/Online):</span>
-                            <span className="font-bold text-emerald-700">(-) {formatINR(showAmounts ? advancePaid : 0)}</span>
+                        <div className="flex justify-between p-1 bg-emerald-50 text-emerald-950 font-bold">
+                            <span>Less: Advance Paid:</span>
+                            <span className="font-mono font-black text-emerald-700">- {showAmounts ? formatINR(advancePaid) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Net Balance To Pay */}
-                        <div className="bg-blue-50 border-2 border-blue-600 p-1.5 rounded-sm flex justify-between items-center mt-1">
-                            <span className="font-black text-[9.5px] text-blue-950 uppercase tracking-wide">NET BALANCE TO PAY:</span>
-                            <span className="font-black text-sm text-blue-900">{formatINR(showAmounts ? netBalanceToPay : 0)}</span>
+                        <div className="flex justify-between items-center p-1.5 bg-[#0f2439] text-white">
+                            <div>
+                                <span className="font-black text-[9px] uppercase tracking-wide block">NET BALANCE TO PAY:</span>
+                                <span className="text-[7px] text-cyan-300 font-medium tracking-tight">
+                                    {freightBasis.includes('PAID') ? '(PAID IN ADVANCE)' : '(PAYABLE AT DESTINATION)'}
+                                </span>
+                            </div>
+                            <span className="font-mono font-black text-base text-yellow-300 tracking-tight">
+                                {showAmounts ? formatINR(netBalanceToPay) : '₹ 0.00'}
+                            </span>
                         </div>
                     </div>
+
+                    {/* Bank & Payment Info Box */}
+                    {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
+                        <div className="p-1 bg-slate-100 border-t border-slate-300 text-[7px] space-y-0.2">
+                            <span className="font-black text-slate-900 block uppercase">Bank RTGS/NEFT Details:</span>
+                            <p className="text-slate-700 font-medium leading-tight">
+                                Bank: <strong className="text-slate-900">{companyDetails.bankDetails.name}</strong> • A/c: <strong className="font-mono text-slate-900">{companyDetails.bankDetails.accountNo}</strong> • IFSC: <strong className="font-mono text-slate-900">{companyDetails.bankDetails.ifscCode}</strong>
+                            </p>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            {/* Footer Notice */}
-            <div className="text-[7px] text-slate-400 text-center pt-1 italic border-t border-slate-200 mt-1">
-                Page 1 of 1 • System Generated GST Compliant Electronic Lorry Receipt (BiltyBook)
+            {/* Footer Watermark */}
+            <div className="border-t border-slate-300 pt-0.5 flex justify-between items-center text-[7px] text-slate-400 font-medium">
+                <span>Computer Generated GST Lorry Receipt • Speedway Logistics ERP</span>
+                <span>Page 1 of 1</span>
             </div>
         </div>
     );
@@ -514,7 +587,10 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
     companyDetails: CompanyDetails;
     showCompanyDetails: boolean;
     showAmounts: boolean;
-}>(({ lr, companyDetails, showCompanyDetails, showAmounts }, ref) => {
+    orientation?: 'portrait' | 'landscape';
+    paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
+    singlePageFit?: boolean;
+}>(({ lr, companyDetails, showCompanyDetails, showAmounts, orientation = 'portrait', paperSize = 'a4', singlePageFit = true }, ref) => {
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
@@ -526,8 +602,15 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
         return showAmounts ? (Number(amount) || 0).toFixed(2) : "0.00";
     };
 
+    const isLandscape = orientation === 'landscape';
+    const containerClass = isLandscape 
+        ? 'w-[1020px] p-3' 
+        : paperSize === 'a5' 
+            ? 'w-[580px] p-2 text-[8px]' 
+            : 'w-[680px] p-2';
+
     return (
-        <div ref={ref} className="printable-area p-2 bg-white text-black font-sans w-[680px] mx-auto border-2 border-black relative">
+        <div ref={ref} className={`printable-area bg-white text-black font-sans ${containerClass} mx-auto border-2 border-black relative ${singlePageFit ? 'page-avoid-break' : ''}`}>
             {/* Jurisdiction Header */}
             {companyDetails.jurisdictionCity && (
                 <div className="text-[10px] font-bold text-center w-full pb-1 uppercase tracking-wide">
@@ -555,127 +638,92 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                     <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal leading-tight">
                         {companyDetails.address}
                     </p>
-                </div>
-
-                {/* Right: Contact & Badge */}
-                <div className="flex-none w-[180px] flex flex-col items-end justify-between py-1">
-                    <div className="text-[10px] font-bold text-right leading-tight w-full break-words">
-                        <p>{companyDetails.email}</p>
-                        {companyDetails.contact.slice(0, 2).map(c => <p key={c}>{c}</p>)}
-                    </div>
-                    <div className="mt-2 self-end">
-                        <span className="bg-ssk-blue text-white px-3 py-1 rounded text-sm font-bold tracking-wider uppercase block text-center min-w-[100px]">
-                            {lr.lrType}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Top Body Grid */}
-            <div className="grid grid-cols-12 gap-x-1 text-[9px] mt-1">
-                {/* Left Col */}
-                <div className="col-span-4 flex flex-col">
-                    <div className="border border-black p-1">
-                        <span className="font-bold bg-white px-1 relative -top-3 text-black">Available At :</span>
-                        <div className="-mt-2 grid grid-cols-2 gap-x-2">
-                            {(companyDetails.branchLocations || []).map(loc => (
-                                <p key={loc} className="font-bold truncate">{loc.toUpperCase()}</p>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="border border-black p-1 mt-1 caution-notice-section">
-                        <p className="font-bold text-center text-red-600 text-sm">CAUTION</p>
-                        <p className="text-[7px] leading-tight">This Consignment Will Not Be Detained Diverted,Re-Routed Or Re-Booked Without Consignee Bank Written Permission Will Be Delivered At the Destination.</p>
-                    </div>
-                    <div className="border border-black p-1 mt-1 flex-grow caution-notice-section">
-                        <p className="font-bold text-center text-red-600 text-sm">NOTICE</p>
-                        <p className="text-[7px] leading-tight">This consignment covered in this set of special lorry receipt shall be stored at the destination under the control of the transport operator & shall be delivered to or to the order of the Consignee bank whose name is mentioned in the lorry receipt.</p>
-                    </div>
-                </div>
-                {/* Mid Col */}
-                <div className="col-span-4">
-                    <div className="border border-black p-1">
-                        <p className="font-bold text-center underline mb-1">AT OWNERS RISKS</p>
-                        {showCompanyDetails && (
-                            <>
-                                <p className="flex justify-between"><span>Pan No. :</span> <span className="font-bold text-black">{companyDetails.pan}</span></p>
-                                <p className="flex justify-between"><span>GST No. :</span> <span className="text-black font-bold">{companyDetails.gstn}</span></p>
-                            </>
-                        )}
-                    </div>
-                    <div className="border border-black p-1 mt-1 text-center h-[90px]">
-                        <p className="font-bold underline">INSURANCE</p>
-                        <p className="text-[7px] font-bold my-1 leading-tight">The Customer Has Started That He Has Not Insured The Consignment</p>
-                        <div className="flex justify-between mt-1 text-left border-b border-gray-300 pb-1">
-                            <span>Policy No: _______</span>
-                            <span>Date: _______</span>
-                        </div>
-                        <div className="flex justify-between mt-1 text-left">
-                            <span>Amount: _______</span>
-                            <span>Risk: _______</span>
-                        </div>
-                    </div>
-                </div>
-                {/* Right Col */}
-                <div className="col-span-4 text-center">
-                    <div className="border border-black p-1">
-                        <p className="font-bold underline">DEMURRAGE CHARGES</p>
-                        <p className="text-[7px] font-bold leading-tight">Chargeable After 5 days Arrival Of Goods Rs. 7/per Qtl.Per Day On Weight Charged</p>
-                    </div>
-                    <div className="border border-black p-1 mt-1 font-bold text-left truncate">Del Addr: <span className="font-bold text-black">{lr.addressOfDelivery}</span></div>
-                    <div className="border border-black p-1 mt-1 font-bold flex justify-between items-center bg-gray-100">
-                        <span>Vehicle No.:</span>
-                        <span className="font-extrabold text-black text-lg">{lr.truckNo}</span>
-                    </div>
-                    <div className="border-y-2 border-black p-1 mt-1 font-bold text-lg flex justify-between">
-                        <span>C NOTE No.:</span>
-                        <span className="font-extrabold text-red-600">{lr.lrNo}</span>
-                    </div>
-                    {lr.ewayBillNo && (
-                        <div className="border-b-2 border-black p-1 font-bold text-left text-[8px]">
-                            E-Way: <span className="font-bold text-black">{lr.ewayBillNo}</span>
-                            <div className="flex justify-between">
-                                <span>Dt: {lr.ewayBillDate ? new Date(lr.ewayBillDate).toLocaleDateString('en-GB') : '-'}</span>
-                                <span>Ex: {lr.ewayExDate ? new Date(lr.ewayExDate).toLocaleDateString('en-GB') : '-'}</span>
-                            </div>
+                    {companyDetails.branchLocations && companyDetails.branchLocations.length > 0 && (
+                        <div className="mt-1 pt-1 border-t border-gray-300">
+                            <p className="text-[8px] font-semibold text-gray-600 tracking-tight leading-tight">
+                                <span className="font-bold text-gray-700">BRANCHES: </span>
+                                {companyDetails.branchLocations.join(' | ')}
+                            </p>
                         </div>
                     )}
-                    <div className="grid grid-cols-5 mt-1 border border-black text-[8px]">
-                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">DATE</div>
-                        <div className="col-span-3 border-b border-black p-1 font-bold text-black">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
-                        <div className="col-span-2 border-r border-b border-black p-1 font-bold bg-gray-50">FROM</div>
-                        <div className="col-span-3 border-b border-black p-1 font-bold text-black uppercase">{lr.fromPlace}</div>
-                        <div className="col-span-2 border-r border-black p-1 font-bold bg-gray-50">TO</div>
-                        <div className="col-span-3 p-1 font-bold text-black uppercase">{lr.toPlace}</div>
-                    </div>
+                </div>
+
+                {/* Right: Contact & Statutory Details */}
+                <div className="flex-none w-36 text-right flex flex-col justify-center text-[9px] font-bold space-y-0.5 leading-tight">
+                    {showCompanyDetails && (
+                        <>
+                            {companyDetails.contact.map((c, i) => <div key={i}>{c}</div>)}
+                            <div>{companyDetails.email}</div>
+                            {companyDetails.web && <div>{companyDetails.web}</div>}
+                            <div className="pt-1">
+                                <span className="font-bold">PAN:</span> {companyDetails.pan}
+                            </div>
+                            <div>
+                                <span className="font-bold">GSTIN:</span> {companyDetails.gstn}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {/* Consignor/Consignee details */}
+            {/* Note */}
+            <div className="text-[8px] text-center my-0.5 font-bold">
+                AT OWNER'S RISK • INSURANCE / DEMURRAGE CHARGES EXTRA
+            </div>
+
+            {/* Top Details Table */}
+            <table className="w-full border-collapse border-2 border-black text-[9px] table-fixed">
+                <tbody>
+                    <tr className="border-b-2 border-black">
+                        <td className="p-1 border-r-2 border-black font-bold w-1/3">
+                            CONSIGNMENT NOTE (LR)
+                        </td>
+                        <td className="p-1 border-r-2 border-black w-1/3">
+                            <span className="font-bold">CAUTION:</span> This Consignment will not be detained after delivery.
+                        </td>
+                        <td className="p-1 w-1/3">
+                            <div className="flex justify-between">
+                                <span className="font-bold">CONSIGNOR COPY</span>
+                                <span>No: <span className="font-bold text-sm text-red-600">{lr.lrNo}</span></span>
+                            </div>
+                            <div>Date: <span className="font-bold">{formatBiltyDate(lr.date)}</span></div>
+                        </td>
+                    </tr>
+                    <tr className="border-b-2 border-black">
+                        <td className="p-1 border-r-2 border-black">
+                            <span className="font-bold">Lorry No:</span> <span className="font-bold uppercase text-xs">{lr.truckNo}</span>
+                        </td>
+                        <td className="p-1 border-r-2 border-black">
+                            <span className="font-bold">From:</span> <span className="font-bold uppercase">{lr.fromPlace}</span>
+                        </td>
+                        <td className="p-1">
+                            <span className="font-bold">To:</span> <span className="font-bold uppercase">{lr.toPlace}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            {/* Parties Table */}
             <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
                 <thead>
-                    <tr>
-                        <td className="border-r-2 border-black p-1 font-bold w-1/2 bg-gray-100">Consignor Name & Address</td>
-                        <td className="p-1 font-bold w-1/2 bg-gray-100">Consignee Name & Address</td>
+                    <tr className="border-b-2 border-black">
+                        <td className="p-1 border-r-2 border-black font-bold w-1/2 bg-gray-100">Consignor Details</td>
+                        <td className="p-1 font-bold w-1/2 bg-gray-100">Consignee Details</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="border-r-2 border-black p-2 align-top h-[70px]">
-                            <p className="font-bold text-black text-xs">{lr.consignor.name}</p>
-                            <p className="text-gray-800">{lr.consignor.address}, {lr.consignor.city}</p>
-                            <div className="mt-1 space-y-0.5">
-                                {lr.consignor.gst && <p className="font-semibold">GST: {lr.consignor.gst}</p>}
-                                {lr.consignor.contact && <p>Ph: {lr.consignor.contact}</p>}
-                            </div>
+                        <td className="p-2 border-r-2 border-black align-top h-20">
+                            <div className="font-bold text-sm text-black">{lr.consignor.name}</div>
+                            <div>{lr.consignor.address}, {lr.consignor.city}</div>
+                            {lr.consignor.contact && <div>Mob: {lr.consignor.contact}</div>}
+                            <div className="font-bold mt-1">GSTIN: {lr.consignor.gst || 'Unregistered'}</div>
                         </td>
-                        <td className="p-2 align-top h-[70px]">
-                            <p className="font-bold text-black text-xs">{lr.consignee.name}</p>
-                            <p className="text-gray-800">{lr.consignee.address}, {lr.consignee.city}</p>
-                            <div className="mt-1 space-y-0.5">
-                                {lr.consignee.gst && <p className="font-semibold">GST: {lr.consignee.gst}</p>}
-                                {lr.consignee.contact && <p>Ph: {lr.consignee.contact}</p>}
-                            </div>
+                        <td className="p-2 align-top h-20">
+                            <div className="font-bold text-sm text-black">{lr.consignee.name}</div>
+                            <div>{lr.consignee.address}, {lr.consignee.city}</div>
+                            {lr.consignee.contact && <div>Mob: {lr.consignee.contact}</div>}
+                            <div className="font-bold mt-1">GSTIN: {lr.consignee.gst || 'Unregistered'}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -772,34 +820,20 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                                     <span>Other</span>
                                     <span>{formatAmount(lr.charges.otherCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-black p-1">
-                                    <span>Risk Charges</span>
-                                    <span>{formatAmount(lr.charges.riskCharge)}</span>
-                                </div>
-                                <div className="flex justify-between p-1 mt-auto bg-gray-100 font-bold border-t border-black text-sm">
-                                    <span>Total</span>
-                                    <span>{formatAmount(totalToPay)}</span>
-                                </div>
                             </div>
                         </td>
                     </tr>
-
-                    {/* Footer Section inside Table */}
+                    <tr className="border-t-2 border-black font-bold">
+                        <td colSpan={4} className="border-r-2 border-black p-1 text-right">Total Payable</td>
+                        <td colSpan={2} className="p-1 text-right font-black text-sm bg-gray-100">{formatAmount(totalToPay)}</td>
+                    </tr>
                     <tr>
-                        <td colSpan={4} className="border-t-2 border-r-2 border-black p-2 align-top">
-                            <div className="flex flex-col justify-between h-full space-y-2">
-                                <div className="grid grid-cols-1 gap-2 text-[8px]">
-                                    <div>
-                                        <p className="font-bold">Invoice No: <span className="font-normal">{lr.invoiceNo}</span></p>
-                                        <p className="font-bold">Value: <span className="font-normal">₹{Number(lr.invoiceAmount).toLocaleString('en-IN')}</span></p>
-                                        <p className="font-bold">GST Paid By: <span className="font-normal">{lr.gstPaidBy}</span></p>
-                                    </div>
+                        <td colSpan={4} className="border-r-2 border-black p-1 align-top text-[8px]">
+                            {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
+                                <div>
+                                    <span className="font-bold">Bank Details:</span> {companyDetails.bankDetails.name}, A/c: {companyDetails.bankDetails.accountNo}, IFSC: {companyDetails.bankDetails.ifscCode}
                                 </div>
-                                <div className="border border-black p-1 text-[8px] bg-gray-50">
-                                    <span className="font-bold block">REMARKS:</span>
-                                    <span className="font-medium text-black">{lr.remark}</span>
-                                </div>
-                            </div>
+                            )}
                         </td>
                         <td colSpan={2} className="border-t-2 border-black p-2 align-bottom">
                             <div className="flex flex-col items-center justify-end h-full min-h-[60px]">
@@ -824,7 +858,20 @@ export const LRContent = forwardRef<HTMLDivElement, {
     showAmounts: boolean;
     templateStyle?: 'modern-gst' | 'classic';
     copyType?: string;
-}>(({ lr, companyDetails, showCompanyDetails, showAmounts, templateStyle = 'modern-gst', copyType = 'CONSIGNOR COPY' }, ref) => {
+    orientation?: 'portrait' | 'landscape';
+    paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
+    singlePageFit?: boolean;
+}>(({ 
+    lr, 
+    companyDetails, 
+    showCompanyDetails, 
+    showAmounts, 
+    templateStyle = 'modern-gst', 
+    copyType = 'CONSIGNOR COPY',
+    orientation = 'portrait',
+    paperSize = 'a4',
+    singlePageFit = true
+}, ref) => {
     const activeTemplate = templateStyle || lr.templateStyle || 'modern-gst';
 
     if (activeTemplate === 'classic') {
@@ -835,6 +882,9 @@ export const LRContent = forwardRef<HTMLDivElement, {
                 companyDetails={companyDetails}
                 showCompanyDetails={showCompanyDetails}
                 showAmounts={showAmounts}
+                orientation={orientation}
+                paperSize={paperSize}
+                singlePageFit={singlePageFit}
             />
         );
     }
@@ -847,6 +897,9 @@ export const LRContent = forwardRef<HTMLDivElement, {
             showCompanyDetails={showCompanyDetails}
             showAmounts={showAmounts}
             copyType={copyType}
+            orientation={orientation}
+            paperSize={paperSize}
+            singlePageFit={singlePageFit}
         />
     );
 });
@@ -870,94 +923,261 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
     const [showAmounts, setShowAmounts] = useState(true);
 
+    // Advanced Print & PDF State
+    const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+    const [paperSize, setPaperSize] = useState<'a4' | 'a5' | 'letter' | 'legal'>('a4');
+    const [singlePageFit, setSinglePageFit] = useState<boolean>(true);
+    const [multiCopyMode, setMultiCopyMode] = useState<'single' | '3-copies' | '4-copies'>('single');
+    const [showShareModal, setShowShareModal] = useState<boolean>(false);
+    const [customPhone, setCustomPhone] = useState<string>('');
+    const [customEmail, setCustomEmail] = useState<string>('');
+    const [isExporting, setIsExporting] = useState<boolean>(false);
+
     const effectiveTemplate = viewMode === 'compare' ? 'modern-gst' : viewMode;
 
-    const handleDownloadPDF = () => {
+    // Copies list for multi-copy printing
+    const getPrintCopies = () => {
+        if (multiCopyMode === '3-copies') {
+            return ['CONSIGNOR COPY', 'CONSIGNEE COPY', 'DRIVER COPY'];
+        }
+        if (multiCopyMode === '4-copies') {
+            return ['CONSIGNOR COPY', 'CONSIGNEE COPY', 'TRANSPORTER COPY', 'DRIVER COPY'];
+        }
+        return [copyType];
+    };
+
+    // Text Summary Generator for Instant Sharing
+    const generateBiltyText = () => {
+        const pkgs = (lr.items || []).reduce((sum, it) => sum + (Number(it.pcs) || 0), 0);
+        const weightStr = Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT (${lr.weight.toLocaleString('en-IN')} Kg)` : `${Number(lr.weight).toLocaleString('en-IN')} Kg`;
+        const freightStr = `₹ ${Number(lr.freight || 0).toLocaleString('en-IN')} (${lr.freightBasis || (lr.gstPaidBy === 'Consignor' ? 'PAID' : 'TO PAY')})`;
+        
+        return `🚚 *LORRY RECEIPT / BILTY DISPATCH*
+━━━━━━━━━━━━━━━━━━━━
+📄 *LR No:* ${lr.lrNo || 'Draft'}
+📅 *Date:* ${formatBiltyDate(lr.date)}
+🚛 *Vehicle:* ${lr.truckNo || 'N/A'}
+📍 *Route:* ${lr.fromPlace || 'Origin'} ➔ ${lr.toPlace || 'Destination'}
+🏢 *Consignor:* ${lr.consignor?.name || 'N/A'}
+🏬 *Consignee:* ${lr.consignee?.name || 'N/A'}
+📦 *Packages:* ${pkgs > 0 ? `${pkgs} Pkgs` : 'As per invoice'}
+⚖️ *Weight:* ${weightStr}
+💰 *Freight:* ${freightStr}
+${lr.ewayBillNo ? `📑 *E-Way Bill:* ${lr.ewayBillNo}\n` : ''}${lr.invoiceNo ? `🧾 *Invoice No:* ${lr.invoiceNo}\n` : ''}━━━━━━━━━━━━━━━━━━━━
+Carrier: *${companyDetails.name || 'Speedway Logistics'}*
+${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
+    };
+
+    // PDF Generator Guaranteed on Single Page
+    const handleDownloadPDF = async () => {
         const element = previewRef.current;
         if (!element) return;
 
-        const opt = {
-            margin: [4, 4, 4, 4],
-            filename: `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`,
-            image: { type: 'jpeg', quality: 0.99 },
-            html2canvas: { scale: 2.5, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        };
+        setIsExporting(true);
+        const toastId = toast.loading('Generating Single-Page PDF...');
 
-        html2pdf().from(element).set(opt).save();
+        try {
+            const isLandscape = printOrientation === 'landscape';
+            const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
+
+            const opt = {
+                margin: singlePageFit ? [3, 3, 3, 3] : [5, 5, 5, 5],
+                filename: filename,
+                image: { type: 'jpeg', quality: 0.99 },
+                html2canvas: {
+                    scale: 2.3,
+                    useCORS: true,
+                    letterRendering: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: isLandscape ? 1120 : paperSize === 'a5' ? 620 : 794
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: paperSize.toLowerCase(),
+                    orientation: printOrientation,
+                    compress: true
+                },
+                pagebreak: singlePageFit ? { mode: ['avoid-all', 'css', 'legacy'] } : { mode: ['css', 'legacy'] }
+            };
+
+            await html2pdf().from(element).set(opt).save();
+            toast.success('Single-Page PDF downloaded successfully!', { id: toastId });
+        } catch (err: any) {
+            console.error('PDF error:', err);
+            toast.error('Could not generate PDF directly. Opening Print dialog...', { id: toastId });
+            handlePrint();
+        } finally {
+            setIsExporting(false);
+        }
     };
 
+    // Dynamic Print Trigger with Paper Size & Orientation
     const handlePrint = () => {
+        let styleEl = document.getElementById('dynamic-print-style') as HTMLStyleElement;
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-print-style';
+            document.head.appendChild(styleEl);
+        }
+        const margin = singlePageFit ? '3mm 3mm' : '5mm 4mm';
+        styleEl.innerHTML = `
+            @media print {
+                @page {
+                    size: ${paperSize.toUpperCase()} ${printOrientation};
+                    margin: ${margin};
+                }
+                #print-root {
+                    width: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+                .printable-area {
+                    ${singlePageFit ? 'max-height: 98vh !important; page-break-inside: avoid !important;' : ''}
+                    width: 100% !important;
+                    max-width: ${printOrientation === 'landscape' ? '1040px' : paperSize === 'a5' ? '580px' : '760px'} !important;
+                }
+                .page-break {
+                    page-break-after: always !important;
+                    break-after: page !important;
+                }
+            }
+        `;
         window.print();
     };
 
-    const handleShareWhatsApp = async () => {
+    // PNG Image Export
+    const handleDownloadImage = async () => {
         const element = previewRef.current;
-        if (!element) {
-            toast.error("Preview content not found. Cannot generate PDF.");
-            return;
-        }
-
-        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
-        const message = `Hi ${lr.consignee?.name || 'Customer'}, here is your GST-compliant Lorry Receipt (LR No. ${lr.lrNo}) from ${companyDetails.name || 'Speedway Logistics'}.`;
-
+        if (!element) return;
+        setIsExporting(true);
+        const toastId = toast.loading('Exporting High-Res Image...');
         try {
-            const opt = {
-                margin: [4, 4, 4, 4],
-                filename: filename,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
+            const isLandscape = printOrientation === 'landscape';
+            const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.png`;
 
-            const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
-            const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+            const imgData = await html2pdf().from(element).set({
+                image: { type: 'png', quality: 1.0 },
+                html2canvas: {
+                    scale: 2.5,
+                    useCORS: true,
+                    scrollX: 0,
+                    scrollY: 0,
+                    windowWidth: isLandscape ? 1120 : paperSize === 'a5' ? 620 : 794
+                }
+            }).outputImg('datauristring');
 
-            if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-                await navigator.share({
-                    files: [pdfFile],
-                    title: `Lorry Receipt ${lr.lrNo}`,
-                    text: message,
-                });
-            } else {
-                toast.error('Your browser doesn\'t support direct sharing. Downloading PDF instead...', { duration: 4000 });
-                html2pdf().from(element).set(opt).save();
-            }
-        } catch (error: any) {
-            if (error.name !== 'AbortError') {
-                console.error('Error sharing file:', error);
-                toast.error('An error occurred while trying to share the file.');
-            }
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = filename;
+            link.click();
+            toast.success('Bilty Image (PNG) downloaded!', { id: toastId });
+        } catch (err) {
+            console.error('Image export error:', err);
+            toast.error('Failed to export image.', { id: toastId });
+        } finally {
+            setIsExporting(false);
         }
     };
 
-    const handleShareEmail = () => {
-        const email = lr.consignee?.contact || '';
-        const subject = encodeURIComponent(`Lorry Receipt (LR No: ${lr.lrNo}) - ${companyDetails.name}`);
-        const body = encodeURIComponent(`Dear ${lr.consignee?.name || 'Customer'},\n\nPlease find the Consignment Note / Lorry Receipt (LR No: ${lr.lrNo}) attached for shipment dispatched from ${lr.fromPlace} to ${lr.toPlace}.\n\nThank you,\n${companyDetails.name}`);
-        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    // WhatsApp Direct Send
+    const handleShareWhatsAppTo = async (targetPhone: string, targetName: string) => {
+        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
+        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        const summary = generateBiltyText();
+        const encodedText = encodeURIComponent(summary);
+
+        const element = previewRef.current;
+        if (navigator.share && navigator.canShare && element) {
+            try {
+                const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}.pdf`;
+                const pdfBlob = await html2pdf().from(element).set({
+                    margin: [3, 3, 3, 3],
+                    filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: paperSize.toLowerCase(), orientation: printOrientation }
+                }).output('blob');
+
+                const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+                if (navigator.canShare({ files: [pdfFile] })) {
+                    await navigator.share({
+                        files: [pdfFile],
+                        title: `LR ${lr.lrNo}`,
+                        text: `Lorry Receipt ${lr.lrNo} - ${companyDetails.name}\n${summary}`
+                    });
+                    return;
+                }
+            } catch (e: any) {
+                if (e.name === 'AbortError') return;
+            }
+        }
+
+        const url = phoneWithCountry
+            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedText}`
+            : `https://api.whatsapp.com/send?text=${encodedText}`;
+        window.open(url, '_blank');
+        toast.success(`Opening WhatsApp for ${targetName}...`);
+    };
+
+    // Direct Email Send
+    const handleShareEmailTo = (emailTarget: string, recipientName: string) => {
+        const subject = encodeURIComponent(`Consignment Note / Lorry Receipt (LR No: ${lr.lrNo}) - ${companyDetails.name}`);
+        const summary = generateBiltyText();
+        const body = encodeURIComponent(`Dear ${recipientName || 'Customer'},\n\nPlease find the dispatch details for Lorry Receipt (LR No: ${lr.lrNo}) from ${lr.fromPlace} to ${lr.toPlace}.\n\n${summary}\n\nThank you,\n${companyDetails.name}`);
+        window.location.href = `mailto:${emailTarget}?subject=${subject}&body=${body}`;
+        toast.success('Opening Email Client...');
+    };
+
+    // Copy Summary Text
+    const handleCopySummary = () => {
+        const text = generateBiltyText();
+        navigator.clipboard.writeText(text);
+        toast.success('LR Summary copied to clipboard!');
+    };
+
+    // Direct SMS Send
+    const handleSendSMS = (phoneTarget: string) => {
+        const cleanPhone = phoneTarget.replace(/[^0-9]/g, '');
+        const summary = generateBiltyText();
+        window.location.href = `sms:${cleanPhone}?body=${encodeURIComponent(summary)}`;
+        toast.success('Opening SMS app...');
     };
 
     if (!isOpen) return null;
 
+    const consignorContact = lr.consignor?.contact || '';
+    const consigneeContact = lr.consignee?.contact || '';
+    const driverContact = lr.driverContact || (lr.charges?.driverContact) || '';
+
     return (
         <div className="fixed inset-0 bg-black/75 z-50 flex justify-center items-start p-2 sm:p-4 overflow-auto backdrop-blur-sm animate-fadeIn">
-            {/* Render a copy for printing */}
+            {/* Render copies for printing */}
             {printRoot && createPortal(
-                <LRContent
-                    lr={lr}
-                    companyDetails={companyDetails}
-                    showCompanyDetails={showCompanyDetails}
-                    showAmounts={showAmounts}
-                    templateStyle={effectiveTemplate}
-                    copyType={copyType}
-                />,
+                <div className="print-copies-container">
+                    {getPrintCopies().map((cType, index) => (
+                        <div key={index} className={`print-page-wrapper ${index > 0 ? 'page-break mt-6' : ''}`}>
+                            <LRContent
+                                lr={lr}
+                                companyDetails={companyDetails}
+                                showCompanyDetails={showCompanyDetails}
+                                showAmounts={showAmounts}
+                                templateStyle={effectiveTemplate}
+                                copyType={cType}
+                                orientation={printOrientation}
+                                paperSize={paperSize}
+                                singlePageFit={singlePageFit}
+                            />
+                        </div>
+                    ))}
+                </div>,
                 printRoot
             )}
 
             {/* Modal Dialog */}
             <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-7xl my-4 overflow-hidden border border-slate-200 flex flex-col">
-                {/* Modal Toolbar */}
+                {/* Modal Toolbar 1: Primary Controls */}
                 <div className="p-3 sm:p-4 bg-white border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-20 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="bg-blue-600 text-white p-2 rounded-xl shadow-md">
@@ -965,18 +1185,18 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                         </div>
                         <div>
                             <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
-                                Bilty / LR Preview & Layout Selector
+                                Bilty / LR Preview & Print Suite
                                 <span className="text-xs bg-blue-100 text-blue-800 font-mono px-2 py-0.5 rounded-full font-bold">
                                     {lr.lrNo || 'Draft'}
                                 </span>
                             </h2>
-                            <p className="text-xs text-slate-500 font-medium">Compare layouts & export print-ready GST Lorry Receipts</p>
+                            <p className="text-xs text-slate-500 font-medium">Configure single-page layout, orientation, ratios & export</p>
                         </div>
                     </div>
 
-                    {/* Template & Copy Switchers + Action Buttons */}
+                    {/* Template & Action Buttons */}
                     <div className="flex items-center flex-wrap gap-2">
-                        {/* Design Template Switcher with Recommendation */}
+                        {/* Design Template Switcher */}
                         <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
                             <button
                                 type="button"
@@ -998,7 +1218,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                                 onClick={() => setViewMode('compare')}
                                 className={`px-3 py-1.5 rounded-lg transition-all ${viewMode === 'compare' ? 'bg-purple-600 text-white shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
                             >
-                                🔀 Compare Both
+                                🔀 Compare
                             </button>
                         </div>
 
@@ -1039,28 +1259,32 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                         {/* Print Button */}
                         <button
                             onClick={handlePrint}
-                            className="flex items-center bg-slate-800 text-white px-3 py-1.5 rounded-xl hover:bg-slate-900 font-bold text-xs shadow-md transition-colors"
+                            className="flex items-center bg-slate-800 text-white px-3.5 py-1.5 rounded-xl hover:bg-slate-900 font-bold text-xs shadow-md transition-all active:scale-95"
+                            title="Print Document"
                         >
-                            <PrintIcon className="w-4 h-4 mr-1" />
+                            <PrintIcon className="w-4 h-4 mr-1.5" />
                             Print
                         </button>
 
                         {/* PDF Download Button */}
                         <button
                             onClick={handleDownloadPDF}
-                            className="flex items-center bg-blue-600 text-white px-3 py-1.5 rounded-xl hover:bg-blue-700 font-bold text-xs shadow-md transition-colors"
+                            disabled={isExporting}
+                            className="flex items-center bg-blue-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
+                            title="Download 1-Page PDF"
                         >
-                            <DownloadIcon className="w-4 h-4 mr-1" />
-                            PDF
+                            <DownloadIcon className="w-4 h-4 mr-1.5" />
+                            PDF (1-Page)
                         </button>
 
-                        {/* WhatsApp Share */}
+                        {/* Share Hub Button */}
                         <button
-                            onClick={handleShareWhatsApp}
-                            className="flex items-center bg-green-500 text-white px-3 py-1.5 rounded-xl hover:bg-green-600 font-bold text-xs shadow-md transition-colors"
+                            onClick={() => setShowShareModal(true)}
+                            className="flex items-center bg-green-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-green-700 font-bold text-xs shadow-md transition-all active:scale-95"
+                            title="Share on WhatsApp, Email & SMS"
                         >
-                            <WhatsAppIcon className="w-4 h-4 mr-1" />
-                            Share
+                            <WhatsAppIcon className="w-4 h-4 mr-1.5" />
+                            Share Hub
                         </button>
 
                         {/* Close Modal */}
@@ -1073,25 +1297,93 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                     </div>
                 </div>
 
-                {/* Layout Recommendation Banner */}
-                <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-4 py-2 text-xs flex justify-between items-center flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                        <span className="bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                            💡 Layout Recommendation
-                        </span>
-                        <span className="font-medium text-slate-200">
-                            {viewMode === 'modern-gst' ? (
-                                <><strong>Modern GST BiltyBook (Recommended)</strong>: Best for GST Compliance, Corporate Customers, E-Way Bill audits, and WhatsApp/PDF sharing.</>
-                            ) : viewMode === 'classic' ? (
-                                <><strong>Classic Standard Layout</strong>: Traditional dot-matrix format for basic printing on legacy paper.</>
-                            ) : (
-                                <><strong>Side-by-Side Comparison</strong>: Compare Modern GST vs Classic layout to pick the best format for your company branding.</>
-                            )}
-                        </span>
+                {/* Modal Toolbar 2: Advanced Print, Layout & Orientation Settings Bar */}
+                <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 text-xs">
+                    {/* Left: Orientation & Ratio Controls */}
+                    <div className="flex items-center flex-wrap gap-3">
+                        {/* Orientation Toggle */}
+                        <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+                            <span className="text-[10px] font-bold text-slate-400 px-1 uppercase">Orientation:</span>
+                            <button
+                                type="button"
+                                onClick={() => setPrintOrientation('portrait')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${printOrientation === 'portrait' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
+                            >
+                                <span>📄</span>
+                                <span>Portrait</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPrintOrientation('landscape')}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${printOrientation === 'landscape' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
+                            >
+                                <span>📜</span>
+                                <span>Landscape</span>
+                            </button>
+                        </div>
+
+                        {/* Paper Ratio / Size Selector */}
+                        <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Ratio/Size:</span>
+                            <select
+                                value={paperSize}
+                                onChange={(e) => setPaperSize(e.target.value as any)}
+                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                            >
+                                <option value="a4" className="bg-slate-900 text-white">A4 (Standard 210×297mm)</option>
+                                <option value="a5" className="bg-slate-900 text-white">A5 (Half Page 148×210mm)</option>
+                                <option value="letter" className="bg-slate-900 text-white">Letter (8.5×11 in)</option>
+                                <option value="legal" className="bg-slate-900 text-white">Legal (8.5×14 in)</option>
+                            </select>
+                        </div>
+
+                        {/* Single-Page Fit Guarantee Toggle */}
+                        <label className="flex items-center space-x-1.5 bg-emerald-950/80 px-2.5 py-1 rounded-xl border border-emerald-500/40 text-xs font-bold text-emerald-300 cursor-pointer shadow-sm hover:bg-emerald-900/80 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={singlePageFit}
+                                onChange={(e) => setSinglePageFit(e.target.checked)}
+                                className="h-3.5 w-3.5 text-emerald-500 rounded border-slate-600 focus:ring-emerald-400"
+                            />
+                            <span>⚡ 100% Single-Page Fit Lock</span>
+                        </label>
+
+                        {/* Multi-Copy Mode */}
+                        <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Batch Print:</span>
+                            <select
+                                value={multiCopyMode}
+                                onChange={(e) => setMultiCopyMode(e.target.value as any)}
+                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                            >
+                                <option value="single" className="bg-slate-900 text-white">1 Copy (Current View)</option>
+                                <option value="3-copies" className="bg-slate-900 text-white">3 Copies (Consignor + Consignee + Driver)</option>
+                                <option value="4-copies" className="bg-slate-900 text-white">4 Copies (All 4 Copies)</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-300">
-                        <span>Current Selected: <strong className="text-white uppercase">{effectiveTemplate === 'modern-gst' ? '✨ Modern GST BiltyBook' : '📋 Classic Standard'}</strong></span>
+                    {/* Right: Quick Image & Share Actions */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleDownloadImage}
+                            disabled={isExporting}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-1 transition-all"
+                            title="Export as High-Res PNG Image"
+                        >
+                            <span>🖼️</span>
+                            <span>PNG Image</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCopySummary}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-1 transition-all"
+                            title="Copy text summary for WhatsApp/SMS"
+                        >
+                            <span>📋</span>
+                            <span>Copy Summary</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1125,6 +1417,9 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                                         showCompanyDetails={showCompanyDetails}
                                         showAmounts={showAmounts}
                                         copyType={copyType}
+                                        orientation={printOrientation}
+                                        paperSize={paperSize}
+                                        singlePageFit={singlePageFit}
                                     />
                                 </div>
                             </div>
@@ -1151,6 +1446,9 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                                         companyDetails={companyDetails}
                                         showCompanyDetails={showCompanyDetails}
                                         showAmounts={showAmounts}
+                                        orientation={printOrientation}
+                                        paperSize={paperSize}
+                                        singlePageFit={singlePageFit}
                                     />
                                 </div>
                             </div>
@@ -1166,11 +1464,212 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
                                 showAmounts={showAmounts}
                                 templateStyle={effectiveTemplate}
                                 copyType={copyType}
+                                orientation={printOrientation}
+                                paperSize={paperSize}
+                                singlePageFit={singlePageFit}
                             />
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* MULTI-CHANNEL SHARE HUB MODAL */}
+            {showShareModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-scaleUp">
+                        {/* Share Modal Header */}
+                        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 flex justify-between items-center">
+                            <div className="flex items-center gap-2.5">
+                                <span className="p-2 rounded-xl bg-white/20 text-white font-black text-lg">🚀</span>
+                                <div>
+                                    <h3 className="font-black text-base">Direct Share Hub</h3>
+                                    <p className="text-xs text-emerald-100">Send LR details instantly via WhatsApp, Email or SMS</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowShareModal(false)}
+                                className="p-1 rounded-lg hover:bg-white/20 text-white transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Share Modal Body */}
+                        <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+                            {/* WhatsApp Fast Share Section */}
+                            <div className="space-y-2">
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
+                                    1-Click WhatsApp Direct Share
+                                </span>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    {/* Consignor */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShareWhatsAppTo(consignorContact, lr.consignor?.name || 'Consignor')}
+                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
+                                    >
+                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">📦 Consignor</div>
+                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignor?.name || 'Sender'}</div>
+                                        <div className="text-[10px] text-slate-500 font-mono">{consignorContact || 'Click to send'}</div>
+                                    </button>
+
+                                    {/* Consignee */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShareWhatsAppTo(consigneeContact, lr.consignee?.name || 'Consignee')}
+                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
+                                    >
+                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">🏢 Consignee</div>
+                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignee?.name || 'Receiver'}</div>
+                                        <div className="text-[10px] text-slate-500 font-mono">{consigneeContact || 'Click to send'}</div>
+                                    </button>
+
+                                    {/* Driver */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShareWhatsAppTo(driverContact, lr.driverName || 'Driver')}
+                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
+                                    >
+                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">🚚 Driver / Truck</div>
+                                        <div className="font-black text-xs text-slate-900 truncate">{lr.driverName || lr.truckNo || 'Driver'}</div>
+                                        <div className="text-[10px] text-slate-500 font-mono">{driverContact || 'Click to send'}</div>
+                                    </button>
+                                </div>
+
+                                {/* Custom WhatsApp Number */}
+                                <div className="mt-2 flex gap-2">
+                                    <div className="relative flex-1">
+                                        <input
+                                            type="tel"
+                                            placeholder="Enter 10-digit mobile number"
+                                            value={customPhone}
+                                            onChange={(e) => setCustomPhone(e.target.value)}
+                                            className="w-full p-2 pl-7 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <PhoneIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-3" />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!customPhone) {
+                                                toast.error('Please enter a phone number');
+                                                return;
+                                            }
+                                            handleShareWhatsAppTo(customPhone, customPhone);
+                                        }}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm"
+                                    >
+                                        Send WA
+                                    </button>
+                                </div>
+                            </div>
+
+                            <hr className="border-slate-200" />
+
+                            {/* Email Direct Share Section */}
+                            <div className="space-y-2">
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                    <EmailIcon className="w-4 h-4 text-blue-600" />
+                                    Direct Email Dispatch
+                                </span>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShareEmailTo(lr.consignor?.contact || '', lr.consignor?.name || 'Consignor')}
+                                        className="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-left transition-all"
+                                    >
+                                        <div className="text-[10px] font-bold text-blue-700">✉️ Consignor Email</div>
+                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignor?.name || 'Sender'}</div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleShareEmailTo(lr.consignee?.contact || '', lr.consignee?.name || 'Consignee')}
+                                        className="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-left transition-all"
+                                    >
+                                        <div className="text-[10px] font-bold text-blue-700">✉️ Consignee Email</div>
+                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignee?.name || 'Receiver'}</div>
+                                    </button>
+                                </div>
+
+                                <div className="flex gap-2">
+                                    <input
+                                        type="email"
+                                        placeholder="Enter customer email address"
+                                        value={customEmail}
+                                        onChange={(e) => setCustomEmail(e.target.value)}
+                                        className="flex-1 p-2 border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (!customEmail) {
+                                                toast.error('Please enter an email address');
+                                                return;
+                                            }
+                                            handleShareEmailTo(customEmail, 'Valued Customer');
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm"
+                                    >
+                                        Send Email
+                                    </button>
+                                </div>
+                            </div>
+
+                            <hr className="border-slate-200" />
+
+                            {/* Additional Tools Section */}
+                            <div className="space-y-2">
+                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                                    Additional Export & Sharing Options
+                                </span>
+
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleCopySummary}
+                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
+                                    >
+                                        <span className="text-base block">📋</span>
+                                        <span className="font-bold text-xs text-slate-800">Copy Text</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadImage}
+                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
+                                    >
+                                        <span className="text-base block">🖼️</span>
+                                        <span className="font-bold text-xs text-slate-800">Save PNG</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSendSMS(consigneeContact || consignorContact || '')}
+                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
+                                    >
+                                        <span className="text-base block">💬</span>
+                                        <span className="font-bold text-xs text-slate-800">SMS / Text</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Share Modal Footer */}
+                        <div className="bg-slate-50 p-3 border-t border-slate-200 flex justify-end">
+                            <button
+                                onClick={() => setShowShareModal(false)}
+                                className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

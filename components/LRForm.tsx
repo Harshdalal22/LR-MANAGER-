@@ -79,6 +79,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [livePreviewTemplate, setLivePreviewTemplate] = useState<'modern-gst' | 'classic'>('modern-gst');
     const [livePreviewCopy, setLivePreviewCopy] = useState<string>('CONSIGNOR COPY');
     const [previewScale, setPreviewScale] = useState<number>(0.82);
+    const [chargedWeightUnit, setChargedWeightUnit] = useState<'Kg' | 'Ton'>('Kg');
 
     useEffect(() => {
         if (existingLR) {
@@ -110,7 +111,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 resetToCleanState();
             }
         }
-    }, [existingLR, lorryReceipts]);
+    }, [existingLR]);
 
     const resetToCleanState = () => {
         let nextLrNo = '';
@@ -123,7 +124,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
     // Auto-save draft to local storage whenever formData or billingPartyType changes
     useEffect(() => {
-        if (!existingLR) {
+        if (!existingLR && formData.lrNo) {
             localStorage.setItem('lr_draft_data', JSON.stringify(formData));
             localStorage.setItem('lr_draft_billing', billingPartyType);
         }
@@ -137,25 +138,57 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         }
     }, [billingPartyType, formData.consignor, formData.consignee]);
 
+    // Weight calculation: normalize all item weights to both Kg and Ton (MT)
     useEffect(() => {
-        const totalWeight = formData.items.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
-        setFormData(prev => ({ ...prev, weight: totalWeight }));
+        let totalKg = 0;
+        let totalTon = 0;
+
+        formData.items.forEach(item => {
+            const w = Number(item.weight) || 0;
+            const unit = (item.unit || 'Kg').toLowerCase();
+
+            if (unit === 'ton' || unit === 'mt') {
+                totalTon += w;
+                totalKg += w * 1000;
+            } else {
+                totalKg += w;
+                totalTon += w / 1000;
+            }
+        });
+
+        const formattedTon = Number(totalTon.toFixed(3));
+        const formattedKg = Math.round(totalKg);
+
+        setFormData(prev => ({
+            ...prev,
+            weight: formattedKg,
+            actualWeightMT: formattedTon
+        }));
     }, [formData.items]);
 
     useEffect(() => {
         // Calculate freight automatically if not Fixed
         if (formData.rateOn !== 'Fixed') {
-            const weightForCalc = Number(formData.chargedWeight) > 0 ? Number(formData.chargedWeight) : (Number(formData.actualWeightMT) > 0 ? Number(formData.actualWeightMT) * 1000 : Number(formData.weight) || 0);
-            if (formData.rateOn === 'Ton') {
-                const tons = Number(formData.actualWeightMT) > 0 ? Number(formData.actualWeightMT) : (weightForCalc / 1000);
-                const calculatedFreight = tons * (Number(formData.rate) || 0);
-                if (calculatedFreight > 0) {
-                    setFormData(prev => ({ ...prev, freight: Math.round(calculatedFreight) }));
-                }
-            } else if (formData.rateOn === 'Kg') {
-                const calculatedFreight = weightForCalc * (Number(formData.rate) || 0);
-                if (calculatedFreight > 0) {
-                    setFormData(prev => ({ ...prev, freight: Math.round(calculatedFreight) }));
+            const rate = Number(formData.rate) || 0;
+            if (rate > 0) {
+                if (formData.rateOn === 'Ton') {
+                    // Use charged weight in tons if specified, else actual weight in MT/Ton
+                    const tons = Number(formData.chargedWeight) > 0 
+                        ? Number(formData.chargedWeight) / 1000 
+                        : (Number(formData.actualWeightMT) > 0 ? Number(formData.actualWeightMT) : (Number(formData.weight) || 0) / 1000);
+                    const calculatedFreight = tons * rate;
+                    if (calculatedFreight > 0) {
+                        setFormData(prev => ({ ...prev, freight: Math.round(calculatedFreight) }));
+                    }
+                } else if (formData.rateOn === 'Kg') {
+                    // Use charged weight in kg if specified, else weight in kg
+                    const kgs = Number(formData.chargedWeight) > 0 
+                        ? Number(formData.chargedWeight) 
+                        : (Number(formData.weight) > 0 ? Number(formData.weight) : (Number(formData.actualWeightMT) || 0) * 1000);
+                    const calculatedFreight = kgs * rate;
+                    if (calculatedFreight > 0) {
+                        setFormData(prev => ({ ...prev, freight: Math.round(calculatedFreight) }));
+                    }
                 }
             }
         }
@@ -812,7 +845,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                 <span className="p-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-base">📦</span>
                                 <div>
                                     <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">3. Consignment Items & Goods</h3>
-                                    <p className="text-[11px] text-slate-500 font-medium">Itemized goods description, packages, HSN & weights</p>
+                                    <p className="text-[11px] text-slate-500 font-medium">Itemized goods description, packages, HSN & weights in Ton / Kg</p>
                                 </div>
                             </div>
                             <button
@@ -827,12 +860,13 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
                         {/* Items Table */}
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                            <div className="grid grid-cols-12 gap-2 bg-slate-100 p-2.5 font-black text-slate-700 text-xs uppercase tracking-wider">
+                            <div className="grid grid-cols-12 gap-2 bg-slate-100 p-2.5 font-black text-slate-700 text-xs uppercase tracking-wider items-center">
                                 <div className="col-span-1 text-center">#</div>
                                 <div className="col-span-4">Description of Goods & Packing</div>
+                                <div className="col-span-1 text-center">Unit</div>
                                 <div className="col-span-2 text-center">Packages (Pcs)</div>
-                                <div className="col-span-2 text-right">Actual Wt (Kg)</div>
-                                <div className="col-span-2 text-right">Charged Wt (Kg)</div>
+                                <div className="col-span-2 text-right">Actual Wt</div>
+                                <div className="col-span-1 text-right">Charged Wt</div>
                                 <div className="col-span-1 text-center">Action</div>
                             </div>
 
@@ -840,7 +874,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                 {formData.items.map((item, index) => (
                                     <div key={index} className="grid grid-cols-12 gap-2 items-center p-2.5 hover:bg-slate-50/50 transition-colors">
                                         <div className="col-span-1 text-center font-bold text-slate-400 text-xs">
-                                            {index + 1}
+                                             {index + 1}
                                         </div>
                                         <div className="col-span-4 space-y-1.5">
                                             <input
@@ -867,6 +901,17 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                                 />
                                             </div>
                                         </div>
+                                        <div className="col-span-1">
+                                            <select
+                                                value={item.unit || 'Kg'}
+                                                onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
+                                                className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-center bg-slate-50 focus:border-blue-500 outline-none cursor-pointer"
+                                                title="Select unit (Kg or Ton)"
+                                            >
+                                                <option value="Kg">Kg</option>
+                                                <option value="Ton">Ton</option>
+                                            </select>
+                                        </div>
                                         <div className="col-span-2">
                                             <input
                                                 type="number"
@@ -879,19 +924,21 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                         <div className="col-span-2">
                                             <input
                                                 type="number"
+                                                step="any"
                                                 value={item.weight === 0 ? '' : item.weight}
                                                 onChange={(e) => handleItemChange(index, 'weight', parseFloat(e.target.value) || 0)}
                                                 className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-right focus:border-blue-500 outline-none"
-                                                placeholder="0"
+                                                placeholder={item.unit === 'Ton' ? '0.00 MT' : '0 Kg'}
                                             />
                                         </div>
-                                        <div className="col-span-2">
+                                        <div className="col-span-1">
                                             <input
                                                 type="number"
+                                                step="any"
                                                 value={item.chargedWeight === 0 ? '' : item.chargedWeight}
                                                 onChange={(e) => handleItemChange(index, 'chargedWeight', parseFloat(e.target.value) || 0)}
                                                 className="w-full p-2 border border-slate-200 rounded-lg text-xs font-bold text-right focus:border-blue-500 outline-none"
-                                                placeholder="0"
+                                                placeholder={item.unit === 'Ton' ? '0.00 MT' : '0 Kg'}
                                             />
                                         </div>
                                         <div className="col-span-1 text-center">
@@ -912,42 +959,112 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                         </div>
 
                         {/* Weight & Rate Controls */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
-                            <div>
-                                <label className={labelBase}>Total Actual Weight (Kg)</label>
-                                <input
-                                    type="number"
-                                    name="weight"
-                                    value={formData.weight || ''}
-                                    readOnly
-                                    placeholder="0"
-                                    className={`${inputBase} bg-slate-100 cursor-not-allowed font-bold text-slate-700`}
-                                />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-slate-100">
+                            {/* Dual Actual Weight Display (Kg & Ton) */}
+                            <div className="space-y-1">
+                                <label className={labelBase}>Total Actual Weight (Auto)</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={formData.weight ? `${formData.weight.toLocaleString('en-IN')}` : '0'}
+                                            readOnly
+                                            placeholder="0"
+                                            className={`${inputBase} bg-slate-100 cursor-not-allowed font-bold text-slate-800 text-xs pr-8`}
+                                        />
+                                        <span className="absolute right-2 top-2.5 text-[10px] font-black text-slate-500">Kg</span>
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={formData.actualWeightMT ? `${formData.actualWeightMT}` : '0'}
+                                            readOnly
+                                            placeholder="0"
+                                            className={`${inputBase} bg-slate-100 cursor-not-allowed font-bold text-blue-700 text-xs pr-9`}
+                                        />
+                                        <span className="absolute right-2 top-2.5 text-[10px] font-black text-blue-600">Ton</span>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                    {formData.weight > 0 ? `⚖️ ${formData.weight.toLocaleString('en-IN')} Kg = ${formData.actualWeightMT} MT` : 'Auto-calculated from items'}
+                                </p>
                             </div>
-                            <div>
-                                <label className={labelBase}>Total Charged Weight (Kg)</label>
-                                <input
-                                    type="number"
-                                    name="chargedWeight"
-                                    value={formData.chargedWeight === 0 ? '' : formData.chargedWeight}
-                                    onChange={handleChange}
-                                    placeholder="0"
-                                    className={`${inputBase} font-bold text-slate-900`}
-                                />
+
+                            {/* Charged Weight with Unit Switcher */}
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center">
+                                    <label className={labelBase}>Total Charged Weight</label>
+                                    <div className="flex items-center gap-0.5 bg-slate-200/80 p-0.5 rounded-lg text-[10px] font-bold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setChargedWeightUnit('Kg')}
+                                            className={`px-2 py-0.5 rounded-md transition-all ${chargedWeightUnit === 'Kg' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            Kg
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setChargedWeightUnit('Ton')}
+                                            className={`px-2 py-0.5 rounded-md transition-all ${chargedWeightUnit === 'Ton' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                                        >
+                                            Ton
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        step={chargedWeightUnit === 'Ton' ? '0.001' : '1'}
+                                        value={
+                                            formData.chargedWeight === 0 
+                                                ? '' 
+                                                : (chargedWeightUnit === 'Ton' ? Number((formData.chargedWeight / 1000).toFixed(3)) : formData.chargedWeight)
+                                        }
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            const inKg = chargedWeightUnit === 'Ton' ? Math.round(val * 1000) : val;
+                                            setFormData(prev => ({ ...prev, chargedWeight: inKg }));
+                                        }}
+                                        placeholder={chargedWeightUnit === 'Ton' ? '0.000' : '0'}
+                                        className={`${inputBase} font-bold text-slate-900 pr-10`}
+                                    />
+                                    <span className="absolute right-2.5 top-2.5 text-[10px] font-black text-slate-500">
+                                        {chargedWeightUnit}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                    {formData.chargedWeight > 0 ? (
+                                        chargedWeightUnit === 'Ton'
+                                            ? `Equivalent: ${formData.chargedWeight.toLocaleString('en-IN')} Kg`
+                                            : `Equivalent: ${(formData.chargedWeight / 1000).toFixed(3)} Ton (MT)`
+                                    ) : 'Leave 0 to use actual weight'}
+                                </p>
                             </div>
-                            <div>
-                                <label className={labelBase}>Freight Rate</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    name="rate"
-                                    value={formData.rate === 0 ? '' : formData.rate}
-                                    onChange={handleChange}
-                                    placeholder="0.00"
-                                    className={`${inputBase} font-black text-blue-700`}
-                                />
+
+                            {/* Freight Rate */}
+                            <div className="space-y-1">
+                                <label className={labelBase}>Freight Rate (₹)</label>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        name="rate"
+                                        value={formData.rate === 0 ? '' : formData.rate}
+                                        onChange={handleChange}
+                                        placeholder="0.00"
+                                        className={`${inputBase} font-black text-blue-700 pr-12`}
+                                    />
+                                    <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-500">
+                                        / {formData.rateOn === 'Ton' ? 'MT' : formData.rateOn === 'Kg' ? 'Kg' : 'Fix'}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-medium">
+                                    Rate applied per calculation basis
+                                </p>
                             </div>
-                            <div>
+
+                            {/* Calculation Basis */}
+                            <div className="space-y-1">
                                 <label className={labelBase}>Calculation Basis</label>
                                 <select
                                     name="rateOn"
@@ -955,10 +1072,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                     onChange={handleChange}
                                     className={`${inputBase} font-semibold`}
                                 >
-                                    <option value="Kg">Per Kg</option>
                                     <option value="Ton">Per Ton (MT)</option>
+                                    <option value="Kg">Per Kg</option>
                                     <option value="Fixed">Fixed Amount (Manual)</option>
                                 </select>
+                                <p className="text-[10px] text-emerald-600 font-bold">
+                                    {formData.rateOn === 'Ton' && 'Freight = Tons (MT) × Rate'}
+                                    {formData.rateOn === 'Kg' && 'Freight = Total Kg × Rate'}
+                                    {formData.rateOn === 'Fixed' && 'Enter lump-sum freight manually'}
+                                </p>
                             </div>
                         </div>
                     </div>

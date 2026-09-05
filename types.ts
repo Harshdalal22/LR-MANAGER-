@@ -16,7 +16,7 @@ export interface Item {
     packingDetails?: string;
     chargedWeight?: number;
     rate?: number;
-    unit?: string;
+    unit?: 'Kg' | 'Ton' | string;
 }
 
 export interface BankDetails {

@@ -306,14 +306,18 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                         {item.hsn || lr.hsnCode || companyDetails.sacCode || '996511'}
                                     </td>
                                     <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">
-                                        {Number(item.weight) > 0 ? `${item.weight.toLocaleString('en-IN')} Kg` : (idx === 0 && Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : '--')}
+                                        {Number(item.weight) > 0 
+                                            ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.weight} Ton` : `${item.weight.toLocaleString('en-IN')} Kg`}` 
+                                            : (idx === 0 && Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : '--')}
                                     </td>
                                     <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">
-                                        {Number(item.chargedWeight) > 0 ? `${item.chargedWeight.toLocaleString('en-IN')} Kg` : (idx === 0 && Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg` : '--')}
+                                        {Number(item.chargedWeight) > 0 
+                                            ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.chargedWeight} Ton` : `${item.chargedWeight.toLocaleString('en-IN')} Kg`}` 
+                                            : (idx === 0 && Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg` : '--')}
                                     </td>
                                     <td className="p-1 text-right font-bold text-slate-900 align-top">
                                         {showAmounts && (Number(item.rate) > 0 || Number(lr.rate) > 0)
-                                            ? `₹ ${Number(item.rate || lr.rate).toFixed(2)} / ${item.unit || lr.rateOn || 'Ton'}`
+                                            ? `₹ ${Number(item.rate || lr.rate).toFixed(2)} / ${item.unit || (lr.rateOn === 'Ton' ? 'MT' : lr.rateOn) || 'Ton'}`
                                             : '--'}
                                     </td>
                                 </tr>
@@ -733,10 +737,10 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                             ))}
                         </td>
                         <td className="border-r border-black p-2 text-center align-top font-bold">
-                            {Number(lr.actualWeightMT) > 0 ? lr.actualWeightMT : (Number(lr.weight) > 0 ? lr.weight : '')}
+                            {Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : (Number(lr.weight) > 0 ? `${lr.weight} Kg` : '')}
                         </td>
                         <td className="border-r-2 border-black p-2 text-center align-top font-bold">
-                            {Number(lr.chargedWeight) > 0 ? lr.chargedWeight : ''}
+                            {Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight} Kg` : ''}
                         </td>
                         <td colSpan={2} className="p-0 align-top">
                             <div className="flex flex-col h-full text-[9px]">

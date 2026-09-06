@@ -1115,6 +1115,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                     <option value="Consignee (RCM @ 5%)">Consignee (RCM @ 5%)</option>
                                     <option value="Transporter (FCM @ 18%)">Transporter / GTA (FCM @ 18%)</option>
                                     <option value="Transporter (FCM @ 12%)">Transporter / GTA (FCM @ 12%)</option>
+                                    <option value="Both (RCM 5% & FCM 18%)">Dual / Both (RCM 5% & FCM 18%)</option>
                                     <option value="Exempted">Exempted / Non-Taxable</option>
                                 </select>
                             </div>

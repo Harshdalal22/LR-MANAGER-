@@ -61,7 +61,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     orientation?: 'portrait' | 'landscape';
     paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
     singlePageFit?: boolean;
-    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED';
+    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'BOTH_5_18' | 'EXEMPTED';
 }>(({ 
     lr, 
     companyDetails, 
@@ -132,6 +132,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     const detectedLiability = (() => {
         if (gstLiability) return gstLiability;
         const p = (lr.gstPaidBy || '').toLowerCase();
+        if (p.includes('both') || p.includes('dual') || (p.includes('5') && p.includes('18'))) return 'BOTH_5_18';
         if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
         if (p.includes('12')) return 'FCM_12';
         if (p.includes('exempt')) return 'EXEMPTED';
@@ -446,18 +447,26 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             GST & STATUTORY COMPLIANCE DETAILS
                         </div>
 
-                        {/* GST on Freight Liability Banner (RCM / FCM 18% / FCM 12% / Exempted) */}
-                        <div className="mt-1 p-1.5 rounded-xs border border-slate-300 bg-slate-50/60">
-                            <div className="font-black text-[8px] uppercase">
+                        {/* GST on Freight Liability Banner (RCM / FCM 18% / FCM 12% / BOTH / Exempted) */}
+                        <div className={`mt-1 p-1.5 rounded-xs border ${
+                            detectedLiability === 'BOTH_5_18' ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-300 bg-slate-50/60'
+                        }`}>
+                            <div className="font-black text-[8px] uppercase flex items-center justify-between">
                                 <span className="text-slate-900">
-                                    GST on Freight Liability ({detectedLiability === 'FCM_18' || detectedLiability === 'FCM_12' ? 'FCM' : detectedLiability === 'EXEMPTED' ? 'EXEMPT' : 'RCM'}):{' '}
+                                    GST on Freight Liability ({
+                                        detectedLiability === 'BOTH_5_18' ? 'RCM 5% & FCM 18%' :
+                                        detectedLiability === 'FCM_18' || detectedLiability === 'FCM_12' ? 'FCM' :
+                                        detectedLiability === 'EXEMPTED' ? 'EXEMPT' : 'RCM'
+                                    }):{' '}
                                     <span className={`font-black ${
+                                        detectedLiability === 'BOTH_5_18' ? 'text-indigo-800' :
                                         detectedLiability === 'FCM_18' ? 'text-emerald-700' :
                                         detectedLiability === 'FCM_12' ? 'text-teal-700' :
                                         detectedLiability === 'EXEMPTED' ? 'text-slate-700' :
                                         'text-blue-700'
                                     }`}>
-                                        {detectedLiability === 'FCM_18' ? 'FORWARD CHARGE APPLICABLE (18%)' :
+                                        {detectedLiability === 'BOTH_5_18' ? 'DUAL STATUTORY COMPLIANCE (RCM 5% & FCM 18%)' :
+                                         detectedLiability === 'FCM_18' ? 'FORWARD CHARGE APPLICABLE (18%)' :
                                          detectedLiability === 'FCM_12' ? 'FORWARD CHARGE APPLICABLE (12%)' :
                                          detectedLiability === 'EXEMPTED' ? 'EXEMPTED FROM GST' :
                                          'REVERSE CHARGE APPLICABLE'}
@@ -465,7 +474,9 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                 </span>
                             </div>
                             <p className="text-[7.5px] text-slate-700 leading-tight mt-0.5">
-                                {detectedLiability === 'FCM_18'
+                                {detectedLiability === 'BOTH_5_18'
+                                    ? '• RCM @ 5%: Payable by Consignor / Consignee under Notif. 11/2017-CT(R) & 13/2017-CT(R). OR • FCM @ 18%: Payable by Transporter under Notif. 05/2022-CT(R) (with Full Input Tax Credit).'
+                                    : detectedLiability === 'FCM_18'
                                     ? 'As per Notification No. 11/2017-CT(R) / 05/2022-CT(R), Goods Transport Agency (GTA) services tax liability @ 18% is payable by Transporter under Forward Charge Mechanism (with full Input Tax Credit).'
                                     : detectedLiability === 'FCM_12'
                                     ? 'As per Notification No. 11/2017-CT(R) / 05/2022-CT(R), Goods Transport Agency (GTA) services tax liability @ 12% is payable by Transporter under Forward Charge Mechanism (with ITC).'
@@ -564,13 +575,16 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         {/* GST on Freight Row */}
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">
-                                {detectedLiability === 'FCM_18' ? 'GST on Freight (18% FCM):' :
+                                {detectedLiability === 'BOTH_5_18' ? 'GST on Freight (5% RCM / 18% FCM):' :
+                                 detectedLiability === 'FCM_18' ? 'GST on Freight (18% FCM):' :
                                  detectedLiability === 'FCM_12' ? 'GST on Freight (12% FCM):' :
                                  detectedLiability === 'EXEMPTED' ? 'GST on Freight (Exempt):' :
                                  'GST on Freight (5% RCM):'}
                             </span>
                             <span className="font-mono text-slate-800 font-bold">
-                                {detectedLiability === 'FCM_18'
+                                {detectedLiability === 'BOTH_5_18'
+                                    ? (showAmounts ? `₹ 0.00 (RCM) | ${formatINR((basicFreight || 51350) * 0.18)} (18%)` : '₹ 0.00 / 18%')
+                                    : detectedLiability === 'FCM_18'
                                     ? (showAmounts ? formatINR((basicFreight || 51350) * 0.18) : '₹ 0.00')
                                     : detectedLiability === 'FCM_12'
                                     ? (showAmounts ? formatINR((basicFreight || 51350) * 0.12) : '₹ 0.00')
@@ -905,7 +919,7 @@ export const LRContent = forwardRef<HTMLDivElement, {
     orientation?: 'portrait' | 'landscape';
     paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
     singlePageFit?: boolean;
-    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED';
+    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'BOTH_5_18' | 'EXEMPTED';
 }>(({ 
     lr, 
     companyDetails, 
@@ -980,9 +994,10 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [customEmail, setCustomEmail] = useState<string>('');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
-    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12% vs Exempted)
-    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED'>(() => {
+    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12% vs Dual BOTH vs Exempted)
+    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12' | 'BOTH_5_18' | 'EXEMPTED'>(() => {
         const p = (lr.gstPaidBy || '').toLowerCase();
+        if (p.includes('both') || p.includes('dual') || (p.includes('5') && p.includes('18'))) return 'BOTH_5_18';
         if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
         if (p.includes('12')) return 'FCM_12';
         if (p.includes('exempt')) return 'EXEMPTED';
@@ -1007,7 +1022,9 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
         const pkgs = (lr.items || []).reduce((sum, it) => sum + (Number(it.pcs) || 0), 0);
         const weightStr = Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT (${lr.weight.toLocaleString('en-IN')} Kg)` : `${Number(lr.weight).toLocaleString('en-IN')} Kg`;
         const freightStr = `₹ ${Number(lr.freight || 0).toLocaleString('en-IN')} (${lr.freightBasis || (lr.gstPaidBy === 'Consignor' ? 'PAID' : 'TO PAY')})`;
-        const gstText = gstLiability === 'FCM_18'
+        const gstText = gstLiability === 'BOTH_5_18'
+            ? 'Dual Compliance (RCM 5% / FCM 18%)'
+            : gstLiability === 'FCM_18'
             ? 'FCM @ 18% (Forward Charge)'
             : gstLiability === 'FCM_12'
             ? 'FCM @ 12% (Forward Charge)'
@@ -1480,7 +1497,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             </select>
                         </div>
 
-                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12% vs Exempted) */}
+                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12% vs Dual BOTH vs Exempted) */}
                         <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">GST Tax:</span>
                             <select
@@ -1491,6 +1508,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                 <option value="RCM" className="bg-slate-900 text-white">RCM @ 5% (Reverse Charge)</option>
                                 <option value="FCM_18" className="bg-slate-900 text-white">FCM @ 18% (Forward Charge)</option>
                                 <option value="FCM_12" className="bg-slate-900 text-white">FCM @ 12% (Forward Charge)</option>
+                                <option value="BOTH_5_18" className="bg-slate-900 text-white">Both (RCM 5% & FCM 18% Dual)</option>
                                 <option value="EXEMPTED" className="bg-slate-900 text-white">Exempted / Non-Taxable</option>
                             </select>
                         </div>

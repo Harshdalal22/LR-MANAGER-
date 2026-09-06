@@ -1109,11 +1109,13 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                 <input type="date" name="invoiceDate" value={formData.invoiceDate || ''} onChange={handleChange} className={inputBase} />
                             </div>
                             <div>
-                                <label className={labelBase}>GST Paid By (RCM)</label>
+                                <label className={labelBase}>GST Liability / Paid By</label>
                                 <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputBase}>
-                                    <option value="Consignor">Consignor (RCM)</option>
-                                    <option value="Consignee">Consignee (RCM)</option>
-                                    <option value="Transporter">Transporter (Forward Charge)</option>
+                                    <option value="Consignor (RCM @ 5%)">Consignor (RCM @ 5%)</option>
+                                    <option value="Consignee (RCM @ 5%)">Consignee (RCM @ 5%)</option>
+                                    <option value="Transporter (FCM @ 18%)">Transporter / GTA (FCM @ 18%)</option>
+                                    <option value="Transporter (FCM @ 12%)">Transporter / GTA (FCM @ 12%)</option>
+                                    <option value="Exempted">Exempted / Non-Taxable</option>
                                 </select>
                             </div>
 

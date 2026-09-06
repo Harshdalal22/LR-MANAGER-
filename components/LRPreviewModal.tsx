@@ -61,6 +61,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     orientation?: 'portrait' | 'landscape';
     paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
     singlePageFit?: boolean;
+    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED';
 }>(({ 
     lr, 
     companyDetails, 
@@ -69,7 +70,8 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
     copyType = 'CONSIGNOR COPY',
     orientation = 'portrait',
     paperSize = 'a4',
-    singlePageFit = true
+    singlePageFit = true,
+    gstLiability
 }, ref) => {
 
     const charges = lr.charges || ({} as any);
@@ -125,7 +127,16 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
         ? 'w-[1040px] max-w-full p-3 text-[9px]' 
         : paperSize === 'a5' 
             ? 'w-[580px] max-w-full p-2 text-[8px]' 
-            : 'w-[760px] max-w-full p-4 text-[9.5px]';
+            : 'w-[794px] max-w-full p-4 text-[9.5px]';
+
+    const detectedLiability = (() => {
+        if (gstLiability) return gstLiability;
+        const p = (lr.gstPaidBy || '').toLowerCase();
+        if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
+        if (p.includes('12')) return 'FCM_12';
+        if (p.includes('exempt')) return 'EXEMPTED';
+        return 'RCM';
+    })();
 
     return (
         <div
@@ -424,13 +435,53 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             GST & STATUTORY COMPLIANCE DETAILS
                         </div>
 
-                        {/* RCM Liability Banner */}
-                        <div className="mt-1 p-1 bg-blue-50/70 border border-blue-200 rounded-sm">
-                            <div className="font-black text-[8px] text-blue-900 uppercase">
-                                GST on Freight Liability (RCM): <span className="text-blue-700 underline">REVERSE CHARGE APPLICABLE</span>
+                        {/* GST on Freight Liability Banner (RCM / FCM 18% / FCM 12% / Exempted) */}
+                        <div className={`mt-1 p-1.5 rounded-sm border ${
+                            detectedLiability === 'FCM_18' ? 'bg-emerald-50/80 border-emerald-300' :
+                            detectedLiability === 'FCM_12' ? 'bg-teal-50/80 border-teal-300' :
+                            detectedLiability === 'EXEMPTED' ? 'bg-slate-100 border-slate-300' :
+                            'bg-blue-50/70 border-blue-200'
+                        }`}>
+                            <div className="font-black text-[8px] uppercase flex items-center justify-between">
+                                <span className={
+                                    detectedLiability === 'FCM_18' ? 'text-emerald-950' :
+                                    detectedLiability === 'FCM_12' ? 'text-teal-950' :
+                                    detectedLiability === 'EXEMPTED' ? 'text-slate-900' :
+                                    'text-blue-900'
+                                }>
+                                    GST on Freight Liability:{' '}
+                                    <span className={`underline font-black ${
+                                        detectedLiability === 'FCM_18' ? 'text-emerald-700' :
+                                        detectedLiability === 'FCM_12' ? 'text-teal-700' :
+                                        detectedLiability === 'EXEMPTED' ? 'text-slate-700' :
+                                        'text-blue-700'
+                                    }`}>
+                                        {detectedLiability === 'FCM_18' ? 'FORWARD CHARGE APPLICABLE (FCM @ 18%)' :
+                                         detectedLiability === 'FCM_12' ? 'FORWARD CHARGE APPLICABLE (FCM @ 12%)' :
+                                         detectedLiability === 'EXEMPTED' ? 'EXEMPTED / NON-TAXABLE' :
+                                         'REVERSE CHARGE APPLICABLE (RCM @ 5%)'}
+                                    </span>
+                                </span>
+                                <span className={`text-[7px] font-extrabold px-1.5 py-0.2 rounded-xs uppercase tracking-wider ${
+                                    detectedLiability === 'FCM_18' ? 'bg-emerald-200 text-emerald-900 border border-emerald-400' :
+                                    detectedLiability === 'FCM_12' ? 'bg-teal-200 text-teal-900 border border-teal-400' :
+                                    detectedLiability === 'EXEMPTED' ? 'bg-slate-200 text-slate-800' :
+                                    'bg-blue-200 text-blue-900 border border-blue-400'
+                                }`}>
+                                    {detectedLiability === 'FCM_18' ? 'FCM 18%' :
+                                     detectedLiability === 'FCM_12' ? 'FCM 12%' :
+                                     detectedLiability === 'EXEMPTED' ? 'EXEMPT' :
+                                     'RCM 5%'}
+                                </span>
                             </div>
                             <p className="text-[7px] text-slate-600 leading-tight mt-0.5">
-                                As per Notification No. 11/2017-CT(R) / 13/2017-CT(R), Goods Transport Agency (GTA) services tax liability is payable under Reverse Charge Mechanism (RCM @ 5%) by the Consignor / Consignee.
+                                {detectedLiability === 'FCM_18'
+                                    ? 'Goods Transport Agency (GTA) services tax liability is payable by Transporter / Carrier under Forward Charge Mechanism (FCM @ 18% with ITC). Tax Invoice issued under Sec 9(1) of CGST Act.'
+                                    : detectedLiability === 'FCM_12'
+                                    ? 'Goods Transport Agency (GTA) services tax liability is payable by Transporter / Carrier under Forward Charge Mechanism (FCM @ 12% with ITC). Tax Invoice issued under Sec 9(1) of CGST Act.'
+                                    : detectedLiability === 'EXEMPTED'
+                                    ? 'Goods Transport Agency (GTA) freight services are exempt from GST under applicable GTA statutory exemption notifications.'
+                                    : 'As per Notification No. 11/2017-CT(R) / 13/2017-CT(R), Goods Transport Agency (GTA) services tax liability is payable under Reverse Charge Mechanism (RCM @ 5%) by the Consignor / Consignee.'}
                             </p>
                         </div>
 
@@ -861,6 +912,7 @@ export const LRContent = forwardRef<HTMLDivElement, {
     orientation?: 'portrait' | 'landscape';
     paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
     singlePageFit?: boolean;
+    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED';
 }>(({ 
     lr, 
     companyDetails, 
@@ -870,7 +922,8 @@ export const LRContent = forwardRef<HTMLDivElement, {
     copyType = 'CONSIGNOR COPY',
     orientation = 'portrait',
     paperSize = 'a4',
-    singlePageFit = true
+    singlePageFit = true,
+    gstLiability
 }, ref) => {
     const activeTemplate = templateStyle || lr.templateStyle || 'modern-gst';
 
@@ -900,6 +953,7 @@ export const LRContent = forwardRef<HTMLDivElement, {
             orientation={orientation}
             paperSize={paperSize}
             singlePageFit={singlePageFit}
+            gstLiability={gstLiability}
         />
     );
 });
@@ -933,6 +987,15 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [customEmail, setCustomEmail] = useState<string>('');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
+    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12% vs Exempted)
+    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12' | 'EXEMPTED'>(() => {
+        const p = (lr.gstPaidBy || '').toLowerCase();
+        if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
+        if (p.includes('12')) return 'FCM_12';
+        if (p.includes('exempt')) return 'EXEMPTED';
+        return 'RCM';
+    });
+
     const effectiveTemplate = viewMode === 'compare' ? 'modern-gst' : viewMode;
 
     // Copies list for multi-copy printing
@@ -951,6 +1014,13 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
         const pkgs = (lr.items || []).reduce((sum, it) => sum + (Number(it.pcs) || 0), 0);
         const weightStr = Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT (${lr.weight.toLocaleString('en-IN')} Kg)` : `${Number(lr.weight).toLocaleString('en-IN')} Kg`;
         const freightStr = `₹ ${Number(lr.freight || 0).toLocaleString('en-IN')} (${lr.freightBasis || (lr.gstPaidBy === 'Consignor' ? 'PAID' : 'TO PAY')})`;
+        const gstText = gstLiability === 'FCM_18'
+            ? 'FCM @ 18% (Forward Charge)'
+            : gstLiability === 'FCM_12'
+            ? 'FCM @ 12% (Forward Charge)'
+            : gstLiability === 'EXEMPTED'
+            ? 'Exempted / Non-Taxable'
+            : 'RCM @ 5% (Reverse Charge)';
         
         return `🚚 *LORRY RECEIPT / BILTY DISPATCH*
 ━━━━━━━━━━━━━━━━━━━━
@@ -963,9 +1033,23 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
 📦 *Packages:* ${pkgs > 0 ? `${pkgs} Pkgs` : 'As per invoice'}
 ⚖️ *Weight:* ${weightStr}
 💰 *Freight:* ${freightStr}
+📋 *GST Liability:* ${gstText}
 ${lr.ewayBillNo ? `📑 *E-Way Bill:* ${lr.ewayBillNo}\n` : ''}${lr.invoiceNo ? `🧾 *Invoice No:* ${lr.invoiceNo}\n` : ''}━━━━━━━━━━━━━━━━━━━━
 Carrier: *${companyDetails.name || 'Speedway Logistics'}*
 ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
+    };
+
+    // 1-Click Direct WhatsApp Share
+    const handleDirectWhatsApp = (targetPhone?: string) => {
+        const cleanPhone = (targetPhone || '').replace(/[^0-9]/g, '');
+        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        const summary = generateBiltyText();
+        const encodedText = encodeURIComponent(summary);
+        const url = phoneWithCountry
+            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedText}`
+            : `https://api.whatsapp.com/send?text=${encodedText}`;
+        window.open(url, '_blank');
+        toast.success('Opening WhatsApp Direct Share...');
     };
 
     // Helper to generate a configured jsPDF instance with the bilty captured on a single page
@@ -982,7 +1066,8 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         const pdfW = pdf.internal.pageSize.getWidth();
         const pdfH = pdf.internal.pageSize.getHeight();
 
-        const margin = paperSize === 'a5' ? 3.5 : 4.5;
+        // Optimized printable margin (3.5mm for full-page portrait coverage)
+        const margin = paperSize === 'a5' ? 3.0 : 3.5;
         const maxW = pdfW - (margin * 2);
         const maxH = pdfH - (margin * 2);
 
@@ -996,11 +1081,13 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                     pdf.addPage(paperSize.toLowerCase(), printOrientation);
                 }
                 const cCanvas = await html2canvas(printCopiesEl[i], {
-                    scale: 2.2,
+                    scale: 2.5,
                     useCORS: true,
                     allowTaint: false,
                     logging: false,
-                    backgroundColor: '#ffffff'
+                    backgroundColor: '#ffffff',
+                    scrollX: 0,
+                    scrollY: 0
                 });
                 const cRatio = cCanvas.width / cCanvas.height;
                 let cW = maxW;
@@ -1016,7 +1103,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             }
         } else {
             const canvas = await html2canvas(targetEl, {
-                scale: 2.2,
+                scale: 2.5,
                 useCORS: true,
                 allowTaint: false,
                 logging: false,
@@ -1216,6 +1303,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                 orientation={printOrientation}
                                 paperSize={paperSize}
                                 singlePageFit={singlePageFit}
+                                gstLiability={gstLiability}
                             />
                         </div>
                     ))}
@@ -1325,14 +1413,28 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             PDF (1-Page)
                         </button>
 
+                        {/* Direct 1-Click WhatsApp Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const targetPhone = consigneeContact || consignorContact || driverContact || '';
+                                handleDirectWhatsApp(targetPhone);
+                            }}
+                            className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
+                            title="1-Click Direct WhatsApp Share"
+                        >
+                            <WhatsAppIcon className="w-4 h-4" />
+                            <span>WhatsApp</span>
+                        </button>
+
                         {/* Share Hub Button */}
                         <button
                             onClick={() => setShowShareModal(true)}
-                            className="flex items-center bg-green-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-green-700 font-bold text-xs shadow-md transition-all active:scale-95"
-                            title="Share on WhatsApp, Email & SMS"
+                            className="flex items-center bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95"
+                            title="Share on WhatsApp, Email & SMS Hub"
                         >
-                            <WhatsAppIcon className="w-4 h-4 mr-1.5" />
-                            Share Hub
+                            <span>🚀</span>
+                            <span className="ml-1">Share Hub</span>
                         </button>
 
                         {/* Close Modal */}
@@ -1347,7 +1449,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
                 {/* Modal Toolbar 2: Advanced Print, Layout & Orientation Settings Bar */}
                 <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 text-xs">
-                    {/* Left: Orientation & Ratio Controls */}
+                    {/* Left: Orientation & Ratio & GST Controls */}
                     <div className="flex items-center flex-wrap gap-3">
                         {/* Orientation Toggle */}
                         <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
@@ -1382,6 +1484,21 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                 <option value="a5" className="bg-slate-900 text-white">A5 (Half Page 148×210mm)</option>
                                 <option value="letter" className="bg-slate-900 text-white">Letter (8.5×11 in)</option>
                                 <option value="legal" className="bg-slate-900 text-white">Legal (8.5×14 in)</option>
+                            </select>
+                        </div>
+
+                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12% vs Exempted) */}
+                        <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">GST Tax:</span>
+                            <select
+                                value={gstLiability}
+                                onChange={(e) => setGstLiability(e.target.value as any)}
+                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                            >
+                                <option value="RCM" className="bg-slate-900 text-white">RCM @ 5% (Reverse Charge)</option>
+                                <option value="FCM_18" className="bg-slate-900 text-white">FCM @ 18% (Forward Charge)</option>
+                                <option value="FCM_12" className="bg-slate-900 text-white">FCM @ 12% (Forward Charge)</option>
+                                <option value="EXEMPTED" className="bg-slate-900 text-white">Exempted / Non-Taxable</option>
                             </select>
                         </div>
 
@@ -1449,7 +1566,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                     </div>
                                     <button
                                         onClick={() => {
-                                            setViewMode('modern-gst');
+                                             setViewMode('modern-gst');
                                             toast.success('Selected Modern GST BiltyBook layout!');
                                         }}
                                         className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-lg hover:bg-blue-700 shadow-sm"
@@ -1468,6 +1585,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                         orientation={printOrientation}
                                         paperSize={paperSize}
                                         singlePageFit={singlePageFit}
+                                        gstLiability={gstLiability}
                                     />
                                 </div>
                             </div>
@@ -1515,6 +1633,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                 orientation={printOrientation}
                                 paperSize={paperSize}
                                 singlePageFit={singlePageFit}
+                                gstLiability={gstLiability}
                             />
                         </div>
                     )}

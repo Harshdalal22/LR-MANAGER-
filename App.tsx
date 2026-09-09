@@ -94,7 +94,13 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isDataLoading, setIsDataLoading] = useState(false);
     const [uploadingPODFor, setUploadingPODFor] = useState<LorryReceipt | null>(null);
-    const [language, setLanguage] = useState<Language>('en');
+    const [language, setLanguage] = useState<Language>(() => {
+        return (localStorage.getItem('bilty_language') as Language) || 'en';
+    });
+    const handleSetLanguage = (lang: Language) => {
+        setLanguage(lang);
+        localStorage.setItem('bilty_language', lang);
+    };
     const [isPasswordResetting, setIsPasswordResetting] = useState(false);
     const [currentRole, setCurrentRole] = useState<'Admin' | 'Manager' | 'Operator'>(() => {
         return (sessionStorage.getItem('currentRole') as 'Admin' | 'Manager' | 'Operator') || 'Admin';
@@ -849,7 +855,7 @@ const App: React.FC = () => {
                 userEmail={session?.user?.email}
                 onSignOut={handleSignOut}
                 language={language}
-                setLanguage={setLanguage}
+                setLanguage={handleSetLanguage}
                 currentRole={currentRole}
                 onRoleChange={handleRoleChangeRequest}
                 onForgotPasskey={handleForgotPasskeyTrigger}

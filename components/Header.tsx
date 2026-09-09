@@ -209,17 +209,27 @@ const Header: React.FC<HeaderProps> = ({
                         </svg>
                     </button>
 
-                    {/* Language Switcher Pill */}
-                    <div className="flex items-center bg-white rounded-full p-0.5 border border-slate-200 shadow-xs">
+                    {/* 3D Language Switcher Pill */}
+                    <div className="flex items-center bg-slate-200/90 p-1 rounded-2xl border border-slate-300 shadow-inner">
                         <button
                             onClick={() => setLanguage('en')}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${language === 'en' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                language === 'en'
+                                    ? 'bg-gradient-to-b from-blue-500 to-indigo-700 text-white shadow-[0_2px_6px_rgba(59,130,246,0.5),inset_0_1px_1px_rgba(255,255,255,0.45)] scale-105'
+                                    : 'text-slate-600 hover:text-slate-900 font-bold'
+                            }`}
+                            title="English Language"
                         >
                             EN
                         </button>
                         <button
                             onClick={() => setLanguage('hi')}
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${language === 'hi' ? 'bg-slate-800 text-white shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            className={`px-2.5 py-1 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                language === 'hi'
+                                    ? 'bg-gradient-to-b from-blue-500 to-indigo-700 text-white shadow-[0_2px_6px_rgba(59,130,246,0.5),inset_0_1px_1px_rgba(255,255,255,0.45)] scale-105'
+                                    : 'text-slate-600 hover:text-slate-900 font-bold'
+                            }`}
+                            title="हिंदी भाषा"
                         >
                             HI
                         </button>
@@ -231,8 +241,8 @@ const Header: React.FC<HeaderProps> = ({
                         {onSignOut && (
                             <button
                                 onClick={onSignOut}
-                                className="text-slate-400 hover:text-rose-600 transition-colors"
-                                title="Sign Out"
+                                className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title={language === 'hi' ? "साइन आउट" : "Sign Out"}
                             >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -241,16 +251,25 @@ const Header: React.FC<HeaderProps> = ({
                         )}
                     </div>
 
-                    {/* Admin / Settings Controls */}
+                    {/* Admin / Settings Controls (Stunning 3D Claymorphic) */}
                     {!isOperator && (
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-2">
                             {currentRole === 'Admin' && onOpenAdminPanel && (
                                 <button
                                     onClick={onOpenAdminPanel}
-                                    className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 shadow-xs transition-colors"
-                                    title="Admin Control Center"
+                                    className="group relative flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl bg-gradient-to-b from-indigo-500 via-indigo-600 to-indigo-800 text-white font-black text-xs shadow-[0_4px_12px_rgba(79,70,229,0.38),inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-2px_4px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_18px_rgba(79,70,229,0.55),inset_0_1px_1px_rgba(255,255,255,0.6)] hover:scale-105 active:scale-95 active:translate-y-0.5 border border-indigo-400/50 transition-all cursor-pointer"
+                                    title={language === 'hi' ? "एडमिन कंट्रोल सेंटर" : "Admin Control Center"}
                                 >
-                                    <UsersIcon className="w-4 h-4" />
+                                    {/* 3D Shield & Crown Badge */}
+                                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-gradient-to-tr from-violet-300 via-indigo-100 to-white flex items-center justify-center shadow-inner text-indigo-900 drop-shadow-sm">
+                                        <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v4.7c0 4.54-3.03 8.8-7 9.88-3.97-1.08-7-5.34-7-9.88v-4.7l7-3.12zM12 6a3.5 3.5 0 100 7 3.5 3.5 0 000-7zm0 2a1.5 1.5 0 110 3 1.5 1.5 0 010-3zm-5 8.5c0-1.8 3.33-2.7 5-2.7s5 .9 5 2.7V17H7v-.5z"/>
+                                        </svg>
+                                    </div>
+                                    <span className="hidden sm:inline-block font-black tracking-wider text-[11px] sm:text-xs text-white uppercase drop-shadow-sm">
+                                        {language === 'hi' ? 'एडमिन' : 'Admin'}
+                                    </span>
+                                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white animate-pulse"></span>
                                 </button>
                             )}
                             <button
@@ -258,10 +277,18 @@ const Header: React.FC<HeaderProps> = ({
                                     setLocalDetails(companyDetails);
                                     setIsSettingsOpen(true);
                                 }}
-                                className="p-2 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-blue-600 shadow-xs transition-colors"
-                                title="Settings"
+                                className="group relative flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-2xl bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 text-white font-black text-xs shadow-[0_4px_12px_rgba(15,23,42,0.4),inset_0_1px_1px_rgba(255,255,255,0.35),inset_0_-2px_4px_rgba(0,0,0,0.5)] hover:shadow-[0_6px_18px_rgba(15,23,42,0.6),inset_0_1px_1px_rgba(255,255,255,0.5)] hover:scale-105 active:scale-95 active:translate-y-0.5 border border-slate-600/60 transition-all cursor-pointer"
+                                title={language === 'hi' ? "सेटिंग्स" : "Settings"}
                             >
-                                <CogIcon className="w-4 h-4" />
+                                {/* 3D Embossed Gear Cog */}
+                                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-gradient-to-tr from-cyan-300 via-sky-100 to-white flex items-center justify-center shadow-inner text-slate-900 drop-shadow-sm group-hover:rotate-90 transition-transform duration-500">
+                                    <svg className="w-4 h-4 sm:w-4.5 sm:h-4.5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                                    </svg>
+                                </div>
+                                <span className="hidden sm:inline-block font-black tracking-wider text-[11px] sm:text-xs text-white uppercase drop-shadow-sm">
+                                    {language === 'hi' ? 'सेटिंग्स' : 'Settings'}
+                                </span>
                             </button>
                         </div>
                     )}

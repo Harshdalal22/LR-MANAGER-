@@ -209,7 +209,8 @@ export const getLRFinancials = (lr: LorryReceipt): LRFinancials => {
 // -------------------------------------------------------------
 // 3. NEW WEEKLY TREND DARK GLASSMORPHIC CHART COMPONENT (REAL-TIME)
 // -------------------------------------------------------------
-const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lorryReceipts }) => {
+const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[]; language?: Language }> = ({ lorryReceipts, language = 'en' }) => {
+    const isHi = language === 'hi';
     const [viewMode, setViewMode] = useState<'volume' | 'cashflow'>('volume');
     const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
 
@@ -346,12 +347,12 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                 <div>
                     <div className="flex items-center gap-2">
                         <h3 className="text-sm sm:text-base lg:text-lg xl:text-xl font-black tracking-wider uppercase text-white">
-                            NEW WEEKLY TREND
+                            {isHi ? 'साप्ताहिक रुझान' : 'NEW WEEKLY TREND'}
                         </h3>
                         <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee]"></div>
                     </div>
                     <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        DAILY VOLUME & COMPLETION • REAL-TIME
+                        {isHi ? 'दैनिक वॉल्यूम और पूर्णता • रियल-टाइम' : 'DAILY VOLUME & COMPLETION • REAL-TIME'}
                     </p>
                 </div>
 
@@ -360,24 +361,24 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     <button
                         type="button"
                         onClick={() => setViewMode('volume')}
-                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all ${
+                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all cursor-pointer ${
                             viewMode === 'volume'
                                 ? 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_10px_rgba(34,211,238,0.4)]'
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        Volume & Done
+                        {isHi ? 'वॉल्यूम और पूर्ण' : 'Volume & Done'}
                     </button>
                     <button
                         type="button"
                         onClick={() => setViewMode('cashflow')}
-                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all ${
+                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all cursor-pointer ${
                             viewMode === 'cashflow'
                                 ? 'bg-emerald-500 text-slate-950 font-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                                 : 'text-slate-400 hover:text-white'
                         }`}
                     >
-                        ₹ Payments
+                        {isHi ? '₹ भुगतान' : '₹ Payments'}
                     </button>
                 </div>
             </div>
@@ -388,7 +389,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                 <div className="bg-gradient-to-br from-emerald-950/50 via-emerald-900/20 to-slate-900/90 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400">
-                            PAYMENT RECEIVED
+                            {isHi ? 'प्राप्त भुगतान' : 'PAYMENT RECEIVED'}
                         </span>
                         <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
                     </div>
@@ -396,11 +397,11 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         ₹ {totalReceivedAll.toLocaleString('en-IN')}
                     </div>
                     <div className="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-xs text-emerald-400/90 font-semibold mt-1">
-                        <span>Adv: ₹{totalAdvanceCollected.toLocaleString('en-IN')}</span>
+                        <span>{isHi ? 'एडवांस:' : 'Adv:'} ₹{totalAdvanceCollected.toLocaleString('en-IN')}</span>
                         {invoicedLRsCount > 0 && (
                             <>
                                 <span>•</span>
-                                <span>{invoicedLRsCount} Invoiced Paid</span>
+                                <span>{invoicedLRsCount} {isHi ? 'इनवॉइस पेड' : 'Invoiced Paid'}</span>
                             </>
                         )}
                     </div>
@@ -410,7 +411,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                 <div className="bg-gradient-to-br from-rose-950/50 via-rose-900/20 to-slate-900/90 border border-rose-500/40 rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm">
                     <div className="flex items-center justify-between">
                         <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-rose-400">
-                            PAYMENT PENDING
+                            {isHi ? 'बकाया भुगतान' : 'PAYMENT PENDING'}
                         </span>
                         <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
                     </div>
@@ -418,7 +419,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         ₹ {totalPendingAll.toLocaleString('en-IN')}
                     </div>
                     <div className="text-[10px] sm:text-xs text-rose-400/90 font-medium mt-1">
-                        {allFinancials.filter(f => f.pendingAmount > 0).length} Uninvoiced Dues
+                        {allFinancials.filter(f => f.pendingAmount > 0).length} {isHi ? 'गैर-चालान बकाया' : 'Uninvoiced Dues'}
                     </div>
                 </div>
             </div>
@@ -430,28 +431,28 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         <>
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
-                                Booked Volume
+                                {isHi ? 'बुक किया गया' : 'Booked Volume'}
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span>
-                                Delivered
+                                {isHi ? 'पहुंचा दिया' : 'Delivered'}
                             </span>
                         </>
                     ) : (
                         <>
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]"></span>
-                                Received (₹)
+                                {isHi ? 'प्राप्त (₹)' : 'Received (₹)'}
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
-                                Pending (₹)
+                                {isHi ? 'बकाया (₹)' : 'Pending (₹)'}
                             </span>
                         </>
                     )}
                 </div>
                 <span className="text-cyan-300 font-black">
-                    {completionRate}% Completed
+                    {completionRate}% {isHi ? 'पूर्ण' : 'Completed'}
                 </span>
             </div>
 
@@ -575,22 +576,22 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     </div>
                     <div className="flex items-center gap-3 sm:gap-4 text-xs lg:text-sm font-semibold flex-wrap">
                         <span className="text-slate-300">
-                            <strong className="text-white font-black">{activeDay.volume}</strong> LRs Booked
+                            <strong className="text-white font-black">{activeDay.volume}</strong> {isHi ? 'LRs बुक' : 'LRs Booked'}
                         </span>
                         <span className="text-slate-500">•</span>
                         <span className="text-purple-300">
-                            <strong className="text-white font-black">{activeDay.delivered}</strong> Delivered
+                            <strong className="text-white font-black">{activeDay.delivered}</strong> {isHi ? 'डिलीवर' : 'Delivered'}
                         </span>
                         <span className="text-slate-500">•</span>
                         <span className="text-emerald-400 font-black">
-                            Recd: ₹{activeDay.received.toLocaleString('en-IN')}
+                            {isHi ? 'प्राप्त:' : 'Recd:'} ₹{activeDay.received.toLocaleString('en-IN')}
                             <span className="text-[10px] text-emerald-300/80 font-normal ml-1">
-                                (Adv: ₹{activeDay.dayAdvance.toLocaleString('en-IN')}{activeDay.dayInvoicedCount > 0 ? ` + ${activeDay.dayInvoicedCount} Inv` : ''})
+                                ({isHi ? 'एडवांस:' : 'Adv:'} ₹{activeDay.dayAdvance.toLocaleString('en-IN')}{activeDay.dayInvoicedCount > 0 ? ` + ${activeDay.dayInvoicedCount} ${isHi ? 'इनवॉइस' : 'Inv'}` : ''})
                             </span>
                         </span>
                         <span className="text-slate-500">•</span>
                         <span className="text-rose-400 font-black">
-                            Pending: ₹{activeDay.pending.toLocaleString('en-IN')}
+                            {isHi ? 'बकाया:' : 'Pending:'} ₹{activeDay.pending.toLocaleString('en-IN')}
                         </span>
                     </div>
                     <button
@@ -620,7 +621,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         title={`${d.label} (${d.dateFormatted}) - Click to inspect`}
                     >
                         {d.label}
-                        {d.isToday && <span className="block text-[8px] lg:text-[9px] text-cyan-400 lowercase font-mono">today</span>}
+                        {d.isToday && <span className="block text-[8px] lg:text-[9px] text-cyan-400 lowercase font-mono">{isHi ? 'आज' : 'today'}</span>}
                     </button>
                 ))}
             </div>
@@ -651,7 +652,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     onRejectManagerRequest
 }) => {
 
-    // --- Metric Calculations ---
+    // --- Metric Calculations & Language Flag ---
+    const isHi = language === 'hi';
     const totalLRs = lorryReceipts.length;
     const totalFreight = lorryReceipts.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0);
     const uniqueConsignors = new Set(lorryReceipts.map(lr => lr.consignor.name.trim()).filter(Boolean)).size;
@@ -747,16 +749,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                         onClick={() => {
                             if (activeSection) setActiveSection(null);
                         }}
-                        className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-blue-600 hover:shadow-md transition-all active:scale-95"
-                        title="Back"
+                        className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-blue-600 hover:shadow-md transition-all active:scale-95 cursor-pointer"
+                        title={isHi ? "वापस जाएं" : "Back"}
                     >
                         <ArrowLeftIcon className="w-5 h-5 lg:w-6 lg:h-6" />
                     </button>
                     <div>
                         <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-800 tracking-tight">
-                            LR Management Dashboard
+                            {isHi ? 'LR प्रबंधन डैशबोर्ड' : 'LR Management Dashboard'}
                         </h1>
-                        <p className="text-xs sm:text-sm text-slate-500 font-medium">Real-time logistics analytics & consignment operations</p>
+                        <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                            {isHi ? 'रियल-टाइम लॉजिस्टिक्स एनालिटिक्स और कंसाइनमेंट संचालन' : 'Real-time logistics analytics & consignment operations'}
+                        </p>
                     </div>
                 </div>
 
@@ -766,10 +770,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {currentRole !== 'Manager' && (
                         <button
                             onClick={onAddNew}
-                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs lg:text-sm shadow-md shadow-sky-500/20 hover:shadow-lg transition-all active:scale-95"
+                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs lg:text-sm shadow-md shadow-sky-500/20 hover:shadow-lg transition-all active:scale-95 cursor-pointer"
                         >
                             <span className="text-base lg:text-lg font-black">+</span>
-                            New LR
+                            {isHi ? 'नई LR' : 'New LR'}
                         </button>
                     )}
 
@@ -777,10 +781,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                         <button
                             onClick={() => setCurrentView('invoices')}
-                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs lg:text-sm shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all active:scale-95"
+                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs lg:text-sm shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all active:scale-95 cursor-pointer"
                         >
                             <DocumentTextIcon className="w-4 h-4 lg:w-5 lg:h-5" />
-                            New Invoice
+                            {isHi ? 'नया चालान' : 'New Invoice'}
                         </button>
                     )}
                 </div>
@@ -790,33 +794,33 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center justify-end gap-2.5 flex-wrap">
                 <button
                     onClick={() => setCurrentView('invoices')}
-                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#be185d] hover:bg-[#9d174d] text-white font-bold text-xs lg:text-sm shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#be185d] hover:bg-[#9d174d] text-white font-bold text-xs lg:text-sm shadow-sm transition-all cursor-pointer"
                 >
                     <InvoiceIcon className="w-4 h-4" />
-                    Invoices
+                    {isHi ? 'चालान (Invoices)' : 'Invoices'}
                 </button>
                 <button
                     onClick={onAddNew}
-                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs lg:text-sm shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs lg:text-sm shadow-sm transition-all cursor-pointer"
                 >
                     <CreateIcon className="w-4 h-4" />
-                    Create LR
+                    {isHi ? 'LR बनाएं' : 'Create LR'}
                 </button>
                 {onViewVouchers && (
                     <button
                         onClick={onViewVouchers}
-                        className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all"
+                        className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all cursor-pointer"
                     >
                         <span>📑</span>
-                        Vouchers
+                        {isHi ? 'वाउचर' : 'Vouchers'}
                     </button>
                 )}
                 <button
                     onClick={onViewList}
-                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all cursor-pointer"
                 >
                     <ListIcon className="w-4 h-4" />
-                    List
+                    {isHi ? 'सूची' : 'List'}
                 </button>
             </div>
 
@@ -824,7 +828,12 @@ const Dashboard: React.FC<DashboardProps> = ({
             {rbacEnabled && currentRole === 'Manager' && (
                 <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-amber-800 text-xs font-semibold">
                     <span>👁️</span>
-                    <span>You are in <strong>View Only</strong> mode. You can inspect all LRs and tracking details.</span>
+                    <span>
+                        {isHi
+                            ? <>आप <strong>केवल देखने (View Only)</strong> मोड में हैं। आप सभी LRs और ट्रैकिंग विवरण देख सकते हैं।</>
+                            : <>You are in <strong>View Only</strong> mode. You can inspect all LRs and tracking details.</>
+                        }
+                    </span>
                 </div>
             )}
 
@@ -832,7 +841,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
                 {/* 1. TOTAL LRs (Bronze/Copper) */}
                 <ClayKPICard
-                    title="TOTAL LRs"
+                    title={isHi ? "कुल LRs" : "TOTAL LRs"}
                     value={totalLRs}
                     theme="bronze"
                     sparklineColor="#fdba74"
@@ -846,7 +855,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* 2. FREIGHT VALUE (Teal/Emerald) */}
                 <ClayKPICard
-                    title="FREIGHT VALUE"
+                    title={isHi ? "भाड़ा मूल्य" : "FREIGHT VALUE"}
                     value={formatCompactFreight(totalFreight)}
                     theme="teal"
                     sparklineColor="#67e8f9"
@@ -859,7 +868,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* 3. CONSIGNORS (Magenta/Pink) */}
                 <ClayKPICard
-                    title="CONSIGNORS"
+                    title={isHi ? "प्रेषक (पार्टियां)" : "CONSIGNORS"}
                     value={uniqueConsignors}
                     theme="pink"
                     sparklineColor="#f472b6"
@@ -872,7 +881,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* 4. PENDING PODS (Lime/Olive Green) */}
                 <ClayKPICard
-                    title="PENDING PODS"
+                    title={isHi ? "लंबित PODs" : "PENDING PODS"}
                     value={podsPending}
                     theme="lime"
                     sparklineColor="#fde047"
@@ -888,10 +897,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 md:p-6 lg:p-7 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] space-y-4 sm:space-y-5">
                 <div className="flex justify-between items-center">
                     <h3 className="font-black text-base sm:text-lg lg:text-xl text-slate-800 tracking-tight">
-                        Shipment Status
+                        {isHi ? 'शिपमेंट स्थिति' : 'Shipment Status'}
                     </h3>
                     <span className="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        Live Fleet Track
+                        {isHi ? 'लाइव फ्लीट ट्रैक' : 'Live Fleet Track'}
                     </span>
                 </div>
 
@@ -906,7 +915,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* STAGE 1: BOOKED */}
                         <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">BOOKED</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">
+                                    {isHi ? 'बुक किया गया' : 'BOOKED'}
+                                </span>
                                 <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Booked'] || 0}</span>
                             </div>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-black text-base lg:text-lg shadow-sm">
@@ -917,7 +928,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* STAGE 2: IN TRANSIT (With 3D Truck on the Highway) */}
                         <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-teal-400 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-md bg-teal-50/20">
                             <div>
-                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-teal-700 uppercase tracking-wider">IN TRANSIT</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-teal-700 uppercase tracking-wider">
+                                    {isHi ? 'रास्ते में' : 'IN TRANSIT'}
+                                </span>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     {/* 3D Cargo Truck Container Graphic */}
                                     <div className="flex items-center bg-[#1e3a8a] text-white px-2 py-0.5 rounded text-[10px] lg:text-xs font-black font-mono shadow-xs">
@@ -936,7 +949,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* STAGE 3: OUT FOR DELIVERY */}
                         <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">OUT FOR DELIVERY</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">
+                                    {isHi ? 'डिलीवरी के लिए बाहर' : 'OUT FOR DELIVERY'}
+                                </span>
                                 <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Out for Delivery'] || 0}</span>
                             </div>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-amber-700 to-amber-500 text-white flex items-center justify-center shadow-sm">
@@ -947,7 +962,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* STAGE 4: DELIVERED (Golden Delivery Shield Emblem) */}
                         <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">DELIVERED</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">
+                                    {isHi ? 'पहुंचा दिया' : 'DELIVERED'}
+                                </span>
                                 <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Delivered'] || 0}</span>
                             </div>
                             <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-amber-950 flex items-center justify-center shadow-md border border-amber-200 text-base lg:text-lg">
@@ -958,7 +975,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {/* STAGE 5: CANCELLED */}
                         <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">CANCELLED</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">
+                                    {isHi ? 'रद्द' : 'CANCELLED'}
+                                </span>
                                 <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Cancelled'] || 0}</span>
                             </div>
                             <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center shadow-sm">
@@ -976,13 +995,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div>
                         <div className="flex justify-between items-center mb-4 pb-2.5 border-b border-slate-100">
                             <h3 className="font-black text-base sm:text-lg lg:text-xl text-slate-800 tracking-tight">
-                                Recent Lorry Receipts
+                                {isHi ? 'हाल की लॉरी रसीदें' : 'Recent Lorry Receipts'}
                             </h3>
                             <button
                                 onClick={onViewList}
-                                className="text-xs sm:text-sm font-black text-blue-600 hover:text-blue-800 transition-colors"
+                                className="text-xs sm:text-sm font-black text-blue-600 hover:text-blue-800 transition-colors cursor-pointer"
                             >
-                                View All ➔
+                                {isHi ? 'सभी देखें ➔' : 'View All ➔'}
                             </button>
                         </div>
 
@@ -991,11 +1010,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <table className="w-full text-left text-xs sm:text-sm">
                                 <thead>
                                     <tr className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                                        <th className="pb-3.5">LR NO</th>
-                                        <th className="pb-3.5">DATE</th>
-                                        <th className="pb-3.5">TRUCK</th>
-                                        <th className="pb-3.5 text-right">FREIGHT</th>
-                                        <th className="pb-3.5 text-center">ACTION</th>
+                                        <th className="pb-3.5">{isHi ? 'LR नंबर' : 'LR NO'}</th>
+                                        <th className="pb-3.5">{isHi ? 'दिनांक' : 'DATE'}</th>
+                                        <th className="pb-3.5">{isHi ? 'ट्रक' : 'TRUCK'}</th>
+                                        <th className="pb-3.5 text-right">{isHi ? 'भाड़ा' : 'FREIGHT'}</th>
+                                        <th className="pb-3.5 text-center">{isHi ? 'कार्रवाई' : 'ACTION'}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -1011,7 +1030,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 <td className="py-3.5 lg:py-4 font-semibold text-slate-800">
                                                     <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-2"></span>
                                                     <span className="font-mono bg-slate-100 px-2 py-1 rounded-lg text-xs sm:text-sm font-bold">
-                                                        {lr.truckNo || 'Not Assigned'}
+                                                        {lr.truckNo || (isHi ? 'आवंटित नहीं' : 'Not Assigned')}
                                                     </span>
                                                 </td>
                                                 <td className="py-3.5 lg:py-4 text-right font-black text-slate-900 text-xs sm:text-sm lg:text-base">
@@ -1020,8 +1039,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 <td className="py-3.5 lg:py-4 text-center">
                                                     <button
                                                         onClick={() => onEditLR(lr.lrNo)}
-                                                        className="p-2 lg:p-2.5 rounded-xl text-blue-600 hover:bg-blue-50 transition-colors"
-                                                        title="Open LR"
+                                                        className="p-2 lg:p-2.5 rounded-xl text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                                                        title={isHi ? "LR खोलें" : "Open LR"}
                                                     >
                                                         <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1033,7 +1052,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     ) : (
                                         <tr>
                                             <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
-                                                No Lorry Receipts created yet. Click "+ New LR" to start!
+                                                {isHi ? 'अभी तक कोई लॉरी रसीद नहीं बनी है। शुरू करने के लिए "+ नई LR" पर क्लिक करें!' : 'No Lorry Receipts created yet. Click "+ New LR" to start!'}
                                             </td>
                                         </tr>
                                     )}
@@ -1045,7 +1064,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Right 5 Cols: NEW WEEKLY TREND (Dark Glassmorphic Card) */}
                 <div className="lg:col-span-5">
-                    <WeeklyTrendGlassChart lorryReceipts={lorryReceipts} />
+                    <WeeklyTrendGlassChart lorryReceipts={lorryReceipts} language={language} />
                 </div>
             </div>
 
@@ -1060,10 +1079,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <div>
                                 <h3 className="font-black text-lg sm:text-xl lg:text-2xl text-slate-800 tracking-tight">
-                                    Upcoming Deliveries & Pending Collections
+                                    {isHi ? 'आगामी डिलीवरी और लंबित वसूली' : 'Upcoming Deliveries & Pending Collections'}
                                 </h3>
                                 <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
-                                    किस-किस LR के कितने पैसे लेने बाकी हैं — लाइव बकाया विवरण (Real-Time Live Dues)
+                                    {isHi
+                                        ? 'किस-किस LR के कितने पैसे लेने बाकी हैं — लाइव बकाया वसूली विवरण'
+                                        : 'Real-time live dues & pending collection tracker'
+                                    }
                                 </p>
                             </div>
                         </div>
@@ -1072,7 +1094,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="flex items-center gap-2">
                         <div className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl lg:rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-black shadow-xs">
                             <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                            Total Pending: ₹ {totalPendingAll.toLocaleString('en-IN')}
+                            {isHi ? `कुल बकाया: ₹ ${totalPendingAll.toLocaleString('en-IN')}` : `Total Pending: ₹ ${totalPendingAll.toLocaleString('en-IN')}`}
                         </div>
                     </div>
                 </div>
@@ -1082,52 +1104,52 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {/* 1. Total Pending */}
                     <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
                         <span className="text-[10px] sm:text-xs font-black text-rose-600 uppercase tracking-wider block">
-                            TOTAL PENDING DUES
+                            {isHi ? 'कुल बकाया राशि' : 'TOTAL PENDING DUES'}
                         </span>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-black text-rose-700 mt-1 tracking-tight">
                             ₹ {totalPendingAll.toLocaleString('en-IN')}
                         </div>
                         <span className="text-[10px] sm:text-xs text-rose-500 font-bold block mt-0.5">
-                            {pendingLRsWithFin.length} LRs with dues
+                            {isHi ? `${pendingLRsWithFin.length} LRs का बकाया` : `${pendingLRsWithFin.length} LRs with dues`}
                         </span>
                     </div>
 
                     {/* 2. TO PAY (Consignee) */}
                     <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
                         <span className="text-[10px] sm:text-xs font-black text-amber-700 uppercase tracking-wider block">
-                            TO PAY (CONSIGNEE)
+                            {isHi ? 'टू पे (कंसाइनी)' : 'TO PAY (CONSIGNEE)'}
                         </span>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-black text-amber-800 mt-1 tracking-tight">
-                            {toPayCount} LRs
+                            {toPayCount} {isHi ? 'LRs' : 'LRs'}
                         </div>
                         <span className="text-[10px] sm:text-xs text-amber-600 font-bold block mt-0.5">
-                            Due on delivery
+                            {isHi ? 'डिलीवरी पर देय' : 'Due on delivery'}
                         </span>
                     </div>
 
                     {/* 3. TO BE BILLED */}
                     <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
                         <span className="text-[10px] sm:text-xs font-black text-indigo-700 uppercase tracking-wider block">
-                            TO BE BILLED (TBB)
+                            {isHi ? 'टू बी बिल्ड (TBB)' : 'TO BE BILLED (TBB)'}
                         </span>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-black text-indigo-800 mt-1 tracking-tight">
-                            {tbbCount} LRs
+                            {tbbCount} {isHi ? 'LRs' : 'LRs'}
                         </div>
                         <span className="text-[10px] sm:text-xs text-indigo-600 font-bold block mt-0.5">
-                            To invoice parties
+                            {isHi ? 'पार्टियों को बिल करना है' : 'To invoice parties'}
                         </span>
                     </div>
 
                     {/* 4. Active On-Road */}
                     <div className="bg-teal-50/80 border border-teal-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
                         <span className="text-[10px] sm:text-xs font-black text-teal-700 uppercase tracking-wider block">
-                            ON-ROAD DELIVERIES
+                            {isHi ? 'रास्ते में डिलीवरी' : 'ON-ROAD DELIVERIES'}
                         </span>
                         <div className="text-xl sm:text-2xl lg:text-3xl font-black text-teal-800 mt-1 tracking-tight">
-                            {onRoadCount} LRs
+                            {onRoadCount} {isHi ? 'LRs' : 'LRs'}
                         </div>
                         <span className="text-[10px] sm:text-xs text-teal-600 font-bold block mt-0.5">
-                            In transit / Out for delivery
+                            {isHi ? 'ट्रांजिट में / डिलीवरी के लिए' : 'In transit / Out for delivery'}
                         </span>
                     </div>
                 </div>
@@ -1140,7 +1162,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             type="text"
                             value={pendingSearchQuery}
                             onChange={(e) => setPendingSearchQuery(e.target.value)}
-                            placeholder="Search by LR No, Consignee, Consignor, Truck, City..."
+                            placeholder={isHi ? "LR नंबर, कंसाइनी, प्रेषक, ट्रक, शहर से खोजें..." : "Search by LR No, Consignee, Consignor, Truck, City..."}
                             className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
                         />
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1149,7 +1171,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {pendingSearchQuery && (
                             <button
                                 onClick={() => setPendingSearchQuery('')}
-                                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 text-xs sm:text-sm"
+                                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 text-xs sm:text-sm cursor-pointer"
                             >
                                 ✕
                             </button>
@@ -1162,43 +1184,43 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex items-center bg-slate-100 p-1 rounded-2xl text-xs sm:text-sm font-bold">
                             <button
                                 onClick={() => setPendingBasisFilter('ALL')}
-                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer ${
                                     pendingBasisFilter === 'ALL'
                                         ? 'bg-white text-slate-900 shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                All ({pendingLRsWithFin.length})
+                                {isHi ? `सभी (${pendingLRsWithFin.length})` : `All (${pendingLRsWithFin.length})`}
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('TO PAY')}
-                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer ${
                                     pendingBasisFilter === 'TO PAY'
                                         ? 'bg-amber-500 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                TO PAY ({toPayCount})
+                                {isHi ? `टू पे (${toPayCount})` : `TO PAY (${toPayCount})`}
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('TO BE BILLED')}
-                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer ${
                                     pendingBasisFilter === 'TO BE BILLED'
                                         ? 'bg-indigo-600 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                TBB ({tbbCount})
+                                {isHi ? `TBB (${tbbCount})` : `TBB (${tbbCount})`}
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('ON_ROAD')}
-                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer ${
                                     pendingBasisFilter === 'ON_ROAD'
                                         ? 'bg-teal-600 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
                                 }`}
                             >
-                                On Road ({onRoadCount})
+                                {isHi ? `रास्ते में (${onRoadCount})` : `On Road (${onRoadCount})`}
                             </button>
                         </div>
 
@@ -1208,8 +1230,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                             onChange={(e) => setPendingSortBy(e.target.value as any)}
                             className="text-xs sm:text-sm font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer"
                         >
-                            <option value="highest">Highest Dues First</option>
-                            <option value="recent">Recent Date First</option>
+                            <option value="highest">{isHi ? 'अधिकतम बकाया पहले' : 'Highest Dues First'}</option>
+                            <option value="recent">{isHi ? 'नवीनतम तारीख पहले' : 'Recent Date First'}</option>
                         </select>
                     </div>
                 </div>
@@ -1232,8 +1254,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => onEditLR(lr.lrNo)}
-                                                className="font-mono font-black text-sm sm:text-base lg:text-lg text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5"
-                                                title="Open LR details"
+                                                className="font-mono font-black text-sm sm:text-base lg:text-lg text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5 cursor-pointer"
+                                                title={isHi ? "LR विवरण खोलें" : "Open LR details"}
                                             >
                                                 <span>LR #{lr.lrNo}</span>
                                                 <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1251,7 +1273,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                     ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                                     : 'bg-blue-100 text-blue-800 border border-blue-200'
                                             }`}>
-                                                {lr.status}
+                                                {isHi
+                                                    ? (lr.status === 'Delivered' ? 'पहुंचा दिया' : lr.status === 'In Transit' ? 'रास्ते में' : lr.status === 'Out for Delivery' ? 'डिलीवरी के लिए' : lr.status)
+                                                    : lr.status}
                                             </span>
 
                                             {/* Payment Basis Badge */}
@@ -1262,18 +1286,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                     ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                                                     : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                             }`}>
-                                                {fin.freightBasis}
+                                                {isHi
+                                                    ? (fin.freightBasis === 'TO PAY' ? 'टू पे' : fin.freightBasis === 'TO BE BILLED' ? 'TBB बिलिंग' : 'पेड')
+                                                    : fin.freightBasis}
                                             </span>
 
                                             {isOnRoad && (
                                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black bg-cyan-100 text-cyan-800 border border-cyan-200 animate-pulse">
-                                                    🚚 Delivery in progress
+                                                    {isHi ? '🚚 डिलीवरी जारी है' : '🚚 Delivery in progress'}
                                                 </span>
                                             )}
                                         </div>
 
                                         <div className="text-xs sm:text-sm font-semibold text-slate-500">
-                                            {lr.date ? new Date(lr.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No Date'}
+                                            {lr.date ? new Date(lr.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                                         </div>
                                     </div>
 
@@ -1287,7 +1313,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                                        {fin.debtorType === 'Consignee' ? 'पैसे लेने हैं (Consignee):' : 'बिलिंग पार्टी (Billing Party):'}
+                                                        {fin.debtorType === 'Consignee'
+                                                            ? (isHi ? 'कंसाइनी से लेना है:' : 'Consignee (Debtor):')
+                                                            : (isHi ? 'बिलिंग पार्टी:' : 'Billing Party:')
+                                                        }
                                                     </div>
                                                     <div className="text-sm sm:text-base lg:text-lg font-black text-slate-900 flex items-center gap-2.5 flex-wrap">
                                                         <span>{fin.debtorName}</span>
@@ -1300,7 +1329,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                             <a
                                                                 href={`tel:${fin.debtorPhone}`}
                                                                 className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200"
-                                                                title="Call contact"
+                                                                title={isHi ? "कॉल करें" : "Call contact"}
                                                             >
                                                                 <PhoneIcon className="w-3.5 h-3.5" />
                                                                 {fin.debtorPhone}
@@ -1313,17 +1342,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             {/* Route & Truck */}
                                             <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600 pl-9 sm:pl-10 flex-wrap">
                                                 <span className="font-bold text-slate-800 text-xs sm:text-sm lg:text-base">
-                                                    {lr.fromPlace || 'Origin'} ➔ {lr.toPlace || 'Destination'}
+                                                    {lr.fromPlace || (isHi ? 'मूल स्थान' : 'Origin')} ➔ {lr.toPlace || (isHi ? 'गंतव्य' : 'Destination')}
                                                 </span>
                                                 <span className="text-slate-300">•</span>
                                                 <span className="font-mono font-black text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs sm:text-sm shadow-xs">
-                                                    {lr.truckNo || 'No Truck Assigned'}
+                                                    {lr.truckNo || (isHi ? 'ट्रक आवंटित नहीं' : 'No Truck Assigned')}
                                                 </span>
                                                 {lr.consignor?.name && (
                                                     <>
                                                         <span className="text-slate-300">•</span>
                                                         <span className="text-xs sm:text-sm text-slate-500 truncate max-w-[200px]" title={lr.consignor.name}>
-                                                            Consignor: {lr.consignor.name}
+                                                            {isHi ? 'प्रेषक:' : 'Consignor:'} {lr.consignor.name}
                                                         </span>
                                                     </>
                                                 )}
@@ -1336,14 +1365,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             <div className="text-left md:text-right">
                                                 <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-rose-600 flex items-center md:justify-end gap-1.5">
                                                     <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
-                                                    लेना बाकी (Pending Dues):
+                                                    {isHi ? 'लेना बाकी (बकाया):' : 'Pending Dues:'}
                                                 </div>
                                                 <div className="text-xl sm:text-2xl lg:text-3xl font-black text-rose-600 tracking-tight mt-0.5">
                                                     ₹ {fin.pendingAmount.toLocaleString('en-IN')}
                                                 </div>
                                                 <div className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                                                    Total: ₹{fin.totalFreight.toLocaleString('en-IN')}
-                                                    {fin.advancePaid > 0 && ` | Adv: ₹${fin.advancePaid.toLocaleString('en-IN')}`}
+                                                    {isHi ? 'कुल:' : 'Total:'} ₹{fin.totalFreight.toLocaleString('en-IN')}
+                                                    {fin.advancePaid > 0 && ` | ${isHi ? 'एडवांस:' : 'Adv:'} ₹${fin.advancePaid.toLocaleString('en-IN')}`}
                                                 </div>
                                             </div>
 
@@ -1351,10 +1380,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => onEditLR(lr.lrNo)}
-                                                className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl lg:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center gap-2 flex-shrink-0"
-                                                title="Open LR"
+                                                className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl lg:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center gap-2 flex-shrink-0 cursor-pointer"
+                                                title={isHi ? "LR विवरण खोलें" : "Open LR"}
                                             >
-                                                <span>Open LR</span>
+                                                <span>{isHi ? 'LR देखें' : 'Open LR'}</span>
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                                 </svg>
@@ -1371,13 +1400,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <div className="text-base sm:text-lg font-black text-slate-800">
                                 {pendingSearchQuery
-                                    ? 'No matching pending records found'
-                                    : 'Sabhi Payments Received Hain! (No Pending Dues)'}
+                                    ? (isHi ? 'कोई मेल खाता बकाया रिकॉर्ड नहीं मिला' : 'No matching pending records found')
+                                    : (isHi ? 'सभी भुगतान प्राप्त हो चुके हैं! (कोई बकाया नहीं)' : 'All Payments Received! (No Pending Dues)')}
                             </div>
                             <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
                                 {pendingSearchQuery
-                                    ? 'Try adjusting your search query or basis filter.'
-                                    : 'All active Lorry Receipts have zero outstanding balance or payments have been collected.'}
+                                    ? (isHi ? 'अपनी खोज या फ़िल्टर बदलकर पुनः प्रयास करें।' : 'Try adjusting your search query or basis filter.')
+                                    : (isHi ? 'सभी सक्रिय लॉरी रसीदों की राशि पूरी तरह से एकत्र हो चुकी है।' : 'All active Lorry Receipts have zero outstanding balance or payments have been collected.')}
                             </p>
                         </div>
                     )}
@@ -1389,11 +1418,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <button
                             type="button"
                             onClick={() => setShowAllPending(!showAllPending)}
-                            className="px-6 py-2.5 sm:px-8 sm:py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm transition-colors shadow-xs"
+                            className="px-6 py-2.5 sm:px-8 sm:py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm transition-colors shadow-xs cursor-pointer"
                         >
                             {showAllPending
-                                ? 'Show Less ▴'
-                                : `Show All ${filteredPending.length} Pending LRs ▾`}
+                                ? (isHi ? 'कम दिखाएं ▴' : 'Show Less ▴')
+                                : (isHi ? `सभी ${filteredPending.length} बकाया LRs देखें ▾` : `Show All ${filteredPending.length} Pending LRs ▾`)}
                         </button>
                     </div>
                 )}

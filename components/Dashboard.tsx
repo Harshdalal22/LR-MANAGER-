@@ -66,9 +66,9 @@ const ClayKPICard: React.FC<ClayKPICardProps> = ({ title, value, theme, icon, sp
         <div
             onClick={onClick}
             className={`
-                relative overflow-hidden rounded-3xl p-5 text-white ${st.bg} ${st.shadow} ${st.border}
+                relative overflow-hidden rounded-3xl p-5 sm:p-6 lg:p-7 text-white ${st.bg} ${st.shadow} ${st.border}
                 transform transition-all duration-300 hover:-translate-y-1.5 hover:scale-[1.02] active:scale-95
-                flex items-center justify-between min-h-[110px] cursor-pointer group select-none
+                flex items-center justify-between min-h-[115px] sm:min-h-[130px] lg:min-h-[145px] xl:min-h-[155px] cursor-pointer group select-none
             `}
         >
             {/* Ambient Background Wave SVG */}
@@ -86,18 +86,18 @@ const ClayKPICard: React.FC<ClayKPICardProps> = ({ title, value, theme, icon, sp
             </div>
 
             {/* Left Content */}
-            <div className="relative z-10 space-y-1">
-                <p className="text-[11px] font-extrabold uppercase tracking-widest text-white/80 drop-shadow-sm">
+            <div className="relative z-10 space-y-1.5">
+                <p className="text-[11px] sm:text-xs lg:text-sm font-black uppercase tracking-widest text-white/90 drop-shadow-sm">
                     {title}
                 </p>
-                <p className="text-3xl sm:text-4xl font-black text-white tracking-tight drop-shadow-md">
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight drop-shadow-md">
                     {value}
                 </p>
             </div>
 
             {/* Right 3D Embossed Icon Token */}
             <div className="relative z-10">
-                <div className="w-14 h-14 rounded-2xl bg-white/25 backdrop-blur-md border border-white/40 shadow-[inset_0_2px_4px_rgba(255,255,255,0.6),0_8px_16px_rgba(0,0,0,0.2)] flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-18 lg:h-18 rounded-2xl lg:rounded-3xl bg-white/25 backdrop-blur-md border border-white/40 shadow-[inset_0_2px_4px_rgba(255,255,255,0.6),0_8px_16px_rgba(0,0,0,0.2)] flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
                     {icon}
                 </div>
             </div>
@@ -264,8 +264,8 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
     const activeLRsCount = lorryReceipts.filter(lr => lr.status !== 'Cancelled').length;
     const completionRate = activeLRsCount > 0 ? Math.round((totalDeliveredAll / activeLRsCount) * 100) : 0;
 
-    // SVG coordinates: 7 points across 340 width
-    const xCoords = [25, 75, 125, 175, 225, 275, 320];
+    // SVG coordinates: 7 points across 350 width
+    const xCoords = [25, 75, 125, 175, 225, 275, 325];
 
     const primaryVals = viewMode === 'volume'
         ? dailyStats.map(d => d.volume)
@@ -277,9 +277,9 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
     const maxVal = Math.max(...primaryVals, ...secondaryVals, 1);
 
     const getPointY = (val: number) => {
-        if (maxVal === 0) return 75;
+        if (maxVal === 0) return 80;
         const normalized = val / maxVal;
-        return 80 - (normalized * 55);
+        return 85 - (normalized * 60);
     };
 
     const primaryPoints = dailyStats.map((d, i) => ({
@@ -312,8 +312,8 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
     const primaryCurve = generateSmoothPath(primaryPoints);
     const secondaryCurve = generateSmoothPath(secondaryPoints);
 
-    const primaryArea = `${primaryCurve} L ${xCoords[6]},100 L ${xCoords[0]},100 Z`;
-    const secondaryArea = `${secondaryCurve} L ${xCoords[6]},100 L ${xCoords[0]},100 Z`;
+    const primaryArea = `${primaryCurve} L ${xCoords[6]},105 L ${xCoords[0]},105 Z`;
+    const secondaryArea = `${secondaryCurve} L ${xCoords[6]},105 L ${xCoords[0]},105 Z`;
 
     const formatPillVal = (val: number) => {
         if (viewMode === 'volume') return val.toString();
@@ -325,27 +325,27 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
     const activeDay = selectedDayIdx !== null ? dailyStats[selectedDayIdx] : null;
 
     return (
-        <div className="bg-[#111520] rounded-3xl p-5 md:p-6 border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.4)] text-white relative overflow-hidden flex flex-col justify-between h-full min-h-[410px]">
+        <div className="bg-[#111520] rounded-3xl p-5 md:p-6 lg:p-7 xl:p-8 border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.4)] text-white relative overflow-hidden flex flex-col justify-between h-full min-h-[420px] sm:min-h-[460px] lg:min-h-[520px] xl:min-h-[560px]">
             {/* Header & Mode Switcher */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3 relative z-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 relative z-10">
                 <div>
                     <div className="flex items-center gap-2">
-                        <h3 className="text-sm md:text-base font-black tracking-wider uppercase text-white">
+                        <h3 className="text-sm sm:text-base lg:text-lg xl:text-xl font-black tracking-wider uppercase text-white">
                             NEW WEEKLY TREND
                         </h3>
                         <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee]"></div>
                     </div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                         DAILY VOLUME & COMPLETION • REAL-TIME
                     </p>
                 </div>
 
                 {/* View Mode Toggle Switch */}
-                <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-bold shadow-inner">
+                <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs lg:text-sm font-bold shadow-inner">
                     <button
                         type="button"
                         onClick={() => setViewMode('volume')}
-                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all ${
                             viewMode === 'volume'
                                 ? 'bg-cyan-500 text-slate-950 font-black shadow-[0_0_10px_rgba(34,211,238,0.4)]'
                                 : 'text-slate-400 hover:text-white'
@@ -356,7 +356,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     <button
                         type="button"
                         onClick={() => setViewMode('cashflow')}
-                        className={`px-2.5 py-1 rounded-lg transition-all ${
+                        className={`px-3 py-1.5 lg:px-4 lg:py-2 rounded-lg transition-all ${
                             viewMode === 'cashflow'
                                 ? 'bg-emerald-500 text-slate-950 font-black shadow-[0_0_10px_rgba(16,185,129,0.4)]'
                                 : 'text-slate-400 hover:text-white'
@@ -368,102 +368,102 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
             </div>
 
             {/* REAL-TIME PAYMENT RECEIVED VS PENDING METRIC BANNER */}
-            <div className="grid grid-cols-2 gap-2.5 mb-2 relative z-10">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-3 relative z-10">
                 {/* 1. Received Tile */}
-                <div className="bg-gradient-to-br from-emerald-950/40 via-emerald-900/20 to-slate-900/80 border border-emerald-500/30 rounded-2xl p-2.5 shadow-sm">
+                <div className="bg-gradient-to-br from-emerald-950/50 via-emerald-900/20 to-slate-900/90 border border-emerald-500/40 rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-400">
+                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-400">
                             PAYMENT RECEIVED
                         </span>
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]"></span>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-emerald-300 mt-0.5 tracking-tight">
+                    <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-black text-emerald-300 mt-1 tracking-tight">
                         ₹ {totalReceivedAll.toLocaleString('en-IN')}
                     </div>
-                    <div className="text-[9px] text-emerald-400/80 font-medium">
+                    <div className="text-[10px] sm:text-xs text-emerald-400/80 font-medium mt-0.5">
                         Real-time Settled & Advance
                     </div>
                 </div>
 
                 {/* 2. Pending Tile */}
-                <div className="bg-gradient-to-br from-rose-950/40 via-rose-900/20 to-slate-900/80 border border-rose-500/30 rounded-2xl p-2.5 shadow-sm">
+                <div className="bg-gradient-to-br from-rose-950/50 via-rose-900/20 to-slate-900/90 border border-rose-500/40 rounded-2xl p-3 sm:p-4 lg:p-5 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-rose-400">
+                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-rose-400">
                             PAYMENT PENDING
                         </span>
-                        <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]"></span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
                     </div>
-                    <div className="text-base sm:text-lg font-black text-rose-300 mt-0.5 tracking-tight">
+                    <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-black text-rose-300 mt-1 tracking-tight">
                         ₹ {totalPendingAll.toLocaleString('en-IN')}
                     </div>
-                    <div className="text-[9px] text-rose-400/80 font-medium">
+                    <div className="text-[10px] sm:text-xs text-rose-400/80 font-medium mt-0.5">
                         {allFinancials.filter(f => f.pendingAmount > 0).length} LRs To Collect
                     </div>
                 </div>
             </div>
 
             {/* Legend & Completion rate indicator */}
-            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 px-1 mb-1">
-                <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between text-xs sm:text-sm font-semibold text-slate-400 px-1 mb-1">
+                <div className="flex items-center gap-3 sm:gap-4">
                     {viewMode === 'volume' ? (
                         <>
                             <span className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
                                 Booked Volume
                             </span>
                             <span className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_6px_#c084fc]"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]"></span>
                                 Delivered
                             </span>
                         </>
                     ) : (
                         <>
                             <span className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#10b981]"></span>
                                 Received (₹)
                             </span>
                             <span className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]"></span>
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_#f43f5e]"></span>
                                 Pending (₹)
                             </span>
                         </>
                     )}
                 </div>
-                <span className="text-cyan-300 font-bold">
+                <span className="text-cyan-300 font-black">
                     {completionRate}% Completed
                 </span>
             </div>
 
-            {/* Glowing SVG Multi-Wave Chart Area */}
-            <div className="relative w-full flex-grow my-2 flex items-center justify-center">
-                <svg className="w-full h-40 overflow-visible" viewBox="0 0 340 100" preserveAspectRatio="none">
+            {/* Glowing SVG Multi-Wave Chart Area (Taller and wider on desktop) */}
+            <div className="relative w-full flex-grow my-3 flex items-center justify-center">
+                <svg className="w-full h-44 sm:h-52 md:h-60 lg:h-72 xl:h-80 overflow-visible" viewBox="0 0 350 110" preserveAspectRatio="none">
                     <defs>
                         {/* Cyan Gradient */}
                         <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.4" />
+                            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.45" />
                             <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
                         </linearGradient>
                         {/* Purple Gradient */}
                         <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#c084fc" stopOpacity="0.35" />
+                            <stop offset="0%" stopColor="#c084fc" stopOpacity="0.38" />
                             <stop offset="100%" stopColor="#c084fc" stopOpacity="0.0" />
                         </linearGradient>
                         {/* Emerald Gradient */}
                         <linearGradient id="emeraldGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.45" />
                             <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
                         </linearGradient>
                         {/* Rose Gradient */}
                         <linearGradient id="roseGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.35" />
+                            <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.38" />
                             <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.0" />
                         </linearGradient>
                     </defs>
 
                     {/* Horizontal Subtle Grid Lines */}
-                    <line x1="0" y1="25" x2="340" y2="25" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
-                    <line x1="0" y1="55" x2="340" y2="55" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="340" y2="80" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
+                    <line x1="0" y1="25" x2="350" y2="25" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
+                    <line x1="0" y1="55" x2="350" y2="55" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
+                    <line x1="0" y1="85" x2="350" y2="85" stroke="#1e293b" strokeWidth="0.8" strokeDasharray="3 3" />
 
                     {/* SECONDARY WAVE (Delivered in volume mode, Pending in cashflow mode) */}
                     <path
@@ -474,7 +474,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         d={secondaryCurve}
                         fill="none"
                         stroke={viewMode === 'volume' ? "#c084fc" : "#f43f5e"}
-                        strokeWidth="2.5"
+                        strokeWidth="2.8"
                     />
 
                     {/* PRIMARY WAVE (Booked volume in volume mode, Received in cashflow mode) */}
@@ -486,8 +486,8 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         d={primaryCurve}
                         fill="none"
                         stroke={viewMode === 'volume' ? "#22d3ee" : "#10b981"}
-                        strokeWidth="3"
-                        className={viewMode === 'volume' ? "drop-shadow-[0_0_10px_#22d3ee]" : "drop-shadow-[0_0_10px_#10b981]"}
+                        strokeWidth="3.2"
+                        className={viewMode === 'volume' ? "drop-shadow-[0_0_12px_#22d3ee]" : "drop-shadow-[0_0_12px_#10b981]"}
                     />
 
                     {/* Floating Value Pill Pins for Primary Points */}
@@ -496,7 +496,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         const pillStroke = viewMode === 'volume' ? '#22d3ee' : '#10b981';
                         const pillBg = viewMode === 'volume' ? '#0e7490' : '#065f46';
                         const pillVal = formatPillVal(pt.val);
-                        const pillWidth = Math.max(16, pillVal.length * 6 + 6);
+                        const pillWidth = Math.max(18, pillVal.length * 7 + 6);
 
                         return (
                             <g key={idx} className="cursor-pointer" onClick={() => setSelectedDayIdx(idx)}>
@@ -504,37 +504,37 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                                 <circle
                                     cx={pt.x}
                                     cy={pt.y}
-                                    r={isHovered ? "5" : "3.5"}
+                                    r={isHovered ? "6" : "4"}
                                     fill={pillStroke}
                                     className="animate-pulse opacity-80"
                                 />
                                 <circle
                                     cx={pt.x}
                                     cy={pt.y}
-                                    r="3"
+                                    r="3.2"
                                     fill="#ffffff"
                                     stroke={pillStroke}
-                                    strokeWidth="1.5"
+                                    strokeWidth="1.8"
                                 />
 
                                 {/* Floating Number Badge Pill */}
                                 <rect
                                     x={pt.x - pillWidth / 2}
-                                    y={pt.y - 17}
+                                    y={pt.y - 19}
                                     width={pillWidth}
-                                    height="12"
-                                    rx="3"
+                                    height="13"
+                                    rx="3.5"
                                     fill={pillBg}
                                     stroke={pillStroke}
-                                    strokeWidth={isHovered ? "1.5" : "0.8"}
+                                    strokeWidth={isHovered ? "1.8" : "1"}
                                     className="shadow-md"
                                 />
                                 <text
                                     x={pt.x}
-                                    y={pt.y - 8.5}
+                                    y={pt.y - 9.5}
                                     textAnchor="middle"
                                     fill="#ffffff"
-                                    fontSize="7"
+                                    fontSize="8"
                                     fontWeight="bold"
                                     fontFamily="sans-serif"
                                 >
@@ -548,26 +548,30 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
 
             {/* Selected Day Details Strip (shows when user clicks or hovers a day) */}
             {activeDay && (
-                <div className="bg-slate-900/90 border border-slate-700/80 rounded-xl px-3 py-1.5 mb-2 flex items-center justify-between text-[11px] animate-fadeIn">
-                    <div className="font-bold text-cyan-400">
+                <div className="bg-slate-900/95 border border-slate-700 rounded-xl px-4 py-2.5 mb-2.5 flex items-center justify-between text-xs lg:text-sm animate-fadeIn shadow-lg">
+                    <div className="font-black text-cyan-400">
                         {activeDay.label} ({activeDay.dateFormatted}):
                     </div>
-                    <div className="flex items-center gap-2 text-[10px]">
-                        <span className="text-slate-300 font-medium">
-                            <strong className="text-white">{activeDay.volume}</strong> LRs
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs lg:text-sm font-semibold">
+                        <span className="text-slate-300">
+                            <strong className="text-white font-black">{activeDay.volume}</strong> LRs Booked
                         </span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-emerald-400 font-bold">
+                        <span className="text-slate-500">•</span>
+                        <span className="text-purple-300">
+                            <strong className="text-white font-black">{activeDay.delivered}</strong> Delivered
+                        </span>
+                        <span className="text-slate-500">•</span>
+                        <span className="text-emerald-400 font-black">
                             Recd: ₹{activeDay.received.toLocaleString('en-IN')}
                         </span>
-                        <span className="text-slate-400">•</span>
-                        <span className="text-rose-400 font-bold">
+                        <span className="text-slate-500">•</span>
+                        <span className="text-rose-400 font-black">
                             Pending: ₹{activeDay.pending.toLocaleString('en-IN')}
                         </span>
                     </div>
                     <button
                         onClick={() => setSelectedDayIdx(null)}
-                        className="text-slate-400 hover:text-white text-xs px-1"
+                        className="text-slate-400 hover:text-white text-sm px-1.5 py-0.5 rounded hover:bg-slate-800 transition-colors"
                         title="Close breakdown"
                     >
                         ✕
@@ -576,29 +580,29 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
             )}
 
             {/* Bottom Days Axis */}
-            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase pt-2 border-t border-slate-800/80">
+            <div className="flex justify-between items-center text-xs lg:text-sm font-black text-slate-400 uppercase pt-2.5 border-t border-slate-800/80">
                 {dailyStats.map((d, i) => (
                     <button
                         key={d.label + i}
                         type="button"
                         onClick={() => setSelectedDayIdx(selectedDayIdx === i ? null : i)}
-                        className={`transition-all px-1.5 py-0.5 rounded-md ${
+                        className={`transition-all px-2 py-1 lg:px-3 lg:py-1.5 rounded-lg ${
                             selectedDayIdx === i
-                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-black'
+                                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 font-black shadow-[0_0_10px_rgba(34,211,238,0.2)]'
                                 : d.isToday
                                 ? 'text-cyan-400 font-black'
-                                : 'hover:text-cyan-400'
+                                : 'hover:text-cyan-400 hover:bg-slate-900/60'
                         }`}
                         title={`${d.label} (${d.dateFormatted}) - Click to inspect`}
                     >
                         {d.label}
-                        {d.isToday && <span className="block text-[7px] text-cyan-400 lowercase font-mono">today</span>}
+                        {d.isToday && <span className="block text-[8px] lg:text-[9px] text-cyan-400 lowercase font-mono">today</span>}
                     </button>
                 ))}
             </div>
 
             {/* Ambient Cyan Base Glow */}
-            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-3/4 h-12 bg-cyan-500/20 blur-xl pointer-events-none"></div>
+            <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 w-3/4 h-16 bg-cyan-500/20 blur-2xl pointer-events-none"></div>
         </div>
     );
 };
@@ -719,28 +723,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                         onClick={() => {
                             if (activeSection) setActiveSection(null);
                         }}
-                        className="w-10 h-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-blue-600 hover:shadow-md transition-all active:scale-95"
+                        className="w-10 h-10 lg:w-12 lg:h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-700 hover:text-blue-600 hover:shadow-md transition-all active:scale-95"
                         title="Back"
                     >
-                        <ArrowLeftIcon className="w-5 h-5" />
+                        <ArrowLeftIcon className="w-5 h-5 lg:w-6 lg:h-6" />
                     </button>
                     <div>
-                        <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">
+                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-800 tracking-tight">
                             LR Management Dashboard
                         </h1>
-                        <p className="text-xs text-slate-500 font-medium">Real-time logistics analytics & consignment operations</p>
+                        <p className="text-xs sm:text-sm text-slate-500 font-medium">Real-time logistics analytics & consignment operations</p>
                     </div>
                 </div>
 
                 {/* Right: Action Pills */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2.5">
                     {/* + New LR Pill */}
                     {currentRole !== 'Manager' && (
                         <button
                             onClick={onAddNew}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-bold text-xs shadow-md shadow-sky-500/20 hover:shadow-lg transition-all active:scale-95"
+                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-xs lg:text-sm shadow-md shadow-sky-500/20 hover:shadow-lg transition-all active:scale-95"
                         >
-                            <span className="text-base font-black">+</span>
+                            <span className="text-base lg:text-lg font-black">+</span>
                             New LR
                         </button>
                     )}
@@ -749,9 +753,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {currentRole !== 'Operator' && (!rbacEnabled || currentRole === 'Admin') && (
                         <button
                             onClick={() => setCurrentView('invoices')}
-                            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all active:scale-95"
+                            className="flex items-center gap-1.5 px-4 py-2.5 lg:px-5 lg:py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs lg:text-sm shadow-md shadow-indigo-600/20 hover:shadow-lg transition-all active:scale-95"
                         >
-                            <DocumentTextIcon className="w-4 h-4" />
+                            <DocumentTextIcon className="w-4 h-4 lg:w-5 lg:h-5" />
                             New Invoice
                         </button>
                     )}
@@ -759,17 +763,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Quick Navigation Filter Bar */}
-            <div className="flex items-center justify-end gap-2 flex-wrap">
+            <div className="flex items-center justify-end gap-2.5 flex-wrap">
                 <button
                     onClick={() => setCurrentView('invoices')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[#be185d] hover:bg-[#9d174d] text-white font-bold text-xs shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#be185d] hover:bg-[#9d174d] text-white font-bold text-xs lg:text-sm shadow-sm transition-all"
                 >
                     <InvoiceIcon className="w-4 h-4" />
                     Invoices
                 </button>
                 <button
                     onClick={onAddNew}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-[#059669] hover:bg-[#047857] text-white font-bold text-xs lg:text-sm shadow-sm transition-all"
                 >
                     <CreateIcon className="w-4 h-4" />
                     Create LR
@@ -777,7 +781,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {onViewVouchers && (
                     <button
                         onClick={onViewVouchers}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs shadow-sm transition-all"
+                        className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all"
                     >
                         <span>📑</span>
                         Vouchers
@@ -785,7 +789,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 )}
                 <button
                     onClick={onViewList}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs shadow-sm transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 lg:px-5 lg:py-2.5 rounded-2xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs lg:text-sm shadow-sm transition-all"
                 >
                     <ListIcon className="w-4 h-4" />
                     List
@@ -801,7 +805,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
 
             {/* --- 1. TOP 4 3D CLAYMORPHIC KPI CARDS --- */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 lg:gap-6">
                 {/* 1. TOTAL LRs (Bronze/Copper) */}
                 <ClayKPICard
                     title="TOTAL LRs"
@@ -811,7 +815,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     onClick={onViewList}
                     icon={
                         <div className="text-white">
-                            <TruckIcon className="w-8 h-8" />
+                            <TruckIcon className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10" />
                         </div>
                     }
                 />
@@ -823,7 +827,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     theme="teal"
                     sparklineColor="#67e8f9"
                     icon={
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-amber-950 font-black text-xl flex items-center justify-center shadow-md border-2 border-white/60">
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 lg:w-12 lg:h-12 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-amber-950 font-black text-xl lg:text-2xl flex items-center justify-center shadow-md border-2 border-white/60">
                             ₹
                         </div>
                     }
@@ -837,7 +841,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     sparklineColor="#f472b6"
                     icon={
                         <div className="text-white">
-                            <UsersIcon className="w-8 h-8" />
+                            <UsersIcon className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10" />
                         </div>
                     }
                 />
@@ -850,91 +854,91 @@ const Dashboard: React.FC<DashboardProps> = ({
                     sparklineColor="#fde047"
                     icon={
                         <div className="text-white">
-                            <UploadIcon className="w-8 h-8" />
+                            <UploadIcon className="w-8 h-8 sm:w-9 sm:h-9 lg:w-10 lg:h-10" />
                         </div>
                     }
                 />
             </div>
 
             {/* --- 2. 3D HIGHWAY / SHIPMENT STATUS PIPELINE --- */}
-            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] space-y-4">
+            <div className="bg-white/90 backdrop-blur-md rounded-3xl p-5 md:p-6 lg:p-7 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] space-y-4 sm:space-y-5">
                 <div className="flex justify-between items-center">
-                    <h3 className="font-extrabold text-base text-slate-800 tracking-tight">
+                    <h3 className="font-black text-base sm:text-lg lg:text-xl text-slate-800 tracking-tight">
                         Shipment Status
                     </h3>
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
                         Live Fleet Track
                     </span>
                 </div>
 
                 {/* 3D Highway Track */}
                 <div className="relative overflow-x-auto pb-2">
-                    <div className="min-w-[700px] flex items-center justify-between gap-3 relative py-2 px-1">
+                    <div className="min-w-[700px] flex items-center justify-between gap-3 sm:gap-4 relative py-2.5 px-1">
                         {/* Background Road Curve */}
-                        <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-10 bg-slate-100 rounded-full border-2 border-slate-200/80 shadow-inner z-0 overflow-hidden flex items-center">
+                        <div className="absolute left-6 right-6 top-1/2 -translate-y-1/2 h-10 lg:h-12 bg-slate-100 rounded-full border-2 border-slate-200/80 shadow-inner z-0 overflow-hidden flex items-center">
                             <div className="w-full border-t-2 border-dashed border-cyan-400/80 opacity-60"></div>
                         </div>
 
                         {/* STAGE 1: BOOKED */}
-                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2 px-4 shadow-sm hover:shadow-md transition-all">
+                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">BOOKED</span>
-                                <span className="text-lg font-black text-slate-800">{statusCounts['Booked'] || 0}</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">BOOKED</span>
+                                <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Booked'] || 0}</span>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-bold text-base shadow-sm">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-black text-base lg:text-lg shadow-sm">
                                 +
                             </div>
                         </div>
 
                         {/* STAGE 2: IN TRANSIT (With 3D Truck on the Highway) */}
-                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-teal-400 rounded-full py-2 px-4 shadow-md bg-teal-50/20">
+                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-teal-400 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-md bg-teal-50/20">
                             <div>
-                                <span className="block text-[9px] font-extrabold text-teal-700 uppercase tracking-wider">IN TRANSIT</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-teal-700 uppercase tracking-wider">IN TRANSIT</span>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     {/* 3D Cargo Truck Container Graphic */}
-                                    <div className="flex items-center bg-[#1e3a8a] text-white px-2 py-0.5 rounded text-[10px] font-black font-mono shadow-xs">
+                                    <div className="flex items-center bg-[#1e3a8a] text-white px-2 py-0.5 rounded text-[10px] lg:text-xs font-black font-mono shadow-xs">
                                         SSK 2664
                                     </div>
-                                    <span className="text-sm font-black text-teal-800">
+                                    <span className="text-sm lg:text-base font-black text-teal-800">
                                         ({statusCounts['In Transit'] || 0})
                                     </span>
                                 </div>
                             </div>
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center shadow-sm">
-                                <TruckIcon className="w-5 h-5" />
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center shadow-sm">
+                                <TruckIcon className="w-5 h-5 lg:w-6 lg:h-6" />
                             </div>
                         </div>
 
                         {/* STAGE 3: OUT FOR DELIVERY */}
-                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2 px-4 shadow-sm hover:shadow-md transition-all">
+                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">OUT FOR DELIVERY</span>
-                                <span className="text-lg font-black text-slate-800">{statusCounts['Out for Delivery'] || 0}</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">OUT FOR DELIVERY</span>
+                                <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Out for Delivery'] || 0}</span>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-700 to-amber-500 text-white flex items-center justify-center shadow-sm">
-                                <ClockIcon className="w-4 h-4" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-amber-700 to-amber-500 text-white flex items-center justify-center shadow-sm">
+                                <ClockIcon className="w-4 h-4 lg:w-5 lg:h-5" />
                             </div>
                         </div>
 
                         {/* STAGE 4: DELIVERED (Golden Delivery Shield Emblem) */}
-                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2 px-4 shadow-sm hover:shadow-md transition-all">
+                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">DELIVERED</span>
-                                <span className="text-lg font-black text-slate-800">{statusCounts['Delivered'] || 0}</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">DELIVERED</span>
+                                <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Delivered'] || 0}</span>
                             </div>
-                            <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-amber-950 flex items-center justify-center shadow-md border border-amber-200">
+                            <div className="w-9 h-9 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-300 text-amber-950 flex items-center justify-center shadow-md border border-amber-200 text-base lg:text-lg">
                                 <span>📦</span>
                             </div>
                         </div>
 
                         {/* STAGE 5: CANCELLED */}
-                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2 px-4 shadow-sm hover:shadow-md transition-all">
+                        <div className="relative z-10 flex-1 flex items-center justify-between bg-white border-2 border-slate-200 rounded-full py-2.5 px-4 lg:py-3.5 lg:px-6 shadow-sm hover:shadow-md transition-all">
                             <div>
-                                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">CANCELLED</span>
-                                <span className="text-lg font-black text-slate-800">{statusCounts['Cancelled'] || 0}</span>
+                                <span className="block text-[9px] sm:text-[10px] lg:text-xs font-black text-slate-400 uppercase tracking-wider">CANCELLED</span>
+                                <span className="text-lg sm:text-xl lg:text-2xl font-black text-slate-800">{statusCounts['Cancelled'] || 0}</span>
                             </div>
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center shadow-sm">
-                                <XIcon className="w-4 h-4" />
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 rounded-full bg-gradient-to-tr from-rose-600 to-pink-500 text-white flex items-center justify-center shadow-sm">
+                                <XIcon className="w-4 h-4 lg:w-5 lg:h-5" />
                             </div>
                         </div>
                     </div>
@@ -944,15 +948,15 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* --- 3. MIDDLE SECTION: RECENT LRs & NEW WEEKLY TREND --- */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                 {/* Left 7 Cols: Recent Lorry Receipts */}
-                <div className="lg:col-span-7 bg-white/90 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] flex flex-col justify-between">
+                <div className="lg:col-span-7 bg-white/90 backdrop-blur-md rounded-3xl p-5 md:p-6 lg:p-7 xl:p-8 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] flex flex-col justify-between">
                     <div>
-                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-100">
-                            <h3 className="font-extrabold text-base text-slate-800 tracking-tight">
+                        <div className="flex justify-between items-center mb-4 pb-2.5 border-b border-slate-100">
+                            <h3 className="font-black text-base sm:text-lg lg:text-xl text-slate-800 tracking-tight">
                                 Recent Lorry Receipts
                             </h3>
                             <button
                                 onClick={onViewList}
-                                className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+                                className="text-xs sm:text-sm font-black text-blue-600 hover:text-blue-800 transition-colors"
                             >
                                 View All ➔
                             </button>
@@ -960,40 +964,42 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                         {/* Recent LRs Table */}
                         <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
+                            <table className="w-full text-left text-xs sm:text-sm">
                                 <thead>
-                                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
-                                        <th className="pb-3">LR NO</th>
-                                        <th className="pb-3">DATE</th>
-                                        <th className="pb-3">TRUCK</th>
-                                        <th className="pb-3 text-right">FREIGHT</th>
-                                        <th className="pb-3 text-center">ACTION</th>
+                                    <tr className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                        <th className="pb-3.5">LR NO</th>
+                                        <th className="pb-3.5">DATE</th>
+                                        <th className="pb-3.5">TRUCK</th>
+                                        <th className="pb-3.5 text-right">FREIGHT</th>
+                                        <th className="pb-3.5 text-center">ACTION</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {recentLRs.length > 0 ? (
                                         recentLRs.map((lr) => (
                                             <tr key={lr.lrNo} className="hover:bg-slate-50/80 transition-colors">
-                                                <td className="py-3 font-bold text-blue-600 font-mono">
+                                                <td className="py-3.5 lg:py-4 font-black text-blue-600 font-mono text-xs sm:text-sm lg:text-base">
                                                     {lr.lrNo}
                                                 </td>
-                                                <td className="py-3 text-slate-600">
+                                                <td className="py-3.5 lg:py-4 text-slate-600 font-medium">
                                                     {lr.date ? new Date(lr.date).toLocaleDateString('en-GB') : '-'}
                                                 </td>
-                                                <td className="py-3 font-semibold text-slate-800">
+                                                <td className="py-3.5 lg:py-4 font-semibold text-slate-800">
                                                     <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-2"></span>
-                                                    {lr.truckNo || 'Not Assigned'}
+                                                    <span className="font-mono bg-slate-100 px-2 py-1 rounded-lg text-xs sm:text-sm font-bold">
+                                                        {lr.truckNo || 'Not Assigned'}
+                                                    </span>
                                                 </td>
-                                                <td className="py-3 text-right font-black text-slate-900">
+                                                <td className="py-3.5 lg:py-4 text-right font-black text-slate-900 text-xs sm:text-sm lg:text-base">
                                                     ₹ {Number(lr.freight || 0).toLocaleString('en-IN')}
                                                 </td>
-                                                <td className="py-3 text-center">
+                                                <td className="py-3.5 lg:py-4 text-center">
                                                     <button
                                                         onClick={() => onEditLR(lr.lrNo)}
-                                                        className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 transition-colors"
+                                                        className="p-2 lg:p-2.5 rounded-xl text-blue-600 hover:bg-blue-50 transition-colors"
                                                         title="Open LR"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                         </svg>
                                                     </button>
@@ -1020,19 +1026,19 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* --- 4. BOTTOM SECTION: UPCOMING DELIVERIES & REAL-TIME PENDING COLLECTIONS --- */}
-            <div className="bg-white/95 backdrop-blur-md rounded-3xl p-5 md:p-6 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] space-y-5">
+            <div className="bg-white/95 backdrop-blur-md rounded-3xl p-5 md:p-6 lg:p-8 border border-slate-200/80 shadow-[0_10px_30px_rgba(0,0,0,0.04)] space-y-5 sm:space-y-6">
                 {/* Header & Live Dues Summary */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-100 pb-4 sm:pb-5">
                     <div>
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shadow-md">
-                                <CurrencyRupeeIcon className="w-5 h-5" />
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 sm:w-11 sm:h-11 lg:w-13 lg:h-13 rounded-2xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shadow-md">
+                                <CurrencyRupeeIcon className="w-6 h-6 lg:w-7 lg:h-7" />
                             </div>
                             <div>
-                                <h3 className="font-black text-lg text-slate-800 tracking-tight">
+                                <h3 className="font-black text-lg sm:text-xl lg:text-2xl text-slate-800 tracking-tight">
                                     Upcoming Deliveries & Pending Collections
                                 </h3>
-                                <p className="text-xs font-semibold text-slate-500">
+                                <p className="text-xs sm:text-sm font-semibold text-slate-500 mt-0.5">
                                     किस-किस LR के कितने पैसे लेने बाकी हैं — लाइव बकाया विवरण (Real-Time Live Dues)
                                 </p>
                             </div>
@@ -1040,63 +1046,63 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black shadow-xs">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                        <div className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl lg:rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-black shadow-xs">
+                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
                             Total Pending: ₹ {totalPendingAll.toLocaleString('en-IN')}
                         </div>
                     </div>
                 </div>
 
                 {/* KPI Ribbon: Quick Counts */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                     {/* 1. Total Pending */}
-                    <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3 shadow-xs">
-                        <span className="text-[10px] font-black text-rose-600 uppercase tracking-wider block">
+                    <div className="bg-rose-50/80 border border-rose-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
+                        <span className="text-[10px] sm:text-xs font-black text-rose-600 uppercase tracking-wider block">
                             TOTAL PENDING DUES
                         </span>
-                        <div className="text-xl font-black text-rose-700 mt-0.5">
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-black text-rose-700 mt-1 tracking-tight">
                             ₹ {totalPendingAll.toLocaleString('en-IN')}
                         </div>
-                        <span className="text-[10px] text-rose-500 font-bold">
+                        <span className="text-[10px] sm:text-xs text-rose-500 font-bold block mt-0.5">
                             {pendingLRsWithFin.length} LRs with dues
                         </span>
                     </div>
 
                     {/* 2. TO PAY (Consignee) */}
-                    <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-3 shadow-xs">
-                        <span className="text-[10px] font-black text-amber-700 uppercase tracking-wider block">
+                    <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
+                        <span className="text-[10px] sm:text-xs font-black text-amber-700 uppercase tracking-wider block">
                             TO PAY (CONSIGNEE)
                         </span>
-                        <div className="text-xl font-black text-amber-800 mt-0.5">
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-black text-amber-800 mt-1 tracking-tight">
                             {toPayCount} LRs
                         </div>
-                        <span className="text-[10px] text-amber-600 font-bold">
+                        <span className="text-[10px] sm:text-xs text-amber-600 font-bold block mt-0.5">
                             Due on delivery
                         </span>
                     </div>
 
                     {/* 3. TO BE BILLED */}
-                    <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-3 shadow-xs">
-                        <span className="text-[10px] font-black text-indigo-700 uppercase tracking-wider block">
+                    <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
+                        <span className="text-[10px] sm:text-xs font-black text-indigo-700 uppercase tracking-wider block">
                             TO BE BILLED (TBB)
                         </span>
-                        <div className="text-xl font-black text-indigo-800 mt-0.5">
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-black text-indigo-800 mt-1 tracking-tight">
                             {tbbCount} LRs
                         </div>
-                        <span className="text-[10px] text-indigo-600 font-bold">
+                        <span className="text-[10px] sm:text-xs text-indigo-600 font-bold block mt-0.5">
                             To invoice parties
                         </span>
                     </div>
 
                     {/* 4. Active On-Road */}
-                    <div className="bg-teal-50/80 border border-teal-200 rounded-2xl p-3 shadow-xs">
-                        <span className="text-[10px] font-black text-teal-700 uppercase tracking-wider block">
+                    <div className="bg-teal-50/80 border border-teal-200 rounded-2xl p-3.5 sm:p-4 lg:p-5 shadow-xs">
+                        <span className="text-[10px] sm:text-xs font-black text-teal-700 uppercase tracking-wider block">
                             ON-ROAD DELIVERIES
                         </span>
-                        <div className="text-xl font-black text-teal-800 mt-0.5">
+                        <div className="text-xl sm:text-2xl lg:text-3xl font-black text-teal-800 mt-1 tracking-tight">
                             {onRoadCount} LRs
                         </div>
-                        <span className="text-[10px] text-teal-600 font-bold">
+                        <span className="text-[10px] sm:text-xs text-teal-600 font-bold block mt-0.5">
                             In transit / Out for delivery
                         </span>
                     </div>
@@ -1105,21 +1111,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {/* Filter and Search Bar */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
                     {/* Search Input */}
-                    <div className="relative flex-1 max-w-md">
+                    <div className="relative flex-1 max-w-lg">
                         <input
                             type="text"
                             value={pendingSearchQuery}
                             onChange={(e) => setPendingSearchQuery(e.target.value)}
                             placeholder="Search by LR No, Consignee, Consignor, Truck, City..."
-                            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
+                            className="w-full pl-10 pr-4 py-2.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-semibold text-slate-700 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
                         />
-                        <svg className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 absolute left-3.5 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         {pendingSearchQuery && (
                             <button
                                 onClick={() => setPendingSearchQuery('')}
-                                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 text-xs sm:text-sm"
                             >
                                 ✕
                             </button>
@@ -1127,12 +1133,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Filter Pills & Sort */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2.5 flex-wrap">
                         {/* Basis Filters */}
-                        <div className="flex items-center bg-slate-100 p-1 rounded-xl text-[11px] font-bold">
+                        <div className="flex items-center bg-slate-100 p-1 rounded-2xl text-xs sm:text-sm font-bold">
                             <button
                                 onClick={() => setPendingBasisFilter('ALL')}
-                                className={`px-2.5 py-1 rounded-lg transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
                                     pendingBasisFilter === 'ALL'
                                         ? 'bg-white text-slate-900 shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
@@ -1142,7 +1148,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('TO PAY')}
-                                className={`px-2.5 py-1 rounded-lg transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
                                     pendingBasisFilter === 'TO PAY'
                                         ? 'bg-amber-500 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
@@ -1152,7 +1158,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('TO BE BILLED')}
-                                className={`px-2.5 py-1 rounded-lg transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
                                     pendingBasisFilter === 'TO BE BILLED'
                                         ? 'bg-indigo-600 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
@@ -1162,7 +1168,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </button>
                             <button
                                 onClick={() => setPendingBasisFilter('ON_ROAD')}
-                                className={`px-2.5 py-1 rounded-lg transition-all ${
+                                className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all ${
                                     pendingBasisFilter === 'ON_ROAD'
                                         ? 'bg-teal-600 text-white shadow-xs'
                                         : 'text-slate-500 hover:text-slate-900'
@@ -1176,7 +1182,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <select
                             value={pendingSortBy}
                             onChange={(e) => setPendingSortBy(e.target.value as any)}
-                            className="text-[11px] font-bold bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer"
+                            className="text-xs sm:text-sm font-bold bg-white border border-slate-200 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-xs cursor-pointer"
                         >
                             <option value="highest">Highest Dues First</option>
                             <option value="recent">Recent Date First</option>
@@ -1185,7 +1191,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 {/* List of Pending LRs */}
-                <div className="space-y-3">
+                <div className="space-y-3.5 sm:space-y-4">
                     {visiblePending.length > 0 ? (
                         visiblePending.map(({ lr, fin }) => {
                             const isDelivered = lr.status === 'Delivered';
@@ -1194,25 +1200,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                             return (
                                 <div
                                     key={lr.lrNo}
-                                    className="p-4 rounded-2xl bg-slate-50/80 hover:bg-slate-100/90 border border-slate-200/90 transition-all shadow-xs hover:shadow-md group"
+                                    className="p-4 sm:p-5 lg:p-6 rounded-2xl sm:rounded-3xl bg-slate-50/90 hover:bg-slate-100/90 border border-slate-200/90 transition-all shadow-xs hover:shadow-md group"
                                 >
                                     {/* Top Row: LR No, Status Badges, Date */}
-                                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-200/60">
-                                        <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 border-b border-slate-200/60">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
                                             <button
                                                 type="button"
                                                 onClick={() => onEditLR(lr.lrNo)}
-                                                className="font-mono font-black text-sm text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                                className="font-mono font-black text-sm sm:text-base lg:text-lg text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1.5"
                                                 title="Open LR details"
                                             >
                                                 <span>LR #{lr.lrNo}</span>
-                                                <svg className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                                 </svg>
                                             </button>
 
                                             {/* Status Badge */}
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider ${
                                                 lr.status === 'Delivered'
                                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                                     : lr.status === 'In Transit'
@@ -1225,54 +1231,54 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             </span>
 
                                             {/* Payment Basis Badge */}
-                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                            <span className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black uppercase ${
                                                 fin.freightBasis === 'TO PAY'
-                                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                                     : fin.freightBasis === 'TO BE BILLED'
-                                                    ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                    ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                             }`}>
                                                 {fin.freightBasis}
                                             </span>
 
                                             {isOnRoad && (
-                                                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-cyan-50 text-cyan-700 border border-cyan-200 animate-pulse">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black bg-cyan-100 text-cyan-800 border border-cyan-200 animate-pulse">
                                                     🚚 Delivery in progress
                                                 </span>
                                             )}
                                         </div>
 
-                                        <div className="text-[11px] font-semibold text-slate-500">
+                                        <div className="text-xs sm:text-sm font-semibold text-slate-500">
                                             {lr.date ? new Date(lr.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'No Date'}
                                         </div>
                                     </div>
 
                                     {/* Middle Row: Debtor Details, Route, Money Breakdown */}
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-3 items-center">
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 pt-3.5 items-center">
                                         {/* Left 7 Cols: Who owes the money & Route */}
-                                        <div className="md:col-span-7 space-y-1.5">
-                                            <div className="flex items-start gap-2">
-                                                <div className="w-6 h-6 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-black flex-shrink-0 mt-0.5">
+                                        <div className="md:col-span-7 space-y-2">
+                                            <div className="flex items-start gap-2.5">
+                                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center text-xs sm:text-sm font-black flex-shrink-0 mt-0.5">
                                                     👤
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">
                                                         {fin.debtorType === 'Consignee' ? 'पैसे लेने हैं (Consignee):' : 'बिलिंग पार्टी (Billing Party):'}
                                                     </div>
-                                                    <div className="text-xs font-extrabold text-slate-900 flex items-center gap-2 flex-wrap">
+                                                    <div className="text-sm sm:text-base lg:text-lg font-black text-slate-900 flex items-center gap-2.5 flex-wrap">
                                                         <span>{fin.debtorName}</span>
                                                         {fin.debtorCity && (
-                                                            <span className="text-[11px] font-normal text-slate-500">
+                                                            <span className="text-xs sm:text-sm font-medium text-slate-500">
                                                                 ({fin.debtorCity})
                                                             </span>
                                                         )}
                                                         {fin.debtorPhone && (
                                                             <a
                                                                 href={`tel:${fin.debtorPhone}`}
-                                                                className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded"
+                                                                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200"
                                                                 title="Call contact"
                                                             >
-                                                                <PhoneIcon className="w-3 h-3" />
+                                                                <PhoneIcon className="w-3.5 h-3.5" />
                                                                 {fin.debtorPhone}
                                                             </a>
                                                         )}
@@ -1281,18 +1287,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             </div>
 
                                             {/* Route & Truck */}
-                                            <div className="flex items-center gap-3 text-xs text-slate-600 pl-8 flex-wrap">
-                                                <span className="font-semibold text-slate-700">
+                                            <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600 pl-9 sm:pl-10 flex-wrap">
+                                                <span className="font-bold text-slate-800 text-xs sm:text-sm lg:text-base">
                                                     {lr.fromPlace || 'Origin'} ➔ {lr.toPlace || 'Destination'}
                                                 </span>
                                                 <span className="text-slate-300">•</span>
-                                                <span className="font-mono font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                                                    {lr.truckNo || 'No Truck'}
+                                                <span className="font-mono font-black text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 text-xs sm:text-sm shadow-xs">
+                                                    {lr.truckNo || 'No Truck Assigned'}
                                                 </span>
                                                 {lr.consignor?.name && (
                                                     <>
                                                         <span className="text-slate-300">•</span>
-                                                        <span className="text-[11px] text-slate-500 truncate max-w-[160px]" title={lr.consignor.name}>
+                                                        <span className="text-xs sm:text-sm text-slate-500 truncate max-w-[200px]" title={lr.consignor.name}>
                                                             Consignor: {lr.consignor.name}
                                                         </span>
                                                     </>
@@ -1301,17 +1307,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         </div>
 
                                         {/* Right 5 Cols: Pending Amount Highlight & Action */}
-                                        <div className="md:col-span-5 flex items-center justify-between md:justify-end gap-4 bg-white/70 md:bg-transparent p-2.5 md:p-0 rounded-xl border border-slate-200/60 md:border-0">
+                                        <div className="md:col-span-5 flex items-center justify-between md:justify-end gap-4 sm:gap-5 bg-white/80 md:bg-transparent p-3 md:p-0 rounded-2xl border border-slate-200/60 md:border-0">
                                             {/* Amount Box */}
                                             <div className="text-left md:text-right">
-                                                <div className="text-[10px] font-black uppercase tracking-wider text-rose-600 flex items-center md:justify-end gap-1">
-                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                                                <div className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-rose-600 flex items-center md:justify-end gap-1.5">
+                                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>
                                                     लेना बाकी (Pending Dues):
                                                 </div>
-                                                <div className="text-lg sm:text-xl font-black text-rose-600 tracking-tight">
+                                                <div className="text-xl sm:text-2xl lg:text-3xl font-black text-rose-600 tracking-tight mt-0.5">
                                                     ₹ {fin.pendingAmount.toLocaleString('en-IN')}
                                                 </div>
-                                                <div className="text-[10px] text-slate-500 font-medium">
+                                                <div className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
                                                     Total: ₹{fin.totalFreight.toLocaleString('en-IN')}
                                                     {fin.advancePaid > 0 && ` | Adv: ₹${fin.advancePaid.toLocaleString('en-IN')}`}
                                                 </div>
@@ -1321,11 +1327,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             <button
                                                 type="button"
                                                 onClick={() => onEditLR(lr.lrNo)}
-                                                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center gap-1.5 flex-shrink-0"
+                                                className="px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl lg:rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs sm:text-sm shadow-sm hover:shadow-md transition-all active:scale-95 flex items-center gap-2 flex-shrink-0"
                                                 title="Open LR"
                                             >
                                                 <span>Open LR</span>
-                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                                 </svg>
                                             </button>
@@ -1335,16 +1341,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                             );
                         })
                     ) : (
-                        <div className="py-12 px-4 text-center rounded-2xl bg-slate-50 border border-dashed border-slate-200 space-y-2">
-                            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-xl shadow-xs">
+                        <div className="py-14 px-4 text-center rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 space-y-2.5">
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 mx-auto flex items-center justify-center text-2xl shadow-xs">
                                 ✓
                             </div>
-                            <div className="text-sm font-black text-slate-800">
+                            <div className="text-base sm:text-lg font-black text-slate-800">
                                 {pendingSearchQuery
                                     ? 'No matching pending records found'
                                     : 'Sabhi Payments Received Hain! (No Pending Dues)'}
                             </div>
-                            <p className="text-xs text-slate-500 max-w-md mx-auto">
+                            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
                                 {pendingSearchQuery
                                     ? 'Try adjusting your search query or basis filter.'
                                     : 'All active Lorry Receipts have zero outstanding balance or payments have been collected.'}
@@ -1359,7 +1365,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <button
                             type="button"
                             onClick={() => setShowAllPending(!showAllPending)}
-                            className="px-5 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors shadow-xs"
+                            className="px-6 py-2.5 sm:px-8 sm:py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs sm:text-sm transition-colors shadow-xs"
                         >
                             {showAllPending
                                 ? 'Show Less ▴'

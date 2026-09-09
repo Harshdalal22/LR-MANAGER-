@@ -857,7 +857,7 @@ const App: React.FC = () => {
                 isOperator={currentRole === 'Operator'}
                 onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
             />
-            <main className="container mx-auto p-4 md:p-6">
+            <main className="max-w-[1680px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 md:py-6">
                 <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
                     {renderContent()}
                 </Suspense>

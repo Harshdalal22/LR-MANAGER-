@@ -95,21 +95,8 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 setBillingPartyType('Other');
             }
         } else {
-            const savedDraft = localStorage.getItem('lr_draft_data');
-            const savedBilling = localStorage.getItem('lr_draft_billing') as 'Consignor' | 'Consignee' | 'Other';
-            if (savedDraft) {
-                try {
-                    const parsed = JSON.parse(savedDraft);
-                    setFormData(parsed);
-                    if (parsed.templateStyle) setLivePreviewTemplate(parsed.templateStyle);
-                    setBillingPartyType(savedBilling || 'Consignor');
-                } catch (e) {
-                    console.error('Failed to parse draft LR data');
-                    resetToCleanState();
-                }
-            } else {
-                resetToCleanState();
-            }
+            // Always start fresh for new LRs — no auto-populated draft data
+            resetToCleanState();
         }
     }, [existingLR]);
 
@@ -122,13 +109,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         setBillingPartyType('Consignor');
     };
 
-    // Auto-save draft to local storage whenever formData or billingPartyType changes
-    useEffect(() => {
-        if (!existingLR && formData.lrNo) {
-            localStorage.setItem('lr_draft_data', JSON.stringify(formData));
-            localStorage.setItem('lr_draft_billing', billingPartyType);
-        }
-    }, [formData, billingPartyType, existingLR]);
+    // Draft auto-save disabled — new LRs always start clean
 
     useEffect(() => {
         if (billingPartyType === 'Consignor') {
@@ -1111,12 +1092,10 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             <div>
                                 <label className={labelBase}>GST Liability / Paid By</label>
                                 <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputBase}>
-                                    <option value="Consignor (RCM @ 5%)">Consignor (RCM @ 5%)</option>
-                                    <option value="Consignee (RCM @ 5%)">Consignee (RCM @ 5%)</option>
-                                    <option value="Transporter (FCM @ 18%)">Transporter / GTA (FCM @ 18%)</option>
-                                    <option value="Transporter (FCM @ 12%)">Transporter / GTA (FCM @ 12%)</option>
-                                    <option value="Both (RCM 5% & FCM 18%)">Dual / Both (RCM 5% & FCM 18%)</option>
-                                    <option value="Exempted">Exempted / Non-Taxable</option>
+                                    <option value="Consignor (RCM @ 5%)">RCM — Consignor Pays @ 5%</option>
+                                    <option value="Consignee (RCM @ 5%)">RCM — Consignee Pays @ 5%</option>
+                                    <option value="Transporter (FCM @ 18%)">FCM — Transporter / GTA @ 18%</option>
+                                    <option value="Transporter (FCM @ 12%)">FCM — Transporter / GTA @ 12%</option>
                                 </select>
                             </div>
 

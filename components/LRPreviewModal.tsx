@@ -994,13 +994,11 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [customEmail, setCustomEmail] = useState<string>('');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
-    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12% vs Dual BOTH vs Exempted)
-    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12' | 'BOTH_5_18' | 'EXEMPTED'>(() => {
+    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12%)
+    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12'>(() => {
         const p = (lr.gstPaidBy || '').toLowerCase();
-        if (p.includes('both') || p.includes('dual') || (p.includes('5') && p.includes('18'))) return 'BOTH_5_18';
         if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
         if (p.includes('12')) return 'FCM_12';
-        if (p.includes('exempt')) return 'EXEMPTED';
         return 'RCM';
     });
 
@@ -1049,11 +1047,34 @@ Carrier: *${companyDetails.name || 'Speedway Logistics'}*
 ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
     };
 
-    // 1-Click Direct WhatsApp Share
-    const handleDirectWhatsApp = (targetPhone?: string) => {
+    // 1-Click Direct WhatsApp Share (tries to attach PDF via Web Share API)
+    const handleDirectWhatsApp = async (targetPhone?: string) => {
+        const summary = generateBiltyText();
+        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
+
+        // Try Web Share API with PDF first (works on mobile / some desktops)
+        if (element && navigator.share && navigator.canShare) {
+            try {
+                const { pdf, filename } = await generateBiltyPdfDoc(element);
+                const pdfBlob = pdf.output('blob');
+                const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+                if (navigator.canShare({ files: [pdfFile] })) {
+                    await navigator.share({
+                        files: [pdfFile],
+                        title: `LR ${lr.lrNo}`,
+                        text: summary
+                    });
+                    toast.success('PDF shared via system share sheet!');
+                    return;
+                }
+            } catch (e: any) {
+                if (e.name === 'AbortError') return; // user cancelled
+            }
+        }
+
+        // Fallback: open WhatsApp with text message
         const cleanPhone = (targetPhone || '').replace(/[^0-9]/g, '');
         const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-        const summary = generateBiltyText();
         const encodedText = encodeURIComponent(summary);
         const url = phoneWithCountry
             ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedText}`
@@ -1423,18 +1444,18 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             PDF (1-Page)
                         </button>
 
-                        {/* Direct 1-Click WhatsApp Button */}
+                        {/* Direct 1-Click WhatsApp Button (tries PDF attachment first) */}
                         <button
                             type="button"
-                            onClick={() => {
+                            onClick={async () => {
                                 const targetPhone = consigneeContact || consignorContact || driverContact || '';
-                                handleDirectWhatsApp(targetPhone);
+                                await handleDirectWhatsApp(targetPhone);
                             }}
                             className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
-                            title="1-Click Direct WhatsApp Share"
+                            title="WhatsApp: tries PDF attachment then text fallback"
                         >
                             <WhatsAppIcon className="w-4 h-4" />
-                            <span>WhatsApp</span>
+                            <span>WhatsApp + PDF</span>
                         </button>
 
                         {/* Share Hub Button */}
@@ -1497,7 +1518,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             </select>
                         </div>
 
-                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12% vs Dual BOTH vs Exempted) */}
+                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12%) */}
                         <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">GST Tax:</span>
                             <select
@@ -1508,8 +1529,6 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                 <option value="RCM" className="bg-slate-900 text-white">RCM @ 5% (Reverse Charge)</option>
                                 <option value="FCM_18" className="bg-slate-900 text-white">FCM @ 18% (Forward Charge)</option>
                                 <option value="FCM_12" className="bg-slate-900 text-white">FCM @ 12% (Forward Charge)</option>
-                                <option value="BOTH_5_18" className="bg-slate-900 text-white">Both (RCM 5% & FCM 18% Dual)</option>
-                                <option value="EXEMPTED" className="bg-slate-900 text-white">Exempted / Non-Taxable</option>
                             </select>
                         </div>
 

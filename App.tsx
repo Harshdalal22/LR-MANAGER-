@@ -184,6 +184,11 @@ const App: React.FC = () => {
     useEffect(() => {
         let authSubscription: Subscription | null = null;
 
+        // Safety timeout: never stay stuck on loading screen for more than 10 seconds
+        const loadingTimeout = setTimeout(() => {
+            setIsLoading(false);
+        }, 10000);
+
         const setupAuth = async () => {
             try {
                 const currentSession = await getSession();
@@ -191,16 +196,22 @@ const App: React.FC = () => {
 
                 if (currentSession) {
                     if (currentSession.user?.email !== 'gps@ssk.com') {
-                        const roleInfo = await checkOperatorRole();
-                        if (roleInfo && !roleInfo.isAdmin) {
-                            sessionStorage.setItem('currentRole', 'Operator');
-                            sessionStorage.setItem('adminId', roleInfo.adminId);
-                            setCurrentRole('Operator');
+                        try {
+                            const roleInfo = await checkOperatorRole();
+                            if (roleInfo && !roleInfo.isAdmin) {
+                                sessionStorage.setItem('currentRole', 'Operator');
+                                sessionStorage.setItem('adminId', roleInfo.adminId);
+                                setCurrentRole('Operator');
+                            }
+                        } catch (roleErr) {
+                            console.warn('checkOperatorRole failed, defaulting to Admin:', roleErr);
                         }
                     }
-                    // For existing session, we'll let fetchData (triggered by session state change)
-                    // handle setting setIsLoading(false) after it finishes loading initial data.
+                    // fetchData (triggered by session state change) will set isLoading(false)
+                    // but we also clear the safety timeout once session is confirmed
+                    clearTimeout(loadingTimeout);
                 } else {
+                    clearTimeout(loadingTimeout);
                     setIsLoading(false);
                 }
 
@@ -272,6 +283,7 @@ const App: React.FC = () => {
 
         return () => {
             authSubscription?.unsubscribe();
+            clearTimeout(loadingTimeout);
         };
     }, []);
 

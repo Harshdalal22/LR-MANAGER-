@@ -219,7 +219,7 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const addItem = () => {
         setFormData(prev => ({
             ...prev,
-            items: [...prev.items, { description: '', pcs: 0, weight: 0, chargedWeight: 0, packingDetails: '', rate: 0, unit: 'Kg', hsn: prev.hsnCode || '996511' }]
+            items: [...prev.items, { description: '', pcs: 0, weight: 0, chargedWeight: 0, packingDetails: '', rate: 0, unit: 'Kg', hsn: prev.hsnCode || '' }]
         }));
     };
 

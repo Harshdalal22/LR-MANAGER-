@@ -141,11 +141,9 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
         <div
             ref={ref}
             className={`printable-area bg-white text-slate-900 font-sans mx-auto border-2 border-slate-900 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
-            style={{ boxSizing: 'border-box' }}
         >
             {/* Top Company Header & LR Document Details */}
             <div className="flex flex-row justify-between items-start border-b-2 border-slate-900 pb-2 gap-3">
-                {/* Left: Company Branding & Details */}
                 <div className="flex-1">
                     <div className="flex items-start gap-2.5">
                         {companyDetails.logoUrl && (
@@ -157,24 +155,24 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         )}
                         <div>
                             <h1 className="font-black text-[#0b192c] text-[21px] uppercase tracking-tight leading-tight">
-                                {companyDetails.name || 'SPEEDWAY LOGISTICS CO.'}
+                                {companyDetails.name || ''}
                             </h1>
                             <p className="text-[9.5px] font-semibold text-slate-600">
-                                {companyDetails.tagline || 'Fleet Owners, Heavy Transport Contractors & Logistics Consultants'}
+                                {companyDetails.tagline || ''}
                             </p>
                         </div>
                     </div>
 
                     <div className="mt-1.5 space-y-0.5 text-[8.5px] text-slate-700">
                         <p className="leading-tight font-medium">
-                            <span className="font-bold text-slate-900">Regd Off:</span> {companyDetails.address || '42/B, Transport Nagar, GT Road, Rohtak, Haryana - 124001'}
+                            {companyDetails.address && <><span className="font-bold text-slate-900">Regd Off:</span> {companyDetails.address}</>}
                             {companyDetails.jurisdictionCity ? ` • Sub to ${companyDetails.jurisdictionCity} Jurisdiction` : ''}
                         </p>
-                        {showCompanyDetails && (
+                        {showCompanyDetails && companyDetails.gstn && (
                             <p className="font-semibold text-slate-800">
-                                <span className="font-bold text-slate-900">GSTIN:</span> <span className="font-mono font-bold text-slate-900">{companyDetails.gstn || '06AAACS1234F1Z5'}</span>
+                                <span className="font-bold text-slate-900">GSTIN:</span> <span className="font-mono font-bold text-slate-900">{companyDetails.gstn}</span>
                                 {companyDetails.pan && <> • <span className="font-bold text-slate-900">PAN:</span> <span className="font-mono font-bold text-slate-900">{companyDetails.pan}</span></>}
-                                <> • <span className="font-bold text-slate-900">State Code:</span> <span className="font-mono font-bold text-slate-900">{getStateCodeFromGst(companyDetails.gstn) || '06'}</span></>
+                                <> • <span className="font-bold text-slate-900">State Code:</span> <span className="font-mono font-bold text-slate-900">{getStateCodeFromGst(companyDetails.gstn) || '--'}</span></>
                             </p>
                         )}
                         <p className="text-slate-600">
@@ -204,7 +202,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         <div className="flex justify-between items-center">
                             <span className="text-slate-600 font-semibold">LR / Bilty No:</span>
                             <span className="font-mono font-black text-[11px] text-blue-800">
-                                {lr.lrNo || 'SWL-2026-0892'}
+                                {lr.lrNo || '--'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
@@ -214,20 +212,20 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         <div className="flex justify-between items-center">
                             <span className="text-slate-600 font-semibold">E-Way Bill No:</span>
                             <span className="font-mono font-bold text-slate-900">
-                                {lr.ewayBillNo || '5819 2840 1928'}
+                                {lr.ewayBillNo || '--'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
                             <span className="text-slate-600 font-semibold">EWB Valid Upto:</span>
                             <span className="font-bold text-slate-900">
-                                {lr.ewayExDate ? formatDisplayDate(lr.ewayExDate) : (lr.ewayBillDate ? formatDisplayDate(lr.ewayBillDate) : '02-Sep-2026 (23:59)')}
+                                {lr.ewayExDate ? formatDisplayDate(lr.ewayExDate) : (lr.ewayBillDate ? formatDisplayDate(lr.ewayBillDate) : '--')}
                             </span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Dark Navy Route & Vehicle Ribbon (Exact match to reference) */}
+            {/* Dark Navy Route & Vehicle Ribbon */}
             <div className="bg-[#0b192c] text-white flex justify-between items-center px-3 py-1.5 my-1.5 rounded-xs">
                 {/* Left: Origin -> Destination */}
                 <div className="flex items-center gap-3">
@@ -236,7 +234,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             SOURCE • ORIGIN
                         </span>
                         <span className="font-black text-[11px] uppercase tracking-wide text-white">
-                            {lr.fromPlace || 'GURGAON (HR)'}
+                            {lr.fromPlace || '--'}
                         </span>
                     </div>
                     
@@ -247,7 +245,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             DESTINATION • DELIVERY POINT
                         </span>
                         <span className="font-black text-[11px] uppercase tracking-wide text-white">
-                            {lr.toPlace || 'MUMBAI (MH)'}
+                            {lr.toPlace || '--'}
                         </span>
                     </div>
                 </div>
@@ -258,10 +256,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         VEHICLE & DRIVER DETAILS
                     </span>
                     <span className="font-mono font-black text-[10px] text-white uppercase block">
-                        {lr.truckNo || 'HR-12-AU-2864'} {vehicleType ? `• ${vehicleType}` : '• 32 Ft MXL'}
+                        {lr.truckNo || '--'} {vehicleType ? `• ${vehicleType}` : ''}
                     </span>
                     <span className="text-slate-300 text-[8px] font-medium block">
-                        Driver: {driverName || 'Rajesh Kumar'} {driverContact ? `(+91 ${driverContact.replace(/[^0-9]/g, '')})` : '(+91 98765 43210)'}
+                        Driver: {driverName || '--'} {driverContact ? `(+91 ${driverContact.replace(/[^0-9]/g, '')})` : ''}
                     </span>
                 </div>
             </div>
@@ -277,22 +275,22 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </span>
                     </div>
                     <h3 className="font-black text-[10.5px] text-slate-900 uppercase leading-tight">
-                        {lr.consignor?.name || 'APEX AUTOMOTIVE COMPONENTS PVT LTD'}
+                        {lr.consignor?.name || '--'}
                     </h3>
                     <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
-                        {lr.consignor?.address || 'Plot No. 104, Sector 8, IMT Manesar, Gurugram, HR - 122051'}
+                        {lr.consignor?.address || '--'}
                         {lr.consignor?.city && !lr.consignor?.address?.includes(lr.consignor.city) ? `, ${lr.consignor.city}` : ''}
                     </p>
                     <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
                         <p>
                             <span className="font-bold text-slate-700">GSTIN:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consignorGst || '06AAACA5566G1Z2'}</span>
+                            <span className="font-mono font-bold text-slate-900">{consignorGst || '--'}</span>
                             {' • '}<span className="font-bold text-slate-700">State Code:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consignorStateCode || '06'}</span>
+                            <span className="font-mono font-bold text-slate-900">{consignorStateCode || '--'}</span>
                         </p>
                         <p>
                             <span className="font-bold text-slate-700">Contact:</span>{' '}
-                            <span className="text-slate-800 font-medium">{lr.consignor?.contact || 'Vikas Sharma (+91 94160 11223)'}</span>
+                            <span className="text-slate-800 font-medium">{lr.consignor?.contact || '--'}</span>
                             {lr.invoiceNo && <> • <span className="font-bold text-slate-700">Inv No:</span> <span className="font-mono font-bold text-slate-900">{lr.invoiceNo}</span></>}
                         </p>
                     </div>
@@ -307,22 +305,22 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </span>
                     </div>
                     <h3 className="font-black text-[10.5px] text-slate-900 uppercase leading-tight">
-                        {lr.consignee?.name || 'MAHARASHTRA AUTO ENGINES LTD'}
+                        {lr.consignee?.name || '--'}
                     </h3>
                     <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
-                        {lr.consignee?.address || 'Gate 3, MIDC Industrial Area, Chakan, Pune, MH - 410501'}
+                        {lr.consignee?.address || '--'}
                         {lr.consignee?.city && !lr.consignee?.address?.includes(lr.consignee.city) ? `, ${lr.consignee.city}` : ''}
                     </p>
                     <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
                         <p>
                             <span className="font-bold text-slate-700">GSTIN:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consigneeGst || '27AABCM7788P1Z9'}</span>
+                            <span className="font-mono font-bold text-slate-900">{consigneeGst || '--'}</span>
                             {' • '}<span className="font-bold text-slate-700">State Code:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consigneeStateCode || '27'}</span>
+                            <span className="font-mono font-bold text-slate-900">{consigneeStateCode || '--'}</span>
                         </p>
                         <p>
                             <span className="font-bold text-slate-700">Contact:</span>{' '}
-                            <span className="text-slate-800 font-medium">{lr.consignee?.contact || 'Receiving Incharge (+91 98220 99887)'}</span>
+                            <span className="text-slate-800 font-medium">{lr.consignee?.contact || '--'}</span>
                             {lr.poNo && <> • <span className="font-bold text-slate-700">PO No:</span> <span className="font-mono font-bold text-slate-900">{lr.poNo}</span></>}
                         </p>
                     </div>
@@ -368,13 +366,13 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                         {item.pcs > 0 ? `${item.pcs} ${item.packingDetails || 'Pkgs'}` : (item.packingDetails ? item.packingDetails : '--')}
                                     </td>
                                     <td className="p-1 border-r border-slate-200 align-top">
-                                        <div className="font-black text-slate-900 uppercase">{item.description || '---'}</div>
+                                        <div className="font-black text-slate-900 uppercase">{item.description || '--'}</div>
                                         {item.packingDetails && (
                                             <div className="text-[7.5px] text-slate-500 font-medium">Packing: {item.packingDetails}</div>
                                         )}
                                     </td>
                                     <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">
-                                        {item.hsn || lr.hsnCode || companyDetails.sacCode || '996511'}
+                                        {item.hsn || lr.hsnCode || companyDetails.sacCode || '--'}
                                     </td>
                                     <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">
                                         {Number(item.weight) > 0 
@@ -394,44 +392,27 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                 </tr>
                             ))
                         ) : (
-                            <>
-                                <tr className="hover:bg-slate-50">
-                                    <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">1</td>
-                                    <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">140 Boxes</td>
-                                    <td className="p-1 border-r border-slate-200 align-top">
-                                        <div className="font-black text-slate-900 uppercase">High Precision Engine Gaskets & Auto Parts</div>
-                                        <div className="text-[7.5px] text-slate-500 font-medium">Dimension: Corrugated Master Cartons (Marks: AAC-MH-01 to 140)</div>
-                                    </td>
-                                    <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">87082900</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">4,250 Kg</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">4,500 Kg</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 align-top">₹ 7.50 / Kg</td>
-                                </tr>
-                                <tr className="hover:bg-slate-50">
-                                    <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">2</td>
-                                    <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">40 Drums</td>
-                                    <td className="p-1 border-r border-slate-200 align-top">
-                                        <div className="font-black text-slate-900 uppercase">Synthetic Engine Lubricants & Coolant Fluid</div>
-                                        <div className="text-[7.5px] text-slate-500 font-medium">Packing: 50L Steel Barrels • Handle with Care</div>
-                                    </td>
-                                    <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">27101980</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">2,100 Kg</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">2,200 Kg</td>
-                                    <td className="p-1 text-right font-bold text-slate-900 align-top">₹ 8.00 / Kg</td>
-                                </tr>
-                            </>
+                            <tr className="hover:bg-slate-50">
+                                <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">1</td>
+                                <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
+                                <td className="p-1 border-r border-slate-200 align-top font-black text-slate-900 uppercase">--</td>
+                                <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">--</td>
+                                <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
+                                <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
+                                <td className="p-1 text-right font-bold text-slate-900 align-top">--</td>
+                            </tr>
                         )}
 
                         {/* Summary Total Row */}
                         <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-800 text-[8.5px]">
                             <td className="p-1 text-center border-r border-slate-300">•</td>
                             <td className="p-1 text-center font-black border-r border-slate-300">
-                                {totalPcs > 0 ? `${totalPcs} Total` : '180 Total'}
+                                {totalPcs > 0 ? `${totalPcs} Total` : '--'}
                             </td>
                             <td className="p-1 font-black border-r border-slate-300">Total Quantities Dispatched (Said to Contain)</td>
                             <td className="p-1 text-center border-r border-slate-300">--</td>
-                            <td className="p-1 text-right font-black border-r border-slate-300">{totalActualWeight !== '--' ? totalActualWeight : '6,350 Kg'}</td>
-                            <td className="p-1 text-right font-black border-r border-slate-300">{totalChargedWeight !== '--' ? totalChargedWeight : '6,700 Kg'}</td>
+                            <td className="p-1 text-right font-black border-r border-slate-300">{totalActualWeight}</td>
+                            <td className="p-1 text-right font-black border-r border-slate-300">{totalChargedWeight}</td>
                             <td className="p-1 text-right">--</td>
                         </tr>
                     </tbody>
@@ -447,54 +428,41 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             GST & STATUTORY COMPLIANCE DETAILS
                         </div>
 
-                        {/* GST on Freight Liability Banner (RCM / FCM 18% / FCM 12% / BOTH / Exempted) */}
-                        <div className={`mt-1 p-1.5 rounded-xs border ${
-                            detectedLiability === 'BOTH_5_18' ? 'border-indigo-300 bg-indigo-50/50' : 'border-slate-300 bg-slate-50/60'
-                        }`}>
-                            <div className="font-black text-[8px] uppercase flex items-center justify-between">
-                                <span className="text-slate-900">
-                                    GST on Freight Liability ({
-                                        detectedLiability === 'BOTH_5_18' ? 'RCM 5% & FCM 18%' :
-                                        detectedLiability === 'FCM_18' || detectedLiability === 'FCM_12' ? 'FCM' :
-                                        detectedLiability === 'EXEMPTED' ? 'EXEMPT' : 'RCM'
-                                    }):{' '}
-                                    <span className={`font-black ${
-                                        detectedLiability === 'BOTH_5_18' ? 'text-indigo-800' :
-                                        detectedLiability === 'FCM_18' ? 'text-emerald-700' :
-                                        detectedLiability === 'FCM_12' ? 'text-teal-700' :
-                                        detectedLiability === 'EXEMPTED' ? 'text-slate-700' :
-                                        'text-blue-700'
-                                    }`}>
-                                        {detectedLiability === 'BOTH_5_18' ? 'DUAL STATUTORY COMPLIANCE (RCM 5% & FCM 18%)' :
-                                         detectedLiability === 'FCM_18' ? 'FORWARD CHARGE APPLICABLE (18%)' :
-                                         detectedLiability === 'FCM_12' ? 'FORWARD CHARGE APPLICABLE (12%)' :
-                                         detectedLiability === 'EXEMPTED' ? 'EXEMPTED FROM GST' :
-                                         'REVERSE CHARGE APPLICABLE'}
-                                    </span>
+                        {/* GST on Freight Liability - Shows BOTH RCM and FCM clearly */}
+                        <div className="mt-1 p-1.5 rounded-xs border border-indigo-200 bg-indigo-50/40 space-y-1 text-[7.5px]">
+                            {/* RCM Row */}
+                            <div className="flex items-start justify-between border-b border-indigo-100 pb-1">
+                                <div>
+                                    <span className="font-bold text-indigo-900 uppercase">GST on Freight (RCM): </span>
+                                    <span className="font-black text-blue-800">REVERSE CHARGE APPLICABLE @ 5%</span>
+                                    <p className="text-slate-600 text-[7px] leading-tight">Tax payable by Consignor / Consignee under Notif. No. 11/2017-CT(R) & 13/2017-CT(R).</p>
+                                </div>
+                                <span className="font-mono font-bold text-blue-900 text-[8px] bg-blue-100 px-1.5 py-0.5 rounded-xs shrink-0 ml-1">
+                                    5% RCM
                                 </span>
                             </div>
-                            <p className="text-[7.5px] text-slate-700 leading-tight mt-0.5">
-                                {detectedLiability === 'BOTH_5_18'
-                                    ? '• RCM @ 5%: Payable by Consignor / Consignee under Notif. 11/2017-CT(R) & 13/2017-CT(R). OR • FCM @ 18%: Payable by Transporter under Notif. 05/2022-CT(R) (with Full Input Tax Credit).'
-                                    : detectedLiability === 'FCM_18'
-                                    ? 'As per Notification No. 11/2017-CT(R) / 05/2022-CT(R), Goods Transport Agency (GTA) services tax liability @ 18% is payable by Transporter under Forward Charge Mechanism (with full Input Tax Credit).'
-                                    : detectedLiability === 'FCM_12'
-                                    ? 'As per Notification No. 11/2017-CT(R) / 05/2022-CT(R), Goods Transport Agency (GTA) services tax liability @ 12% is payable by Transporter under Forward Charge Mechanism (with ITC).'
-                                    : detectedLiability === 'EXEMPTED'
-                                    ? 'Applicable under Notification No. 12/2017-Central Tax (Rate), Goods Transport Agency (GTA) freight charges are exempt from GST.'
-                                    : 'As per Notification No. 11/2017-CT(R) / 13/2017-CT(R), Goods Transport Agency (GTA) services tax liability is payable under Reverse Charge Mechanism (RCM @ 5%) by the Consignor / Consignee.'}
-                            </p>
+                            {/* FCM Row */}
+                            <div className="flex items-start justify-between pt-0.5">
+                                <div>
+                                    <span className="font-bold text-indigo-900 uppercase">GST on Freight (FCM): </span>
+                                    <span className="font-black text-emerald-800">FORWARD CHARGE APPLICABLE @ 18%</span>
+                                    <p className="text-slate-600 text-[7px] leading-tight">Tax payable by Transporter/GTA under Notif. No. 05/2022-CT(R) with Full ITC.</p>
+                                </div>
+                                <span className="font-mono font-bold text-emerald-900 text-[8px] bg-emerald-100 px-1.5 py-0.5 rounded-xs shrink-0 ml-1">
+                                    18% FCM
+                                </span>
+                            </div>
                         </div>
 
                         {/* Declared Value & Insurance */}
                         <div className="mt-1 text-[8px] space-y-0.5 border border-slate-200 p-1 rounded-xs bg-slate-50/30">
                             <p>
-                                <span className="font-bold text-slate-800">Declared Value of Goods:</span> <span className="font-bold text-slate-900">{declaredValue !== 'As per Invoice' ? declaredValue : '₹ 14,85,000/-'}</span>
+                                <span className="font-bold text-slate-800">Declared Value of Goods:</span> <span className="font-bold text-slate-900">{declaredValue}</span>
                                 <> • <span className="font-bold text-slate-800">Transit Risk:</span> <span className="font-medium text-slate-900">{transitRisk}</span></>
                             </p>
                             <p className="text-slate-700">
-                                <span className="font-bold text-slate-800">Insurance Policy No:</span> {insurancePolicy !== 'Not Insured / Customer Declaration' ? insurancePolicy : 'ICICI-LOMB-77210940'}
-                                <> • <span className="font-bold text-slate-800">Insurer:</span> {insuranceCompany !== 'Carrier Not Insurer' ? insuranceCompany : 'ICICI Lombard GIC Ltd.'}</>
+                                <span className="font-bold text-slate-800">Insurance Policy No:</span> {insurancePolicy}
+                                <> • <span className="font-bold text-slate-800">Insurer:</span> {insuranceCompany}</>
                             </p>
                         </div>
 
@@ -536,12 +504,12 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             ) : (
                                 <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
                             )}
-                            <span className="font-bold text-slate-900">For {companyDetails.name || 'Speedway Logistics Co.'}</span>
+                            <span className="font-bold text-slate-900">For {companyDetails.name || ''}</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Right 5 Columns: FINANCIAL CHARGES & NET PAYABLE (Exact match to reference) */}
+                {/* Right 5 Columns: FINANCIAL CHARGES & NET PAYABLE */}
                 <div className="col-span-5 border border-slate-800 rounded-xs bg-white overflow-hidden shadow-xs">
                     <div className="flex justify-between items-center p-1.5 bg-slate-100/90 border-b border-slate-300 text-[8.5px]">
                         <span className="text-slate-600 font-bold uppercase">Freight Basis:</span>
@@ -553,57 +521,47 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                     <div className="divide-y divide-slate-200 text-[8.5px]">
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">Basic Freight (Charged Wt):</span>
-                            <span className="font-mono text-slate-900 font-bold">{showAmounts ? (basicFreight > 0 ? formatINR(basicFreight) : '₹ 51,350.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-900 font-bold">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">Loading & Handling Hamali:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? (hamali > 0 ? formatINR(hamali) : '₹ 1,200.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">Door Pickup & Delivery:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? (doorDelivery > 0 ? formatINR(doorDelivery) : '₹ 2,500.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">Statistical & LR Surcharge:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? (statistical > 0 ? formatINR(statistical) : '₹ 150.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">Toll & Green Tax Surcharge:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? (tollTax > 0 ? formatINR(tollTax) : '₹ 1,800.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
                         </div>
 
-                        {/* GST on Freight Row */}
+                        {/* GST on Freight Row (Shows RCM 5% and FCM 18%) */}
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">
-                                {detectedLiability === 'BOTH_5_18' ? 'GST on Freight (5% RCM / 18% FCM):' :
-                                 detectedLiability === 'FCM_18' ? 'GST on Freight (18% FCM):' :
-                                 detectedLiability === 'FCM_12' ? 'GST on Freight (12% FCM):' :
-                                 detectedLiability === 'EXEMPTED' ? 'GST on Freight (Exempt):' :
-                                 'GST on Freight (5% RCM):'}
+                                GST on Freight (5% RCM / 18% FCM):
                             </span>
                             <span className="font-mono text-slate-800 font-bold">
-                                {detectedLiability === 'BOTH_5_18'
-                                    ? (showAmounts ? `₹ 0.00 (RCM) | ${formatINR((basicFreight || 51350) * 0.18)} (18%)` : '₹ 0.00 / 18%')
-                                    : detectedLiability === 'FCM_18'
-                                    ? (showAmounts ? formatINR((basicFreight || 51350) * 0.18) : '₹ 0.00')
-                                    : detectedLiability === 'FCM_12'
-                                    ? (showAmounts ? formatINR((basicFreight || 51350) * 0.12) : '₹ 0.00')
-                                    : detectedLiability === 'EXEMPTED'
-                                    ? '₹ 0.00 (Exempt)'
-                                    : '₹ 0.00 (by Recipient)'}
+                                {showAmounts 
+                                    ? `₹ 0.00 (RCM) | ${formatINR(basicFreight * 0.18)} (18% FCM)` 
+                                    : '₹ 0.00'}
                             </span>
                         </div>
 
                         {/* Total Freight Amount Bar */}
                         <div className="flex justify-between items-center p-1.5 bg-[#0b192c] text-white font-black text-[9.5px]">
                             <span>TOTAL FREIGHT AMOUNT:</span>
-                            <span className="font-mono text-[10.5px]">{showAmounts ? (totalFreight > 0 ? formatINR(totalFreight) : '₹ 57,000.00') : '₹ 0.00'}</span>
+                            <span className="font-mono text-[10.5px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Advance Paid */}
                         <div className="flex justify-between p-1 bg-slate-50 text-emerald-800 font-bold">
                             <span>Advance Paid (by Cash/Online):</span>
-                            <span className="font-mono font-black">(-) {showAmounts ? (advancePaid > 0 ? formatINR(advancePaid) : '₹ 15,000.00') : '₹ 0.00'}</span>
+                            <span className="font-mono font-black">(-) {showAmounts ? formatINR(advancePaid) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Net Balance To Pay */}
@@ -612,7 +570,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                 NET BALANCE TO PAY:
                             </span>
                             <span className="font-mono font-black text-sm text-blue-900">
-                                {showAmounts ? (netBalanceToPay > 0 ? formatINR(netBalanceToPay) : '₹ 42,000.00') : '₹ 0.00'}
+                                {showAmounts ? formatINR(netBalanceToPay) : '₹ 0.00'}
                             </span>
                         </div>
                     </div>

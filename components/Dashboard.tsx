@@ -116,6 +116,7 @@ export interface LRFinancials {
     receivedAmount: number;
     pendingAmount: number;
     isFullyPaid: boolean;
+    hasInvoice: boolean;
     freightBasis: 'PAID' | 'TO PAY' | 'TO BE BILLED';
     debtorType: 'Consignor' | 'Consignee' | 'Billing Party';
     debtorName: string;
@@ -151,17 +152,22 @@ export const getLRFinancials = (lr: LorryReceipt): LRFinancials => {
         freightBasis = 'TO PAY';
     }
 
+    // Check if transporter invoice has been generated for this LR
+    const hasInvoice = Boolean(lr.isInvoiceGenerated === true || lr.isInvoiceGenerated === ('true' as any));
+
     let receivedAmount = 0;
     let pendingAmount = 0;
 
     if (isCancelled) {
         receivedAmount = 0;
         pendingAmount = 0;
-    } else if (freightBasis === 'PAID') {
+    } else if (hasInvoice || freightBasis === 'PAID') {
+        // Jis LR ka invoice ban gaya ho uski bhi payment received ho chuki hai, ya fir PAID basis ho
         receivedAmount = totalFreight > 0 ? totalFreight : advancePaid;
         pendingAmount = 0;
     } else {
-        // TO PAY or TO BE BILLED
+        // Non-invoiced TO PAY ya TO BE BILLED:
+        // Jo advance aayi ho wo received amount me aayegi, baaki remaining pending me
         receivedAmount = Math.min(totalFreight, advancePaid);
         pendingAmount = Math.max(0, totalFreight - advancePaid);
     }
@@ -191,6 +197,7 @@ export const getLRFinancials = (lr: LorryReceipt): LRFinancials => {
         receivedAmount,
         pendingAmount,
         isFullyPaid: pendingAmount === 0,
+        hasInvoice,
         freightBasis,
         debtorType,
         debtorName,
@@ -237,12 +244,16 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
         let received = 0;
         let pending = 0;
         let totalFreight = 0;
+        let dayAdvance = 0;
+        let dayInvoicedCount = 0;
 
         dayLRs.forEach(lr => {
             const fin = getLRFinancials(lr);
             received += fin.receivedAmount;
             pending += fin.pendingAmount;
             totalFreight += fin.totalFreight;
+            dayAdvance += fin.advancePaid;
+            if (fin.hasInvoice) dayInvoicedCount++;
         });
 
         return {
@@ -252,7 +263,9 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
             delivered,
             received,
             pending,
-            totalFreight
+            totalFreight,
+            dayAdvance,
+            dayInvoicedCount
         };
     });
 
@@ -260,6 +273,8 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
     const allFinancials = lorryReceipts.map(getLRFinancials);
     const totalReceivedAll = allFinancials.reduce((sum, f) => sum + f.receivedAmount, 0);
     const totalPendingAll = allFinancials.reduce((sum, f) => sum + f.pendingAmount, 0);
+    const totalAdvanceCollected = allFinancials.reduce((sum, f) => sum + f.advancePaid, 0);
+    const invoicedLRsCount = lorryReceipts.filter(lr => Boolean(lr.isInvoiceGenerated) && lr.status !== 'Cancelled').length;
     const totalDeliveredAll = lorryReceipts.filter(lr => lr.status === 'Delivered').length;
     const activeLRsCount = lorryReceipts.filter(lr => lr.status !== 'Cancelled').length;
     const completionRate = activeLRsCount > 0 ? Math.round((totalDeliveredAll / activeLRsCount) * 100) : 0;
@@ -380,8 +395,14 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-black text-emerald-300 mt-1 tracking-tight">
                         ₹ {totalReceivedAll.toLocaleString('en-IN')}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-emerald-400/80 font-medium mt-0.5">
-                        Real-time Settled & Advance
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10px] sm:text-xs text-emerald-400/90 font-semibold mt-1">
+                        <span>Adv: ₹{totalAdvanceCollected.toLocaleString('en-IN')}</span>
+                        {invoicedLRsCount > 0 && (
+                            <>
+                                <span>•</span>
+                                <span>{invoicedLRsCount} Invoiced Paid</span>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -396,8 +417,8 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     <div className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-black text-rose-300 mt-1 tracking-tight">
                         ₹ {totalPendingAll.toLocaleString('en-IN')}
                     </div>
-                    <div className="text-[10px] sm:text-xs text-rose-400/80 font-medium mt-0.5">
-                        {allFinancials.filter(f => f.pendingAmount > 0).length} LRs To Collect
+                    <div className="text-[10px] sm:text-xs text-rose-400/90 font-medium mt-1">
+                        {allFinancials.filter(f => f.pendingAmount > 0).length} Uninvoiced Dues
                     </div>
                 </div>
             </div>
@@ -552,7 +573,7 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                     <div className="font-black text-cyan-400">
                         {activeDay.label} ({activeDay.dateFormatted}):
                     </div>
-                    <div className="flex items-center gap-3 sm:gap-4 text-xs lg:text-sm font-semibold">
+                    <div className="flex items-center gap-3 sm:gap-4 text-xs lg:text-sm font-semibold flex-wrap">
                         <span className="text-slate-300">
                             <strong className="text-white font-black">{activeDay.volume}</strong> LRs Booked
                         </span>
@@ -563,6 +584,9 @@ const WeeklyTrendGlassChart: React.FC<{ lorryReceipts: LorryReceipt[] }> = ({ lo
                         <span className="text-slate-500">•</span>
                         <span className="text-emerald-400 font-black">
                             Recd: ₹{activeDay.received.toLocaleString('en-IN')}
+                            <span className="text-[10px] text-emerald-300/80 font-normal ml-1">
+                                (Adv: ₹{activeDay.dayAdvance.toLocaleString('en-IN')}{activeDay.dayInvoicedCount > 0 ? ` + ${activeDay.dayInvoicedCount} Inv` : ''})
+                            </span>
                         </span>
                         <span className="text-slate-500">•</span>
                         <span className="text-rose-400 font-black">

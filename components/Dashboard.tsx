@@ -737,7 +737,193 @@ const Dashboard: React.FC<DashboardProps> = ({
     const visiblePending = showAllPending ? filteredPending : filteredPending.slice(0, 6);
 
     // Default to 'lr' view if activeSection is null or 'lr'
-    const isLRSectionActive = activeSection === 'lr' || activeSection === null;
+    const isLRSectionActive = activeSection === 'lr';
+
+    // ─── HOME SCREEN (shown when no section is selected) ─────────────────────
+    if (activeSection === null) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 animate-fadeIn"
+                style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f2027 100%)' }}>
+
+                {/* Ambient glow orbs */}
+                <div className="fixed top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="fixed bottom-1/4 -right-32 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                {/* Header Badge */}
+                <div className="mb-3 flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
+                    <span className="text-xs font-black text-white/80 uppercase tracking-widest">
+                        {isHi ? 'बिल्टी बुक • लाइव' : 'Bilty Book • Live'}
+                    </span>
+                </div>
+
+                {/* Main Title */}
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white text-center tracking-tight mb-2"
+                    style={{ textShadow: '0 0 60px rgba(99,179,237,0.4)' }}>
+                    {isHi ? 'नमस्ते 👋' : 'Welcome Back 👋'}
+                </h1>
+                <p className="text-slate-400 text-sm sm:text-base font-medium mb-12 text-center max-w-sm">
+                    {isHi ? 'आप क्या प्रबंधित करना चाहते हैं?' : 'What would you like to manage today?'}
+                </p>
+
+                {/* 3D Module Tiles */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-3xl">
+
+                    {/* ── TILE 1: LR MANAGEMENT ── */}
+                    <button
+                        type="button"
+                        onClick={() => setActiveSection('lr')}
+                        className="group relative overflow-hidden rounded-3xl p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer focus:outline-none"
+                        style={{
+                            background: 'linear-gradient(145deg, #1a3a6b 0%, #0f2a56 50%, #091d3e 100%)',
+                            boxShadow: '0 30px 60px -10px rgba(15,42,86,0.7), inset 0 2px 0 rgba(255,255,255,0.15), inset 0 -4px 0 rgba(0,0,0,0.4)',
+                            border: '1px solid rgba(99,179,237,0.25)'
+                        }}
+                    >
+                        {/* Glossy top highlight */}
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent" />
+                        <div className="absolute inset-x-4 top-0 h-16 bg-white/5 rounded-b-full blur-xl" />
+
+                        {/* Animated grid pattern */}
+                        <div className="absolute inset-0 opacity-[0.04]"
+                            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+
+                        {/* 3D Icon Container */}
+                        <div className="relative mb-6">
+                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center relative"
+                                style={{
+                                    background: 'linear-gradient(145deg, #3b82f6, #1d4ed8)',
+                                    boxShadow: '0 12px 24px rgba(29,78,216,0.5), inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4)',
+                                    transform: 'perspective(200px) rotateX(8deg)'
+                                }}>
+                                {/* Truck SVG — 3D rendered */}
+                                <svg className="w-10 h-10 drop-shadow-lg" viewBox="0 0 24 24" fill="none">
+                                    <path d="M1 3h15v13H1z" fill="rgba(255,255,255,0.9)" rx="1" />
+                                    <path d="M16 8h4l3 4v4h-7V8z" fill="rgba(255,255,255,0.7)" />
+                                    <circle cx="5.5" cy="18.5" r="2.5" fill="white" />
+                                    <circle cx="18.5" cy="18.5" r="2.5" fill="white" />
+                                    <path d="M1 3h15v13H1z" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5" />
+                                    {/* Windshield shine */}
+                                    <path d="M17 9h3l2 3h-5V9z" fill="rgba(147,210,255,0.6)" />
+                                </svg>
+                                {/* Top shine */}
+                                <div className="absolute inset-x-2 top-1 h-4 bg-white/20 rounded-full blur-sm" />
+                            </div>
+                            {/* Float ring */}
+                            <div className="absolute -inset-2 rounded-3xl border border-blue-400/20 group-hover:border-blue-400/40 transition-all duration-300" />
+                        </div>
+
+                        {/* Text */}
+                        <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
+                            {isHi ? 'LR प्रबंधन' : 'LR Management'}
+                        </h2>
+                        <p className="text-blue-300/80 text-sm font-medium leading-relaxed mb-6">
+                            {isHi
+                                ? 'लॉरी रसीद बनाएं, ट्रैक करें, इनवॉइस और भुगतान प्रबंधित करें'
+                                : 'Create bilties, track shipments, manage invoices & collections'}
+                        </p>
+
+                        {/* Stats pills */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-500/20 text-blue-200 border border-blue-400/20">
+                                {totalLRs} {isHi ? 'कुल LRs' : 'Total LRs'}
+                            </span>
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/20">
+                                {statusCounts['In Transit'] || 0} {isHi ? 'रास्ते में' : 'In Transit'}
+                            </span>
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="absolute bottom-8 right-8 w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center group-hover:bg-blue-500/40 group-hover:translate-x-1 transition-all duration-300">
+                            <svg className="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </div>
+                    </button>
+
+                    {/* ── TILE 2: DATA MANAGEMENT ── */}
+                    <button
+                        type="button"
+                        onClick={() => setCurrentView('data-management')}
+                        className="group relative overflow-hidden rounded-3xl p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer focus:outline-none"
+                        style={{
+                            background: 'linear-gradient(145deg, #1a3d2b 0%, #0f2b1c 50%, #071a10 100%)',
+                            boxShadow: '0 30px 60px -10px rgba(15,43,28,0.7), inset 0 2px 0 rgba(255,255,255,0.12), inset 0 -4px 0 rgba(0,0,0,0.4)',
+                            border: '1px solid rgba(52,211,153,0.2)'
+                        }}
+                    >
+                        {/* Glossy top highlight */}
+                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
+                        <div className="absolute inset-x-4 top-0 h-16 bg-white/4 rounded-b-full blur-xl" />
+
+                        {/* Animated grid pattern */}
+                        <div className="absolute inset-0 opacity-[0.04]"
+                            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+
+                        {/* 3D Icon Container */}
+                        <div className="relative mb-6">
+                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center relative"
+                                style={{
+                                    background: 'linear-gradient(145deg, #10b981, #047857)',
+                                    boxShadow: '0 12px 24px rgba(4,120,87,0.5), inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4)',
+                                    transform: 'perspective(200px) rotateX(8deg)'
+                                }}>
+                                {/* Database / Gear SVG — 3D look */}
+                                <svg className="w-10 h-10 drop-shadow-lg" viewBox="0 0 24 24" fill="none">
+                                    {/* Three stacked discs = database */}
+                                    <ellipse cx="12" cy="6" rx="8" ry="3" fill="rgba(255,255,255,0.9)" />
+                                    <path d="M4 6v4c0 1.657 3.582 3 8 3s8-1.343 8-3V6" fill="rgba(255,255,255,0.6)" />
+                                    <path d="M4 10v4c0 1.657 3.582 3 8 3s8-1.343 8-3v-4" fill="rgba(255,255,255,0.4)" />
+                                    <path d="M4 14v2c0 1.657 3.582 3 8 3s8-1.343 8-3v-2" fill="rgba(255,255,255,0.25)" />
+                                    {/* Shine on top ellipse */}
+                                    <ellipse cx="10" cy="5.5" rx="3" ry="1" fill="rgba(255,255,255,0.35)" />
+                                </svg>
+                                {/* Top shine */}
+                                <div className="absolute inset-x-2 top-1 h-4 bg-white/20 rounded-full blur-sm" />
+                            </div>
+                            {/* Float ring */}
+                            <div className="absolute -inset-2 rounded-3xl border border-emerald-400/20 group-hover:border-emerald-400/40 transition-all duration-300" />
+                        </div>
+
+                        {/* Text */}
+                        <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
+                            {isHi ? 'डेटा प्रबंधन' : 'Data Management'}
+                        </h2>
+                        <p className="text-emerald-300/80 text-sm font-medium leading-relaxed mb-6">
+                            {isHi
+                                ? 'कंपनी सेटिंग, पार्टियां, ट्रक, बुकिंग रजिस्टर और अधिक'
+                                : 'Company settings, parties, trucks, booking register & more'}
+                        </p>
+
+                        {/* Stats pills */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-200 border border-emerald-400/20">
+                                {uniqueConsignors} {isHi ? 'पार्टियां' : 'Parties'}
+                            </span>
+                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-500/20 text-teal-300 border border-teal-400/20">
+                                {isHi ? 'सेटिंग्स' : 'Settings'}
+                            </span>
+                        </div>
+
+                        {/* Arrow */}
+                        <div className="absolute bottom-8 right-8 w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center group-hover:bg-emerald-500/40 group-hover:translate-x-1 transition-all duration-300">
+                            <svg className="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                        </div>
+                    </button>
+                </div>
+
+                {/* Bottom role badge */}
+                <div className="mt-10 px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        {isHi ? `भूमिका: ${currentRole}` : `Logged in as: ${currentRole}`}
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 md:space-y-8 pb-16 animate-fadeIn">

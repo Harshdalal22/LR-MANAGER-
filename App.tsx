@@ -83,11 +83,39 @@ const defaultCompanyDetails: CompanyDetails = {
 
 const App: React.FC = () => {
     const [session, setSession] = useState<Session | null>(null);
-    const [lorryReceipts, setLorryReceipts] = useState<LorryReceipt[]>([]);
-    const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
-    const [savedTrucks, setSavedTrucks] = useState<SavedTruck[]>([]);
+    const [lorryReceipts, setLorryReceipts] = useState<LorryReceipt[]>(() => {
+        try {
+            const cached = localStorage.getItem('bilty_cached_lrs');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [savedParties, setSavedParties] = useState<SavedParty[]>(() => {
+        try {
+            const cached = localStorage.getItem('bilty_cached_parties');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
+    const [savedTrucks, setSavedTrucks] = useState<SavedTruck[]>(() => {
+        try {
+            const cached = localStorage.getItem('bilty_cached_trucks');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
     const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
-    const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(defaultCompanyDetails);
+    const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(() => {
+        try {
+            const cached = localStorage.getItem('bilty_cached_company');
+            return cached ? JSON.parse(cached) : defaultCompanyDetails;
+        } catch {
+            return defaultCompanyDetails;
+        }
+    });
     const [currentView, setCurrentView] = useState<View>('dashboard');
     const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
     const [viewHistory, setViewHistory] = useState<View[]>([]);
@@ -318,6 +346,14 @@ const App: React.FC = () => {
             if (company) setCompanyDetails(company);
             setSavedParties(parties);
             setSavedTrucks(trucks);
+            try {
+                localStorage.setItem('bilty_cached_lrs', JSON.stringify(lrs));
+                if (company) localStorage.setItem('bilty_cached_company', JSON.stringify(company));
+                localStorage.setItem('bilty_cached_parties', JSON.stringify(parties));
+                localStorage.setItem('bilty_cached_trucks', JSON.stringify(trucks));
+            } catch (cacheErr) {
+                console.warn('Failed to update localStorage caches:', cacheErr);
+            }
         } catch (error) {
             handleError(error, "Failed to load data");
         } finally {
@@ -445,16 +481,22 @@ const App: React.FC = () => {
             // Run side effects in background (don't block UI)
             Promise.all(promises).catch(err => console.error("Auto-save error:", err));
 
-            // ✅ FIX 2b: Optimistically update list in state immediately
+            // ✅ FIX 2b: Optimistically update list in state immediately and update cache
             setLorryReceipts(prev => {
                 const index = prev.findIndex(item => item.lrNo === savedLR.lrNo);
-                if (index >= 0) {
-                    const newArray = [...prev];
-                    newArray[index] = savedLR;
-                    return newArray;
-                }
-                return [savedLR, ...prev];
+                const updated = index >= 0
+                    ? prev.map((item, i) => i === index ? savedLR : item)
+                    : [savedLR, ...prev];
+                try {
+                    localStorage.setItem('bilty_cached_lrs', JSON.stringify(updated));
+                } catch (e) {}
+                return updated;
             });
+            // Clear draft cache for this LR
+            try {
+                localStorage.removeItem('bilty_lr_draft_new');
+                localStorage.removeItem(`bilty_lr_draft_edit_${savedLR.lrNo}`);
+            } catch (e) {}
             toast.success('LR Saved Successfully! ✅', { id: toastId, duration: 3000 });
             if (currentRole === 'Operator') {
                 navigateTo('dashboard');
@@ -508,7 +550,13 @@ const App: React.FC = () => {
         const toastId = toast.loading('Deleting LR...');
         try {
             await deleteLorryReceipt(lrNo);
-            setLorryReceipts(prev => prev.filter(lr => lr.lrNo !== lrNo));
+            setLorryReceipts(prev => {
+                const updated = prev.filter(lr => lr.lrNo !== lrNo);
+                try {
+                    localStorage.setItem('bilty_cached_lrs', JSON.stringify(updated));
+                } catch (e) {}
+                return updated;
+            });
             toast.success('LR Deleted', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon, DownloadIcon, WhatsAppIcon, PrintIcon } from './icons';
@@ -6,6 +6,7 @@ import { suggestLRDetails } from '../services/geminiService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
 import { getNextSequence } from '../utils/sequenceUtils';
+import { DraftIndicator } from './DraftIndicator';
 
 interface LRFormProps {
     onSave: (lr: LorryReceipt) => void;
@@ -81,24 +82,23 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [previewScale, setPreviewScale] = useState<number>(0.82);
     const [chargedWeightUnit, setChargedWeightUnit] = useState<'Kg' | 'Ton'>('Kg');
 
-    useEffect(() => {
-        if (existingLR) {
-            setFormData(existingLR);
-            if (existingLR.templateStyle) setLivePreviewTemplate(existingLR.templateStyle);
-            if (existingLR.copyType) setLivePreviewCopy(existingLR.copyType);
+    // Draft auto-save / cache state
+    const [hasDraft, setHasDraft] = useState(false);
+    const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+    const isInitialMount = useRef(true);
+    const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-            if (JSON.stringify(existingLR.billingTo) === JSON.stringify(existingLR.consignor)) {
-                setBillingPartyType('Consignor');
-            } else if (JSON.stringify(existingLR.billingTo) === JSON.stringify(existingLR.consignee)) {
-                setBillingPartyType('Consignee');
-            } else {
-                setBillingPartyType('Other');
-            }
+    const updateBillingPartyType = (lr: LorryReceipt) => {
+        if (lr.billingTo?.name && lr.consignor?.name && JSON.stringify(lr.billingTo) === JSON.stringify(lr.consignor)) {
+            setBillingPartyType('Consignor');
+        } else if (lr.billingTo?.name && lr.consignee?.name && JSON.stringify(lr.billingTo) === JSON.stringify(lr.consignee)) {
+            setBillingPartyType('Consignee');
+        } else if (lr.billingTo?.name) {
+            setBillingPartyType('Other');
         } else {
-            // Always start fresh for new LRs — no auto-populated draft data
-            resetToCleanState();
+            setBillingPartyType('Consignor');
         }
-    }, [existingLR]);
+    };
 
     const resetToCleanState = () => {
         let nextLrNo = '';
@@ -109,7 +109,139 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         setBillingPartyType('Consignor');
     };
 
-    // Draft auto-save disabled — new LRs always start clean
+    // Mount & Restore Effect: check cache if user left midway
+    useEffect(() => {
+        if (existingLR) {
+            const draftKey = `bilty_lr_draft_edit_${existingLR.lrNo}`;
+            let restored = false;
+            try {
+                const cached = localStorage.getItem(draftKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    setFormData(parsed);
+                    if (parsed.templateStyle) setLivePreviewTemplate(parsed.templateStyle);
+                    if (parsed.copyType) setLivePreviewCopy(parsed.copyType);
+                    setHasDraft(true);
+                    setDraftSavedAt(parsed._draftSavedAt ? new Date(parsed._draftSavedAt) : new Date());
+                    updateBillingPartyType(parsed);
+                    toast.success(`Unsaved draft loaded for LR #${existingLR.lrNo}`, { id: 'lr-draft-restored', duration: 2500 });
+                    restored = true;
+                }
+            } catch (e) {
+                console.error('Error reading edit LR draft:', e);
+            }
+
+            if (!restored) {
+                setFormData(existingLR);
+                if (existingLR.templateStyle) setLivePreviewTemplate(existingLR.templateStyle);
+                if (existingLR.copyType) setLivePreviewCopy(existingLR.copyType);
+                updateBillingPartyType(existingLR);
+                setHasDraft(false);
+                setDraftSavedAt(null);
+            }
+        } else {
+            // Check for new LR draft
+            const draftKey = 'bilty_lr_draft_new';
+            let restored = false;
+            try {
+                const cached = localStorage.getItem(draftKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    const hasUserContent = Boolean(
+                        parsed.truckNo ||
+                        parsed.fromPlace ||
+                        parsed.toPlace ||
+                        parsed.consignor?.name ||
+                        parsed.consignee?.name ||
+                        parsed.driverName ||
+                        parsed.freight ||
+                        (parsed.items && parsed.items.some((it: any) => it.description || it.weight || it.pcs))
+                    );
+                    if (hasUserContent) {
+                        setFormData(parsed);
+                        if (parsed.templateStyle) setLivePreviewTemplate(parsed.templateStyle);
+                        if (parsed.copyType) setLivePreviewCopy(parsed.copyType);
+                        setHasDraft(true);
+                        setDraftSavedAt(parsed._draftSavedAt ? new Date(parsed._draftSavedAt) : new Date());
+                        updateBillingPartyType(parsed);
+                        toast.success('Unsaved LR draft restored', { id: 'lr-draft-restored', duration: 2500 });
+                        restored = true;
+                    }
+                }
+            } catch (e) {
+                console.error('Error reading new LR draft:', e);
+            }
+
+            if (!restored) {
+                resetToCleanState();
+                setHasDraft(false);
+                setDraftSavedAt(null);
+            }
+        }
+    }, [existingLR]);
+
+    // Debounced Auto-save draft effect
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (saveTimerRef.current) {
+            clearTimeout(saveTimerRef.current);
+        }
+
+        saveTimerRef.current = setTimeout(() => {
+            try {
+                if (existingLR) {
+                    const hasChanges = JSON.stringify(formData) !== JSON.stringify(existingLR);
+                    const draftKey = `bilty_lr_draft_edit_${existingLR.lrNo}`;
+                    if (hasChanges) {
+                        const now = new Date();
+                        localStorage.setItem(draftKey, JSON.stringify({
+                            ...formData,
+                            templateStyle: livePreviewTemplate,
+                            copyType: livePreviewCopy,
+                            _draftSavedAt: now.toISOString()
+                        }));
+                        setHasDraft(true);
+                        setDraftSavedAt(now);
+                    }
+                } else {
+                    const hasContent = Boolean(
+                        formData.truckNo ||
+                        formData.fromPlace ||
+                        formData.toPlace ||
+                        formData.consignor?.name ||
+                        formData.consignee?.name ||
+                        formData.driverName ||
+                        formData.freight ||
+                        (formData.items && formData.items.some(it => it.description || it.weight || it.pcs))
+                    );
+                    const draftKey = 'bilty_lr_draft_new';
+                    if (hasContent) {
+                        const now = new Date();
+                        localStorage.setItem(draftKey, JSON.stringify({
+                            ...formData,
+                            templateStyle: livePreviewTemplate,
+                            copyType: livePreviewCopy,
+                            _draftSavedAt: now.toISOString()
+                        }));
+                        setHasDraft(true);
+                        setDraftSavedAt(now);
+                    }
+                }
+            } catch (err) {
+                console.warn('LR AutoSave failed:', err);
+            }
+        }, 600);
+
+        return () => {
+            if (saveTimerRef.current) {
+                clearTimeout(saveTimerRef.current);
+            }
+        };
+    }, [formData, livePreviewTemplate, livePreviewCopy, existingLR]);
 
     useEffect(() => {
         if (billingPartyType === 'Consignor') {
@@ -258,10 +390,17 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                 copyType: livePreviewCopy
             };
             await onSave(payload);
-            if (!existingLR) {
+            // Clear drafts upon successful save
+            if (existingLR) {
+                localStorage.removeItem(`bilty_lr_draft_edit_${existingLR.lrNo}`);
+            } else {
+                localStorage.removeItem('bilty_lr_draft_new');
                 localStorage.removeItem('lr_draft_data');
                 localStorage.removeItem('lr_draft_billing');
+                localStorage.removeItem('lr-draft');
             }
+            setHasDraft(false);
+            setDraftSavedAt(null);
         } catch (error) {
             console.error("Save error in LRForm:", error);
             throw error;
@@ -270,12 +409,40 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
         }
     };
 
+    // Discard Draft Handler (from DraftIndicator trash icon)
+    const handleDiscardDraft = () => {
+        if (existingLR) {
+            localStorage.removeItem(`bilty_lr_draft_edit_${existingLR.lrNo}`);
+            setFormData(existingLR);
+            updateBillingPartyType(existingLR);
+            setHasDraft(false);
+            setDraftSavedAt(null);
+            toast.success('Unsaved edits discarded');
+        } else {
+            localStorage.removeItem('bilty_lr_draft_new');
+            localStorage.removeItem('lr_draft_data');
+            localStorage.removeItem('lr_draft_billing');
+            localStorage.removeItem('lr-draft');
+            resetToCleanState();
+            setHasDraft(false);
+            setDraftSavedAt(null);
+            toast.success('Draft discarded');
+        }
+    };
+
     // Clean Fresh Reset
     const handleResetFresh = () => {
         if (window.confirm('Reset all fields to a fresh, clean LR with zero values?')) {
+            localStorage.removeItem('bilty_lr_draft_new');
             localStorage.removeItem('lr_draft_data');
             localStorage.removeItem('lr_draft_billing');
+            localStorage.removeItem('lr-draft');
+            if (existingLR) {
+                localStorage.removeItem(`bilty_lr_draft_edit_${existingLR.lrNo}`);
+            }
             resetToCleanState();
+            setHasDraft(false);
+            setDraftSavedAt(null);
             toast.success('Form reset to fresh clean state!');
         }
     };
@@ -581,6 +748,14 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
 
                     {/* Quick Action Buttons */}
                     <div className="flex items-center flex-wrap gap-2">
+                        {/* Draft indicator if draft exists */}
+                        {hasDraft && (
+                            <DraftIndicator
+                                lastSaved={draftSavedAt}
+                                onClear={handleDiscardDraft}
+                            />
+                        )}
+
                         {/* Reset / Fresh Button */}
                         <button
                             type="button"

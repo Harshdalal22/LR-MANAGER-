@@ -33,7 +33,14 @@ const initialRecord: VehicleHiringType = {
 };
 
 const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [] }) => {
-    const [records, setRecords] = useState<VehicleHiringType[]>([]);
+    const [records, setRecords] = useState<VehicleHiringType[]>(() => {
+        try {
+            const cached = localStorage.getItem('vh_cached_records');
+            return cached ? JSON.parse(cached) : [];
+        } catch {
+            return [];
+        }
+    });
     const [view, setView] = useState<'list' | 'form'>('list');
     const [formData, setFormData] = useState<VehicleHiringType>(initialRecord);
     const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +52,9 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
     const [lrSearchQuery, setLrSearchQuery] = useState('');
     const [showLrDropdown, setShowLrDropdown] = useState(false);
     const lrSearchRef = useRef<HTMLDivElement>(null);
+    // Draft state
+    const [hasVhDraft, setHasVhDraft] = useState(false);
+    const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Temp state for new payment entry
     const [newPayment, setNewPayment] = useState<PaymentRecord>({
@@ -116,6 +126,9 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
             }));
 
             setRecords(sanitizedData);
+            try {
+                localStorage.setItem('vh_cached_records', JSON.stringify(sanitizedData));
+            } catch (e) {}
         } catch (error) {
             console.error("Failed to load vehicle hirings:", error);
             const msg = getErrorMessage(error);
@@ -134,7 +147,21 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
     };
 
     const handleAddNew = () => {
-        setFormData(initialRecord);
+        let recordToUse = initialRecord;
+        let isDraft = false;
+        try {
+            const cached = localStorage.getItem('vh_draft_new');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed.grNo || parsed.lorryNo || parsed.driverNo || parsed.fromPlace || parsed.toPlace || parsed.freight) {
+                    recordToUse = parsed;
+                    isDraft = true;
+                    toast.success('Restored unsaved hiring draft', { id: 'vh-draft-restored', duration: 2500 });
+                }
+            }
+        } catch (e) {}
+        setFormData(recordToUse);
+        setHasVhDraft(isDraft);
         setLrSearchQuery('');
         setShowLrDropdown(false);
         setView('form');
@@ -165,19 +192,75 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
         : [];
 
     const handleEdit = (record: VehicleHiringType) => {
-        setFormData({
+        let recordToUse = {
             ...record,
             advances: Array.isArray(record.advances) ? record.advances : []
-        });
+        };
+        let isDraft = false;
+        try {
+            const cached = localStorage.getItem(`vh_draft_edit_${record.id}`);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                recordToUse = parsed;
+                isDraft = true;
+                toast.success('Restored unsaved edits for this record', { id: 'vh-draft-restored', duration: 2500 });
+            }
+        } catch (e) {}
+        setFormData(recordToUse);
+        setHasVhDraft(isDraft);
         setView('form');
     };
+
+    const handleDiscardVhDraft = () => {
+        if (formData.id) {
+            localStorage.removeItem(`vh_draft_edit_${formData.id}`);
+            const original = records.find(r => r.id === formData.id);
+            if (original) setFormData(original);
+        } else {
+            localStorage.removeItem('vh_draft_new');
+            setFormData(initialRecord);
+        }
+        setHasVhDraft(false);
+        toast.success('Draft discarded');
+    };
+
+    // Debounced Auto-save draft effect when filling form
+    useEffect(() => {
+        if (view !== 'form') return;
+
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+        saveTimerRef.current = setTimeout(() => {
+            try {
+                if (formData.id) {
+                    const key = `vh_draft_edit_${formData.id}`;
+                    localStorage.setItem(key, JSON.stringify(formData));
+                    setHasVhDraft(true);
+                } else {
+                    const hasContent = Boolean(formData.grNo || formData.lorryNo || formData.driverNo || formData.fromPlace || formData.toPlace || formData.freight);
+                    if (hasContent) {
+                        localStorage.setItem('vh_draft_new', JSON.stringify(formData));
+                        setHasVhDraft(true);
+                    }
+                }
+            } catch (e) {}
+        }, 600);
+
+        return () => {
+            if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        };
+    }, [formData, view]);
 
     const handleDelete = async (id: string) => {
         if (!confirm('Are you sure you want to delete this record?')) return;
         const toastId = toast.loading('Deleting...');
         try {
             await deleteVehicleHiring(id);
-            setRecords(prev => prev.filter(r => r.id !== id));
+            setRecords(prev => {
+                const updated = prev.filter(r => r.id !== id);
+                try { localStorage.setItem('vh_cached_records', JSON.stringify(updated)); } catch (e) {}
+                return updated;
+            });
             toast.success('Deleted successfully', { id: toastId });
         } catch (error) {
             toast.error(`Failed to delete: ${getErrorMessage(error)}`, { id: toastId });
@@ -202,11 +285,22 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
             };
 
             if (formData.id) {
-                setRecords(prev => prev.map(r => r.id === saved.id ? savedWithAdvances : r));
+                setRecords(prev => {
+                    const updated = prev.map(r => r.id === saved.id ? savedWithAdvances : r);
+                    try { localStorage.setItem('vh_cached_records', JSON.stringify(updated)); } catch (e) {}
+                    return updated;
+                });
+                localStorage.removeItem(`vh_draft_edit_${formData.id}`);
             } else {
-                setRecords(prev => [savedWithAdvances, ...prev]);
+                setRecords(prev => {
+                    const updated = [savedWithAdvances, ...prev];
+                    try { localStorage.setItem('vh_cached_records', JSON.stringify(updated)); } catch (e) {}
+                    return updated;
+                });
+                localStorage.removeItem('vh_draft_new');
             }
 
+            setHasVhDraft(false);
             toast.success('Saved successfully', { id: toastId });
             setView('list');
         } catch (error) {
@@ -666,6 +760,22 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
             {/* Add/Edit Form */}
             {view === 'form' && (
                 <div className="max-w-4xl mx-auto">
+                    {/* Draft bar if draft is active */}
+                    {hasVhDraft && (
+                        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-xs text-amber-800 font-semibold">
+                                <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                Unsaved draft loaded from your previous session
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleDiscardVhDraft}
+                                className="text-xs text-red-600 hover:text-red-800 font-bold px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors"
+                            >
+                                Discard Draft
+                            </button>
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit} className="space-y-6">
 
                         {/* LR Quick-Fill (only for new records) */}

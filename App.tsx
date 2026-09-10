@@ -201,21 +201,22 @@ const App: React.FC = () => {
                 setSession(currentSession);
 
                 if (currentSession) {
+                    // ✅ FIX 1: Clear loading immediately — don't wait for role check
+                    clearTimeout(loadingTimeout);
+                    setIsLoading(false);
+
+                    // Role check runs in background after UI is already unblocked
                     if (currentSession.user?.email !== 'gps@ssk.com') {
-                        try {
-                            const roleInfo = await checkOperatorRole();
+                        checkOperatorRole().then(roleInfo => {
                             if (roleInfo && !roleInfo.isAdmin) {
                                 sessionStorage.setItem('currentRole', 'Operator');
                                 sessionStorage.setItem('adminId', roleInfo.adminId);
                                 setCurrentRole('Operator');
                             }
-                        } catch (roleErr) {
+                        }).catch(roleErr => {
                             console.warn('checkOperatorRole failed, defaulting to Admin:', roleErr);
-                        }
+                        });
                     }
-                    // fetchData (triggered by session state change) will set isLoading(false)
-                    // but we also clear the safety timeout once session is confirmed
-                    clearTimeout(loadingTimeout);
                 } else {
                     clearTimeout(loadingTimeout);
                     setIsLoading(false);
@@ -223,22 +224,25 @@ const App: React.FC = () => {
 
                 const { data } = subscribeToAuthState(async (event, session) => {
                     if (session) {
-                        if (session.user?.email === 'gps@ssk.com') {
-                            setIsLoading(false);
-                        } else {
-                            const roleInfo = await checkOperatorRole();
-                            if (roleInfo && !roleInfo.isAdmin) {
-                                sessionStorage.setItem('currentRole', 'Operator');
-                                sessionStorage.setItem('adminId', roleInfo.adminId);
-                                setCurrentRole('Operator');
-                            } else if (roleInfo && roleInfo.isAdmin) {
-                                const storedRole = sessionStorage.getItem('currentRole');
-                                if (!storedRole || storedRole === 'Operator') {
-                                    sessionStorage.setItem('currentRole', 'Admin');
-                                    setCurrentRole('Admin');
+                        // ✅ FIX 1b: Unblock loading immediately, role check in background
+                        setIsLoading(false);
+
+                        if (session.user?.email !== 'gps@ssk.com') {
+                            checkOperatorRole().then(roleInfo => {
+                                if (roleInfo && !roleInfo.isAdmin) {
+                                    sessionStorage.setItem('currentRole', 'Operator');
+                                    sessionStorage.setItem('adminId', roleInfo.adminId);
+                                    setCurrentRole('Operator');
+                                } else if (roleInfo && roleInfo.isAdmin) {
+                                    const storedRole = sessionStorage.getItem('currentRole');
+                                    if (!storedRole || storedRole === 'Operator') {
+                                        sessionStorage.setItem('currentRole', 'Admin');
+                                        setCurrentRole('Admin');
+                                    }
                                 }
-                            }
-                            setIsLoading(false);
+                            }).catch(roleErr => {
+                                console.warn('checkOperatorRole (auth event) failed:', roleErr);
+                            });
                         }
                     }
 
@@ -327,6 +331,21 @@ const App: React.FC = () => {
             fetchData();
         }
     }, [session]);
+
+    // ✅ FIX 3: Refresh LR list silently in background whenever user navigates
+    // to list or dashboard — prevents stale data after going back
+    const prevViewRef = React.useRef<View | null>(null);
+    useEffect(() => {
+        if (!session || session.user?.email === 'gps@ssk.com') return;
+        const prev = prevViewRef.current;
+        prevViewRef.current = currentView;
+        // Only re-fetch when arriving at list or dashboard from another view
+        if ((currentView === 'list' || currentView === 'dashboard') && prev !== null && prev !== currentView) {
+            getLorryReceipts()
+                .then(lrs => setLorryReceipts(lrs))
+                .catch(err => console.warn('Background LR refresh failed:', err));
+        }
+    }, [currentView, session]);
 
     // Show role selection after login if RBAC is enabled
     useEffect(() => {
@@ -426,6 +445,7 @@ const App: React.FC = () => {
             // Run side effects in background (don't block UI)
             Promise.all(promises).catch(err => console.error("Auto-save error:", err));
 
+            // ✅ FIX 2b: Optimistically update list in state immediately
             setLorryReceipts(prev => {
                 const index = prev.findIndex(item => item.lrNo === savedLR.lrNo);
                 if (index >= 0) {
@@ -435,17 +455,17 @@ const App: React.FC = () => {
                 }
                 return [savedLR, ...prev];
             });
-            toast.success('LR Saved Successfully', { id: toastId });
+            toast.success('LR Saved Successfully! ✅', { id: toastId, duration: 3000 });
             if (currentRole === 'Operator') {
                 navigateTo('dashboard');
             } else {
                 navigateTo('list');
             }
         } catch (error: any) {
-            toast.dismiss(toastId);
             const msg = error?.message || 'Unknown error';
             console.error('LR Save Failed:', msg);
-            toast.error(`Failed to save LR: ${msg}`, { duration: 8000 });
+            // ✅ FIX 2b: Always dismiss loading toast before showing error
+            toast.error(`Failed to save LR: ${msg}`, { id: toastId, duration: 8000 });
         }
     };
 

@@ -37,8 +37,8 @@ const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500):
     let lastError: any;
     for (let i = 0; i < attempts; i++) {
         try {
-            // Ensure each attempt times out after 15 seconds to prevent indefinite hangs
-            return await withTimeout(fn(), 15000);
+            // Ensure each attempt times out after 8 seconds to prevent indefinite hangs
+            return await withTimeout(fn(), 8000);
         } catch (err: any) {
             lastError = err;
             // Don't retry on known permanent errors
@@ -359,7 +359,7 @@ export const applySession = async (sessionData: any) => {
 export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
     const { data, error } = await withTimeout(
         supabase.from('lorry_receipts').select('*').order('date', { ascending: false }),
-        15000
+        10000
     );
     if (error) throw error;
 
@@ -455,7 +455,8 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         is_invoice_generated: !!isInvoiceGenerated
     };
 
-    // Retry up to 3 times with exponential backoff — handles cold-start & transient errors
+    // Retry up to 2 times with exponential backoff — handles cold-start & transient errors
+    // Reduced from 3 attempts x 15s to 2 attempts x 8s to prevent 45s spinner hang
     const data = await withRetry(async () => {
         const { data, error } = await supabase
             .from('lorry_receipts')
@@ -474,7 +475,7 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
             }
         }
         return data;
-    }, 3, 2000);
+    }, 2, 1000);
 
     const charges = data.charges || {};
 

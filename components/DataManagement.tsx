@@ -43,9 +43,37 @@ const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, in
     const [filterParty, setFilterParty] = useState('');
     const [filterGR, setFilterGR] = useState('');
 
-    // Selection States for Bulk Actions
+    // Specific Filters for Other Sections
+    const [filterHiringDate, setFilterHiringDate] = useState('');
+    const [filterHiringRoute, setFilterHiringRoute] = useState('');
+
+    const [filterBookingDate, setFilterBookingDate] = useState('');
+    const [filterBookingStatus, setFilterBookingStatus] = useState('');
+
+    const [filterPartyType, setFilterPartyType] = useState('');
+    const [filterPartyCity, setFilterPartyCity] = useState('');
+
+    const [filterTruckOwner, setFilterTruckOwner] = useState('');
+
+    // Selection States for Bulk Actions for all sections
+    const [selectedHiringIds, setSelectedHiringIds] = useState<string[]>([]);
     const [selectedBookingIds, setSelectedBookingIds] = useState<string[]>([]);
+    const [selectedPartyIds, setSelectedPartyIds] = useState<string[]>([]);
+    const [selectedTruckIds, setSelectedTruckIds] = useState<string[]>([]);
     const [selectedRegisterIds, setSelectedRegisterIds] = useState<string[]>([]);
+
+    // Modals and editing state for all sections
+    const [showHiringModal, setShowHiringModal] = useState(false);
+    const [editingHiring, setEditingHiring] = useState<Partial<VehicleHiring> | null>(null);
+
+    const [showBookingModal, setShowBookingModal] = useState(false);
+    const [editingBooking, setEditingBooking] = useState<Partial<BookingRecord> | null>(null);
+
+    const [showPartyModal, setShowPartyModal] = useState(false);
+    const [editingParty, setEditingParty] = useState<Partial<SavedParty> | null>(null);
+
+    const [showTruckModal, setShowTruckModal] = useState(false);
+    const [editingTruck, setEditingTruck] = useState<Partial<SavedTruck> | null>(null);
 
     // SQL Script State
     const [copied, setCopied] = useState(false);
@@ -375,17 +403,215 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         }
     };
 
-    const handleDeleteBulk = async (type: 'booking' | 'register') => {
-        const ids = type === 'booking' ? selectedBookingIds : selectedRegisterIds;
-        if (ids.length === 0) return;
-        if (!confirm(`Are you sure you want to delete ${ids.length} selected records?`)) return;
+    // Save Vehicle Hiring
+    const handleSaveHiring = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingHiring?.lorryNo || !editingHiring?.grNo) {
+            toast.error("Lorry Number and GR Number are required");
+            return;
+        }
+        const freight = Number(editingHiring.freight) || 0;
+        const advance = Number(editingHiring.advance) || 0;
+        const otherExpenses = Number(editingHiring.otherExpenses) || 0;
+        const balance = freight - advance;
+        const totalBalance = balance + otherExpenses;
 
-        const toastId = toast.loading(`Deleting ${ids.length} records...`);
+        const payload: VehicleHiring = {
+            id: editingHiring.id,
+            date: editingHiring.date || new Date().toISOString().split('T')[0],
+            grNo: (editingHiring.grNo || '').trim(),
+            billNo: (editingHiring.billNo || '').trim(),
+            lorryNo: (editingHiring.lorryNo || '').trim().toUpperCase(),
+            driverNo: (editingHiring.driverNo || '').trim(),
+            ownerName: editingHiring.ownerName || 'Third Party',
+            fromPlace: (editingHiring.fromPlace || '').trim(),
+            toPlace: (editingHiring.toPlace || '').trim(),
+            freight,
+            advance,
+            balance,
+            otherExpenses,
+            totalBalance,
+            podStatus: editingHiring.podStatus || 'Pending',
+            paymentStatus: editingHiring.paymentStatus || 'Pending',
+        };
+
+        const toastId = toast.loading("Saving vehicle hiring record...");
         try {
-            if (type === 'booking') {
+            const saved = await saveVehicleHiring(payload);
+            setHirings(prev => {
+                const idx = prev.findIndex(h => h.id === saved.id);
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = saved;
+                    return copy;
+                }
+                return [saved, ...prev];
+            });
+            toast.success("Vehicle hiring record saved!", { id: toastId });
+            setShowHiringModal(false);
+            setEditingHiring(null);
+        } catch (error: any) {
+            console.error("Save hiring error:", error);
+            toast.error(`Failed to save: ${error?.message || String(error)}`, { id: toastId });
+        }
+    };
+
+    // Save Booking Record
+    const handleSaveBooking = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingBooking?.partyName || !editingBooking?.grNo) {
+            toast.error("Party Name and GR Number are required");
+            return;
+        }
+        const freight = Number(editingBooking.freight) || 0;
+        const advance = Number(editingBooking.advance) || 0;
+        const otherExpenses = Number(editingBooking.otherExpenses) || 0;
+        const balance = freight - advance;
+        const totalBalance = balance + otherExpenses;
+
+        const payload: BookingRecord = {
+            id: editingBooking.id,
+            partyName: (editingBooking.partyName || '').trim(),
+            date: editingBooking.date || new Date().toISOString().split('T')[0],
+            grNo: (editingBooking.grNo || '').trim(),
+            billNo: (editingBooking.billNo || '').trim(),
+            lorryNo: (editingBooking.lorryNo || '').trim().toUpperCase(),
+            lorryType: editingBooking.lorryType || 'Open',
+            weight: Number(editingBooking.weight) || 0,
+            fromPlace: (editingBooking.fromPlace || '').trim(),
+            toPlace: (editingBooking.toPlace || '').trim(),
+            freight,
+            advance,
+            balance,
+            otherExpenses,
+            totalBalance,
+            paymentStatus: editingBooking.paymentStatus || 'Pending'
+        };
+
+        const toastId = toast.loading("Saving booking record...");
+        try {
+            const saved = await saveBookingRecord(payload);
+            setBookings(prev => {
+                const idx = prev.findIndex(b => b.id === saved.id);
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = saved;
+                    return copy;
+                }
+                return [saved, ...prev];
+            });
+            toast.success("Booking record saved!", { id: toastId });
+            setShowBookingModal(false);
+            setEditingBooking(null);
+        } catch (error: any) {
+            console.error("Save booking error:", error);
+            toast.error(`Failed to save: ${error?.message || String(error)}`, { id: toastId });
+        }
+    };
+
+    // Save Customer / Party
+    const handleSaveParty = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingParty?.name) {
+            toast.error("Party Name is required");
+            return;
+        }
+        const payload: SavedParty = {
+            id: editingParty.id,
+            name: editingParty.name.trim(),
+            type: editingParty.type || 'Both',
+            address: (editingParty.address || '').trim(),
+            city: (editingParty.city || '').trim(),
+            contact: (editingParty.contact || '').trim(),
+            pan: (editingParty.pan || '').trim().toUpperCase(),
+            gst: (editingParty.gst || '').trim().toUpperCase()
+        };
+
+        const toastId = toast.loading("Saving party...");
+        try {
+            const saved = await saveSavedParty(payload);
+            setParties(prev => {
+                const idx = prev.findIndex(p => p.id === saved.id);
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = saved;
+                    return copy;
+                }
+                return [saved, ...prev];
+            });
+            toast.success("Party saved successfully!", { id: toastId });
+            setShowPartyModal(false);
+            setEditingParty(null);
+        } catch (error: any) {
+            console.error("Save party error:", error);
+            toast.error(`Failed to save party: ${error?.message || String(error)}`, { id: toastId });
+        }
+    };
+
+    // Save Truck
+    const handleSaveTruck = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTruck?.truckNo) {
+            toast.error("Truck Number is required");
+            return;
+        }
+        const payload: SavedTruck = {
+            id: editingTruck.id,
+            truckNo: editingTruck.truckNo.trim().toUpperCase(),
+            ownerName: (editingTruck.ownerName || '').trim(),
+            contactNumber: (editingTruck.contactNumber || '').trim()
+        };
+
+        const toastId = toast.loading("Saving truck...");
+        try {
+            const saved = await saveSavedTruck(payload);
+            setTrucks(prev => {
+                const idx = prev.findIndex(t => t.id === saved.id);
+                if (idx >= 0) {
+                    const copy = [...prev];
+                    copy[idx] = saved;
+                    return copy;
+                }
+                return [saved, ...prev];
+            });
+            toast.success("Truck saved successfully!", { id: toastId });
+            setShowTruckModal(false);
+            setEditingTruck(null);
+        } catch (error: any) {
+            console.error("Save truck error:", error);
+            toast.error(`Failed to save truck: ${error?.message || String(error)}`, { id: toastId });
+        }
+    };
+
+    const handleDeleteBulk = async (type: 'hiring' | 'booking' | 'party' | 'truck' | 'register') => {
+        let ids: string[] = [];
+        if (type === 'hiring') ids = selectedHiringIds;
+        else if (type === 'booking') ids = selectedBookingIds;
+        else if (type === 'party') ids = selectedPartyIds;
+        else if (type === 'truck') ids = selectedTruckIds;
+        else if (type === 'register') ids = selectedRegisterIds;
+
+        if (ids.length === 0) return;
+        if (!confirm(`Are you sure you want to delete ${ids.length} selected record(s)?`)) return;
+
+        const toastId = toast.loading(`Deleting ${ids.length} record(s)...`);
+        try {
+            if (type === 'hiring') {
+                await Promise.all(ids.map(id => deleteVehicleHiring(id)));
+                setHirings(prev => prev.filter(h => h.id && !ids.includes(h.id)));
+                setSelectedHiringIds([]);
+            } else if (type === 'booking') {
                 await Promise.all(ids.map(id => deleteBookingRecord(id)));
                 setBookings(prev => prev.filter(b => b.id && !ids.includes(b.id)));
                 setSelectedBookingIds([]);
+            } else if (type === 'party') {
+                await Promise.all(ids.map(id => deleteSavedParty(id)));
+                setParties(prev => prev.filter(p => p.id && !ids.includes(p.id)));
+                setSelectedPartyIds([]);
+            } else if (type === 'truck') {
+                await Promise.all(ids.map(id => deleteSavedTruck(id)));
+                setTrucks(prev => prev.filter(t => t.id && !ids.includes(t.id)));
+                setSelectedTruckIds([]);
             } else if (type === 'register') {
                 await Promise.all(ids.map(id => deleteRegisterEntry(id)));
                 setRegisters(prev => prev.filter(r => r.id && !ids.includes(r.id)));
@@ -852,192 +1078,618 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
         if (isLoading) return <div className="p-8 text-center text-gray-500">Loading data...</div>;
 
         if (activeTab === 'vehicle-hiring') {
-            const filtered = hirings.filter(h =>
-                h.lorryNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                h.grNo.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const filtered = hirings.filter(h => {
+                const matchesSearch = !searchTerm ||
+                    (h.lorryNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (h.grNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (h.driverNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (h.fromPlace || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (h.toPlace || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesDate = !filterHiringDate || (h.date && h.date.includes(filterHiringDate));
+                const matchesRoute = !filterHiringRoute || 
+                    (h.fromPlace || '').toLowerCase().includes(filterHiringRoute.toLowerCase()) ||
+                    (h.toPlace || '').toLowerCase().includes(filterHiringRoute.toLowerCase());
+                return matchesSearch && matchesDate && matchesRoute;
+            });
+
+            const hasActiveFilters = Boolean(searchTerm || filterHiringDate || filterHiringRoute);
+
             return (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left text-gray-700">
-                        <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-3 py-3 border-r">Date</th>
-                                <th className="px-3 py-3 border-r">GR Number</th>
-                                <th className="px-3 py-3 border-r">Lorry Number</th>
-                                <th className="px-3 py-3 border-r">Route</th>
-                                <th className="px-3 py-3 border-r">Freight</th>
-                                <th className="px-3 py-3 border-r">Total Balance</th>
-                                <th className="px-3 py-3 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
-                            ) : filtered.map(r => (
-                                <tr key={r.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
-                                    <td className="px-3 py-2 border-r">{r.grNo}</td>
-                                    <td className="px-3 py-2 border-r font-bold">{r.lorryNo}</td>
-                                    <td className="px-3 py-2 border-r text-xs">{r.fromPlace} → {r.toPlace}</td>
-                                    <td className="px-3 py-2 border-r text-right">₹{r.freight}</td>
-                                    <td className="px-3 py-2 border-r text-right font-bold text-red-600">₹{r.totalBalance}</td>
-                                    <td className="px-3 py-2 text-center">
-                                        <button onClick={() => r.id && handleDelete(r.id, 'hiring')} className="p-1 hover:bg-gray-100 rounded text-red-500">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Filter & Action Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Filter by Date</label>
+                            <input
+                                type="date"
+                                value={filterHiringDate}
+                                onChange={(e) => setFilterHiringDate(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Filter Route (From / To)</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Delhi, Mumbai..."
+                                value={filterHiringRoute}
+                                onChange={(e) => setFilterHiringRoute(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setFilterHiringDate(''); setFilterHiringRoute(''); setSearchTerm(''); }}
+                                    className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition-colors"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : <div className="hidden md:block"></div>}
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={() => { setEditingHiring({ date: new Date().toISOString().split('T')[0], ownerName: 'Third Party', podStatus: 'Pending', paymentStatus: 'Pending' }); setShowHiringModal(true); }}
+                                className="w-full bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Add Vehicle Hiring
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bulk Selection Actions */}
+                    {selectedHiringIds.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
+                            <span className="text-red-700 text-xs font-bold">{selectedHiringIds.length} hiring records selected</span>
+                            <button 
+                                onClick={() => handleDeleteBulk('hiring')}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 font-bold transition-colors shadow-sm"
+                            >
+                                Delete Selected ({selectedHiringIds.length})
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                        <table className="w-full text-xs text-left text-gray-700">
+                            <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-3 py-3 border-r w-10 text-center">
+                                        <input 
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={filtered.length > 0 && selectedHiringIds.length === filtered.length}
+                                            onChange={() => {
+                                                const ids = filtered.map(h => h.id).filter((id): id is string => !!id);
+                                                setSelectedHiringIds(prev => prev.length === ids.length ? [] : ids);
+                                            }}
+                                        />
+                                    </th>
+                                    <th className="px-3 py-3 border-r text-center w-16">Actions</th>
+                                    <th className="px-3 py-3 border-r">Date</th>
+                                    <th className="px-3 py-3 border-r">GR Number</th>
+                                    <th className="px-3 py-3 border-r">Bill No</th>
+                                    <th className="px-3 py-3 border-r">Lorry Number</th>
+                                    <th className="px-3 py-3 border-r">Driver Contact</th>
+                                    <th className="px-3 py-3 border-r">Owner</th>
+                                    <th className="px-3 py-3 border-r">Route</th>
+                                    <th className="px-3 py-3 border-r text-right">Freight</th>
+                                    <th className="px-3 py-3 border-r text-right">Advance</th>
+                                    <th className="px-3 py-3 border-r text-right">Total Balance</th>
+                                    <th className="px-3 py-3 text-center">Status</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={13} className="p-8 text-center text-gray-500 italic">No hiring records found matching your filters.</td></tr>
+                                ) : filtered.map(r => (
+                                    <tr key={r.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedHiringIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
+                                        <td className="px-3 py-2 border-r text-center">
+                                            <input 
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={r.id ? selectedHiringIds.includes(r.id) : false}
+                                                onChange={() => {
+                                                    if (!r.id) return;
+                                                    setSelectedHiringIds(prev => 
+                                                        prev.includes(r.id!) ? prev.filter(id => id !== r.id) : [...prev, r.id!]
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => { setEditingHiring(r); setShowHiringModal(true); }}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                                    title="Edit Record"
+                                                >
+                                                    <PencilIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => r.id && handleDelete(r.id, 'hiring')}
+                                                    className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors"
+                                                    title="Delete Record"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
+                                        <td className="px-3 py-2 border-r font-bold text-blue-700">{r.grNo}</td>
+                                        <td className="px-3 py-2 border-r text-gray-600">{r.billNo || '-'}</td>
+                                        <td className="px-3 py-2 border-r font-mono font-bold text-gray-900">{r.lorryNo}</td>
+                                        <td className="px-3 py-2 border-r">{r.driverNo || '-'}</td>
+                                        <td className="px-3 py-2 border-r">{r.ownerName || 'Third Party'}</td>
+                                        <td className="px-3 py-2 border-r text-xs">{r.fromPlace} → {r.toPlace}</td>
+                                        <td className="px-3 py-2 border-r text-right font-semibold">₹{Number(r.freight || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 border-r text-right text-green-700">₹{Number(r.advance || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 border-r text-right font-bold text-red-600">₹{Number(r.totalBalance || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 text-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${r.paymentStatus === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {r.paymentStatus || 'Pending'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         }
 
         if (activeTab === 'booking-register') {
-            const filtered = bookings.filter(b =>
-                b.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                b.grNo.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+            const filtered = bookings.filter(b => {
+                const matchesSearch = !searchTerm ||
+                    (b.partyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (b.grNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (b.lorryNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (b.fromPlace || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (b.toPlace || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesDate = !filterBookingDate || (b.date && b.date.includes(filterBookingDate));
+                const matchesStatus = !filterBookingStatus || b.paymentStatus === filterBookingStatus;
+                return matchesSearch && matchesDate && matchesStatus;
+            });
+
+            const hasActiveFilters = Boolean(searchTerm || filterBookingDate || filterBookingStatus);
+
             return (
-                <div className="overflow-x-auto">
+                <div className="space-y-4">
+                    {/* Filter & Action Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Filter by Date</label>
+                            <input
+                                type="date"
+                                value={filterBookingDate}
+                                onChange={(e) => setFilterBookingDate(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Payment Status</label>
+                            <select
+                                value={filterBookingStatus}
+                                onChange={(e) => setFilterBookingStatus(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <div className="flex items-end">
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setFilterBookingDate(''); setFilterBookingStatus(''); setSearchTerm(''); }}
+                                    className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition-colors"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : <div className="hidden md:block"></div>}
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={() => { setEditingBooking({ date: new Date().toISOString().split('T')[0], lorryType: 'Open', paymentStatus: 'Pending' }); setShowBookingModal(true); }}
+                                className="w-full bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Add Booking Record
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bulk Selection Actions */}
                     {selectedBookingIds.length > 0 && (
-                        <div className="p-3 bg-red-50 border-b border-red-100 flex justify-between items-center sticky left-0">
-                            <span className="text-red-700 text-xs font-bold">{selectedBookingIds.length} items selected</span>
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
+                            <span className="text-red-700 text-xs font-bold">{selectedBookingIds.length} bookings selected</span>
                             <button 
                                 onClick={() => handleDeleteBulk('booking')}
-                                className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 font-bold transition-colors shadow-sm"
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 font-bold transition-colors shadow-sm"
                             >
-                                Delete Selected
+                                Delete Selected ({selectedBookingIds.length})
                             </button>
                         </div>
                     )}
-                    <table className="w-full text-xs text-left text-gray-700">
-                        <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-3 py-3 border-r w-10 text-center">
-                                    <input 
-                                        type="checkbox"
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                        checked={filtered.length > 0 && selectedBookingIds.length === filtered.length}
-                                        onChange={() => {
-                                            const ids = filtered.map(b => b.id).filter((id): id is string => !!id);
-                                            setSelectedBookingIds(prev => prev.length === ids.length ? [] : ids);
-                                        }}
-                                    />
-                                </th>
-                                <th className="px-3 py-3 border-r">Date</th>
-                                <th className="px-3 py-3 border-r">Party Name</th>
-                                <th className="px-3 py-3 border-r">GR Number</th>
-                                <th className="px-3 py-3 border-r">Route</th>
-                                <th className="px-3 py-3 border-r">Freight</th>
-                                <th className="px-3 py-3 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
-                            ) : filtered.map(r => (
-                                <tr key={r.id} className={`bg-white border-b hover:bg-gray-50 transition-colors ${selectedBookingIds.includes(r.id!) ? 'bg-blue-50/50' : ''}`}>
-                                    <td className="px-3 py-2 border-r text-center">
+
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                        <table className="w-full text-xs text-left text-gray-700">
+                            <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-3 py-3 border-r w-10 text-center">
                                         <input 
                                             type="checkbox"
                                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                            checked={r.id ? selectedBookingIds.includes(r.id) : false}
+                                            checked={filtered.length > 0 && selectedBookingIds.length === filtered.length}
                                             onChange={() => {
-                                                if (!r.id) return;
-                                                setSelectedBookingIds(prev => 
-                                                    prev.includes(r.id!) 
-                                                        ? prev.filter(id => id !== r.id) 
-                                                        : [...prev, r.id!]
-                                                );
+                                                const ids = filtered.map(b => b.id).filter((id): id is string => !!id);
+                                                setSelectedBookingIds(prev => prev.length === ids.length ? [] : ids);
                                             }}
                                         />
-                                    </td>
-                                    <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
-                                    <td className="px-3 py-2 border-r font-medium">{r.partyName}</td>
-                                    <td className="px-3 py-2 border-r">{r.grNo}</td>
-                                    <td className="px-3 py-2 border-r text-xs">{r.fromPlace} - {r.toPlace}</td>
-                                    <td className="px-3 py-2 border-r text-right">₹{r.freight}</td>
-                                    <td className="px-3 py-2 text-center">
-                                        <button onClick={() => r.id && handleDelete(r.id, 'booking')} className="p-1 hover:bg-gray-100 rounded text-red-500">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                                    </th>
+                                    <th className="px-3 py-3 border-r text-center w-16">Actions</th>
+                                    <th className="px-3 py-3 border-r">Date</th>
+                                    <th className="px-3 py-3 border-r">Party Name</th>
+                                    <th className="px-3 py-3 border-r">GR Number</th>
+                                    <th className="px-3 py-3 border-r">Lorry Number</th>
+                                    <th className="px-3 py-3 border-r">Route</th>
+                                    <th className="px-3 py-3 border-r text-right">Freight</th>
+                                    <th className="px-3 py-3 border-r text-right">Advance</th>
+                                    <th className="px-3 py-3 border-r text-right">Total Balance</th>
+                                    <th className="px-3 py-3 text-center">Status</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={11} className="p-8 text-center text-gray-500 italic">No bookings found matching your filters.</td></tr>
+                                ) : filtered.map(r => (
+                                    <tr key={r.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedBookingIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
+                                        <td className="px-3 py-2 border-r text-center">
+                                            <input 
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={r.id ? selectedBookingIds.includes(r.id) : false}
+                                                onChange={() => {
+                                                    if (!r.id) return;
+                                                    setSelectedBookingIds(prev => 
+                                                        prev.includes(r.id!) ? prev.filter(id => id !== r.id) : [...prev, r.id!]
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => { setEditingBooking(r); setShowBookingModal(true); }}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                                    title="Edit Record"
+                                                >
+                                                    <PencilIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => r.id && handleDelete(r.id, 'booking')}
+                                                    className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors"
+                                                    title="Delete Record"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-r whitespace-nowrap">{r.date ? new Date(r.date).toLocaleDateString('en-GB') : '-'}</td>
+                                        <td className="px-3 py-2 border-r font-bold text-gray-900">{r.partyName}</td>
+                                        <td className="px-3 py-2 border-r font-bold text-blue-700">{r.grNo}</td>
+                                        <td className="px-3 py-2 border-r font-mono">{r.lorryNo}</td>
+                                        <td className="px-3 py-2 border-r text-xs">{r.fromPlace} → {r.toPlace}</td>
+                                        <td className="px-3 py-2 border-r text-right font-semibold">₹{Number(r.freight || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 border-r text-right text-green-700">₹{Number(r.advance || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 border-r text-right font-bold text-red-600">₹{Number(r.totalBalance || 0).toLocaleString('en-IN')}</td>
+                                        <td className="px-3 py-2 text-center">
+                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${r.paymentStatus === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {r.paymentStatus || 'Pending'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         }
 
         if (activeTab === 'customer-details') {
-            const filtered = parties.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            const filtered = parties.filter(p => {
+                const matchesSearch = !searchTerm ||
+                    (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (p.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (p.gst || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (p.pan || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (p.address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (p.contact || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesType = !filterPartyType || p.type === filterPartyType;
+                const matchesCity = !filterPartyCity || (p.city || '').toLowerCase().includes(filterPartyCity.toLowerCase());
+                return matchesSearch && matchesType && matchesCity;
+            });
+
+            const hasActiveFilters = Boolean(searchTerm || filterPartyType || filterPartyCity);
+
             return (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left text-gray-700">
-                        <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-3 py-3 border-r">Party Name</th>
-                                <th className="px-3 py-3 border-r">Type</th>
-                                <th className="px-3 py-3 border-r">City</th>
-                                <th className="px-3 py-3 border-r">GSTIN</th>
-                                <th className="px-3 py-3 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr><td colSpan={5} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
-                            ) : filtered.map(p => (
-                                <tr key={p.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-3 py-2 border-r font-bold">{p.name}</td>
-                                    <td className="px-3 py-2 border-r">{p.type}</td>
-                                    <td className="px-3 py-2 border-r">{p.city}</td>
-                                    <td className="px-3 py-2 border-r">{p.gst}</td>
-                                    <td className="px-3 py-2 text-center">
-                                        <button onClick={() => p.id && handleDelete(p.id, 'party')} className="p-1 hover:bg-gray-100 rounded text-red-500">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Filter & Action Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Party Type</label>
+                            <select
+                                value={filterPartyType}
+                                onChange={(e) => setFilterPartyType(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            >
+                                <option value="">All Types</option>
+                                <option value="Both">Both (Consignor & Consignee)</option>
+                                <option value="Consignor">Consignor (Sender)</option>
+                                <option value="Consignee">Consignee (Receiver)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Filter by City</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Mumbai, Pune..."
+                                value={filterPartyCity}
+                                onChange={(e) => setFilterPartyCity(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setFilterPartyType(''); setFilterPartyCity(''); setSearchTerm(''); }}
+                                    className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition-colors"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : <div className="hidden md:block"></div>}
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={() => { setEditingParty({ type: 'Both' }); setShowPartyModal(true); }}
+                                className="w-full bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Add Customer / Party
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bulk Selection Actions */}
+                    {selectedPartyIds.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
+                            <span className="text-red-700 text-xs font-bold">{selectedPartyIds.length} parties selected</span>
+                            <button 
+                                onClick={() => handleDeleteBulk('party')}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 font-bold transition-colors shadow-sm"
+                            >
+                                Delete Selected ({selectedPartyIds.length})
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                        <table className="w-full text-xs text-left text-gray-700">
+                            <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-3 py-3 border-r w-10 text-center">
+                                        <input 
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={filtered.length > 0 && selectedPartyIds.length === filtered.length}
+                                            onChange={() => {
+                                                const ids = filtered.map(p => p.id).filter((id): id is string => !!id);
+                                                setSelectedPartyIds(prev => prev.length === ids.length ? [] : ids);
+                                            }}
+                                        />
+                                    </th>
+                                    <th className="px-3 py-3 border-r text-center w-16">Actions</th>
+                                    <th className="px-3 py-3 border-r">Party Name</th>
+                                    <th className="px-3 py-3 border-r">Type</th>
+                                    <th className="px-3 py-3 border-r">City</th>
+                                    <th className="px-3 py-3 border-r">Contact</th>
+                                    <th className="px-3 py-3 border-r">Address</th>
+                                    <th className="px-3 py-3 border-r">PAN</th>
+                                    <th className="px-3 py-3">GSTIN</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={9} className="p-8 text-center text-gray-500 italic">No customer/party records found matching your filters.</td></tr>
+                                ) : filtered.map(p => (
+                                    <tr key={p.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedPartyIds.includes(p.id!) ? 'bg-blue-50/70' : ''}`}>
+                                        <td className="px-3 py-2 border-r text-center">
+                                            <input 
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={p.id ? selectedPartyIds.includes(p.id) : false}
+                                                onChange={() => {
+                                                    if (!p.id) return;
+                                                    setSelectedPartyIds(prev => 
+                                                        prev.includes(p.id!) ? prev.filter(id => id !== p.id) : [...prev, p.id!]
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => { setEditingParty(p); setShowPartyModal(true); }}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                                    title="Edit Party"
+                                                >
+                                                    <PencilIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => p.id && handleDelete(p.id, 'party')}
+                                                    className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors"
+                                                    title="Delete Party"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-r font-bold text-gray-900">{p.name}</td>
+                                        <td className="px-3 py-2 border-r">
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-800">
+                                                {p.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2 border-r">{p.city || '-'}</td>
+                                        <td className="px-3 py-2 border-r">{p.contact || '-'}</td>
+                                        <td className="px-3 py-2 border-r text-xs max-w-[200px] truncate">{p.address || '-'}</td>
+                                        <td className="px-3 py-2 border-r font-mono text-xs">{p.pan || '-'}</td>
+                                        <td className="px-3 py-2 font-mono text-xs font-semibold text-gray-800">{p.gst || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         }
 
         if (activeTab === 'vehicle-fleet') {
-            const filtered = trucks.filter(t => t.truckNo.toLowerCase().includes(searchTerm.toLowerCase()));
+            const filtered = trucks.filter(t => {
+                const matchesSearch = !searchTerm ||
+                    (t.truckNo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (t.ownerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    (t.contactNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesOwner = !filterTruckOwner || (t.ownerName || '').toLowerCase().includes(filterTruckOwner.toLowerCase());
+                return matchesSearch && matchesOwner;
+            });
+
+            const hasActiveFilters = Boolean(searchTerm || filterTruckOwner);
+
             return (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left text-gray-700">
-                        <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th className="px-3 py-3 border-r">Truck No</th>
-                                <th className="px-3 py-3 border-r">Owner Name</th>
-                                <th className="px-3 py-3 border-r">Contact Number</th>
-                                <th className="px-3 py-3 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.length === 0 ? (
-                                <tr><td colSpan={4} className="p-4 text-center text-gray-500 italic">No records found. Run database setup if tables are missing.</td></tr>
-                            ) : filtered.map(t => (
-                                <tr key={t.id} className="bg-white border-b hover:bg-gray-50">
-                                    <td className="px-3 py-2 border-r font-bold font-mono">{t.truckNo}</td>
-                                    <td className="px-3 py-2 border-r">{t.ownerName}</td>
-                                    <td className="px-3 py-2 border-r">{t.contactNumber}</td>
-                                    <td className="px-3 py-2 text-center">
-                                        <button onClick={() => t.id && handleDelete(t.id, 'truck')} className="p-1 hover:bg-gray-100 rounded text-red-500">
-                                            <TrashIcon className="w-4 h-4" />
-                                        </button>
-                                    </td>
+                <div className="space-y-4">
+                    {/* Filter & Action Bar */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div>
+                            <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Filter by Owner Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Sharma Transport..."
+                                value={filterTruckOwner}
+                                onChange={(e) => setFilterTruckOwner(e.target.value)}
+                                className="w-full text-xs p-2 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            />
+                        </div>
+                        <div className="flex items-end">
+                            {hasActiveFilters ? (
+                                <button
+                                    type="button"
+                                    onClick={() => { setFilterTruckOwner(''); setSearchTerm(''); }}
+                                    className="w-full text-xs font-semibold py-2 px-3 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-100 transition-colors"
+                                >
+                                    Clear Filters
+                                </button>
+                            ) : <div className="hidden md:block"></div>}
+                        </div>
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                onClick={() => { setEditingTruck({}); setShowTruckModal(true); }}
+                                className="w-full bg-blue-600 text-white text-xs font-bold py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                Add Truck / Vehicle
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bulk Selection Actions */}
+                    {selectedTruckIds.length > 0 && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex justify-between items-center">
+                            <span className="text-red-700 text-xs font-bold">{selectedTruckIds.length} trucks selected</span>
+                            <button 
+                                onClick={() => handleDeleteBulk('truck')}
+                                className="px-3 py-1.5 bg-red-600 text-white text-xs rounded-lg hover:bg-red-700 font-bold transition-colors shadow-sm"
+                            >
+                                Delete Selected ({selectedTruckIds.length})
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="overflow-x-auto rounded-xl border border-gray-200">
+                        <table className="w-full text-xs text-left text-gray-700">
+                            <thead className="text-[10px] text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th className="px-3 py-3 border-r w-10 text-center">
+                                        <input 
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            checked={filtered.length > 0 && selectedTruckIds.length === filtered.length}
+                                            onChange={() => {
+                                                const ids = filtered.map(t => t.id).filter((id): id is string => !!id);
+                                                setSelectedTruckIds(prev => prev.length === ids.length ? [] : ids);
+                                            }}
+                                        />
+                                    </th>
+                                    <th className="px-3 py-3 border-r text-center w-16">Actions</th>
+                                    <th className="px-3 py-3 border-r">Truck / Vehicle No</th>
+                                    <th className="px-3 py-3 border-r">Owner Name</th>
+                                    <th className="px-3 py-3">Contact Number</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">No trucks found matching your filters.</td></tr>
+                                ) : filtered.map(t => (
+                                    <tr key={t.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedTruckIds.includes(t.id!) ? 'bg-blue-50/70' : ''}`}>
+                                        <td className="px-3 py-2 border-r text-center">
+                                            <input 
+                                                type="checkbox"
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                checked={t.id ? selectedTruckIds.includes(t.id) : false}
+                                                onChange={() => {
+                                                    if (!t.id) return;
+                                                    setSelectedTruckIds(prev => 
+                                                        prev.includes(t.id!) ? prev.filter(id => id !== t.id) : [...prev, t.id!]
+                                                    );
+                                                }}
+                                            />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1">
+                                                <button
+                                                    onClick={() => { setEditingTruck(t); setShowTruckModal(true); }}
+                                                    className="p-1 hover:bg-blue-100 rounded text-blue-600 transition-colors"
+                                                    title="Edit Truck"
+                                                >
+                                                    <PencilIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => t.id && handleDelete(t.id, 'truck')}
+                                                    className="p-1 hover:bg-red-100 rounded text-red-500 transition-colors"
+                                                    title="Delete Truck"
+                                                >
+                                                    <TrashIcon className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 border-r font-bold font-mono text-sm text-gray-900">{t.truckNo}</td>
+                                        <td className="px-3 py-2 border-r text-gray-800">{t.ownerName || '-'}</td>
+                                        <td className="px-3 py-2 text-gray-800">{t.contactNumber || '-'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             );
         }
@@ -1906,6 +2558,622 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                 Save Details
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Vehicle Hiring Modal */}
+            {showHiringModal && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold">
+                                    {editingHiring?.id ? 'Edit Vehicle Hiring Record' : 'Add Vehicle Hiring Record'}
+                                </h3>
+                                <p className="text-xs text-blue-100 mt-0.5">Enter truck hiring details & calculate balances automatically</p>
+                            </div>
+                            <button
+                                onClick={() => { setShowHiringModal(false); setEditingHiring(null); }}
+                                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveHiring} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={editingHiring?.date || new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">GR / LR No *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. GR-101"
+                                        value={editingHiring?.grNo || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, grNo: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Bill No</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. BILL-55"
+                                        value={editingHiring?.billNo || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, billNo: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Lorry No *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. MH12AB1234"
+                                        value={editingHiring?.lorryNo || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, lorryNo: e.target.value.toUpperCase() }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Driver Phone</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="10 digit number"
+                                        value={editingHiring?.driverNo || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, driverNo: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Owner Type</label>
+                                    <select
+                                        value={editingHiring?.ownerName || 'Third Party'}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, ownerName: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    >
+                                        <option value="Third Party">Third Party</option>
+                                        <option value="Self">Self / Owned</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">From Place</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Source City / Location"
+                                        value={editingHiring?.fromPlace || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, fromPlace: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">To Place</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Destination City / Location"
+                                        value={editingHiring?.toPlace || ''}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, toPlace: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50/60 p-4 rounded-xl border border-blue-100">
+                                <h4 className="text-xs font-bold text-blue-900 uppercase tracking-wider mb-3">Freight & Expense Breakdown</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Freight (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingHiring?.freight ?? ''}
+                                            onChange={(e) => setEditingHiring(prev => ({ ...prev, freight: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Advance (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingHiring?.advance ?? ''}
+                                            onChange={(e) => setEditingHiring(prev => ({ ...prev, advance: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Other Exp. (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingHiring?.otherExpenses ?? ''}
+                                            onChange={(e) => setEditingHiring(prev => ({ ...prev, otherExpenses: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-blue-200 text-xs">
+                                    <div className="bg-white p-2 rounded border border-blue-100">
+                                        <span className="text-gray-500 font-medium">Balance: </span>
+                                        <span className="font-bold text-blue-800">
+                                            ₹{((editingHiring?.freight || 0) - (editingHiring?.advance || 0)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="bg-white p-2 rounded border border-blue-100">
+                                        <span className="text-gray-500 font-medium">Total Balance: </span>
+                                        <span className="font-bold text-emerald-700">
+                                            ₹{(((editingHiring?.freight || 0) - (editingHiring?.advance || 0)) + (editingHiring?.otherExpenses || 0)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">POD Status</label>
+                                    <select
+                                        value={editingHiring?.podStatus || 'Pending'}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, podStatus: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="Pending">Pending</option>
+                                        <option value="Received">Received</option>
+                                        <option value="Submitted">Submitted</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Payment Status</label>
+                                    <select
+                                        value={editingHiring?.paymentStatus || 'Pending'}
+                                        onChange={(e) => setEditingHiring(prev => ({ ...prev, paymentStatus: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="Pending">Pending</option>
+                                        <option value="Partial">Partial</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowHiringModal(false); setEditingHiring(null); }}
+                                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition-colors flex items-center gap-2"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4" />
+                                    Save Record
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Booking Register Modal */}
+            {showBookingModal && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold">
+                                    {editingBooking?.id ? 'Edit Booking Record' : 'Add Booking Record'}
+                                </h3>
+                                <p className="text-xs text-emerald-100 mt-0.5">Enter party booking, freight and payment details</p>
+                            </div>
+                            <button
+                                onClick={() => { setShowBookingModal(false); setEditingBooking(null); }}
+                                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveBooking} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={editingBooking?.date || new Date().toISOString().split('T')[0]}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, date: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Party Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. ABC Logistics Pvt Ltd"
+                                        value={editingBooking?.partyName || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, partyName: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">GR / LR No *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="e.g. GR-201"
+                                        value={editingBooking?.grNo || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, grNo: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Bill No</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. INV-100"
+                                        value={editingBooking?.billNo || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, billNo: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Lorry No</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. DL01AB1234"
+                                        value={editingBooking?.lorryNo || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, lorryNo: e.target.value.toUpperCase() }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 font-mono uppercase focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Lorry Type</label>
+                                    <select
+                                        value={editingBooking?.lorryType || 'Open'}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, lorryType: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        <option value="Open">Open</option>
+                                        <option value="Closed">Closed</option>
+                                        <option value="Container">Container</option>
+                                        <option value="Trailer">Trailer</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Weight (Kg/Tons)</label>
+                                    <input
+                                        type="number"
+                                        placeholder="0"
+                                        value={editingBooking?.weight ?? ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Payment Status</label>
+                                    <select
+                                        value={editingBooking?.paymentStatus || 'Pending'}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, paymentStatus: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    >
+                                        <option value="Pending">Pending</option>
+                                        <option value="Partial">Partial</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">From Place</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Origin"
+                                        value={editingBooking?.fromPlace || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, fromPlace: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">To Place</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Destination"
+                                        value={editingBooking?.toPlace || ''}
+                                        onChange={(e) => setEditingBooking(prev => ({ ...prev, toPlace: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                                <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider mb-3">Freight & Balance Details</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Freight (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingBooking?.freight ?? ''}
+                                            onChange={(e) => setEditingBooking(prev => ({ ...prev, freight: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Advance (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingBooking?.advance ?? ''}
+                                            onChange={(e) => setEditingBooking(prev => ({ ...prev, advance: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Other Exp. (₹)</label>
+                                        <input
+                                            type="number"
+                                            placeholder="0"
+                                            value={editingBooking?.otherExpenses ?? ''}
+                                            onChange={(e) => setEditingBooking(prev => ({ ...prev, otherExpenses: parseFloat(e.target.value) || 0 }))}
+                                            className="w-full text-sm p-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-emerald-200 text-xs">
+                                    <div className="bg-white p-2 rounded border border-emerald-100">
+                                        <span className="text-gray-500 font-medium">Balance: </span>
+                                        <span className="font-bold text-teal-800">
+                                            ₹{((editingBooking?.freight || 0) - (editingBooking?.advance || 0)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="bg-white p-2 rounded border border-emerald-100">
+                                        <span className="text-gray-500 font-medium">Total Balance: </span>
+                                        <span className="font-bold text-emerald-800">
+                                            ₹{(((editingBooking?.freight || 0) - (editingBooking?.advance || 0)) + (editingBooking?.otherExpenses || 0)).toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowBookingModal(false); setEditingBooking(null); }}
+                                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-md transition-colors flex items-center gap-2"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4" />
+                                    Save Record
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Customer / Party Modal */}
+            {showPartyModal && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold">
+                                    {editingParty?.id ? 'Edit Customer / Party' : 'Add New Customer / Party'}
+                                </h3>
+                                <p className="text-xs text-blue-100 mt-0.5">Consignor & Consignee details saved for quick LR selection</p>
+                            </div>
+                            <button
+                                onClick={() => { setShowPartyModal(false); setEditingParty(null); }}
+                                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveParty} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Party / Company Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Reliable Traders Ltd"
+                                    value={editingParty?.name || ''}
+                                    onChange={(e) => setEditingParty(prev => ({ ...prev, name: e.target.value }))}
+                                    className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Party Type</label>
+                                    <select
+                                        value={editingParty?.type || 'Both'}
+                                        onChange={(e) => setEditingParty(prev => ({ ...prev, type: e.target.value as any }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    >
+                                        <option value="Both">Both (Consignor & Consignee)</option>
+                                        <option value="Consignor">Consignor Only (Sender)</option>
+                                        <option value="Consignee">Consignee Only (Receiver)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Contact Phone</label>
+                                    <input
+                                        type="tel"
+                                        placeholder="Mobile / Office number"
+                                        value={editingParty?.contact || ''}
+                                        onChange={(e) => setEditingParty(prev => ({ ...prev, contact: e.target.value }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Address</label>
+                                <textarea
+                                    rows={2}
+                                    placeholder="Premises / Street / Industrial Area"
+                                    value={editingParty?.address || ''}
+                                    onChange={(e) => setEditingParty(prev => ({ ...prev, address: e.target.value }))}
+                                    className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">City / Location</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Mumbai, Delhi, Ahmedabad"
+                                    value={editingParty?.city || ''}
+                                    onChange={(e) => setEditingParty(prev => ({ ...prev, city: e.target.value }))}
+                                    className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">PAN Number</label>
+                                    <input
+                                        type="text"
+                                        maxLength={10}
+                                        placeholder="ABCDE1234F"
+                                        value={editingParty?.pan || ''}
+                                        onChange={(e) => setEditingParty(prev => ({ ...prev, pan: e.target.value.toUpperCase() }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 uppercase font-mono focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">GSTIN Number</label>
+                                    <input
+                                        type="text"
+                                        maxLength={15}
+                                        placeholder="27ABCDE1234F1Z5"
+                                        value={editingParty?.gst || ''}
+                                        onChange={(e) => setEditingParty(prev => ({ ...prev, gst: e.target.value.toUpperCase() }))}
+                                        className="w-full text-sm p-2.5 rounded-lg border border-gray-300 uppercase font-mono focus:ring-2 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowPartyModal(false); setEditingParty(null); }}
+                                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md transition-colors flex items-center gap-2"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4" />
+                                    Save Party
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Truck Fleet Modal */}
+            {showTruckModal && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full my-8 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-slate-800 to-gray-900 text-white p-5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold">
+                                    {editingTruck?.id ? 'Edit Vehicle Details' : 'Add Vehicle to Fleet'}
+                                </h3>
+                                <p className="text-xs text-slate-300 mt-0.5">Save vehicle number & transporter info for fast auto-fill</p>
+                            </div>
+                            <button
+                                onClick={() => { setShowTruckModal(false); setEditingTruck(null); }}
+                                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+                            >
+                                <XIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveTruck} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Truck / Vehicle No *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. MH04EB5678"
+                                    value={editingTruck?.truckNo || ''}
+                                    onChange={(e) => setEditingTruck(prev => ({ ...prev, truckNo: e.target.value.toUpperCase() }))}
+                                    className="w-full text-base font-bold font-mono uppercase p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-slate-700"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Owner / Transporter Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. Sharma Transport / Self"
+                                    value={editingTruck?.ownerName || ''}
+                                    onChange={(e) => setEditingTruck(prev => ({ ...prev, ownerName: e.target.value }))}
+                                    className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-slate-700"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Owner / Driver Contact</label>
+                                <input
+                                    type="tel"
+                                    placeholder="10 digit phone number"
+                                    value={editingTruck?.contactNumber || ''}
+                                    onChange={(e) => setEditingTruck(prev => ({ ...prev, contactNumber: e.target.value }))}
+                                    className="w-full text-sm p-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-slate-700"
+                                />
+                            </div>
+
+                            <div className="pt-4 border-t flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowTruckModal(false); setEditingTruck(null); }}
+                                    className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-6 py-2 text-sm font-bold text-white bg-slate-800 hover:bg-slate-900 rounded-lg shadow-md transition-colors flex items-center gap-2"
+                                >
+                                    <CheckCircleIcon className="w-4 h-4" />
+                                    Save Vehicle
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

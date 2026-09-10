@@ -19,10 +19,10 @@ interface DataManagementProps {
     onUploadAsset?: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
 }
 
-type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'database-setup' | 'brand-settings';
+type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'brand-settings';
 
 const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab, companyDetails, onUpdateDetails, onUploadAsset }) => {
-    const [activeTab, setActiveTab] = useState<Tab>(initialTab || (currentRole === 'Operator' ? 'customer-details' : 'database-setup'));
+    const [activeTab, setActiveTab] = useState<Tab>(initialTab || (currentRole === 'Operator' ? 'customer-details' : 'vehicle-hiring'));
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -316,9 +316,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
     `.trim();
 
     useEffect(() => {
-        if (activeTab !== 'database-setup') {
-            fetchData();
-        }
+        fetchData();
     }, [activeTab]);
 
     const fetchData = async () => {
@@ -1305,18 +1303,17 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         <h1 className="text-2xl font-bold text-gray-900">Data Management</h1>
                     </div>
                 </div>
-                <p className="text-sm text-gray-500 ml-11">View, manage, and fix database schema errors</p>
+                <p className="text-sm text-gray-500 ml-11">Manage parties, trucks, vehicle hirings, bookings and company settings</p>
             </div>
 
             <div className="flex flex-wrap gap-2 border-b border-gray-200 mb-6 bg-gray-50/50 p-1 rounded-t-lg">
                 {[
-                    { id: 'vehicle-hiring', label: 'Vehicle Hiring' },
-                    { id: 'booking-register', label: 'Booking Register' },
-                    { id: 'customer-details', label: 'Customer Details' },
-                    { id: 'vehicle-fleet', label: 'Vehicle Fleet' },
-                    { id: 'register-entries', label: 'Register' },
-                    { id: 'brand-settings', label: 'Company Settings' },
-                    { id: 'database-setup', label: 'Database Setup' }
+                    { id: 'vehicle-hiring', label: '🚛 Vehicle Hiring' },
+                    { id: 'booking-register', label: '📋 Booking Register' },
+                    { id: 'customer-details', label: '👤 Customer Details' },
+                    { id: 'vehicle-fleet', label: '🚚 Vehicle Fleet' },
+                    { id: 'register-entries', label: '📑 Register' },
+                    { id: 'brand-settings', label: '⚙️ Company Settings' }
                 ].filter(tab => {
                     if (currentRole === 'Operator') {
                         return tab.id === 'customer-details' || tab.id === 'vehicle-fleet' || tab.id === 'register-entries';
@@ -1493,41 +1490,6 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                         >
                             {isSavingSettings ? 'Saving...' : 'Save All Settings'}
                         </button>
-                    </div>
-                </div>
-            ) : activeTab === 'database-setup' ? (
-                <div className="space-y-6">
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
-                        <div className="flex">
-                            <div className="flex-shrink-0">
-                                <CheckCircleIcon className="h-5 w-5 text-red-500" />
-                            </div>
-                            <div className="ml-3">
-                                <p className="text-sm text-red-700 font-bold">
-                                    Database Update Required
-                                </p>
-                                <p className="text-xs text-red-600 mt-1">
-                                    To fix "403 Permission Denied" or "Could not find column" errors, copy and run the complete script below in your Supabase SQL Editor.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-semibold text-gray-800">Complete Fix Script</h3>
-                            <button
-                                onClick={handleCopy}
-                                className={`px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${copied ? 'bg-green-100 text-green-700' : 'bg-gray-800 text-white hover:bg-gray-700'}`}
-                            >
-                                {copied ? <CheckCircleIcon className="w-5 h-5" /> : null}
-                                {copied ? 'Copied!' : 'Copy Fix Script'}
-                            </button>
-                        </div>
-
-                        <div className="bg-gray-900 rounded-lg p-4 overflow-auto max-h-[400px] border border-gray-700 shadow-inner group relative">
-                            <pre className="text-green-400 font-mono text-xs whitespace-pre-wrap">{sqlScript}</pre>
-                        </div>
                     </div>
                 </div>
             ) : (

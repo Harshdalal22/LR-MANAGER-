@@ -779,7 +779,7 @@ const App: React.FC = () => {
                     />
                 );
             case 'vehicle-hiring':
-                return <VehicleHiring onBack={() => setCurrentView('dashboard')} />;
+                return <VehicleHiring onBack={() => setCurrentView('dashboard')} lorryReceipts={lorryReceipts} />;
             case 'booking-register':
                 return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} initialTab="register-entries" companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
             case 'data-management':

@@ -6,8 +6,11 @@ import { getVehicleHirings, saveVehicleHiring, deleteVehicleHiring } from '../se
 import { toast } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
+import { LorryReceipt } from '../types';
+
 interface VehicleHiringProps {
     onBack: () => void;
+    lorryReceipts?: LorryReceipt[];
 }
 
 const initialRecord: VehicleHiringType = {
@@ -29,7 +32,7 @@ const initialRecord: VehicleHiringType = {
     paymentStatus: 'Pending'
 };
 
-const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
+const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [] }) => {
     const [records, setRecords] = useState<VehicleHiringType[]>([]);
     const [view, setView] = useState<'list' | 'form'>('list');
     const [formData, setFormData] = useState<VehicleHiringType>(initialRecord);
@@ -38,6 +41,10 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
     const [isImporting, setIsImporting] = useState(false);
     const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // LR auto-fill search
+    const [lrSearchQuery, setLrSearchQuery] = useState('');
+    const [showLrDropdown, setShowLrDropdown] = useState(false);
+    const lrSearchRef = useRef<HTMLDivElement>(null);
 
     // Temp state for new payment entry
     const [newPayment, setNewPayment] = useState<PaymentRecord>({
@@ -125,6 +132,37 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             setIsLoading(false);
         }
     };
+
+    const handleAddNew = () => {
+        setFormData(initialRecord);
+        setLrSearchQuery('');
+        setShowLrDropdown(false);
+        setView('form');
+    };
+
+    // Auto-fill form from a selected LR
+    const handleFillFromLR = (lr: LorryReceipt) => {
+        setFormData(prev => ({
+            ...prev,
+            grNo: lr.lrNo || prev.grNo,
+            lorryNo: lr.truckNo || prev.lorryNo,
+            driverNo: lr.driverContact || prev.driverNo,
+            fromPlace: lr.fromPlace || prev.fromPlace,
+            toPlace: lr.toPlace || prev.toPlace,
+            date: lr.date || prev.date,
+        }));
+        setLrSearchQuery(`LR ${lr.lrNo} — ${lr.truckNo}`);
+        setShowLrDropdown(false);
+        toast.success(`✅ Details filled from LR ${lr.lrNo}`);
+    };
+
+    const filteredLrSuggestions = lrSearchQuery.length >= 2
+        ? lorryReceipts.filter(lr =>
+            lr.lrNo?.toLowerCase().includes(lrSearchQuery.toLowerCase()) ||
+            lr.truckNo?.toLowerCase().includes(lrSearchQuery.toLowerCase()) ||
+            lr.consignor?.name?.toLowerCase().includes(lrSearchQuery.toLowerCase())
+          ).slice(0, 6)
+        : [];
 
     const handleEdit = (record: VehicleHiringType) => {
         setFormData({
@@ -512,7 +550,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
                             Export CSV
                         </button>
                         <button
-                            onClick={() => { setFormData(initialRecord); setView('form'); }}
+                            onClick={handleAddNew}
                             className="bg-ssk-blue text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-800 transition-colors flex items-center gap-2 shadow-md"
                         >
                             <PlusIcon className="w-5 h-5" /> Add Row
@@ -629,6 +667,40 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack }) => {
             {view === 'form' && (
                 <div className="max-w-4xl mx-auto">
                     <form onSubmit={handleSubmit} className="space-y-6">
+
+                        {/* LR Quick-Fill (only for new records) */}
+                        {!formData.id && lorryReceipts.length > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                <p className="text-xs font-black text-blue-700 uppercase tracking-widest mb-2">🔗 Fill from existing LR (optional)</p>
+                                <div className="relative" ref={lrSearchRef}>
+                                    <input
+                                        type="text"
+                                        placeholder="Type LR No, Truck No or Party name to auto-fill..."
+                                        value={lrSearchQuery}
+                                        onChange={e => { setLrSearchQuery(e.target.value); setShowLrDropdown(true); }}
+                                        onFocus={() => setShowLrDropdown(true)}
+                                        className="w-full px-4 py-2.5 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 bg-white"
+                                    />
+                                    {showLrDropdown && filteredLrSuggestions.length > 0 && (
+                                        <div className="absolute z-50 mt-1 w-full bg-white rounded-xl border border-blue-200 shadow-xl overflow-hidden">
+                                            {filteredLrSuggestions.map(lr => (
+                                                <button
+                                                    key={lr.lrNo}
+                                                    type="button"
+                                                    onClick={() => handleFillFromLR(lr)}
+                                                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0"
+                                                >
+                                                    <span className="font-black text-blue-700 text-sm">LR {lr.lrNo}</span>
+                                                    <span className="text-xs text-gray-500 ml-2">{lr.truckNo} • {lr.fromPlace} → {lr.toPlace}</span>
+                                                    {lr.consignor?.name && <span className="text-xs text-gray-400 ml-2">| {lr.consignor.name}</span>}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-gray-50 p-4 rounded-lg border">
                             <h3 className="text-lg font-bold text-gray-800 mb-4 border-b pb-2">Basic Details</h3>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

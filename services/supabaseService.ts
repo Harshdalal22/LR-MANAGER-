@@ -176,10 +176,7 @@ export const signInWithGoogle = async () => {
 };
 
 export const signOut = async (): Promise<void> => {
-    // 1. Clear in-memory user cache immediately
-    cachedUserId = null;
-
-    // 2. Try global signOut with a short timeout to prevent network hang
+    // 1. Try global signOut with a short timeout to prevent network hang
     try {
         const globalSignOutPromise = supabase.auth.signOut({ scope: 'global' });
         const timeoutPromise = new Promise<void>((_, reject) =>

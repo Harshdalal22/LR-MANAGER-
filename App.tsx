@@ -22,6 +22,8 @@ const PasswordResetModal = lazy(() => import('./components/PasswordResetModal'))
 const RoleSelection = lazy(() => import('./components/RoleSelection'));
 const AdminPanel3D = lazy(() => import('./components/AdminPanel3D'));
 const GPSPanel = lazy(() => import('./components/GPSPanel'));
+const ReportsView = lazy(() => import('./components/ReportsView'));
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
 import {
     LorryReceipt,
     CompanyDetails,
@@ -142,6 +144,7 @@ const App: React.FC = () => {
     const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
     const [managerRequests, setManagerRequests] = useState<any[]>([]);
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
@@ -770,6 +773,7 @@ const App: React.FC = () => {
                         userEmail={session?.user?.email}
                         onSignOut={handleSignOut}
                         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+                        onOpenSettings={() => setIsSettingsModalOpen(true)}
                     />
                 );
             case 'list':
@@ -881,6 +885,15 @@ const App: React.FC = () => {
                         onRemoveLRsFromInvoice={handleClearLRInvoiceDetails}
                     />
                 );
+            case 'reports':
+                return (
+                    <ReportsView
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        onBack={() => setCurrentView('dashboard')}
+                        language={language}
+                    />
+                );
             default:
                 return <div>View Not Found</div>;
         }
@@ -960,6 +973,17 @@ const App: React.FC = () => {
                             managerRequests={managerRequests}
                             onApproveManagerRequest={handleApproveManagerRequest}
                             onRejectManagerRequest={handleRejectManagerRequest}
+                        />
+                    )}
+                    {isSettingsModalOpen && (
+                        <SettingsModal
+                            isOpen={isSettingsModalOpen}
+                            onClose={() => setIsSettingsModalOpen(false)}
+                            companyDetails={companyDetails}
+                            onUpdateDetails={handleUpdateDetails}
+                            onUploadAsset={handleUploadAsset}
+                            language={language}
+                            currentRole={currentRole}
                         />
                     )}
                 </Suspense>
@@ -1082,6 +1106,20 @@ const App: React.FC = () => {
                     <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
                         <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
                     </div>
+                </Suspense>
+            )}
+
+            {isSettingsModalOpen && (
+                <Suspense fallback={null}>
+                    <SettingsModal
+                        isOpen={isSettingsModalOpen}
+                        onClose={() => setIsSettingsModalOpen(false)}
+                        companyDetails={companyDetails}
+                        onUpdateDetails={handleUpdateDetails}
+                        onUploadAsset={handleUploadAsset}
+                        language={language}
+                        currentRole={currentRole}
+                    />
                 </Suspense>
             )}
         </div>

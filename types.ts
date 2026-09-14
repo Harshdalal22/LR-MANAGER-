@@ -286,4 +286,4 @@ export interface LedgerStatement {
     created_at: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager';
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager' | 'reports';

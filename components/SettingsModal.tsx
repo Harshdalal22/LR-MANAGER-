@@ -12,6 +12,7 @@ interface SettingsModalProps {
     onUploadAsset: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
     language?: Language;
     currentRole?: 'Admin' | 'Manager' | 'Operator';
+    onSignOut?: () => void;
 }
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -21,7 +22,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     onUpdateDetails,
     onUploadAsset,
     language = 'en',
-    currentRole = 'Admin'
+    currentRole = 'Admin',
+    onSignOut
 }) => {
     const isHi = language === 'hi';
     const [localDetails, setLocalDetails] = useState<CompanyDetails>(companyDetails);
@@ -531,23 +533,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
 
                 {/* ── Modal Action Footer ── */}
-                <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                        {isHi ? 'रद्द करें' : 'Cancel'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                    >
-                        {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-                        <span>{isSaving ? (isHi ? 'सहेज रहे हैं...' : 'Saving...') : (isHi ? 'सेटिंग्स सहेजें' : 'Save Settings')}</span>
-                    </button>
+                <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3 shrink-0">
+                    <div>
+                        {onSignOut && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onClose();
+                                    onSignOut();
+                                }}
+                                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 border border-red-200 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                                title={isHi ? "खाते से लॉगआउट करें" : "Sign out of account"}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                <span>{isHi ? 'साइन आउट' : 'Sign Out'}</span>
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+                        >
+                            {isHi ? 'रद्द करें' : 'Cancel'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-500/30 flex items-center gap-2 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                        >
+                            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+                            <span>{isSaving ? (isHi ? 'सहेज रहे हैं...' : 'Saving...') : (isHi ? 'सेटिंग्स सहेजें' : 'Save Settings')}</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

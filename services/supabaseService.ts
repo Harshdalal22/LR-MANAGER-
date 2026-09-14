@@ -175,11 +175,56 @@ export const signInWithGoogle = async () => {
     return data;
 };
 
-export const signOut = async () => {
-    // Clear cache immediately so subsequent calls don't use stale data
+export const signOut = async (): Promise<void> => {
+    // 1. Clear in-memory user cache immediately
     cachedUserId = null;
-    // Fire and forget — don't block on the network; local state is cleared by caller
-    supabase.auth.signOut().catch(err => console.warn('SignOut network error (safe to ignore):', err));
+
+    // 2. Try global signOut with a short timeout to prevent network hang
+    try {
+        const globalSignOutPromise = supabase.auth.signOut({ scope: 'global' });
+        const timeoutPromise = new Promise<void>((_, reject) =>
+            setTimeout(() => reject(new Error('SignOut network timeout')), 2500)
+        );
+        await Promise.race([globalSignOutPromise, timeoutPromise]);
+    } catch (err) {
+        console.warn('Global signOut network warning (falling back to local):', err);
+        try {
+            // Local signOut ensures Supabase client discards session even if network failed
+            await supabase.auth.signOut({ scope: 'local' });
+        } catch (localErr) {
+            console.warn('Local signOut warning:', localErr);
+        }
+    }
+
+    // 3. Forcefully remove ALL Supabase auth keys and application cache from localStorage
+    try {
+        const removeKeys: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const lowerKey = key.toLowerCase();
+                if (
+                    key.startsWith('sb-') ||
+                    lowerKey.includes('auth-token') ||
+                    lowerKey.includes('supabase') ||
+                    key.startsWith('bilty_cached_') ||
+                    key === 'bilty_last_sync'
+                ) {
+                    removeKeys.push(key);
+                }
+            }
+        }
+        removeKeys.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+        console.warn('Error clearing localStorage in signOut:', e);
+    }
+
+    // 4. Forcefully clear sessionStorage
+    try {
+        sessionStorage.clear();
+    } catch (e) {
+        console.warn('Error clearing sessionStorage in signOut:', e);
+    }
 };
 
 export const getSession = async (): Promise<Session | null> => {

@@ -839,6 +839,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [pendingBasisFilter, setPendingBasisFilter] = useState<'ALL' | 'TO PAY' | 'TO BE BILLED' | 'ON_ROAD'>('ALL');
     const [pendingSortBy, setPendingSortBy] = useState<'highest' | 'recent'>('highest');
     const [showAllPending, setShowAllPending] = useState(false);
+    const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
     // Compute all pending LRs with financials in real-time
     const pendingLRsWithFin = lorryReceipts
@@ -1069,6 +1070,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </svg>
                                 <span>{isHi ? 'सेटिंग्स' : 'Settings'}</span>
                             </button>
+
+                            {/* Sign Out (Sidebar) */}
+                            {onSignOut && (
+                                <button
+                                    onClick={onSignOut}
+                                    className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 font-medium text-sm transition-colors cursor-pointer text-left group"
+                                    title={isHi ? 'खाते से लॉगआउट करें' : 'Sign out of your account'}
+                                >
+                                    <svg className="w-5 h-5 shrink-0 group-hover:text-rose-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                    <span>{isHi ? 'साइन आउट' : 'Sign Out'}</span>
+                                </button>
+                            )}
                         </nav>
                     </div>
 
@@ -1151,26 +1166,90 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </span>
                             </div>
 
-                            {/* User Profile */}
-                            <div 
-                                onClick={() => onOpenAdminPanel ? onOpenAdminPanel() : null}
-                                className="flex items-center gap-3 pl-2 py-1 pr-2 rounded-xl hover:bg-slate-800/80 transition-colors cursor-pointer"
-                                title="Click to open Admin Panel"
-                            >
-                                <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-white font-black text-xs shadow-inner">
-                                    {userInitial}
-                                </div>
-                                <div className="hidden sm:block text-left">
-                                    <div className="text-xs font-bold text-white leading-tight">
-                                        {userName}
+                            {/* User Profile with Interactive Dropdown */}
+                            <div className="relative">
+                                <div 
+                                    onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                                    className="flex items-center gap-2 sm:gap-3 pl-2 py-1 pr-2 rounded-xl hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                    title={isHi ? "प्रोफ़ाइल मेनू खोलें" : "Open user menu"}
+                                >
+                                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-500 border border-slate-700 flex items-center justify-center text-white font-black text-xs shadow-inner">
+                                        {userInitial}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
-                                        {userRoleDisplay}
+                                    <div className="hidden sm:block text-left">
+                                        <div className="text-xs font-bold text-white leading-tight">
+                                            {userName}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                                            {userRoleDisplay}
+                                        </div>
                                     </div>
+                                    <svg className={`w-4 h-4 text-slate-400 hidden sm:block transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180 text-white' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
                                 </div>
-                                <svg className="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-                                </svg>
+
+                                {/* User Dropdown Popover */}
+                                {isUserMenuOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setIsUserMenuOpen(false)} />
+                                        <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#0e1628] border border-slate-700/80 shadow-2xl z-50 p-2 text-slate-200 animate-fadeIn">
+                                            <div className="px-3 py-2.5 border-b border-slate-800/80 mb-1.5">
+                                                <p className="text-xs font-black text-white truncate">{userName}</p>
+                                                <p className="text-[10px] text-cyan-400 font-mono font-medium truncate mt-0.5">{userEmail || 'Active Operator'}</p>
+                                                <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 text-[9px] font-black uppercase tracking-wider border border-blue-500/30">
+                                                    {userRoleDisplay} MODE
+                                                </span>
+                                            </div>
+
+                                            {onOpenAdminPanel && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsUserMenuOpen(false);
+                                                        onOpenAdminPanel();
+                                                    }}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left cursor-pointer"
+                                                >
+                                                    <span className="text-sm">🛡️</span>
+                                                    <span>{isHi ? 'एडमिन सेंटर' : 'Admin Control Center'}</span>
+                                                </button>
+                                            )}
+
+                                            {onOpenSettings && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setIsUserMenuOpen(false);
+                                                        onOpenSettings();
+                                                    }}
+                                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left cursor-pointer"
+                                                >
+                                                    <span className="text-sm">⚙️</span>
+                                                    <span>{isHi ? 'वेब ऐप सेटिंग्स' : 'Web App Settings'}</span>
+                                                </button>
+                                            )}
+
+                                            {onSignOut && (
+                                                <div className="border-t border-slate-800/80 mt-1.5 pt-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setIsUserMenuOpen(false);
+                                                            onSignOut();
+                                                        }}
+                                                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-600/30 transition-colors text-left cursor-pointer"
+                                                    >
+                                                        <svg className="w-4 h-4 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                                        </svg>
+                                                        <span>{isHi ? 'साइन आउट (लॉगआउट)' : 'Sign Out of Account'}</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
 
                             {/* Settings Button */}
@@ -1185,16 +1264,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </svg>
                             </button>
 
-                            {/* Sign Out Button (Quick access) */}
+                            {/* Sign Out Button (Prominent & Quick Access) */}
                             {onSignOut && (
                                 <button
                                     onClick={onSignOut}
-                                    className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 hover:text-white border border-rose-500/30 transition-all cursor-pointer shadow-xs active:scale-95 text-xs font-bold"
                                     title={isHi ? 'लॉगआउट' : 'Sign Out'}
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                                     </svg>
+                                    <span className="hidden sm:inline">{isHi ? 'साइन आउट' : 'Sign Out'}</span>
                                 </button>
                             )}
                         </div>
@@ -1786,6 +1866,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </svg>
                             <span>More</span>
                         </button>
+                        {onSignOut && (
+                            <button
+                                onClick={onSignOut}
+                                className="flex flex-col items-center gap-1 text-rose-400 hover:text-rose-300 font-bold text-[10px]"
+                                title={isHi ? 'लॉगआउट' : 'Sign Out'}
+                            >
+                                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                <span>{isHi ? 'लॉगआउट' : 'Sign Out'}</span>
+                            </button>
+                        )}
                     </div>
 
                 </div>

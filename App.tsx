@@ -255,6 +255,24 @@ const App: React.FC = () => {
                 }
 
                 const { data } = subscribeToAuthState(async (event, session) => {
+                    if (event === 'SIGNED_OUT' || !session) {
+                        setSession(null);
+                        setIsLoading(false);
+                        sessionStorage.removeItem('currentRole');
+                        sessionStorage.removeItem('adminId');
+                        sessionStorage.removeItem('roleSelected');
+                        setCurrentRole('Admin');
+                        setLorryReceipts([]);
+                        setSavedParties([]);
+                        setSavedTrucks([]);
+                        setCompanyDetails(defaultCompanyDetails);
+                        setCurrentView('dashboard');
+                        setDashboardSection(null);
+                        setViewHistory([]);
+                        setIsPasswordResetting(false);
+                        return;
+                    }
+
                     if (session) {
                         // ✅ FIX 1b: Unblock loading immediately, role check in background
                         setIsLoading(false);
@@ -282,21 +300,6 @@ const App: React.FC = () => {
 
                     if (event === 'PASSWORD_RECOVERY') {
                         setIsPasswordResetting(true);
-                    }
-
-                    if (!session) {
-                        sessionStorage.removeItem('currentRole');
-                        sessionStorage.removeItem('adminId');
-                        sessionStorage.removeItem('roleSelected');
-                        setCurrentRole('Admin');
-                        setLorryReceipts([]);
-                        setSavedParties([]);
-                        setSavedTrucks([]);
-                        setCompanyDetails(defaultCompanyDetails);
-                        setCurrentView('dashboard');
-                        setDashboardSection(null);
-                        setViewHistory([]);
-                        setIsPasswordResetting(false);
                     }
                 });
                 authSubscription = data.subscription;
@@ -584,7 +587,14 @@ const App: React.FC = () => {
     const handleSignOut = async () => {
         const toastId = toast.loading('Signing out...');
 
-        // ── 1. Clear ALL local state immediately so the UI transitions now ──
+        try {
+            // Await remote session invalidation and storage purging
+            await signOut();
+        } catch (err) {
+            console.warn('Sign-out error:', err);
+        }
+
+        // ── Clear ALL local state and modals immediately ──
         setSession(null);
         setIsPasswordResetting(false);
         setIsLoading(false);
@@ -595,18 +605,25 @@ const App: React.FC = () => {
         setCurrentView('dashboard');
         setViewHistory([]);
         setDashboardSection(null);
-        sessionStorage.removeItem('roleSelected');
-        sessionStorage.removeItem('currentRole');
-        sessionStorage.removeItem('adminId');
         setCurrentRole('Admin');
+        setShowRoleSelection(false);
+        setIsAdminPanelOpen(false);
+        setIsSettingsModalOpen(false);
+
+        // Clear session & localStorage flags
+        try {
+            sessionStorage.clear();
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('bilty_cached_'))) {
+                    localStorage.removeItem(key);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed clearing storage during sign out:', e);
+        }
 
         toast.success('Signed out successfully.', { id: toastId });
-
-        // ── 2. Invalidate the remote session in the background ──
-        // (fire-and-forget — user is already on the login screen)
-        signOut().catch(err =>
-            console.warn('Remote sign-out error (safe to ignore):', err)
-        );
     };
 
     const handleEditLR = (lrNo: string) => {
@@ -973,6 +990,7 @@ const App: React.FC = () => {
                             managerRequests={managerRequests}
                             onApproveManagerRequest={handleApproveManagerRequest}
                             onRejectManagerRequest={handleRejectManagerRequest}
+                            onSignOut={handleSignOut}
                         />
                     )}
                     {isSettingsModalOpen && (
@@ -984,6 +1002,7 @@ const App: React.FC = () => {
                             onUploadAsset={handleUploadAsset}
                             language={language}
                             currentRole={currentRole}
+                            onSignOut={handleSignOut}
                         />
                     )}
                 </Suspense>

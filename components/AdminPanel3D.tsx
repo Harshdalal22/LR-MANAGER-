@@ -55,6 +55,14 @@ import {
 interface AdminPanel3DProps {
     onClose?: () => void;
     currentRole: 'Admin' | 'Manager' | 'Operator';
+    isOpen?: boolean;
+    companyDetails?: CompanyDetails;
+    onUpdateDetails?: (details: CompanyDetails) => Promise<boolean>;
+    onUploadAsset?: (file: File, type: 'logo' | 'signature') => Promise<string | null>;
+    managerRequests?: any[];
+    onApproveManagerRequest?: (request: any) => void;
+    onRejectManagerRequest?: (requestId: string) => void;
+    onSignOut?: () => void;
 }
 
 interface StatCard3DProps {
@@ -300,7 +308,7 @@ const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) =>
     );
 };
 
-const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => {
+const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole, onSignOut }) => {
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'system' | 'analytics' | 'ledger'>('overview');
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -520,15 +528,34 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole }) => 
                         </div>
                     </div>
 
-                    {onClose && (
-                        <button
-                            onClick={onClose}
-                            className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white font-semibold
-                                     hover:bg-white/20 transition-all duration-300 hover:scale-105 shadow-xl"
-                        >
-                            Close Panel
-                        </button>
-                    )}
+                    <div className="flex items-center gap-3">
+                        {onSignOut && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (onClose) onClose();
+                                    onSignOut();
+                                }}
+                                className="px-5 py-3 bg-red-500/20 backdrop-blur-xl border border-red-500/40 rounded-xl text-red-300 font-bold hover:bg-red-500/30 hover:text-white transition-all duration-300 hover:scale-105 shadow-xl cursor-pointer flex items-center gap-2"
+                                title="Sign out of your account"
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                </svg>
+                                <span>Sign Out</span>
+                            </button>
+                        )}
+                        {onClose && (
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white font-semibold
+                                         hover:bg-white/20 transition-all duration-300 hover:scale-105 shadow-xl cursor-pointer"
+                            >
+                                Close Panel
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Tab Navigation */}

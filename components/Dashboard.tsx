@@ -865,8 +865,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             const truckMatch = lr.truckNo?.toLowerCase().includes(q);
             const debtorMatch = fin.debtorName?.toLowerCase().includes(q);
             const consignorMatch = lr.consignor?.name?.toLowerCase().includes(q);
+            const consigneeMatch = lr.consignee?.name?.toLowerCase().includes(q);
             const routeMatch = `${lr.fromPlace || ''} ${lr.toPlace || ''}`.toLowerCase().includes(q);
-            return lrNoMatch || truckMatch || debtorMatch || consignorMatch || consigneeMatch || routeMatch;
+            return Boolean(lrNoMatch || truckMatch || debtorMatch || consignorMatch || consigneeMatch || routeMatch);
         }
         return true;
     });

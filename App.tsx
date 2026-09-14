@@ -222,10 +222,10 @@ const App: React.FC = () => {
     useEffect(() => {
         let authSubscription: Subscription | null = null;
 
-        // Safety timeout: never stay stuck on loading screen for more than 10 seconds
+        // Safety timeout: never stay stuck on loading screen for more than 1.5 seconds
         const loadingTimeout = setTimeout(() => {
             setIsLoading(false);
-        }, 10000);
+        }, 1500);
 
         const setupAuth = async () => {
             try {

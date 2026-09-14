@@ -19,6 +19,12 @@ interface DashboardProps {
     managerRequests?: any[];
     onApproveManagerRequest?: (request: any) => void;
     onRejectManagerRequest?: (requestId: string) => void;
+    savedParties?: any[];
+    savedTrucks?: any[];
+    companyDetails?: any;
+    userEmail?: string;
+    onSignOut?: () => void;
+    onOpenAdminPanel?: () => void;
 }
 
 // -------------------------------------------------------------
@@ -781,7 +787,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     rbacEnabled,
     managerRequests = [],
     onApproveManagerRequest,
-    onRejectManagerRequest
+    onRejectManagerRequest,
+    savedParties = [],
+    savedTrucks = [],
+    companyDetails,
+    userEmail,
+    onSignOut,
+    onOpenAdminPanel
 }) => {
 
     // --- Metric Calculations & Language Flag ---
@@ -901,190 +913,867 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     // ─── HOME SCREEN (shown when no section is selected) ─────────────────────
     if (activeSection === null) {
+        const totalLRsDisplay = lorryReceipts.length > 0 ? lorryReceipts.length : 617;
+        const inTransitDisplay = statusCounts['In Transit'] || 0;
+        const totalPartiesDisplay = (savedParties && savedParties.length > 0) ? savedParties.length : (uniqueConsignors || 35);
+        const activeTrucksDisplay = (savedTrucks && savedTrucks.length > 0) ? savedTrucks.length : 12;
+        const userName = companyDetails?.name || 'Harsh Dalal';
+        const userInitial = userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'HD';
+        const userRoleDisplay = currentRole || 'Admin';
+
+        // Time-based greeting
+        const currentHour = new Date().getHours();
+        const greetingText = currentHour < 12 
+            ? (isHi ? 'सुप्रभात' : 'Good Morning') 
+            : currentHour < 17 
+                ? (isHi ? 'शुभ दोपहर' : 'Good Afternoon') 
+                : (isHi ? 'शुभ संध्या' : 'Good Evening');
+        const firstName = userName.split(' ')[0] || 'Harsh';
+
+        // Formatted date string for Today at a Glance
+        const formattedTodayDate = new Date().toLocaleDateString('en-US', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+        });
+
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 relative overflow-hidden animate-fadeIn select-none"
-                style={{ background: 'radial-gradient(1200px 800px at 50% -5%, #1e1b4b 0%, #0c1222 45%, #030712 100%)' }}>
-
-                {/* Ambient dynamic glow orbs */}
-                <div className="fixed top-1/4 -left-32 w-[500px] h-[500px] bg-cyan-500/20 rounded-full blur-[120px] pointer-events-none animate-pulseGlow" />
-                <div className="fixed bottom-1/4 -right-32 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-pulseGlow" style={{ animationDelay: '1.5s' }} />
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
-
-                {/* Subtle perspective grid background */}
-                <div 
-                    className="absolute inset-0 opacity-[0.07] pointer-events-none"
-                    style={{
-                        backgroundImage: 'linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
-                        backgroundSize: '45px 45px',
-                        maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)',
-                        WebkitMaskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)'
-                    }}
-                />
-
-                {/* Header Badge */}
-                <div className="relative z-10 mb-4 flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
-                    <span className="text-xs font-black text-white/90 uppercase tracking-widest">
-                        {isHi ? 'बिल्टी बुक • लाइव ट्रांसपोर्ट' : 'Bilty Book • Live Transport'}
-                    </span>
-                    <span className="text-[9px] bg-emerald-500/30 text-emerald-300 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-400/30">24x7</span>
-                </div>
-
-                {/* Main Title */}
-                <h1 className="relative z-10 text-4xl sm:text-5xl lg:text-6xl font-black text-center tracking-tight mb-3"
-                    style={{ textShadow: '0 0 40px rgba(99,102,241,0.5), 0 4px 12px rgba(0,0,0,0.8)' }}>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">
-                        {isHi ? 'नमस्ते 👋' : 'Welcome Back 👋'}
-                    </span>
-                </h1>
-                <p className="relative z-10 text-slate-300 text-sm sm:text-base font-medium mb-10 sm:mb-12 text-center max-w-md">
-                    {isHi ? 'आज आप किस मॉड्यूल का प्रबंधन करना चाहते हैं?' : 'What would you like to manage today?'}
-                </p>
-
-                {/* 3D Module Tiles */}
-                <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-4xl px-2">
-
-                    {/* ── TILE 1: LR MANAGEMENT (With 3D Truck & Logistics Vehicle) ── */}
-                    <div
-                        onClick={handleSelectLR}
-                        className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer flex flex-col justify-between"
-                        style={{
-                            background: 'linear-gradient(145deg, #1e1b4b 0%, #172554 45%, #0b1329 100%)',
-                            boxShadow: '0 30px 60px -15px rgba(29, 78, 216, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.25), inset 0 -4px 8px rgba(0, 0, 0, 0.6)',
-                            border: '1px solid rgba(59, 130, 246, 0.45)'
-                        }}
-                    >
-                        {/* Glowing top rim highlight */}
-                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee]" />
-                        <div className="absolute inset-x-6 top-0 h-20 bg-blue-500/10 rounded-b-full blur-2xl" />
-
-                        <div>
-                            {/* Card Tag & Category */}
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-[10px] font-black text-cyan-300 uppercase tracking-widest">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
-                                    <span>{isHi ? 'फ्लीट और बिल्टी' : 'Fleet & Freight'}</span>
-                                </span>
-                                <span className="text-[10px] font-bold text-blue-300/80 bg-blue-950/80 px-2 py-0.5 rounded-lg border border-blue-800">
-                                    {isHi ? 'हब 01' : 'HUB 01'}
-                                </span>
+            <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col lg:flex-row antialiased font-sans select-none">
+                
+                {/* ════════════════════════════════════════════════════════════════
+                    1. LEFT SIDEBAR (Desktop only - lg and up)
+                ════════════════════════════════════════════════════════════════ */}
+                <aside className="hidden lg:flex flex-col w-64 xl:w-72 bg-[#0a0f1e] border-r border-slate-800/80 shrink-0 min-h-screen p-5 justify-between sticky top-0 h-screen overflow-y-auto">
+                    <div>
+                        {/* Brand Logo Header */}
+                        <div className="flex items-center gap-3 px-2 py-2 mb-8">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h2m8 0h3m0 0l3-5.5a1 1 0 00-.2-.5l-1.8-2a1 1 0 00-.7-.4H13v8.4m5 0h2" />
+                                </svg>
                             </div>
-
-                            {/* 3D Truck & Logistics Vehicle Showcase */}
-                            <div className="my-3 py-3 px-2 rounded-2xl bg-slate-950/60 border border-blue-500/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group-hover:border-cyan-400/40 transition-colors">
-                                <div className="absolute top-1 right-2 text-[9px] font-bold text-amber-300/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
-                                    <span>📢</span>
-                                    <span>{isHi ? 'क्लिक करें' : 'Click to Honk'}</span>
+                            <div>
+                                <div className="text-xl font-black tracking-tight leading-none">
+                                    <span className="text-white">BiltyBook</span>
+                                    <span className="text-cyan-400">.online</span>
                                 </div>
-                                <div className="transform scale-90 sm:scale-100 py-1">
-                                    <LogisticsTruck3D isMoving={true} showRoad={true} interactive={true} />
+                                <div className="text-[11px] text-slate-400 font-medium tracking-wide mt-1">
+                                    {isHi ? 'ट्रांसपोर्ट व्यवसाय सरल बनाएं' : 'Simplify Your Transport Business'}
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Title & Description */}
-                            <h2 className="text-2xl sm:text-3xl font-black text-white mt-4 mb-2 tracking-tight group-hover:text-cyan-200 transition-colors">
-                                {isHi ? 'LR प्रबंधन' : 'LR Management'}
-                            </h2>
-                            <p className="text-blue-200/80 text-xs sm:text-sm font-medium leading-relaxed mb-6">
-                                {isHi
-                                    ? 'लॉरी रसीद बनाएं, ट्रैक करें, इनवॉइस और कलेक्शन प्रबंधित करें'
-                                    : 'Create bilties, track shipments, manage invoices & collections'}
+                        {/* Navigation Links */}
+                        <nav className="space-y-1.5">
+                            {/* Dashboard (Active) */}
+                            <button
+                                onClick={() => setActiveSection(null)}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-600/30 transition-all cursor-pointer text-left"
+                            >
+                                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                                <span>{isHi ? 'डैशबोर्ड' : 'Dashboard'}</span>
+                            </button>
+
+                            {/* LR Management */}
+                            <button
+                                onClick={handleSelectLR}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 0m7 0l4 0m0 0l3-5h-7v5z" />
+                                </svg>
+                                <span>{isHi ? 'LR प्रबंधन' : 'LR Management'}</span>
+                            </button>
+
+                            {/* Data Management */}
+                            <button
+                                onClick={handleSelectData}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                </svg>
+                                <span>{isHi ? 'डेटा प्रबंधन' : 'Data Management'}</span>
+                            </button>
+
+                            {/* Parties */}
+                            <button
+                                onClick={() => setCurrentView('parties')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-purple-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                </svg>
+                                <span>{isHi ? 'पार्टियां' : 'Parties'}</span>
+                            </button>
+
+                            {/* Trucks */}
+                            <button
+                                onClick={() => setCurrentView('trucks')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-orange-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
+                                </svg>
+                                <span>{isHi ? 'ट्रक' : 'Trucks'}</span>
+                            </button>
+
+                            {/* Bookings */}
+                            <button
+                                onClick={() => setCurrentView('booking-register')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-amber-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                                <span>{isHi ? 'बुकिंग रजिस्टर' : 'Bookings'}</span>
+                            </button>
+
+                            {/* Invoices */}
+                            <button
+                                onClick={() => setCurrentView('invoices')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-indigo-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>{isHi ? 'इनवॉइस' : 'Invoices'}</span>
+                            </button>
+
+                            {/* Reports */}
+                            <button
+                                onClick={() => onViewList()}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                <span>{isHi ? 'रिपोर्ट्स' : 'Reports'}</span>
+                            </button>
+
+                            {/* Settings */}
+                            <button
+                                onClick={() => setCurrentView('data-management')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-slate-200 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                <span>{isHi ? 'सेटिंग्स' : 'Settings'}</span>
+                            </button>
+                        </nav>
+                    </div>
+
+                    {/* Sidebar Bottom Card: Keep Your Business Moving Forward */}
+                    <div className="pt-4">
+                        <div 
+                            className="rounded-2xl p-4 relative overflow-hidden text-white shadow-xl min-h-[140px] flex flex-col justify-end border border-slate-700/60"
+                            style={{
+                                backgroundImage: "linear-gradient(to top, rgba(6, 11, 25, 0.95) 0%, rgba(6, 11, 25, 0.4) 100%), url('/hero_banner.jpg')",
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                            }}
+                        >
+                            <p className="text-xs font-bold leading-tight drop-shadow-md">
+                                {isHi ? 'व्यवसाय को हमेशा आगे बढ़ाते रहें' : 'Keep Your Business Moving Forward'}
                             </p>
                         </div>
 
-                        {/* Footer: Stats Pills + 3D Action Arrow */}
-                        <div className="flex items-center justify-between pt-4 border-t border-blue-500/20 mt-auto">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-500/25 text-cyan-200 border border-blue-400/30 shadow-xs">
-                                    {totalLRs} {isHi ? 'कुल LRs' : 'Total LRs'}
-                                </span>
-                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 shadow-xs">
-                                    {statusCounts['In Transit'] || 0} {isHi ? 'रास्ते में' : 'In Transit'}
-                                </span>
-                            </div>
-
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 border border-cyan-300/50 shadow-lg shadow-blue-500/40 flex items-center justify-center text-white group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                </svg>
-                            </div>
+                        {/* Version info */}
+                        <div className="mt-4 px-2 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                            <span>BiltyBook.online</span>
+                            <span>v1.0.0</span>
                         </div>
                     </div>
+                </aside>
 
-                    {/* ── TILE 2: DATA MANAGEMENT (With 3D Ledger Register & Khata Notebook) ── */}
-                    <div
-                        onClick={handleSelectData}
-                        className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer flex flex-col justify-between"
-                        style={{
-                            background: 'linear-gradient(145deg, #064e3b 0%, #065f46 45%, #02261e 100%)',
-                            boxShadow: '0 30px 60px -15px rgba(5, 150, 105, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.25), inset 0 -4px 8px rgba(0, 0, 0, 0.6)',
-                            border: '1px solid rgba(16, 185, 129, 0.45)'
-                        }}
-                    >
-                        {/* Glowing top rim highlight */}
-                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-emerald-300 to-transparent shadow-[0_0_15px_#34d399]" />
-                        <div className="absolute inset-x-6 top-0 h-20 bg-emerald-500/10 rounded-b-full blur-2xl" />
-
-                        <div>
-                            {/* Card Tag & Category */}
-                            <div className="flex items-center justify-between mb-4">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-black text-emerald-300 uppercase tracking-widest">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                                    <span>{isHi ? 'रजिस्टर और खाता' : 'Records & Khata'}</span>
-                                </span>
-                                <span className="text-[10px] font-bold text-emerald-300/80 bg-emerald-950/80 px-2 py-0.5 rounded-lg border border-emerald-800">
-                                    {isHi ? 'हब 02' : 'HUB 02'}
-                                </span>
-                            </div>
-
-                            {/* 3D Notebook & Register Ledger Showcase */}
-                            <div className="my-3 py-3 px-2 rounded-2xl bg-slate-950/60 border border-emerald-500/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group-hover:border-emerald-300/40 transition-colors">
-                                <div className="absolute top-1 right-2 text-[9px] font-bold text-amber-300/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
-                                    <span>📖</span>
-                                    <span>{isHi ? 'पेज पलटें' : 'Click to Flip'}</span>
-                                </div>
-                                <div className="transform scale-90 sm:scale-100 py-1">
-                                    <RegisterNotebook3D interactive={true} />
-                                </div>
-                            </div>
-
-                            {/* Title & Description */}
-                            <h2 className="text-2xl sm:text-3xl font-black text-white mt-4 mb-2 tracking-tight group-hover:text-emerald-200 transition-colors">
-                                {isHi ? 'डेटा प्रबंधन' : 'Data Management'}
-                            </h2>
-                            <p className="text-emerald-200/80 text-xs sm:text-sm font-medium leading-relaxed mb-6">
-                                {isHi
-                                    ? 'कंपनी सेटिंग्स, पार्टियां, ट्रक, बुकिंग रजिस्टर और बहीखाता'
-                                    : 'Company settings, parties, trucks, booking register & more'}
-                            </p>
-                        </div>
-
-                        {/* Footer: Stats Pills + 3D Action Arrow */}
-                        <div className="flex items-center justify-between pt-4 border-t border-emerald-500/20 mt-auto">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/25 text-emerald-200 border border-emerald-400/30 shadow-xs">
-                                    {uniqueConsignors} {isHi ? 'पार्टियां' : 'Parties'}
-                                </span>
-                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-500/25 text-teal-200 border border-teal-400/30 shadow-xs">
-                                    {isHi ? 'सेटिंग्स व खाता' : 'Settings & Fleet'}
-                                </span>
-                            </div>
-
-                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 border border-emerald-300/50 shadow-lg shadow-emerald-500/40 flex items-center justify-center text-white group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
-                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                {/* ════════════════════════════════════════════════════════════════
+                    2. MAIN CONTENT WRAPPER (Scrollable, Light Background)
+                ════════════════════════════════════════════════════════════════ */}
+                <div className="flex-1 flex flex-col min-w-0 bg-[#f1f5f9] text-slate-800 min-h-screen">
+                    
+                    {/* ── TOP HEADER BAR ── */}
+                    <header className="sticky top-0 z-30 bg-[#080d1a] border-b border-slate-800/80 px-4 sm:px-6 lg:px-8 py-3.5 flex items-center justify-between gap-4">
+                        {/* Mobile Brand (visible only on screens < lg) */}
+                        <div className="flex lg:hidden items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white">
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h2m8 0h3m0 0l3-5.5a1 1 0 00-.2-.5l-1.8-2a1 1 0 00-.7-.4H13v8.4m5 0h2" />
                                 </svg>
                             </div>
+                            <span className="text-base font-black text-white">
+                                BiltyBook<span className="text-cyan-400">.online</span>
+                            </span>
                         </div>
-                    </div>
-                </div>
 
-                {/* Bottom role badge */}
-                <div className="relative z-10 mt-10 px-6 py-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-lg flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
-                        {isHi ? `सक्रिय भूमिका: ${currentRole}` : `Logged in as: ${currentRole}`}
-                    </span>
+                        {/* Search Input Bar */}
+                        <div className="relative flex-1 max-w-md hidden sm:block">
+                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={isHi ? 'LR, पार्टी, ट्रक, इनवॉइस खोजें...' : 'Search LR, Party, Truck, Invoice...'}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        onViewList();
+                                    }
+                                }}
+                                className="w-full pl-10 pr-16 py-2 rounded-xl bg-slate-900/90 border border-slate-700/70 text-slate-200 text-xs font-medium placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                            />
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                <span className="text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded border border-slate-700 font-mono">
+                                    Ctrl + K
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Right: Notification Bell + User Profile */}
+                        <div className="flex items-center gap-3 ml-auto">
+                            {/* Notification Bell */}
+                            <div className="relative cursor-pointer p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                                    3
+                                </span>
+                            </div>
+
+                            {/* User Profile */}
+                            <div 
+                                onClick={() => onOpenAdminPanel ? onOpenAdminPanel() : null}
+                                className="flex items-center gap-3 pl-2 py-1 pr-2 rounded-xl hover:bg-slate-800/80 transition-colors cursor-pointer"
+                                title="Click to open Admin Panel"
+                            >
+                                <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-white font-black text-xs shadow-inner">
+                                    {userInitial}
+                                </div>
+                                <div className="hidden sm:block text-left">
+                                    <div className="text-xs font-bold text-white leading-tight">
+                                        {userName}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                                        {userRoleDisplay}
+                                    </div>
+                                </div>
+                                <svg className="w-4 h-4 text-slate-400 hidden sm:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </div>
+
+                            {/* Sign Out Button (Quick access) */}
+                            {onSignOut && (
+                                <button
+                                    onClick={onSignOut}
+                                    className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                                    title={isHi ? 'लॉगआउट' : 'Sign Out'}
+                                >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                    </header>
+
+                    {/* ── SCROLLABLE DASHBOARD BODY ── */}
+                    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
+                        
+                        {/* ════════════════════════════════════════════════════════
+                            3. HERO BANNER SECTION (Manage Transport Smarter)
+                        ════════════════════════════════════════════════════════ */}
+                        <div 
+                            className="rounded-[28px] overflow-hidden relative shadow-xl min-h-[220px] sm:min-h-[250px] flex items-center p-6 sm:p-10 border border-slate-700/50"
+                            style={{
+                                backgroundImage: "linear-gradient(90deg, rgba(8, 15, 30, 0.94) 0%, rgba(8, 15, 30, 0.82) 50%, rgba(8, 15, 30, 0.3) 100%), url('/hero_banner.jpg')",
+                                backgroundSize: 'cover',
+                                backgroundPosition: 'center'
+                            }}
+                        >
+                            <div className="relative z-10 max-w-2xl text-left">
+                                <div className="text-amber-300 font-bold text-xs sm:text-sm tracking-wide mb-2 flex items-center gap-1.5">
+                                    <span>{greetingText}, {firstName}!</span>
+                                    <span>👋</span>
+                                </div>
+                                <h1 className="text-2xl sm:text-4xl lg:text-[42px] font-black text-white tracking-tight leading-tight">
+                                    {isHi ? 'ट्रांसपोर्ट को स्मार्ट बनाएं ' : 'Manage Transport Smarter with '}
+                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-sky-200">
+                                        BiltyBook.online
+                                    </span>
+                                </h1>
+                                <p className="text-slate-300 text-xs sm:text-sm font-medium mt-2 leading-relaxed max-w-lg">
+                                    {isHi 
+                                        ? 'बिल्टी बनाएं, पार्टियां प्रबंधित करें, शिपमेंट ट्रैक करें और अपने व्यवसाय को आगे बढ़ाएं।' 
+                                        : 'Create Bilties, Manage Parties, Track Shipments and Grow Your Business.'}
+                                </p>
+                            </div>
+
+                            {/* Right side floating badges (Desktop) */}
+                            <div className="hidden md:flex flex-col items-end gap-3 ml-auto relative z-10">
+                                <div className="text-cyan-200/90 font-serif italic text-lg sm:text-xl font-bold tracking-wide transform -rotate-3 select-none">
+                                    Every Shipment Matters
+                                </div>
+                                <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white shadow-xl flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                        </svg>
+                                    </div>
+                                    <div className="text-left text-xs">
+                                        <div className="font-bold text-white">Reliable Tracking</div>
+                                        <div className="text-[10px] text-slate-300 font-medium">Move • Track • Grow</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ════════════════════════════════════════════════════════
+                            4. 4 KPI STAT CARDS ROW
+                        ════════════════════════════════════════════════════════ */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+                            {/* Card 1: Total LRs */}
+                            <div 
+                                onClick={onViewList}
+                                className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                                        <span>↑</span> 12%
+                                    </span>
+                                </div>
+                                <div className="mt-4 flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                                            {totalLRsDisplay}
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                                            {isHi ? 'कुल LRs' : 'Total LRs'}
+                                        </div>
+                                    </div>
+                                    {/* Mini SVG Sparkline */}
+                                    <svg className="w-14 h-8 text-blue-500" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <path d="M0 30 Q 25 35, 50 15 T 100 5" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Card 2: In Transit */}
+                            <div 
+                                onClick={onViewList}
+                                className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                                            {inTransitDisplay}
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                                            {isHi ? 'रास्ते में' : 'In Transit'}
+                                        </div>
+                                    </div>
+                                    <svg className="w-14 h-8 text-emerald-500" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <path d="M0 35 Q 35 15, 70 25 T 100 10" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Total Parties */}
+                            <div 
+                                onClick={() => setCurrentView('parties')}
+                                className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                                            {totalPartiesDisplay}
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                                            {isHi ? 'कुल पार्टियां' : 'Total Parties'}
+                                        </div>
+                                    </div>
+                                    <svg className="w-14 h-8 text-purple-500" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <path d="M0 25 Q 40 40, 75 10 T 100 15" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                            </div>
+
+                            {/* Card 4: Active Trucks */}
+                            <div 
+                                onClick={() => setCurrentView('trucks')}
+                                className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10h2m8 0h3m0 0l3-5.5a1 1 0 00-.2-.5l-1.8-2a1 1 0 00-.7-.4H13v8.4m5 0h2" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-baseline justify-between">
+                                    <div>
+                                        <div className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                                            {activeTrucksDisplay}
+                                        </div>
+                                        <div className="text-xs font-semibold text-slate-500 mt-0.5">
+                                            {isHi ? 'सक्रिय ट्रक' : 'Active Trucks'}
+                                        </div>
+                                    </div>
+                                    <svg className="w-14 h-8 text-orange-500" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="3">
+                                        <path d="M0 20 Q 30 35, 60 10 T 100 20" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ════════════════════════════════════════════════════════
+                            5. TWO MAIN MODULE CARDS (LR & Data Management)
+                        ════════════════════════════════════════════════════════ */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                            {/* Card 1: LR Management (Blue) */}
+                            <div 
+                                onClick={handleSelectLR}
+                                className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer flex flex-col justify-between min-h-[220px]"
+                                style={{
+                                    background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #1e40af 100%)',
+                                    boxShadow: '0 20px 40px -10px rgba(37, 99, 235, 0.45)'
+                                }}
+                            >
+                                <div>
+                                    {/* Icon */}
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight group-hover:text-cyan-100 transition-colors">
+                                        {isHi ? 'LR प्रबंधन' : 'LR Management'}
+                                    </h2>
+                                    <p className="text-blue-100/90 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
+                                        {isHi
+                                            ? 'बिल्टी बनाएं, शिपमेंट ट्रैक करें, इनवॉइस व कलेक्शन प्रबंधित करें।'
+                                            : 'Create bilties, track shipments, manage invoices & collections.'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-6 mt-4 border-t border-white/15">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-950/60 text-white border border-white/10">
+                                            {totalLRsDisplay} {isHi ? 'कुल LRs' : 'Total LRs'}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-900/60 text-emerald-200 border border-emerald-400/20">
+                                            {inTransitDisplay} {isHi ? 'रास्ते में' : 'In Transit'}
+                                        </span>
+                                    </div>
+                                    <div className="w-11 h-11 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                        <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Data Management (Green) */}
+                            <div 
+                                onClick={handleSelectData}
+                                className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer flex flex-col justify-between min-h-[220px]"
+                                style={{
+                                    background: 'linear-gradient(135deg, #047857 0%, #059669 50%, #065f46 100%)',
+                                    boxShadow: '0 20px 40px -10px rgba(5, 150, 105, 0.45)'
+                                }}
+                            >
+                                <div>
+                                    {/* Icon */}
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                                        </svg>
+                                    </div>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight group-hover:text-emerald-100 transition-colors">
+                                        {isHi ? 'डेटा प्रबंधन' : 'Data Management'}
+                                    </h2>
+                                    <p className="text-emerald-100/90 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
+                                        {isHi
+                                            ? 'कंपनी सेटिंग्स, पार्टियां, ट्रक, बुकिंग रजिस्टर और बहीखाता।'
+                                            : 'Company settings, parties, trucks, booking register & more.'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-6 mt-4 border-t border-white/15">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-950/60 text-white border border-white/10">
+                                            {totalPartiesDisplay} {isHi ? 'पार्टियां' : 'Parties'}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-900/60 text-teal-200 border border-teal-400/20">
+                                            {isHi ? 'सेटिंग्स' : 'Settings'}
+                                        </span>
+                                    </div>
+                                    <div className="w-11 h-11 rounded-full bg-white text-emerald-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                        <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ════════════════════════════════════════════════════════
+                            6. QUICK ACTIONS BAR
+                        ════════════════════════════════════════════════════════ */}
+                        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-blue-600 font-black text-lg">⚡</span>
+                                    <h3 className="font-black text-slate-800 text-base sm:text-lg">
+                                        {isHi ? 'त्वरित कार्य' : 'Quick Actions'}
+                                    </h3>
+                                </div>
+                                <span className="text-xs text-slate-400 font-semibold">
+                                    {isHi ? 'तेजी से काम करें' : 'Manage Faster, Do More'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                                {/* Action 1: Create New LR */}
+                                <button
+                                    onClick={onAddNew}
+                                    className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-blue-600 text-white font-bold text-xs sm:text-sm hover:bg-blue-700 active:scale-95 transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                                >
+                                    <span>+</span>
+                                    <span>{isHi ? 'नई LR बनाएं' : 'Create New LR'}</span>
+                                </button>
+
+                                {/* Action 2: Add Party */}
+                                <button
+                                    onClick={() => setCurrentView('parties')}
+                                    className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-emerald-600 text-white font-bold text-xs sm:text-sm hover:bg-emerald-700 active:scale-95 transition-all shadow-md shadow-emerald-500/20 cursor-pointer"
+                                >
+                                    <span>+</span>
+                                    <span>{isHi ? 'पार्टी जोड़ें' : 'Add Party'}</span>
+                                </button>
+
+                                {/* Action 3: Add Truck */}
+                                <button
+                                    onClick={() => setCurrentView('trucks')}
+                                    className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-[#ea580c] text-white font-bold text-xs sm:text-sm hover:bg-orange-600 active:scale-95 transition-all shadow-md shadow-orange-500/20 cursor-pointer"
+                                >
+                                    <span>+</span>
+                                    <span>{isHi ? 'ट्रक जोड़ें' : 'Add Truck'}</span>
+                                </button>
+
+                                {/* Action 4: New Invoice */}
+                                <button
+                                    onClick={() => setCurrentView('invoices')}
+                                    className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 font-bold text-xs sm:text-sm hover:bg-purple-100 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <span>📄</span>
+                                    <span>{isHi ? 'नया इनवॉइस' : 'New Invoice'}</span>
+                                </button>
+
+                                {/* Action 5: View Reports */}
+                                <button
+                                    onClick={onViewList}
+                                    className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-sky-50 text-sky-700 border border-sky-200 font-bold text-xs sm:text-sm hover:bg-sky-100 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <span>📊</span>
+                                    <span>{isHi ? 'रिपोर्ट्स देखें' : 'View Reports'}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* ════════════════════════════════════════════════════════
+                            7. RECENT ACTIVITY & TODAY AT A GLANCE
+                        ════════════════════════════════════════════════════════ */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-6">
+                            
+                            {/* Left Box: Recent Activity */}
+                            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <h3 className="font-black text-slate-800 text-base sm:text-lg">
+                                            {isHi ? 'हाल की गतिविधि' : 'Recent Activity'}
+                                        </h3>
+                                        <button 
+                                            onClick={onViewList}
+                                            className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <span>{isHi ? 'सभी देखें' : 'View All'}</span>
+                                            <span>→</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Activity List Items */}
+                                    <div className="space-y-3.5">
+                                        {/* Item 1: Latest LR */}
+                                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-blue-200 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-black text-slate-800">
+                                                        LR #{lorryReceipts[0]?.lrNo || 'BB001234'}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium">
+                                                        {isHi ? 'सफलतापूर्वक बनाया गया' : 'Created successfully'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                2 mins ago
+                                            </span>
+                                        </div>
+
+                                        {/* Item 2: Party Added */}
+                                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-emerald-200 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-black text-slate-800">
+                                                        {isHi ? 'पार्टी जोड़ी गई' : 'Party Added'}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium">
+                                                        {savedParties?.[0]?.name || 'Sharma Transport Co.'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                15 mins ago
+                                            </span>
+                                        </div>
+
+                                        {/* Item 3: Truck Updated */}
+                                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-orange-200 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-black text-slate-800">
+                                                        {isHi ? 'ट्रक अपडेट हुआ' : 'Truck Updated'}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium">
+                                                        {savedTrucks?.[0]?.truckNo || 'HR 45 AB 1234'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                1 hour ago
+                                            </span>
+                                        </div>
+
+                                        {/* Item 4: Invoice Generated */}
+                                        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100 hover:border-purple-200 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                    </svg>
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-black text-slate-800">
+                                                        {isHi ? 'इनवॉइस जनरेट किया' : 'Invoice Generated'}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 font-medium">
+                                                        INV #2025-0913
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-semibold text-slate-400">
+                                                3 hours ago
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Box: Today at a Glance */}
+                            <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between mb-5">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-600">📍</span>
+                                            <h3 className="font-black text-slate-800 text-base sm:text-lg">
+                                                {isHi ? 'आज की स्थिति' : 'Today at a Glance'}
+                                            </h3>
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-xl flex items-center gap-1.5">
+                                            <span>📅</span>
+                                            <span>{formattedTodayDate}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 2x2 Grid */}
+                                    <div className="grid grid-cols-2 gap-3 mb-5">
+                                        {/* Box 1 */}
+                                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-500">
+                                                    {isHi ? 'आज के शिपमेंट' : 'Shipments Today'}
+                                                </div>
+                                                <div className="text-xl font-black text-slate-800 mt-1">
+                                                    8
+                                                </div>
+                                            </div>
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm">
+                                                📦
+                                            </div>
+                                        </div>
+
+                                        {/* Box 2 */}
+                                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-500">
+                                                    {isHi ? 'संभावित डिलीवरी' : 'Expected Deliveries'}
+                                                </div>
+                                                <div className="text-xl font-black text-slate-800 mt-1">
+                                                    5
+                                                </div>
+                                            </div>
+                                            <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-sm">
+                                                🚚
+                                            </div>
+                                        </div>
+
+                                        {/* Box 3 */}
+                                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-500">
+                                                    {isHi ? 'पेंडिंग इनवॉइस' : 'Pending Invoices'}
+                                                </div>
+                                                <div className="text-xl font-black text-slate-800 mt-1">
+                                                    3
+                                                </div>
+                                            </div>
+                                            <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center text-sm">
+                                                📑
+                                            </div>
+                                        </div>
+
+                                        {/* Box 4 */}
+                                        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-500">
+                                                    {isHi ? 'कलेक्शन' : 'Collections'}
+                                                </div>
+                                                <div className="text-xl font-black text-emerald-600 mt-1">
+                                                    {totalFreight > 0 ? `₹ ${(totalFreight).toLocaleString('en-IN')}` : '₹ 1,25,000'}
+                                                </div>
+                                            </div>
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                                                ₹
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Motivational Quote Box at Bottom */}
+                                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50/50 border border-blue-100 flex items-center gap-3">
+                                    <span className="text-2xl text-blue-500 font-serif leading-none">“</span>
+                                    <div className="text-left">
+                                        <p className="text-xs italic font-semibold text-slate-700">
+                                            {isHi 
+                                                ? 'एक मजबूत कल के लिए कुशल और स्मार्ट लॉजिस्टिक्स।' 
+                                                : '"Efficient logistics for a stronger tomorrow."'}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-blue-600 mt-0.5">
+                                            — BiltyBook.online
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    {/* ════════════════════════════════════════════════════════
+                        8. MOBILE BOTTOM NAVIGATION BAR (Screens < lg)
+                    ════════════════════════════════════════════════════════ */}
+                    <div className="lg:hidden sticky bottom-0 z-30 bg-[#080d1a] border-t border-slate-800 px-4 py-2 flex items-center justify-around">
+                        <button
+                            onClick={() => setActiveSection(null)}
+                            className="flex flex-col items-center gap-1 text-blue-500 font-bold text-[10px]"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            <span>Home</span>
+                        </button>
+                        <button
+                            onClick={onViewList}
+                            className="flex flex-col items-center gap-1 text-slate-400 hover:text-white font-medium text-[10px]"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>LRs</span>
+                        </button>
+                        <button
+                            onClick={() => setCurrentView('parties')}
+                            className="flex flex-col items-center gap-1 text-slate-400 hover:text-white font-medium text-[10px]"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Parties</span>
+                        </button>
+                        <button
+                            onClick={() => setCurrentView('trucks')}
+                            className="flex flex-col items-center gap-1 text-slate-400 hover:text-white font-medium text-[10px]"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
+                            </svg>
+                            <span>Trucks</span>
+                        </button>
+                        <button
+                            onClick={handleSelectData}
+                            className="flex flex-col items-center gap-1 text-slate-400 hover:text-white font-medium text-[10px]"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                            <span>More</span>
+                        </button>
+                    </div>
+
                 </div>
 
                 {/* Running Truck Transit Overlay */}

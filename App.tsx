@@ -764,6 +764,12 @@ const App: React.FC = () => {
                         managerRequests={managerRequests}
                         onApproveManagerRequest={handleApproveManagerRequest}
                         onRejectManagerRequest={handleRejectManagerRequest}
+                        savedParties={savedParties}
+                        savedTrucks={savedTrucks}
+                        companyDetails={companyDetails}
+                        userEmail={session?.user?.email}
+                        onSignOut={handleSignOut}
+                        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
                     />
                 );
             case 'list':
@@ -920,6 +926,42 @@ const App: React.FC = () => {
                         onUpdateDetails={handleUpdateDetails}
                         onUploadAsset={handleUploadAsset}
                     />
+                </Suspense>
+            </div>
+        );
+    }
+
+    const isHomeScreen = currentView === 'dashboard' && dashboardSection === null;
+
+    if (isHomeScreen) {
+        return (
+            <div className="bg-[#0b1329] min-h-screen font-sans">
+                <Toaster position="top-center" />
+                <Suspense fallback={
+                    <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                        <RunningTruckLoader 
+                            statusMessage="Loading BiltyBook.online..."
+                            subMessage="Synchronizing transport fleet..."
+                            fullScreen={true}
+                        />
+                    </div>
+                }>
+                    {renderContent()}
+                </Suspense>
+                <Suspense fallback={null}>
+                    {isAdminPanelOpen && (
+                        <AdminPanel3D
+                            isOpen={isAdminPanelOpen}
+                            onClose={() => setIsAdminPanelOpen(false)}
+                            companyDetails={companyDetails}
+                            onUpdateDetails={handleUpdateDetails}
+                            onUploadAsset={handleUploadAsset}
+                            currentRole={currentRole}
+                            managerRequests={managerRequests}
+                            onApproveManagerRequest={handleApproveManagerRequest}
+                            onRejectManagerRequest={handleRejectManagerRequest}
+                        />
+                    )}
                 </Suspense>
             </div>
         );

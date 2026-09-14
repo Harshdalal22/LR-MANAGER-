@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { LorryReceipt, LRStatus, View } from '../types';
 import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon, ExclamationTriangleIcon, PhoneIcon } from './icons';
 import { Language, t } from '../utils/translations';
+import { BiltyBook3D, LogisticsTruck3D, RunningTruckLoader } from './BookTruckAnimation';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -99,6 +100,137 @@ const ClayKPICard: React.FC<ClayKPICardProps> = ({ title, value, theme, icon, sp
             <div className="relative z-10">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-18 lg:h-18 rounded-2xl lg:rounded-3xl bg-white/25 backdrop-blur-md border border-white/40 shadow-[inset_0_2px_4px_rgba(255,255,255,0.6),0_8px_16px_rgba(0,0,0,0.2)] flex items-center justify-center group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
                     {icon}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// -------------------------------------------------------------
+// 1B. 3D ACCOUNTING REGISTER / BILTY KHATA NOTEBOOK COMPONENT
+// -------------------------------------------------------------
+const RegisterNotebook3D: React.FC<{
+    interactive?: boolean;
+    onClick?: () => void;
+}> = ({ interactive = true, onClick }) => {
+    const [pageTurn, setPageTurn] = useState(false);
+
+    const handleInteract = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setPageTurn(prev => !prev);
+        if (onClick) onClick();
+    };
+
+    return (
+        <div 
+            onClick={interactive ? handleInteract : undefined}
+            title={interactive ? "Click to flip Bilty Ledger Register!" : undefined}
+            className={`relative flex items-center justify-center select-none ${interactive ? 'cursor-pointer group' : ''}`}
+            style={{ perspective: '1200px' }}
+        >
+            {/* Ambient Green & Golden Book Glow */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/25 via-teal-500/20 to-amber-500/25 rounded-full blur-xl animate-pulseGlow pointer-events-none" />
+
+            {/* Book Body / Leather Cover */}
+            <div 
+                className="relative w-48 h-32 bg-gradient-to-br from-emerald-950 via-teal-950 to-slate-950 rounded-xl shadow-[0_20px_45px_-10px_rgba(5,150,105,0.6),inset_0_2px_4px_rgba(255,255,255,0.25),inset_0_-4px_8px_rgba(0,0,0,0.7)] border-2 border-emerald-400/50 p-2 flex group-hover:scale-105 transition-all duration-300"
+                style={{ transform: 'rotateY(-4deg) rotateX(6deg)' }}
+            >
+                {/* Brass Corner Guards */}
+                <div className="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-400 bg-gradient-to-br from-amber-200 to-amber-600 rounded-tl shadow-xs z-30" />
+                <div className="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-400 bg-gradient-to-bl from-amber-200 to-amber-600 rounded-tr shadow-xs z-30" />
+                <div className="absolute bottom-1 left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-400 bg-gradient-to-tr from-amber-200 to-amber-600 rounded-bl shadow-xs z-30" />
+                <div className="absolute bottom-1 right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-400 bg-gradient-to-tl from-amber-200 to-amber-600 rounded-br shadow-xs z-30" />
+
+                {/* Left Page (Accounting Ledger) */}
+                <div className="w-1/2 h-full bg-gradient-to-l from-amber-50 to-emerald-50/70 rounded-l-md shadow-inner border-r border-slate-300 p-2 flex flex-col justify-between overflow-hidden">
+                    <div>
+                        <div className="flex items-center justify-between border-b border-emerald-300 pb-1 mb-1">
+                            <span className="text-[7.5px] font-black tracking-wider text-emerald-900 uppercase">KHATA REGISTER</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        </div>
+                        {/* Ledger Lines */}
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-1">
+                                <div className="h-1 bg-emerald-400/50 rounded w-1/3" />
+                                <div className="h-1 bg-slate-300 rounded w-2/3" />
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="h-1 bg-emerald-300/40 rounded w-1/4" />
+                                <div className="h-1 bg-slate-200 rounded w-3/4" />
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="h-1 bg-emerald-400/50 rounded w-1/3" />
+                                <div className="h-1 bg-slate-300 rounded w-2/3" />
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="h-1 bg-emerald-300/40 rounded w-2/5" />
+                                <div className="h-1 bg-slate-200 rounded w-3/5" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center text-[6.5px] text-slate-500 font-bold border-t border-slate-200 pt-0.5">
+                        <span>FOLIO #104</span>
+                        <span className="text-emerald-700 font-black">₹ RECORDED</span>
+                    </div>
+                </div>
+
+                {/* Spine Golden Crease */}
+                <div className="w-2 h-full bg-gradient-to-r from-amber-600 via-amber-300 to-amber-700 shadow-md z-20 -mx-0.5 rounded-sm flex flex-col justify-evenly items-center py-1">
+                    <span className="w-1 h-1 bg-slate-900 rounded-full" />
+                    <span className="w-1 h-1 bg-slate-900 rounded-full" />
+                    <span className="w-1 h-1 bg-slate-900 rounded-full" />
+                </div>
+
+                {/* Right Page */}
+                <div className="w-1/2 h-full bg-gradient-to-r from-amber-50 to-emerald-50/70 rounded-r-md shadow-inner border-l border-slate-300 p-2 flex flex-col justify-between overflow-hidden">
+                    <div>
+                        <div className="flex items-center justify-between border-b border-teal-300 pb-1 mb-1">
+                            <span className="text-[7.5px] font-black text-teal-950 tracking-wider">ENTRIES & GST</span>
+                            <span className="text-[6.5px] bg-emerald-100 text-emerald-800 px-1 rounded font-bold">VERIFIED</span>
+                        </div>
+                        <div className="space-y-1">
+                            <div className="h-1 bg-teal-300/50 rounded w-full" />
+                            <div className="h-1 bg-slate-200 rounded w-4/5" />
+                            <div className="h-1 bg-teal-200/50 rounded w-5/6" />
+                        </div>
+                    </div>
+
+                    {/* Official Red Rubber Stamp */}
+                    <div className="self-end border-2 border-red-600/80 text-red-600 text-[6.5px] font-black px-1.5 py-0.5 rounded transform -rotate-12 uppercase tracking-tighter shadow-xs bg-red-50/50">
+                        AUDITED ✓
+                    </div>
+                </div>
+
+                {/* Dynamic Page Turn Overlay */}
+                <div 
+                    className={`absolute top-2 left-1/2 w-[calc(50%-8px)] h-[calc(100%-16px)] bg-gradient-to-r from-amber-100 to-white rounded-r-md shadow-2xl border-l border-slate-300 p-2 flex flex-col justify-between origin-left transition-all duration-700 pointer-events-none z-30 ${
+                        pageTurn ? 'animate-biltyFlip' : ''
+                    }`}
+                    style={{
+                        transformStyle: 'preserve-3d',
+                        backfaceVisibility: 'hidden'
+                    }}
+                >
+                    <div>
+                        <div className="flex items-center justify-between border-b border-emerald-300 pb-1 mb-1">
+                            <span className="text-[7px] font-extrabold text-emerald-700">PARTY LEDGER</span>
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-spin" />
+                        </div>
+                        <div className="space-y-1">
+                            <div className="h-1 bg-emerald-300 rounded w-full" />
+                            <div className="h-1 bg-slate-200 rounded w-3/4" />
+                            <div className="h-1 bg-emerald-200 rounded w-5/6" />
+                        </div>
+                    </div>
+                    <div className="text-[6px] text-emerald-600 font-mono text-center font-bold">
+                        DATA MASTER
+                    </div>
+                </div>
+
+                {/* Red Bookmark Ribbon */}
+                <div className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 w-3.5 h-6 bg-gradient-to-b from-red-600 to-red-700 rounded-b shadow-lg flex items-end justify-center pb-1 z-10">
+                    <div className="w-1.5 h-1.5 bg-amber-300 rounded-full shadow-xs" />
                 </div>
             </div>
         </div>
@@ -718,7 +850,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             const truckMatch = lr.truckNo?.toLowerCase().includes(q);
             const debtorMatch = fin.debtorName?.toLowerCase().includes(q);
             const consignorMatch = lr.consignor?.name?.toLowerCase().includes(q);
-            const consigneeMatch = lr.consignee?.name?.toLowerCase().includes(q);
             const routeMatch = `${lr.fromPlace || ''} ${lr.toPlace || ''}`.toLowerCase().includes(q);
             return lrNoMatch || truckMatch || debtorMatch || consignorMatch || consigneeMatch || routeMatch;
         }
@@ -739,188 +870,231 @@ const Dashboard: React.FC<DashboardProps> = ({
     // Default to 'lr' view if activeSection is null or 'lr'
     const isLRSectionActive = activeSection === 'lr';
 
+    // Click transit loading state for animated running truck transition
+    const [transitLoading, setTransitLoading] = useState<{ active: boolean; target: 'lr' | 'data'; title: string; sub: string } | null>(null);
+
+    const handleSelectLR = () => {
+        setTransitLoading({
+            active: true,
+            target: 'lr',
+            title: isHi ? 'LR प्रबंधन में जा रहे हैं...' : 'Dispatching to LR Management...',
+            sub: isHi ? 'फ्लीट, बिल्टी रिकॉर्ड्स और शिपमेंट लोड हो रहे हैं...' : 'Loading Fleet, Bilty Records & Transport Desk...'
+        });
+        setTimeout(() => {
+            setActiveSection('lr');
+            setTransitLoading(null);
+        }, 450);
+    };
+
+    const handleSelectData = () => {
+        setTransitLoading({
+            active: true,
+            target: 'data',
+            title: isHi ? 'डेटा रजिस्टर और खाता खोल रहे हैं...' : 'Opening Bilty Register & Master Data...',
+            sub: isHi ? 'कंपनी सेटिंग्स, पार्टीज और वाहन सूची लोड हो रही है...' : 'Synchronizing Ledger Entries, Parties & Truck Fleet...'
+        });
+        setTimeout(() => {
+            setCurrentView('data-management');
+            setTransitLoading(null);
+        }, 450);
+    };
+
     // ─── HOME SCREEN (shown when no section is selected) ─────────────────────
     if (activeSection === null) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 animate-fadeIn"
-                style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 40%, #0f2027 100%)' }}>
+            <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 relative overflow-hidden animate-fadeIn select-none"
+                style={{ background: 'radial-gradient(1200px 800px at 50% -5%, #1e1b4b 0%, #0c1222 45%, #030712 100%)' }}>
 
-                {/* Ambient glow orbs */}
-                <div className="fixed top-1/4 -left-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="fixed bottom-1/4 -right-32 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+                {/* Ambient dynamic glow orbs */}
+                <div className="fixed top-1/4 -left-32 w-[500px] h-[500px] bg-cyan-500/20 rounded-full blur-[120px] pointer-events-none animate-pulseGlow" />
+                <div className="fixed bottom-1/4 -right-32 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-pulseGlow" style={{ animationDelay: '1.5s' }} />
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] bg-emerald-500/10 rounded-full blur-[140px] pointer-events-none" />
+
+                {/* Subtle perspective grid background */}
+                <div 
+                    className="absolute inset-0 opacity-[0.07] pointer-events-none"
+                    style={{
+                        backgroundImage: 'linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)',
+                        backgroundSize: '45px 45px',
+                        maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)',
+                        WebkitMaskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)'
+                    }}
+                />
 
                 {/* Header Badge */}
-                <div className="mb-3 flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-md">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399]" />
-                    <span className="text-xs font-black text-white/80 uppercase tracking-widest">
-                        {isHi ? 'बिल्टी बुक • लाइव' : 'Bilty Book • Live'}
+                <div className="relative z-10 mb-4 flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_10px_#34d399]" />
+                    <span className="text-xs font-black text-white/90 uppercase tracking-widest">
+                        {isHi ? 'बिल्टी बुक • लाइव ट्रांसपोर्ट' : 'Bilty Book • Live Transport'}
                     </span>
+                    <span className="text-[9px] bg-emerald-500/30 text-emerald-300 font-extrabold px-1.5 py-0.5 rounded-full border border-emerald-400/30">24x7</span>
                 </div>
 
                 {/* Main Title */}
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white text-center tracking-tight mb-2"
-                    style={{ textShadow: '0 0 60px rgba(99,179,237,0.4)' }}>
-                    {isHi ? 'नमस्ते 👋' : 'Welcome Back 👋'}
+                <h1 className="relative z-10 text-4xl sm:text-5xl lg:text-6xl font-black text-center tracking-tight mb-3"
+                    style={{ textShadow: '0 0 40px rgba(99,102,241,0.5), 0 4px 12px rgba(0,0,0,0.8)' }}>
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300">
+                        {isHi ? 'नमस्ते 👋' : 'Welcome Back 👋'}
+                    </span>
                 </h1>
-                <p className="text-slate-400 text-sm sm:text-base font-medium mb-12 text-center max-w-sm">
-                    {isHi ? 'आप क्या प्रबंधित करना चाहते हैं?' : 'What would you like to manage today?'}
+                <p className="relative z-10 text-slate-300 text-sm sm:text-base font-medium mb-10 sm:mb-12 text-center max-w-md">
+                    {isHi ? 'आज आप किस मॉड्यूल का प्रबंधन करना चाहते हैं?' : 'What would you like to manage today?'}
                 </p>
 
                 {/* 3D Module Tiles */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-3xl">
+                <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-8 w-full max-w-4xl px-2">
 
-                    {/* ── TILE 1: LR MANAGEMENT ── */}
-                    <button
-                        type="button"
-                        onClick={() => setActiveSection('lr')}
-                        className="group relative overflow-hidden rounded-3xl p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer focus:outline-none"
+                    {/* ── TILE 1: LR MANAGEMENT (With 3D Truck & Logistics Vehicle) ── */}
+                    <div
+                        onClick={handleSelectLR}
+                        className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer flex flex-col justify-between"
                         style={{
-                            background: 'linear-gradient(145deg, #1a3a6b 0%, #0f2a56 50%, #091d3e 100%)',
-                            boxShadow: '0 30px 60px -10px rgba(15,42,86,0.7), inset 0 2px 0 rgba(255,255,255,0.15), inset 0 -4px 0 rgba(0,0,0,0.4)',
-                            border: '1px solid rgba(99,179,237,0.25)'
+                            background: 'linear-gradient(145deg, #1e1b4b 0%, #172554 45%, #0b1329 100%)',
+                            boxShadow: '0 30px 60px -15px rgba(29, 78, 216, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.25), inset 0 -4px 8px rgba(0, 0, 0, 0.6)',
+                            border: '1px solid rgba(59, 130, 246, 0.45)'
                         }}
                     >
-                        {/* Glossy top highlight */}
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-300/60 to-transparent" />
-                        <div className="absolute inset-x-4 top-0 h-16 bg-white/5 rounded-b-full blur-xl" />
+                        {/* Glowing top rim highlight */}
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee]" />
+                        <div className="absolute inset-x-6 top-0 h-20 bg-blue-500/10 rounded-b-full blur-2xl" />
 
-                        {/* Animated grid pattern */}
-                        <div className="absolute inset-0 opacity-[0.04]"
-                            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
-
-                        {/* 3D Icon Container */}
-                        <div className="relative mb-6">
-                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center relative"
-                                style={{
-                                    background: 'linear-gradient(145deg, #3b82f6, #1d4ed8)',
-                                    boxShadow: '0 12px 24px rgba(29,78,216,0.5), inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4)',
-                                    transform: 'perspective(200px) rotateX(8deg)'
-                                }}>
-                                {/* Truck SVG — 3D rendered */}
-                                <svg className="w-10 h-10 drop-shadow-lg" viewBox="0 0 24 24" fill="none">
-                                    <path d="M1 3h15v13H1z" fill="rgba(255,255,255,0.9)" rx="1" />
-                                    <path d="M16 8h4l3 4v4h-7V8z" fill="rgba(255,255,255,0.7)" />
-                                    <circle cx="5.5" cy="18.5" r="2.5" fill="white" />
-                                    <circle cx="18.5" cy="18.5" r="2.5" fill="white" />
-                                    <path d="M1 3h15v13H1z" stroke="rgba(255,255,255,0.4)" strokeWidth="0.5" />
-                                    {/* Windshield shine */}
-                                    <path d="M17 9h3l2 3h-5V9z" fill="rgba(147,210,255,0.6)" />
-                                </svg>
-                                {/* Top shine */}
-                                <div className="absolute inset-x-2 top-1 h-4 bg-white/20 rounded-full blur-sm" />
+                        <div>
+                            {/* Card Tag & Category */}
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/40 text-[10px] font-black text-cyan-300 uppercase tracking-widest">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                                    <span>{isHi ? 'फ्लीट और बिल्टी' : 'Fleet & Freight'}</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-blue-300/80 bg-blue-950/80 px-2 py-0.5 rounded-lg border border-blue-800">
+                                    {isHi ? 'हब 01' : 'HUB 01'}
+                                </span>
                             </div>
-                            {/* Float ring */}
-                            <div className="absolute -inset-2 rounded-3xl border border-blue-400/20 group-hover:border-blue-400/40 transition-all duration-300" />
+
+                            {/* 3D Truck & Logistics Vehicle Showcase */}
+                            <div className="my-3 py-3 px-2 rounded-2xl bg-slate-950/60 border border-blue-500/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group-hover:border-cyan-400/40 transition-colors">
+                                <div className="absolute top-1 right-2 text-[9px] font-bold text-amber-300/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                                    <span>📢</span>
+                                    <span>{isHi ? 'क्लिक करें' : 'Click to Honk'}</span>
+                                </div>
+                                <div className="transform scale-90 sm:scale-100 py-1">
+                                    <LogisticsTruck3D isMoving={true} showRoad={true} interactive={true} />
+                                </div>
+                            </div>
+
+                            {/* Title & Description */}
+                            <h2 className="text-2xl sm:text-3xl font-black text-white mt-4 mb-2 tracking-tight group-hover:text-cyan-200 transition-colors">
+                                {isHi ? 'LR प्रबंधन' : 'LR Management'}
+                            </h2>
+                            <p className="text-blue-200/80 text-xs sm:text-sm font-medium leading-relaxed mb-6">
+                                {isHi
+                                    ? 'लॉरी रसीद बनाएं, ट्रैक करें, इनवॉइस और कलेक्शन प्रबंधित करें'
+                                    : 'Create bilties, track shipments, manage invoices & collections'}
+                            </p>
                         </div>
 
-                        {/* Text */}
-                        <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
-                            {isHi ? 'LR प्रबंधन' : 'LR Management'}
-                        </h2>
-                        <p className="text-blue-300/80 text-sm font-medium leading-relaxed mb-6">
-                            {isHi
-                                ? 'लॉरी रसीद बनाएं, ट्रैक करें, इनवॉइस और भुगतान प्रबंधित करें'
-                                : 'Create bilties, track shipments, manage invoices & collections'}
-                        </p>
+                        {/* Footer: Stats Pills + 3D Action Arrow */}
+                        <div className="flex items-center justify-between pt-4 border-t border-blue-500/20 mt-auto">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-500/25 text-cyan-200 border border-blue-400/30 shadow-xs">
+                                    {totalLRs} {isHi ? 'कुल LRs' : 'Total LRs'}
+                                </span>
+                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/25 text-emerald-300 border border-emerald-400/30 shadow-xs">
+                                    {statusCounts['In Transit'] || 0} {isHi ? 'रास्ते में' : 'In Transit'}
+                                </span>
+                            </div>
 
-                        {/* Stats pills */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-500/20 text-blue-200 border border-blue-400/20">
-                                {totalLRs} {isHi ? 'कुल LRs' : 'Total LRs'}
-                            </span>
-                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-400/20">
-                                {statusCounts['In Transit'] || 0} {isHi ? 'रास्ते में' : 'In Transit'}
-                            </span>
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-blue-600 to-cyan-500 border border-cyan-300/50 shadow-lg shadow-blue-500/40 flex items-center justify-center text-white group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
                         </div>
+                    </div>
 
-                        {/* Arrow */}
-                        <div className="absolute bottom-8 right-8 w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center group-hover:bg-blue-500/40 group-hover:translate-x-1 transition-all duration-300">
-                            <svg className="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                        </div>
-                    </button>
-
-                    {/* ── TILE 2: DATA MANAGEMENT ── */}
-                    <button
-                        type="button"
-                        onClick={() => setCurrentView('data-management')}
-                        className="group relative overflow-hidden rounded-3xl p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer focus:outline-none"
+                    {/* ── TILE 2: DATA MANAGEMENT (With 3D Ledger Register & Khata Notebook) ── */}
+                    <div
+                        onClick={handleSelectData}
+                        className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-2 hover:scale-[1.02] active:scale-95 cursor-pointer flex flex-col justify-between"
                         style={{
-                            background: 'linear-gradient(145deg, #1a3d2b 0%, #0f2b1c 50%, #071a10 100%)',
-                            boxShadow: '0 30px 60px -10px rgba(15,43,28,0.7), inset 0 2px 0 rgba(255,255,255,0.12), inset 0 -4px 0 rgba(0,0,0,0.4)',
-                            border: '1px solid rgba(52,211,153,0.2)'
+                            background: 'linear-gradient(145deg, #064e3b 0%, #065f46 45%, #02261e 100%)',
+                            boxShadow: '0 30px 60px -15px rgba(5, 150, 105, 0.45), inset 0 2px 4px rgba(255, 255, 255, 0.25), inset 0 -4px 8px rgba(0, 0, 0, 0.6)',
+                            border: '1px solid rgba(16, 185, 129, 0.45)'
                         }}
                     >
-                        {/* Glossy top highlight */}
-                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/50 to-transparent" />
-                        <div className="absolute inset-x-4 top-0 h-16 bg-white/4 rounded-b-full blur-xl" />
+                        {/* Glowing top rim highlight */}
+                        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-emerald-300 to-transparent shadow-[0_0_15px_#34d399]" />
+                        <div className="absolute inset-x-6 top-0 h-20 bg-emerald-500/10 rounded-b-full blur-2xl" />
 
-                        {/* Animated grid pattern */}
-                        <div className="absolute inset-0 opacity-[0.04]"
-                            style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
-
-                        {/* 3D Icon Container */}
-                        <div className="relative mb-6">
-                            <div className="w-20 h-20 rounded-2xl flex items-center justify-center relative"
-                                style={{
-                                    background: 'linear-gradient(145deg, #10b981, #047857)',
-                                    boxShadow: '0 12px 24px rgba(4,120,87,0.5), inset 0 2px 4px rgba(255,255,255,0.3), inset 0 -3px 6px rgba(0,0,0,0.4)',
-                                    transform: 'perspective(200px) rotateX(8deg)'
-                                }}>
-                                {/* Database / Gear SVG — 3D look */}
-                                <svg className="w-10 h-10 drop-shadow-lg" viewBox="0 0 24 24" fill="none">
-                                    {/* Three stacked discs = database */}
-                                    <ellipse cx="12" cy="6" rx="8" ry="3" fill="rgba(255,255,255,0.9)" />
-                                    <path d="M4 6v4c0 1.657 3.582 3 8 3s8-1.343 8-3V6" fill="rgba(255,255,255,0.6)" />
-                                    <path d="M4 10v4c0 1.657 3.582 3 8 3s8-1.343 8-3v-4" fill="rgba(255,255,255,0.4)" />
-                                    <path d="M4 14v2c0 1.657 3.582 3 8 3s8-1.343 8-3v-2" fill="rgba(255,255,255,0.25)" />
-                                    {/* Shine on top ellipse */}
-                                    <ellipse cx="10" cy="5.5" rx="3" ry="1" fill="rgba(255,255,255,0.35)" />
-                                </svg>
-                                {/* Top shine */}
-                                <div className="absolute inset-x-2 top-1 h-4 bg-white/20 rounded-full blur-sm" />
+                        <div>
+                            {/* Card Tag & Category */}
+                            <div className="flex items-center justify-between mb-4">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-black text-emerald-300 uppercase tracking-widest">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                                    <span>{isHi ? 'रजिस्टर और खाता' : 'Records & Khata'}</span>
+                                </span>
+                                <span className="text-[10px] font-bold text-emerald-300/80 bg-emerald-950/80 px-2 py-0.5 rounded-lg border border-emerald-800">
+                                    {isHi ? 'हब 02' : 'HUB 02'}
+                                </span>
                             </div>
-                            {/* Float ring */}
-                            <div className="absolute -inset-2 rounded-3xl border border-emerald-400/20 group-hover:border-emerald-400/40 transition-all duration-300" />
+
+                            {/* 3D Notebook & Register Ledger Showcase */}
+                            <div className="my-3 py-3 px-2 rounded-2xl bg-slate-950/60 border border-emerald-500/20 shadow-inner flex flex-col items-center justify-center relative overflow-hidden group-hover:border-emerald-300/40 transition-colors">
+                                <div className="absolute top-1 right-2 text-[9px] font-bold text-amber-300/90 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                                    <span>📖</span>
+                                    <span>{isHi ? 'पेज पलटें' : 'Click to Flip'}</span>
+                                </div>
+                                <div className="transform scale-90 sm:scale-100 py-1">
+                                    <RegisterNotebook3D interactive={true} />
+                                </div>
+                            </div>
+
+                            {/* Title & Description */}
+                            <h2 className="text-2xl sm:text-3xl font-black text-white mt-4 mb-2 tracking-tight group-hover:text-emerald-200 transition-colors">
+                                {isHi ? 'डेटा प्रबंधन' : 'Data Management'}
+                            </h2>
+                            <p className="text-emerald-200/80 text-xs sm:text-sm font-medium leading-relaxed mb-6">
+                                {isHi
+                                    ? 'कंपनी सेटिंग्स, पार्टियां, ट्रक, बुकिंग रजिस्टर और बहीखाता'
+                                    : 'Company settings, parties, trucks, booking register & more'}
+                            </p>
                         </div>
 
-                        {/* Text */}
-                        <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 tracking-tight">
-                            {isHi ? 'डेटा प्रबंधन' : 'Data Management'}
-                        </h2>
-                        <p className="text-emerald-300/80 text-sm font-medium leading-relaxed mb-6">
-                            {isHi
-                                ? 'कंपनी सेटिंग, पार्टियां, ट्रक, बुकिंग रजिस्टर और अधिक'
-                                : 'Company settings, parties, trucks, booking register & more'}
-                        </p>
+                        {/* Footer: Stats Pills + 3D Action Arrow */}
+                        <div className="flex items-center justify-between pt-4 border-t border-emerald-500/20 mt-auto">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/25 text-emerald-200 border border-emerald-400/30 shadow-xs">
+                                    {uniqueConsignors} {isHi ? 'पार्टियां' : 'Parties'}
+                                </span>
+                                <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-500/25 text-teal-200 border border-teal-400/30 shadow-xs">
+                                    {isHi ? 'सेटिंग्स व खाता' : 'Settings & Fleet'}
+                                </span>
+                            </div>
 
-                        {/* Stats pills */}
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-200 border border-emerald-400/20">
-                                {uniqueConsignors} {isHi ? 'पार्टियां' : 'Parties'}
-                            </span>
-                            <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-500/20 text-teal-300 border border-teal-400/20">
-                                {isHi ? 'सेटिंग्स' : 'Settings'}
-                            </span>
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 border border-emerald-300/50 shadow-lg shadow-emerald-500/40 flex items-center justify-center text-white group-hover:scale-110 group-hover:rotate-6 transition-all duration-300">
+                                <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                </svg>
+                            </div>
                         </div>
-
-                        {/* Arrow */}
-                        <div className="absolute bottom-8 right-8 w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center group-hover:bg-emerald-500/40 group-hover:translate-x-1 transition-all duration-300">
-                            <svg className="w-5 h-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                            </svg>
-                        </div>
-                    </button>
+                    </div>
                 </div>
 
                 {/* Bottom role badge */}
-                <div className="mt-10 px-5 py-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                        {isHi ? `भूमिका: ${currentRole}` : `Logged in as: ${currentRole}`}
+                <div className="relative z-10 mt-10 px-6 py-2.5 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-lg flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">
+                        {isHi ? `सक्रिय भूमिका: ${currentRole}` : `Logged in as: ${currentRole}`}
                     </span>
                 </div>
+
+                {/* Running Truck Transit Overlay */}
+                {transitLoading?.active && (
+                    <RunningTruckLoader 
+                        statusMessage={transitLoading.title}
+                        subMessage={transitLoading.sub}
+                        fullScreen={true}
+                    />
+                )}
             </div>
         );
     }

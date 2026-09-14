@@ -45,6 +45,18 @@
               roadDashes: {
                 '0%': { transform: 'translateX(0)' },
                 '100%': { transform: 'translateX(-25%)' },
+              },
+              truckDriveAcross: {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(100%)' },
+              },
+              floatSlow: {
+                '0%, 100%': { transform: 'translateY(0px)' },
+                '50%': { transform: 'translateY(-6px)' },
+              },
+              pulseGlow: {
+                '0%, 100%': { opacity: '0.6', transform: 'scale(1)' },
+                '50%': { opacity: '1', transform: 'scale(1.05)' },
               }
             },
             animation: {
@@ -55,6 +67,9 @@
               truckBoost: 'truckBoost 1s ease-in-out forwards',
               smokePuff: 'smokePuff 0.8s ease-out infinite',
               roadDashes: 'roadDashes 0.5s linear infinite',
+              truckDriveAcross: 'truckDriveAcross 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite',
+              floatSlow: 'floatSlow 3s ease-in-out infinite',
+              pulseGlow: 'pulseGlow 2.5s ease-in-out infinite',
             }
           },
         },

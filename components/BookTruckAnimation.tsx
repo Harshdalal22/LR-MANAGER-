@@ -379,3 +379,50 @@ export const ProcessLoadingState: React.FC<{
         </div>
     );
 };
+
+// ==========================================
+// 4. RUNNING TRUCK LOADER (FULLSCREEN OR OVERLAY)
+// ==========================================
+export const RunningTruckLoader: React.FC<{
+    statusMessage?: string;
+    subMessage?: string;
+    fullScreen?: boolean;
+    overlay?: boolean;
+}> = ({
+    statusMessage = "Dispatching Fleet...",
+    subMessage = "Synchronizing with Central Bilty Cloud...",
+    fullScreen = false,
+    overlay = false
+}) => {
+    return (
+        <div className={`flex flex-col items-center justify-center p-6 text-center select-none ${
+            fullScreen ? 'fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-xl min-h-screen' : 
+            overlay ? 'absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md rounded-3xl' : ''
+        }`}>
+            {/* Ambient Highway Glow */}
+            <div className="absolute w-72 h-72 bg-blue-600/20 rounded-full blur-3xl pointer-events-none animate-pulseGlow" />
+            <div className="absolute w-60 h-60 bg-indigo-600/20 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col items-center">
+                {/* 3D Moving Truck */}
+                <div className="transform scale-110 sm:scale-125 mb-4">
+                    <LogisticsTruck3D isMoving={true} showRoad={true} interactive={false} />
+                </div>
+
+                {/* Status Indicator */}
+                <div className="mt-5 space-y-2 max-w-xs sm:max-w-sm">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-900/70 border border-blue-400/40 text-blue-200 text-xs font-bold shadow-lg shadow-blue-950/60 backdrop-blur-sm">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                        <span>{statusMessage}</span>
+                    </div>
+                    {subMessage && (
+                        <p className="text-xs text-slate-300 font-medium tracking-wide">
+                            {subMessage}
+                        </p>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+

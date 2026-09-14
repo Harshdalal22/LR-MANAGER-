@@ -9,8 +9,7 @@ import {
     listenToAccessRequest, 
     applySession 
 } from '../services/supabaseService';
-import { GoogleIcon, EyeIcon } from './icons';
-import { BiltyBook3D, LogisticsTruck3D, ProcessLoadingState } from './BookTruckAnimation';
+import { BiltyBook3D, LogisticsTruck3D, ProcessLoadingState, RunningTruckLoader } from './BookTruckAnimation';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password' | 'manager_request';
 
@@ -300,17 +299,21 @@ const Auth: React.FC = () => {
                     )}
 
                     {/* ============================================================ */}
-                    {/* VIEW: PROCESSING / IN PROGRESS STATE (signup/manager only) */}
+                    {/* VIEW: PROCESSING / IN PROGRESS STATE (login/signup/manager) */}
                     {/* ============================================================ */}
-                    {loading && !waitingForApproval ? (
-                        <ProcessLoadingState 
-                            statusMessage={
-                                view === 'sign_up' 
-                                    ? 'Generating New Fleet Account...' 
-                                    : 'Dispatching Freight Request...'
-                            }
-                            subMessage="Synchronizing ledger entries, vehicle records and digital signature keys."
-                        />
+                    {(loading || signingIn) && !waitingForApproval ? (
+                        <div className="py-4 animate-fadeIn">
+                            <RunningTruckLoader 
+                                statusMessage={
+                                    signingIn
+                                        ? 'Authenticating & Launching Bilty Book...'
+                                        : view === 'sign_up' 
+                                            ? 'Generating New Fleet Account...' 
+                                            : 'Dispatching Freight Request...'
+                                }
+                                subMessage="Connecting to secure logistics cloud, synchronizing transport ledger..."
+                            />
+                        </div>
                     ) : waitingForApproval ? (
                         /* ============================================================ */
                         /* VIEW: WAITING FOR ADMIN APPROVAL */

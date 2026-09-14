@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import LRList from './components/LRList';
 import LRForm from './components/LRForm';
 import AdBanner from './components/AdBanner';
+import { RunningTruckLoader } from './components/BookTruckAnimation';
 
 // Heavy components — lazy loaded to reduce initial bundle size
 const VehicleHiring = lazy(() => import('./components/VehicleHiring'));
@@ -881,8 +882,12 @@ const App: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <p className="text-lg font-semibold text-gray-700">Loading Bilty Book...</p>
+            <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                <RunningTruckLoader 
+                    statusMessage="Launching Bilty Book..."
+                    subMessage="Loading Fleet, LR Records & Master Data..."
+                    fullScreen={true}
+                />
             </div>
         );
     }
@@ -901,7 +906,14 @@ const App: React.FC = () => {
         return (
             <div className="bg-slate-50 min-h-screen font-sans">
                 <Toaster position="top-center" />
-                <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
+                <Suspense fallback={
+                    <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                        <RunningTruckLoader 
+                            statusMessage="Connecting Satellite GPS..."
+                            subMessage="Tracking fleet locations..."
+                        />
+                    </div>
+                }>
                     <GPSPanel 
                         companyDetails={companyDetails} 
                         onSignOut={handleSignOut} 
@@ -932,7 +944,14 @@ const App: React.FC = () => {
                 onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
             />
             <main className="max-w-[1680px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 md:py-6">
-                <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>}>
+                <Suspense fallback={
+                    <div className="flex flex-col items-center justify-center min-h-[40vh] py-16">
+                        <RunningTruckLoader 
+                            statusMessage="Loading Transport View..."
+                            subMessage="Synchronizing logistics records..."
+                        />
+                    </div>
+                }>
                     {renderContent()}
                 </Suspense>
                 <AdBanner />

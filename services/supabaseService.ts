@@ -1,5 +1,5 @@
 import { createClient, Session, Subscription } from '@supabase/supabase-js';
-import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice, LedgerStatement } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, SavedTruck, VehicleHiring, BookingRecord, LRStatus, LedgerEntry, Voucher, GPSInvoice, LedgerStatement, PaymentReceipt } from '../types';
 
 /* 
 ================================================================================
@@ -1095,3 +1095,50 @@ export const deleteLedgerStatement = async (id: string, filePath: string) => {
     const { error } = await supabase.from('ledger_statements').delete().eq('id', id);
     if (error) throw error;
 };
+
+// --- Payment Receipts (Accounting) ---
+
+export const getPaymentReceipts = async (): Promise<PaymentReceipt[]> => {
+    const { data, error } = await withTimeout(
+        supabase.from('payment_receipts').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }),
+        15000
+    );
+    if (error && error.code !== 'PGRST116') throw error;
+    return (data || []).map((r: any) => ({
+        ...r,
+        invoice_nos: r.invoice_nos || []
+    }));
+};
+
+export const savePaymentReceipt = async (receipt: PaymentReceipt): Promise<PaymentReceipt> => {
+    const finalUserId = await getEffectiveUserId();
+    const payload = { ...receipt, user_id: finalUserId };
+    const { data, error } = await withTimeout(
+        supabase.from('payment_receipts').upsert(payload).select().single(),
+        15000
+    );
+    if (error) throw error;
+    return data;
+};
+
+export const deletePaymentReceipt = async (id: string) => {
+    const { error } = await supabase.from('payment_receipts').delete().eq('id', id);
+    if (error) throw error;
+};
+
+// --- Extended Ledger Functions ---
+
+export const updateLedgerEntry = async (id: string, updates: Partial<import('../types').LedgerEntry>) => {
+    const { data, error } = await withTimeout(
+        supabase.from('ledger_entries').update(updates).eq('id', id).select().single(),
+        15000
+    );
+    if (error) throw error;
+    return data;
+};
+
+export const deleteLedgerEntry = async (id: string) => {
+    const { error } = await supabase.from('ledger_entries').delete().eq('id', id);
+    if (error) throw error;
+};
+

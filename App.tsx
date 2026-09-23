@@ -24,6 +24,7 @@ const AdminPanel3D = lazy(() => import('./components/AdminPanel3D'));
 const GPSPanel = lazy(() => import('./components/GPSPanel'));
 const ReportsView = lazy(() => import('./components/ReportsView'));
 const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const AccountingView = lazy(() => import('./components/AccountingView'));
 import {
     LorryReceipt,
     CompanyDetails,
@@ -909,6 +910,15 @@ const App: React.FC = () => {
                         companyDetails={companyDetails}
                         onBack={() => setCurrentView('dashboard')}
                         language={language}
+                    />
+                );
+            case 'accounting':
+                return (
+                    <AccountingView
+                        lorryReceipts={lorryReceipts}
+                        companyDetails={companyDetails}
+                        savedParties={savedParties}
+                        onBack={() => setCurrentView('dashboard')}
                     />
                 );
             default:

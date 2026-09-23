@@ -1060,6 +1060,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <span>{isHi ? 'रिपोर्ट्स' : 'Reports'}</span>
                             </button>
 
+                            {/* Accounting */}
+                            <button
+                                onClick={() => setCurrentView('accounting')}
+                                className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-emerald-600/20 font-medium text-sm transition-colors cursor-pointer text-left group"
+                            >
+                                <svg className="w-5 h-5 shrink-0 group-hover:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="flex items-center gap-2">
+                                    {isHi ? 'अकाउंटिंग' : 'Accounting'}
+                                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">NEW</span>
+                                </span>
+                            </button>
+
                             {/* Settings */}
                             <button
                                 onClick={() => onOpenSettings ? onOpenSettings() : setCurrentView('data-management')}
@@ -1538,6 +1552,55 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Card 3: Accounting (Indigo) */}
+                            <div
+                                onClick={() => setCurrentView('accounting')}
+                                className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer flex flex-col justify-between min-h-[220px]"
+                                style={{
+                                    background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #1e3a8a 100%)',
+                                    boxShadow: '0 20px 40px -10px rgba(59, 130, 246, 0.45)'
+                                }}
+                            >
+                                <div>
+                                    {/* Icon */}
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight group-hover:text-blue-100 transition-colors">
+                                            {isHi ? 'अकाउंटिंग' : 'Accounting'}
+                                        </h2>
+                                        <span className="text-[10px] bg-white/20 text-white border border-white/30 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">NEW</span>
+                                    </div>
+                                    <p className="text-blue-100/90 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
+                                        {isHi
+                                            ? 'पार्टी लेजर, इनवॉइस एजिंग, भुगतान, खर्च और P&L रिपोर्ट।'
+                                            : 'Party Ledger, Invoice Aging, Payments, Expenses & P&L Reports.'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-6 mt-4 border-t border-white/15">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-blue-950/60 text-white border border-white/10">
+                                            {isHi ? 'लेजर' : 'Ledger'}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-indigo-900/60 text-indigo-200 border border-indigo-400/20">
+                                            P&L
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-sky-900/60 text-sky-200 border border-sky-400/20">
+                                            GST
+                                        </span>
+                                    </div>
+                                    <div className="w-11 h-11 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                        <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* ════════════════════════════════════════════════════════
@@ -1596,10 +1659,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {/* Action 5: View Reports */}
                                 <button
                                     onClick={() => setCurrentView('reports')}
-                                    className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-sky-50 text-sky-700 border border-sky-200 font-bold text-xs sm:text-sm hover:bg-sky-100 active:scale-95 transition-all cursor-pointer"
+                                    className="flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-sky-50 text-sky-700 border border-sky-200 font-bold text-xs sm:text-sm hover:bg-sky-100 active:scale-95 transition-all cursor-pointer"
                                 >
                                     <span>📊</span>
                                     <span>{isHi ? 'रिपोर्ट्स देखें' : 'View Reports'}</span>
+                                </button>
+
+                                {/* Action 6: Accounting */}
+                                <button
+                                    onClick={() => setCurrentView('accounting')}
+                                    className="col-span-2 sm:col-span-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-xs sm:text-sm hover:bg-emerald-100 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <span>💰</span>
+                                    <span>{isHi ? 'अकाउंटिंग' : 'Accounting'}</span>
                                 </button>
                             </div>
                         </div>

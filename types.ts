@@ -203,6 +203,30 @@ export interface LedgerEntry {
     payment_mode?: string;
     user_id?: string;
     created_at?: string;
+    // Extended accounting fields
+    party_name?: string;
+    entry_type?: 'invoice' | 'payment' | 'expense' | 'manual' | 'lr_freight';
+    category?: string;
+}
+
+export interface PaymentReceipt {
+    id?: string;
+    user_id?: string;
+    date: string;
+    receipt_no: string;
+    party_name: string;
+    amount: number;
+    payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT' | 'RTGS';
+    invoice_nos?: string[];
+    notes?: string;
+    created_at?: string;
+}
+
+export interface AccountingChartData {
+    month: string;
+    revenue: number;
+    expenses: number;
+    outstanding: number;
 }
 
 export interface Voucher {
@@ -286,4 +310,4 @@ export interface LedgerStatement {
     created_at: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager' | 'reports';
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager' | 'reports' | 'accounting';

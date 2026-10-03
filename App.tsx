@@ -343,9 +343,12 @@ const App: React.FC = () => {
             return;
         }
         setIsDataLoading(true);
+        // Sub-users (Operators) are limited to the last 50 LRs
+        const isSubUser = sessionStorage.getItem('currentRole') === 'Operator';
+        const lrLimit = isSubUser ? 50 : undefined;
         try {
             const [lrs, company, parties, trucks] = await Promise.all([
-                getLorryReceipts(),
+                getLorryReceipts(lrLimit),
                 getCompanyDetails(),
                 getSavedParties(),
                 getSavedTrucks()
@@ -385,7 +388,8 @@ const App: React.FC = () => {
         prevViewRef.current = currentView;
         // Only re-fetch when arriving at list or dashboard from another view
         if ((currentView === 'list' || currentView === 'dashboard') && prev !== null && prev !== currentView) {
-            getLorryReceipts()
+            const isSubUser = sessionStorage.getItem('currentRole') === 'Operator';
+            getLorryReceipts(isSubUser ? 50 : undefined)
                 .then(lrs => setLorryReceipts(lrs))
                 .catch(err => console.warn('Background LR refresh failed:', err));
         }

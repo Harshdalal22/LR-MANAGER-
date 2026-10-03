@@ -398,11 +398,10 @@ export const applySession = async (sessionData: any) => {
 
 // --- Lorry Receipts ---
 
-export const getLorryReceipts = async (): Promise<LorryReceipt[]> => {
-    const { data, error } = await withTimeout(
-        supabase.from('lorry_receipts').select('*').order('date', { ascending: false }),
-        10000
-    );
+export const getLorryReceipts = async (limit?: number): Promise<LorryReceipt[]> => {
+    let query = supabase.from('lorry_receipts').select('*').order('date', { ascending: false });
+    if (limit) query = query.limit(limit);
+    const { data, error } = await withTimeout(query, 10000);
     if (error) throw error;
 
     // Map snake_case is_invoice_generated to camelCase isInvoiceGenerated and unwrap metadata from JSONB

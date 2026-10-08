@@ -712,56 +712,332 @@ const PaymentsTab = ({ payments, lorryReceipts, onRefresh }: {
     );
 };
 
+// ─── TRUCK EXPENSE TYPES ─────────────────────────────────────────────────────
+interface TruckExpenseEntry {
+    category: string;
+    amount: number;
+    note: string;
+}
+
+const TRUCK_EXPENSE_CATEGORIES = [
+    { key: 'Fuel',          icon: '⛽', label: 'Fuel' },
+    { key: 'Toll',          icon: '🛣️', label: 'Toll' },
+    { key: 'Driver Payment',icon: '👨‍✈️', label: 'Driver Payment' },
+    { key: 'Driver Advance',icon: '💵', label: 'Driver Advance' },
+    { key: 'Hamali',        icon: '🏋️', label: 'Hamali / Loading' },
+    { key: 'Maintenance',   icon: '🔧', label: 'Maintenance / Repair' },
+    { key: 'Tyre',          icon: '🔄', label: 'Tyre / Puncture' },
+    { key: 'Police / RTO',  icon: '🚔', label: 'Police / RTO' },
+    { key: 'Cleaning',      icon: '🧹', label: 'Cleaning / Dhulai' },
+    { key: 'Commission',    icon: '🤝', label: 'Commission' },
+    { key: 'Extra',         icon: '➕', label: 'Extra / Misc' },
+];
+
 // ─── EXPENSES TAB ─────────────────────────────────────────────────────────────
-const ExpensesTab = ({ vouchers, onRefresh }: { vouchers: Voucher[]; onRefresh: () => void }) => {
-    const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState<Partial<Voucher>>({
-        date: today(), description: '', amount: 0, payment_mode: 'Cash', voucher_no: `EXP-${Date.now().toString().slice(-6)}`, party_name: ''
+const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
+    vouchers: Voucher[];
+    lorryReceipts: LorryReceipt[];
+    onRefresh: () => void;
+}) => {
+    // ── Truck Expense Form state ────────────────────────────────────────────────
+    const [showTruckForm, setShowTruckForm]   = useState(false);
+    const [showGenForm,   setShowGenForm]     = useState(false);
+    const [selectedTruck, setSelectedTruck]   = useState('');
+    const [selectedLR,    setSelectedLR]      = useState('');
+    const [expDate,       setExpDate]         = useState(today());
+    const [payMode,       setPayMode]         = useState('Cash');
+    const [expenses,      setExpenses]        = useState<TruckExpenseEntry[]>(
+        TRUCK_EXPENSE_CATEGORIES.map(c => ({ category: c.key, amount: 0, note: '' }))
+    );
+    const [saving,        setSaving]          = useState(false);
+
+    // ── General form state ──────────────────────────────────────────────────────
+    const [genForm, setGenForm] = useState<Partial<Voucher>>({
+        date: today(), description: '', amount: 0, payment_mode: 'Cash',
+        voucher_no: `EXP-${Date.now().toString().slice(-6)}`, party_name: ''
     });
-    const [saving, setSaving] = useState(false);
+    const [genSaving, setGenSaving] = useState(false);
     const [filterCat, setFilterCat] = useState('All');
 
-    const CATEGORIES = ['All', 'Driver Payment', 'Fuel', 'Toll', 'Maintenance', 'Office', 'Commission', 'Other'];
+    const GEN_CATEGORIES = ['All', 'Fuel', 'Toll', 'Driver Payment', 'Hamali', 'Maintenance', 'Commission', 'Office', 'Other'];
 
-    const handleSave = async () => {
-        if (!form.description || !form.amount) return toast.error('Description and amount required');
+    // ── Derived ─────────────────────────────────────────────────────────────────
+    const trucks = useMemo(() => {
+        const set = new Set<string>();
+        lorryReceipts.forEach(lr => { if (lr.truckNo) set.add(lr.truckNo.trim().toUpperCase()); });
+        return Array.from(set).sort();
+    }, [lorryReceipts]);
+
+    const truckLRs = useMemo(() =>
+        selectedTruck
+            ? lorryReceipts
+                .filter(lr => lr.truckNo?.trim().toUpperCase() === selectedTruck)
+                .sort((a, b) => b.date.localeCompare(a.date))
+            : [],
+    [selectedTruck, lorryReceipts]);
+
+    const filtered = filterCat === 'All'
+        ? vouchers
+        : vouchers.filter(v =>
+            v.description?.toLowerCase().includes(filterCat.toLowerCase()) ||
+            v.party_name?.toLowerCase().includes(filterCat.toLowerCase()));
+
+    const totalExpAll      = vouchers.reduce((s, v) => s + v.amount, 0);
+    const totalExpFiltered = filtered.reduce((s, v) => s + v.amount, 0);
+    const truckExpTotal    = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    const breakdown = GEN_CATEGORIES.slice(1).map(cat => ({
+        cat,
+        total: vouchers.filter(v => v.description?.toLowerCase().includes(cat.toLowerCase())).reduce((s, v) => s + v.amount, 0)
+    })).filter(b => b.total > 0);
+
+    // Expenses grouped by truck
+    const byTruck = useMemo(() => {
+        const map: Record<string, { amount: number; count: number }> = {};
+        vouchers.forEach(v => {
+            const match = v.description?.match(/\[Truck:\s*([^\]]+)\]/);
+            const key = match ? match[1] : '(General)';
+            if (!map[key]) map[key] = { amount: 0, count: 0 };
+            map[key].amount += v.amount;
+            map[key].count  += 1;
+        });
+        return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
+    }, [vouchers]);
+
+    // ── Handlers ────────────────────────────────────────────────────────────────
+    const updateExpense = (idx: number, field: keyof TruckExpenseEntry, value: string | number) =>
+        setExpenses(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+
+    const handleTruckExpenseSave = async () => {
+        if (!selectedTruck) return toast.error('Pehle truck select karo');
+        const active = expenses.filter(e => Number(e.amount) > 0);
+        if (active.length === 0) return toast.error('Kam se kam ek expense amount daalo');
         setSaving(true);
         try {
-            await addVoucher(form);
-            toast.success('Expense saved');
-            setShowForm(false);
-            setForm({ date: today(), description: '', amount: 0, payment_mode: 'Cash', voucher_no: `EXP-${Date.now().toString().slice(-6)}`, party_name: '' });
+            const lr = truckLRs.find(l => l.lrNo === selectedLR);
+            const lrTag = lr ? ` | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace})` : '';
+            await Promise.all(active.map((e, i) =>
+                addVoucher({
+                    date:         expDate,
+                    voucher_no:   `TRK-${selectedTruck}-${Date.now().toString().slice(-5)}-${i}`,
+                    description:  `[Truck: ${selectedTruck}] ${e.category}${lrTag}${e.note ? ' | ' + e.note : ''}`,
+                    amount:       Number(e.amount),
+                    payment_mode: payMode,
+                    party_name:   selectedTruck,
+                })
+            ));
+            toast.success(`${active.length} expense(s) saved for ${selectedTruck} ✅`);
+            setShowTruckForm(false);
+            setExpenses(TRUCK_EXPENSE_CATEGORIES.map(c => ({ category: c.key, amount: 0, note: '' })));
+            setSelectedLR('');
             onRefresh();
         } catch (e: any) { toast.error(e.message); }
         finally { setSaving(false); }
     };
 
-    const filtered = filterCat === 'All' ? vouchers : vouchers.filter(v => v.description?.toLowerCase().includes(filterCat.toLowerCase()) || v.party_name?.toLowerCase().includes(filterCat.toLowerCase()));
-    const totalExpense = filtered.reduce((s, v) => s + v.amount, 0);
-
-    // Category breakdown
-    const breakdown = CATEGORIES.slice(1).map(cat => ({
-        cat,
-        total: vouchers.filter(v => v.description?.toLowerCase().includes(cat.toLowerCase())).reduce((s, v) => s + v.amount, 0)
-    })).filter(b => b.total > 0);
+    const handleGenSave = async () => {
+        if (!genForm.description || !genForm.amount) return toast.error('Description and amount required');
+        setGenSaving(true);
+        try {
+            await addVoucher(genForm);
+            toast.success('Expense saved');
+            setShowGenForm(false);
+            setGenForm({ date: today(), description: '', amount: 0, payment_mode: 'Cash', voucher_no: `EXP-${Date.now().toString().slice(-6)}`, party_name: '' });
+            onRefresh();
+        } catch (e: any) { toast.error(e.message); }
+        finally { setGenSaving(false); }
+    };
 
     return (
         <div className="space-y-5">
-            <div className="flex items-center justify-between">
-                <div className="flex gap-4">
+
+            {/* ── Top Row ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-3 flex-wrap">
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3">
                         <div className="text-xs text-gray-500 font-bold">TOTAL EXPENSES</div>
-                        <div className="text-xl font-black text-red-600">{fmt(totalExpense)}</div>
+                        <div className="text-xl font-black text-red-600">{fmt(totalExpAll)}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3">
+                        <div className="text-xs text-gray-500 font-bold">VOUCHERS</div>
+                        <div className="text-xl font-black text-orange-600">{vouchers.length}</div>
                     </div>
                 </div>
-                <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-red-600 text-white rounded-xl font-bold shadow hover:bg-red-700 transition">
-                    + Add Expense
-                </button>
+                <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => { setShowTruckForm(v => !v); setShowGenForm(false); }}
+                        className="px-4 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow hover:bg-orange-700 transition flex items-center gap-2">
+                        🚛 Truck Expense
+                    </button>
+                    <button onClick={() => { setShowGenForm(v => !v); setShowTruckForm(false); }}
+                        className="px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold shadow hover:bg-red-700 transition">
+                        + General Expense
+                    </button>
+                </div>
             </div>
 
-            {/* Category pills */}
+            {/* ── Truck-wise summary ── */}
+            {byTruck.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {byTruck.map(([truck, data]) => (
+                        <div key={truck} className="bg-white rounded-xl border border-orange-100 shadow-sm p-3 text-center">
+                            <div className="text-xs font-bold text-orange-700 truncate mb-1">🚛 {truck}</div>
+                            <div className="font-black text-red-600 text-sm">{fmt(data.amount)}</div>
+                            <div className="text-xs text-gray-400">{data.count} entries</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ══ TRUCK EXPENSE FORM ══ */}
+            {showTruckForm && (
+                <div className="bg-orange-50 border-2 border-orange-300 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="font-black text-orange-800 text-lg">🚛 Truck Expense Entry</h3>
+                        <button onClick={() => setShowTruckForm(false)} className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none">&times;</button>
+                    </div>
+
+                    {/* Truck / LR / Date / Mode */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-white rounded-xl p-4 border border-orange-100">
+                        <div>
+                            <label className="block text-xs font-black text-orange-700 mb-1">🚛 TRUCK NO *</label>
+                            <select value={selectedTruck} onChange={e => { setSelectedTruck(e.target.value); setSelectedLR(''); }}
+                                className="w-full border-2 border-orange-300 rounded-lg px-3 py-2.5 text-sm font-bold bg-orange-50 focus:outline-none focus:border-orange-500">
+                                <option value="">— Select Truck —</option>
+                                {trucks.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-orange-700 mb-1">📋 LINK LR (Optional)</label>
+                            <select value={selectedLR} onChange={e => setSelectedLR(e.target.value)} disabled={!selectedTruck}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 disabled:bg-gray-100 disabled:text-gray-400">
+                                <option value="">— No LR —</option>
+                                {truckLRs.map(lr => (
+                                    <option key={lr.lrNo} value={lr.lrNo}>
+                                        LR# {lr.lrNo} | {lr.date} | {lr.fromPlace}→{lr.toPlace}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-orange-700 mb-1">📅 DATE *</label>
+                            <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-black text-orange-700 mb-1">💳 PAYMENT MODE</label>
+                            <select value={payMode} onChange={e => setPayMode(e.target.value)}
+                                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400">
+                                {['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Expense category grid */}
+                    <div>
+                        <div className="text-xs font-black text-orange-700 mb-3 uppercase tracking-wider">
+                            💰 Expense Categories — Jo bhi hua daalo (0 wale skip ho jaayenge)
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {TRUCK_EXPENSE_CATEGORIES.map((cat, idx) => (
+                                <div key={cat.key}
+                                    className={`bg-white rounded-xl border p-3 transition-all ${Number(expenses[idx].amount) > 0 ? 'border-orange-400 shadow-md' : 'border-gray-200'}`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-base">{cat.icon}</span>
+                                        <span className="text-sm font-bold text-gray-700">{cat.label}</span>
+                                        {Number(expenses[idx].amount) > 0 && (
+                                            <span className="ml-auto text-xs font-black text-orange-600">
+                                                ₹{Number(expenses[idx].amount).toLocaleString('en-IN')}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input type="number" placeholder="Amount (₹)"
+                                            value={expenses[idx].amount || ''}
+                                            onChange={e => updateExpense(idx, 'amount', +e.target.value)}
+                                            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-orange-400 min-w-0" />
+                                        <input type="text" placeholder="Note (optional)"
+                                            value={expenses[idx].note}
+                                            onChange={e => updateExpense(idx, 'note', e.target.value)}
+                                            className="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-orange-400 min-w-0" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Total + Save */}
+                    <div className="flex items-center justify-between bg-orange-100 rounded-xl px-5 py-4 border border-orange-200">
+                        <div>
+                            <div className="text-xs font-bold text-orange-700">TOTAL — {selectedTruck || 'TRUCK'}</div>
+                            <div className="text-2xl font-black text-orange-800">{fmt(truckExpTotal)}</div>
+                            <div className="text-xs text-orange-600">{expenses.filter(e => Number(e.amount) > 0).length} categories active</div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setExpenses(TRUCK_EXPENSE_CATEGORIES.map(c => ({ category: c.key, amount: 0, note: '' })))}
+                                className="px-4 py-2 border border-orange-300 rounded-xl text-sm font-semibold text-orange-700 hover:bg-orange-50">
+                                Clear All
+                            </button>
+                            <button onClick={handleTruckExpenseSave}
+                                disabled={saving || !selectedTruck || truckExpTotal === 0}
+                                className="px-6 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-black shadow hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed">
+                                {saving ? 'Saving...' : `💾 Save ${expenses.filter(e => Number(e.amount) > 0).length} Expense(s)`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ GENERAL EXPENSE FORM ══ */}
+            {showGenForm && (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-red-800">Add General Expense</h3>
+                        <button onClick={() => setShowGenForm(false)} className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none">&times;</button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Date *</label>
+                            <input type="date" value={genForm.date} onChange={e => setGenForm(f => ({ ...f, date: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Voucher No</label>
+                            <input value={genForm.voucher_no} onChange={e => setGenForm(f => ({ ...f, voucher_no: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Payment Mode</label>
+                            <select value={genForm.payment_mode} onChange={e => setGenForm(f => ({ ...f, payment_mode: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
+                                {['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
+                            </select>
+                        </div>
+                        <div className="col-span-2">
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Description *</label>
+                            <input value={genForm.description} onChange={e => setGenForm(f => ({ ...f, description: e.target.value }))}
+                                list="gen-exp-cats" placeholder="Expense description / category" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <datalist id="gen-exp-cats">{GEN_CATEGORIES.slice(1).map(c => <option key={c} value={c} />)}</datalist>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Amount (₹) *</label>
+                            <input type="number" value={genForm.amount || ''} onChange={e => setGenForm(f => ({ ...f, amount: +e.target.value }))}
+                                placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 mb-1">Party / Vendor</label>
+                            <input value={genForm.party_name || ''} onChange={e => setGenForm(f => ({ ...f, party_name: e.target.value }))}
+                                placeholder="Optional vendor name" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                        </div>
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                        <button onClick={handleGenSave} disabled={genSaving} className="px-5 py-2 bg-red-600 text-white rounded-xl text-sm font-bold shadow hover:bg-red-700 disabled:opacity-60">
+                            {genSaving ? 'Saving...' : 'Save Expense'}
+                        </button>
+                        <button onClick={() => setShowGenForm(false)} className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Filter pills ── */}
             <div className="flex gap-2 flex-wrap">
-                {CATEGORIES.map(cat => (
+                {GEN_CATEGORIES.map(cat => (
                     <button key={cat} onClick={() => setFilterCat(cat)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${filterCat === cat ? 'bg-red-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
                         {cat}
@@ -769,7 +1045,7 @@ const ExpensesTab = ({ vouchers, onRefresh }: { vouchers: Voucher[]; onRefresh: 
                 ))}
             </div>
 
-            {/* Category breakdown cards */}
+            {/* ── Category breakdown ── */}
             {breakdown.length > 0 && (
                 <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
                     {breakdown.map(b => (
@@ -781,58 +1057,13 @@ const ExpensesTab = ({ vouchers, onRefresh }: { vouchers: Voucher[]; onRefresh: 
                 </div>
             )}
 
-            {/* Form */}
-            {showForm && (
-                <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
-                    <h3 className="font-bold text-red-800 mb-4">Add Expense Voucher</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Date *</label>
-                            <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Voucher No</label>
-                            <input value={form.voucher_no} onChange={e => setForm(f => ({ ...f, voucher_no: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Payment Mode</label>
-                            <select value={form.payment_mode} onChange={e => setForm(f => ({ ...f, payment_mode: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                                {['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
-                            </select>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Description *</label>
-                            <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                list="exp-cats" placeholder="Expense description / category" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                            <datalist id="exp-cats">{CATEGORIES.slice(1).map(c => <option key={c} value={c} />)}</datalist>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Amount (₹) *</label>
-                            <input type="number" value={form.amount || ''} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))}
-                                placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Party / Vendor</label>
-                            <input value={form.party_name || ''} onChange={e => setForm(f => ({ ...f, party_name: e.target.value }))}
-                                placeholder="Optional vendor name" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                    </div>
-                    <div className="flex gap-3 mt-4">
-                        <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-red-600 text-white rounded-xl text-sm font-bold shadow hover:bg-red-700 disabled:opacity-60">
-                            {saving ? 'Saving...' : 'Save Expense'}
-                        </button>
-                        <button onClick={() => setShowForm(false)} className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Table */}
+            {/* ── Expense Table ── */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50">
-                                {['Date', 'Voucher No', 'Description', 'Party/Vendor', 'Mode', 'Amount'].map(h => (
+                                {['Date', 'Voucher No', 'Description', 'Truck / Vendor', 'Mode', 'Amount'].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr>
@@ -840,22 +1071,28 @@ const ExpensesTab = ({ vouchers, onRefresh }: { vouchers: Voucher[]; onRefresh: 
                         <tbody className="divide-y divide-gray-50">
                             {filtered.length === 0 ? (
                                 <tr><td colSpan={6} className="text-center py-12 text-gray-400">No expenses recorded</td></tr>
-                            ) : filtered.map((v, i) => (
-                                <tr key={v.id || i} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-4 py-3 font-medium text-gray-600">{v.date}</td>
-                                    <td className="px-4 py-3 font-bold text-red-700">{v.voucher_no}</td>
-                                    <td className="px-4 py-3 text-gray-700">{v.description}</td>
-                                    <td className="px-4 py-3 text-gray-500">{v.party_name || '—'}</td>
-                                    <td className="px-4 py-3"><Badge color="bg-gray-100 text-gray-600">{v.payment_mode}</Badge></td>
-                                    <td className="px-4 py-3 font-black text-red-600">{fmt(v.amount)}</td>
-                                </tr>
-                            ))}
+                            ) : filtered.map((v, i) => {
+                                const isTruck = v.description?.includes('[Truck:');
+                                return (
+                                    <tr key={v.id || i} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{v.date}</td>
+                                        <td className="px-4 py-3 font-bold text-red-700">{v.voucher_no}</td>
+                                        <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={v.description}>
+                                            {isTruck && <span className="inline-block bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded mr-1">🚛</span>}
+                                            {v.description?.replace(/\[Truck:[^\]]+\]\s*/, '')}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.party_name || '—'}</td>
+                                        <td className="px-4 py-3"><Badge color="bg-gray-100 text-gray-600">{v.payment_mode}</Badge></td>
+                                        <td className="px-4 py-3 font-black text-red-600 whitespace-nowrap">{fmt(v.amount)}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                         {filtered.length > 0 && (
                             <tfoot>
                                 <tr className="bg-gray-50 border-t-2 border-gray-200">
-                                    <td colSpan={5} className="px-4 py-3 font-black text-gray-700">TOTAL</td>
-                                    <td className="px-4 py-3 font-black text-red-700">{fmt(totalExpense)}</td>
+                                    <td colSpan={5} className="px-4 py-3 font-black text-gray-700">TOTAL ({filtered.length} entries)</td>
+                                    <td className="px-4 py-3 font-black text-red-700">{fmt(totalExpFiltered)}</td>
                                 </tr>
                             </tfoot>
                         )}
@@ -1256,7 +1493,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
                         {activeTab === 'ledger' && <LedgerTab lorryReceipts={lorryReceipts} ledgerEntries={ledgerEntries} payments={payments} onRefresh={loadData} />}
                         {activeTab === 'invoices' && <InvoicesTab lorryReceipts={lorryReceipts} payments={payments} />}
                         {activeTab === 'payments' && <PaymentsTab payments={payments} lorryReceipts={lorryReceipts} onRefresh={loadData} />}
-                        {activeTab === 'expenses' && <ExpensesTab vouchers={vouchers} onRefresh={loadData} />}
+                        {activeTab === 'expenses' && <ExpensesTab vouchers={vouchers} lorryReceipts={lorryReceipts} onRefresh={loadData} />}
                         {activeTab === 'reports' && <ReportsTab lorryReceipts={lorryReceipts} vouchers={vouchers} payments={payments} />}
                     </>
                 )}

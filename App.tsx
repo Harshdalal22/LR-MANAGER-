@@ -746,10 +746,14 @@ const App: React.FC = () => {
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
         const isOperator = currentRole === 'Operator';
         
-        // 'list' is now accessible to managers
+        // 'list' is now accessible to managers and operators
         const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
-        // Operator can access parties/trucks (inside data-management) but NOT invoices, vouchers, or list
-        const restrictedViewsOperator: View[] = ['list', 'vehicle-hiring', 'invoices', 'vouchers'];
+        // Operator can access LR list (non-invoiced only) but NOT invoices, vouchers, vehicle-hiring
+        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'invoices', 'vouchers'];
+        // Filter LRs for Operators: only show LRs where invoice has NOT been generated
+        const operatorLRs = isOperator
+            ? lorryReceipts.filter(lr => !lr.isInvoiceGenerated)
+            : lorryReceipts;
 
         if ((isManager && restrictedViewsManager.includes(currentView)) || (isOperator && restrictedViewsOperator.includes(currentView))) {
             return (
@@ -775,7 +779,7 @@ const App: React.FC = () => {
             case 'dashboard':
                 return (
                     <Dashboard
-                        lorryReceipts={lorryReceipts}
+                        lorryReceipts={operatorLRs}
                         onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
                         onViewList={() => setCurrentView('list')}
                         onViewVouchers={() => setCurrentView('vouchers')}
@@ -801,7 +805,7 @@ const App: React.FC = () => {
             case 'list':
                 return (
                     <LRList
-                        lorryReceipts={lorryReceipts}
+                        lorryReceipts={operatorLRs}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
                         onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
@@ -817,7 +821,7 @@ const App: React.FC = () => {
                         }}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
-                        isReadOnly={isManager}
+                        isReadOnly={isManager || isOperator}
                         initialViewMode="lrs"
                         savedParties={savedParties}
                     />

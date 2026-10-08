@@ -33,11 +33,24 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({ lorryR
         );
     }, [lorryReceipts]);
 
-    // Helper: sum only numeric values from charges (string fields like driverName, vehicleType etc. are ignored)
+    // Only sum known numeric charge keys (from DetailedCharges type in types.ts).
+    // This prevents string fields like driverContact (phone number), vehicleType,
+    // driverName, freightBasis etc. from being accidentally counted as charges.
+    const NUMERIC_CHARGE_KEYS = new Set([
+        'hamail', 'surCharge', 'stCharge', 'collectionCharge', 'ddCharge',
+        'otherCharge', 'riskCharge', 'tollTax', 'advancePaid',
+        // common aliases also used in some LRs
+        'hamali', 'detention', 'extraCharge', 'doorDelivery',
+        'loadingCharge', 'unloadingCharge', 'tollCharge',
+        'cashMemo', 'extraCharges',
+    ]);
+
     const safeChargesSum = (charges: Record<string, any>) =>
-        Object.values(charges || {}).reduce((sum: number, val: any) => {
+        Object.entries(charges || {}).reduce((sum: number, [key, val]: [string, any]) => {
+            // Skip non-numeric keys (string metadata stored alongside charges)
+            if (!NUMERIC_CHARGE_KEYS.has(key)) return sum;
             const n = Number(val);
-            return sum + (isFinite(n) ? n : 0);
+            return sum + (isFinite(n) && !isNaN(n) ? n : 0);
         }, 0);
 
     const totalAmount = sortedLorryReceipts.reduce((sum, lr) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LorryReceipt, CompanyDetails, SavedParty, LedgerEntry, Voucher, PaymentReceipt } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, LedgerEntry, Voucher, PaymentReceipt, SavedTruck } from '../types';
+import { IndianNumberPlate } from './TruckGarage';
 import {
     getLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry,
     getVouchers, addVoucher, updateVoucher, deleteVoucher,
@@ -12,10 +13,12 @@ interface AccountingViewProps {
     lorryReceipts: LorryReceipt[];
     companyDetails: CompanyDetails;
     savedParties: SavedParty[];
+    savedTrucks?: SavedTruck[];
     onBack: () => void;
+    onOpenGarage?: (truckNo?: string) => void;
 }
 
-type AccTab = 'overview' | 'ledger' | 'invoices' | 'payments' | 'expenses' | 'reports';
+type AccTab = 'overview' | 'truck-pnl' | 'gst' | 'ledger' | 'invoices' | 'payments' | 'expenses' | 'reports';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
@@ -1450,8 +1453,700 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
     );
 };
 
+// ─── TRUCK P&L / FLEET PROFITABILITY TAB ──────────────────────────────────────
+const TruckPnlTab = ({
+    lorryReceipts,
+    vouchers,
+    savedTrucks = [],
+    onOpenGarage
+}: {
+    lorryReceipts: LorryReceipt[];
+    vouchers: Voucher[];
+    savedTrucks?: SavedTruck[];
+    onOpenGarage?: (truckNo?: string) => void;
+}) => {
+    // 1. Gather all unique trucks from savedTrucks, LRs, and expense vouchers
+    const allTruckNumbers = useMemo(() => {
+        const set = new Set<string>();
+        savedTrucks.forEach(t => t.truckNo && set.add(t.truckNo.toUpperCase().trim()));
+        lorryReceipts.forEach(lr => lr.truckNo && set.add(lr.truckNo.toUpperCase().trim()));
+        vouchers.forEach(v => {
+            const match = v.description?.match(/\[Truck:\s*([^\]]+)\]/i);
+            if (match) set.add(match[1].toUpperCase().trim());
+            else if (v.party_name && (v.party_name.startsWith('HR') || v.party_name.startsWith('DL') || v.party_name.match(/^[A-Z]{2}\s*\d/))) {
+                set.add(v.party_name.toUpperCase().trim());
+            }
+        });
+        return Array.from(set).filter(Boolean);
+    }, [savedTrucks, lorryReceipts, vouchers]);
+
+    // 2. Compute financial performance for every truck
+    const fleetMetrics = useMemo(() => {
+        return allTruckNumbers.map(truckNo => {
+            const saved = savedTrucks.find(t => t.truckNo.toUpperCase().trim() === truckNo);
+            
+            // LRs for this truck
+            const truckLRs = lorryReceipts.filter(lr => lr.truckNo && lr.truckNo.toUpperCase().trim() === truckNo);
+            const totalFreight = truckLRs.reduce((s, lr) => s + (Number(lr.freight) || 0), 0);
+
+            // Expenses for this truck
+            const truckExpenses = vouchers.filter(v => {
+                const descMatch = v.description && new RegExp(`\\[Truck:\\s*${truckNo}\\]`, 'i').test(v.description);
+                const partyMatch = v.party_name && v.party_name.toUpperCase().trim() === truckNo;
+                return descMatch || partyMatch;
+            });
+            const totalExpenses = truckExpenses.reduce((s, v) => s + (Number(v.amount) || 0), 0);
+
+            // Category breakdown
+            const catMap: Record<string, number> = {
+                'Fuel': 0,
+                'Toll': 0,
+                'Driver': 0,
+                'Maintenance': 0,
+                'Tyres': 0,
+                'Challan': 0,
+                'EMI': 0,
+                'Other': 0
+            };
+
+            truckExpenses.forEach(v => {
+                const desc = (v.description || '').toLowerCase();
+                if (/fuel|diesel/i.test(desc)) catMap['Fuel'] += v.amount;
+                else if (/toll/i.test(desc)) catMap['Toll'] += v.amount;
+                else if (/driver|bhatta|kharcha/i.test(desc)) catMap['Driver'] += v.amount;
+                else if (/repair|maintenance|servicing/i.test(desc)) catMap['Maintenance'] += v.amount;
+                else if (/tyre|tire/i.test(desc)) catMap['Tyres'] += v.amount;
+                else if (/challan|fine/i.test(desc)) catMap['Challan'] += v.amount;
+                else if (/emi|finance|loan/i.test(desc)) catMap['EMI'] += v.amount;
+                else catMap['Other'] += v.amount;
+            });
+
+            const netProfit = totalFreight - totalExpenses;
+            const margin = totalFreight > 0 ? (netProfit / totalFreight) * 100 : 0;
+
+            return {
+                truckNo,
+                make: saved?.make || 'Tata Motors',
+                model: saved?.model || 'Heavy Hauler',
+                driverName: saved?.driverName || '',
+                ownerName: saved?.ownerName || '',
+                emiAmount: saved?.emiAmount || 0,
+                lrs: truckLRs,
+                tripsCount: truckLRs.length,
+                totalFreight,
+                expenses: truckExpenses,
+                totalExpenses,
+                catBreakdown: catMap,
+                netProfit,
+                margin
+            };
+        }).sort((a, b) => b.netProfit - a.netProfit);
+    }, [allTruckNumbers, savedTrucks, lorryReceipts, vouchers]);
+
+    // Selected spotlight truck
+    const [selectedTruck, setSelectedTruck] = useState<string>(() => fleetMetrics[0]?.truckNo || '');
+    const [searchTruck, setSearchTruck] = useState('');
+    const [sortField, setSortField] = useState<'profit' | 'freight' | 'expenses' | 'trips'>('profit');
+
+    const activeTruckData = useMemo(() => {
+        return fleetMetrics.find(t => t.truckNo === selectedTruck) || fleetMetrics[0];
+    }, [fleetMetrics, selectedTruck]);
+
+    // Fleet Summary Totals
+    const totalFleetFreight = fleetMetrics.reduce((s, t) => s + t.totalFreight, 0);
+    const totalFleetExpenses = fleetMetrics.reduce((s, t) => s + t.totalExpenses, 0);
+    const totalFleetProfit = totalFleetFreight - totalFleetExpenses;
+    const avgFleetMargin = totalFleetFreight > 0 ? (totalFleetProfit / totalFleetFreight) * 100 : 0;
+    const topTruck = fleetMetrics[0];
+
+    const sortedTrucks = useMemo(() => {
+        return [...fleetMetrics]
+            .filter(t => t.truckNo.toLowerCase().includes(searchTruck.toLowerCase()) || t.make.toLowerCase().includes(searchTruck.toLowerCase()))
+            .sort((a, b) => {
+                if (sortField === 'freight') return b.totalFreight - a.totalFreight;
+                if (sortField === 'expenses') return b.totalExpenses - a.totalExpenses;
+                if (sortField === 'trips') return b.tripsCount - a.tripsCount;
+                return b.netProfit - a.netProfit;
+            });
+    }, [fleetMetrics, searchTruck, sortField]);
+
+    const exportCsv = () => {
+        const headers = ['Truck Number', 'Make/Brand', 'Trips Count', 'Freight Earned (₹)', 'Expenses (₹)', 'Net Profit (₹)', 'Margin %'];
+        const rows = fleetMetrics.map(t => [
+            t.truckNo,
+            t.make,
+            t.tripsCount,
+            t.totalFreight,
+            t.totalExpenses,
+            t.netProfit,
+            `${t.margin.toFixed(1)}%`
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `Fleet_Profit_Loss_${today()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('Fleet Profit & Loss exported to CSV ✅');
+    };
+
+    return (
+        <div className="space-y-6">
+            
+            {/* ── Top Fleet KPI Cards ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard 
+                    label="Fleet Freight Revenue" 
+                    value={fmt(totalFleetFreight)} 
+                    sub={`${fleetMetrics.reduce((s, t) => s + t.tripsCount, 0)} Total LRs`} 
+                    color="bg-blue-100 text-blue-700" 
+                    icon="🚛" 
+                />
+                <StatCard 
+                    label="Fleet Trip Expenses" 
+                    value={fmt(totalFleetExpenses)} 
+                    sub="Fuel, Toll, Repairs & Drivers" 
+                    color="bg-rose-100 text-rose-700" 
+                    icon="⛽" 
+                />
+                <StatCard 
+                    label="Fleet Net Operating Profit" 
+                    value={fmt(totalFleetProfit)} 
+                    sub={`${avgFleetMargin.toFixed(1)}% Fleet Margin`} 
+                    color={totalFleetProfit >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"} 
+                    icon="💰" 
+                />
+                <StatCard 
+                    label="Top Performing Truck" 
+                    value={topTruck ? topTruck.truckNo : '—'} 
+                    sub={topTruck ? `${fmt(topTruck.netProfit)} profit (${topTruck.tripsCount} trips)` : 'No Data'} 
+                    color="bg-amber-100 text-amber-700" 
+                    icon="🏆" 
+                />
+            </div>
+
+            {/* ── Spotlight Selected Truck Card (3D preview & deep P&L) ── */}
+            {activeTruckData && (
+                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-800 text-white flex items-center justify-center text-3xl shadow-md">
+                                🚛
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <IndianNumberPlate plateNo={activeTruckData.truckNo} size="md" />
+                                    <span className="text-xs font-bold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                        {activeTruckData.make} {activeTruckData.model}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-gray-500 font-medium">
+                                    {activeTruckData.driverName ? `Driver: ${activeTruckData.driverName}` : 'Self Driven'} 
+                                    {activeTruckData.ownerName && ` • Owner: ${activeTruckData.ownerName}`}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            {onOpenGarage && (
+                                <button
+                                    onClick={() => onOpenGarage(activeTruckData.truckNo)}
+                                    className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 hover:bg-blue-600 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    <span>🚛 Inspect in 3D Garage</span>
+                                    <span>→</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Financial Scoreboard for Selected Truck */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 text-center">
+                            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">LR Freight Revenue</span>
+                            <div className="text-xl sm:text-2xl font-black text-blue-900 mt-1">{fmt(activeTruckData.totalFreight)}</div>
+                            <span className="text-[10px] text-blue-600 font-semibold">{activeTruckData.tripsCount} Completed LRs</span>
+                        </div>
+
+                        <div className="bg-rose-50/70 border border-rose-100 rounded-2xl p-4 text-center">
+                            <span className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Trip Expenses</span>
+                            <div className="text-xl sm:text-2xl font-black text-rose-900 mt-1">{fmt(activeTruckData.totalExpenses)}</div>
+                            <span className="text-[10px] text-rose-600 font-semibold">{activeTruckData.expenses.length} Expense Entries</span>
+                        </div>
+
+                        <div className={`rounded-2xl p-4 text-center border ${activeTruckData.netProfit >= 0 ? 'bg-emerald-50/70 border-emerald-100' : 'bg-red-50/70 border-red-100'}`}>
+                            <span className={`text-[11px] font-bold uppercase tracking-wider ${activeTruckData.netProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                                Net Profit / Loss
+                            </span>
+                            <div className={`text-xl sm:text-2xl font-black mt-1 ${activeTruckData.netProfit >= 0 ? 'text-emerald-900' : 'text-red-900'}`}>
+                                {fmt(activeTruckData.netProfit)}
+                            </div>
+                            <span className={`text-[10px] font-bold ${activeTruckData.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {activeTruckData.margin.toFixed(1)}% Operating Margin
+                            </span>
+                        </div>
+
+                        <div className="bg-purple-50/70 border border-purple-100 rounded-2xl p-4 text-center">
+                            <span className="text-[11px] font-bold text-purple-700 uppercase tracking-wider">Avg Freight per Trip</span>
+                            <div className="text-xl sm:text-2xl font-black text-purple-900 mt-1">
+                                {activeTruckData.tripsCount > 0 ? fmt(Math.round(activeTruckData.totalFreight / activeTruckData.tripsCount)) : '—'}
+                            </div>
+                            <span className="text-[10px] text-purple-600 font-semibold">Per Trip Average</span>
+                        </div>
+                    </div>
+
+                    {/* Expense Breakdown by Category */}
+                    <div>
+                        <div className="text-xs font-black uppercase text-gray-500 tracking-wider mb-3">
+                            Expense Categories for {activeTruckData.truckNo}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {Object.entries(activeTruckData.catBreakdown).map(([cat, amt]) => {
+                                const pct = activeTruckData.totalExpenses > 0 ? ((amt / activeTruckData.totalExpenses) * 100).toFixed(0) : '0';
+                                return (
+                                    <div key={cat} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                            <span className="font-bold text-gray-700">{cat}</span>
+                                            <span className="text-[10px] text-gray-400 font-semibold">{pct}%</span>
+                                        </div>
+                                        <div className="text-sm font-black text-gray-900">{fmt(amt)}</div>
+                                        <div className="w-full bg-gray-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                                            <div 
+                                                className="bg-orange-500 h-full rounded-full transition-all" 
+                                                style={{ width: `${Math.min(Number(pct), 100)}%` }} 
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── FLEET PROFITABILITY COMPARATIVE TABLE ── */}
+            <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 className="font-black text-gray-900 text-lg">Fleet Profit & Loss Overview</h3>
+                        <p className="text-xs text-gray-500">Every truck's trips, freight earned, trip expenses and net margin</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <input
+                            type="text"
+                            placeholder="Search truck number..."
+                            value={searchTruck}
+                            onChange={e => setSearchTruck(e.target.value)}
+                            className="p-2 border border-gray-200 rounded-xl text-xs font-bold flex-1 sm:w-44 focus:outline-none focus:border-blue-500"
+                        />
+                        <select
+                            value={sortField}
+                            onChange={e => setSortField(e.target.value as any)}
+                            className="p-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 bg-gray-50 focus:outline-none"
+                        >
+                            <option value="profit">Sort: Net Profit</option>
+                            <option value="freight">Sort: Freight Revenue</option>
+                            <option value="expenses">Sort: Trip Expenses</option>
+                            <option value="trips">Sort: Total Trips</option>
+                        </select>
+                        <button
+                            onClick={exportCsv}
+                            className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                            title="Export to CSV"
+                        >
+                            <span>📥</span>
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50/80 border-b border-gray-100">
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Rank</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Truck Number</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Brand & Model</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Trips</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Freight Revenue</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Trip Expenses</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Net Profit / Loss</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Margin</th>
+                                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {sortedTrucks.length === 0 ? (
+                                <tr>
+                                    <td colSpan={9} className="text-center py-12 text-gray-400 font-semibold">
+                                        No trucks found matching "{searchTruck}".
+                                    </td>
+                                </tr>
+                            ) : (
+                                sortedTrucks.map((truck, idx) => {
+                                    const isSelected = truck.truckNo === selectedTruck;
+                                    return (
+                                        <tr 
+                                            key={truck.truckNo} 
+                                            onClick={() => setSelectedTruck(truck.truckNo)}
+                                            className={`hover:bg-blue-50/40 transition cursor-pointer ${isSelected ? 'bg-blue-50/70' : ''}`}
+                                        >
+                                            <td className="px-4 py-3 font-bold text-gray-400 text-xs">
+                                                #{idx + 1}
+                                            </td>
+                                            <td className="px-4 py-3 font-mono font-black text-gray-900">
+                                                <div className="flex items-center gap-2">
+                                                    <span>🚛</span>
+                                                    <span>{truck.truckNo}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-600 text-xs">
+                                                <span className="font-bold text-gray-800">{truck.make}</span> {truck.model}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-gray-700">
+                                                {truck.tripsCount}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-blue-700">
+                                                {fmt(truck.totalFreight)}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-rose-600">
+                                                {fmt(truck.totalExpenses)}
+                                            </td>
+                                            <td className={`px-4 py-3 text-right font-black ${truck.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {fmt(truck.netProfit)}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${truck.netProfit >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                                    {truck.margin.toFixed(1)}%
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {onOpenGarage && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onOpenGarage(truck.truckNo);
+                                                        }}
+                                                        className="px-2.5 py-1 bg-slate-900 hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                                                    >
+                                                        3D Garage 🚛
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    );
+};
+
+// ─── ADVANCED GST COLLECTION & TAX DASHBOARD ─────────────────────────────────
+const GSTCenterTab = ({
+    lorryReceipts,
+    companyDetails
+}: {
+    lorryReceipts: LorryReceipt[];
+    companyDetails: CompanyDetails;
+}) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [rateFilter, setRateFilter] = useState<'all' | '5' | '12' | '18'>('all');
+    const [fromDate, setFromDate] = useState(() => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - 2);
+        return d.toISOString().split('T')[0];
+    });
+    const [toDate, setToDate] = useState(today());
+
+    // Invoiced LRs calculation
+    const invoicedLRs = useMemo(() => {
+        return lorryReceipts.filter(lr => lr.isInvoiceGenerated && lr.invoiceNo);
+    }, [lorryReceipts]);
+
+    const gstRows = useMemo(() => {
+        return invoicedLRs.map(lr => {
+            const taxable = Number(lr.freight) || 0;
+            // Standard Goods Transport Agency rate is 5%
+            const rate = 5;
+            // Check if intra-state or inter-state
+            const isInterstate = lr.fromPlace && lr.toPlace && lr.fromPlace.split(',')[0].trim().toLowerCase() !== lr.toPlace.split(',')[0].trim().toLowerCase();
+            
+            let cgst = 0;
+            let sgst = 0;
+            let igst = 0;
+
+            if (isInterstate) {
+                igst = (taxable * rate) / 100;
+            } else {
+                cgst = (taxable * (rate / 2)) / 100;
+                sgst = (taxable * (rate / 2)) / 100;
+            }
+
+            const totalGst = cgst + sgst + igst;
+            const invoiceTotal = taxable + totalGst;
+
+            return {
+                invoiceNo: lr.invoiceNo,
+                invoiceDate: lr.invoiceDate || lr.date,
+                lrNo: lr.lrNo,
+                party: lr.billingTo?.name || lr.consignor?.name || 'Party',
+                partyGst: lr.billingTo?.gstin || lr.consignor?.gstin || 'Unregistered',
+                from: lr.fromPlace,
+                to: lr.toPlace,
+                taxable,
+                rate,
+                cgst,
+                sgst,
+                igst,
+                totalGst,
+                invoiceTotal,
+                isInterstate
+            };
+        });
+    }, [invoicedLRs]);
+
+    // Filter by date & search
+    const filteredRows = useMemo(() => {
+        return gstRows.filter(r => {
+            if (fromDate && r.invoiceDate && r.invoiceDate < fromDate) return false;
+            if (toDate && r.invoiceDate && r.invoiceDate > toDate) return false;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchInv = r.invoiceNo?.toLowerCase().includes(q);
+                const matchParty = r.party?.toLowerCase().includes(q);
+                const matchGst = r.partyGst?.toLowerCase().includes(q);
+                if (!matchInv && !matchParty && !matchGst) return false;
+            }
+            return true;
+        });
+    }, [gstRows, fromDate, toDate, searchQuery]);
+
+    // Summary Totals
+    const totalTaxable = filteredRows.reduce((s, r) => s + r.taxable, 0);
+    const totalCGST = filteredRows.reduce((s, r) => s + r.cgst, 0);
+    const totalSGST = filteredRows.reduce((s, r) => s + r.sgst, 0);
+    const totalIGST = filteredRows.reduce((s, r) => s + r.igst, 0);
+    const totalGST = totalCGST + totalSGST + totalIGST;
+    const totalInvoiceValue = totalTaxable + totalGST;
+
+    const exportGstCsv = () => {
+        const headers = ['Invoice No', 'Date', 'LR No', 'Party Name', 'Party GSTIN', 'Taxable Freight (₹)', 'Rate %', 'CGST (₹)', 'SGST (₹)', 'IGST (₹)', 'Total GST (₹)', 'Invoice Value (₹)'];
+        const rows = filteredRows.map(r => [
+            r.invoiceNo,
+            r.invoiceDate,
+            r.lrNo,
+            `"${r.party}"`,
+            r.partyGst,
+            r.taxable,
+            `${r.rate}%`,
+            r.cgst,
+            r.sgst,
+            r.igst,
+            r.totalGst,
+            r.invoiceTotal
+        ]);
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `GST_Collection_Report_${today()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success('GST Collection Report exported to CSV ✅');
+    };
+
+    return (
+        <div className="space-y-6">
+            
+            {/* ── Top GST Metric Cards ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard 
+                    label="Total GST Collected" 
+                    value={fmt(totalGST)} 
+                    sub={`${filteredRows.length} Invoices Filed`} 
+                    color="bg-emerald-100 text-emerald-700" 
+                    icon="🏛️" 
+                />
+                <StatCard 
+                    label="CGST Collected (@2.5%)" 
+                    value={fmt(totalCGST)} 
+                    sub="Central GST Pool" 
+                    color="bg-blue-100 text-blue-700" 
+                    icon="📊" 
+                />
+                <StatCard 
+                    label="SGST Collected (@2.5%)" 
+                    value={fmt(totalSGST)} 
+                    sub="State GST Pool" 
+                    color="bg-indigo-100 text-indigo-700" 
+                    icon="📈" 
+                />
+                <StatCard 
+                    label="IGST Collected (@5.0%)" 
+                    value={fmt(totalIGST)} 
+                    sub="Inter-state Transport" 
+                    color="bg-purple-100 text-purple-700" 
+                    icon="🌐" 
+                />
+            </div>
+
+            {/* ── Secondary Summary Tiles ── */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">TAXABLE TURNOVER</span>
+                    <div className="text-2xl font-black text-gray-900 mt-1">{fmt(totalTaxable)}</div>
+                    <span className="text-xs text-gray-400 font-medium">Total freight base value before tax</span>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">TOTAL INVOICE VALUE</span>
+                    <div className="text-2xl font-black text-blue-800 mt-1">{fmt(totalInvoiceValue)}</div>
+                    <span className="text-xs text-gray-400 font-medium">Grand gross billed including tax</span>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">COMPANY GSTIN</span>
+                    <div className="text-lg font-mono font-black text-slate-800 mt-1">{companyDetails.gstn || 'NOT SPECIFIED'}</div>
+                    <span className="text-xs text-gray-400 font-medium">PAN: {companyDetails.pan || '—'}</span>
+                </div>
+            </div>
+
+            {/* ── GST Schedule Table (GSTR-1 Ready) ── */}
+            <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 className="font-black text-gray-900 text-lg">GST Filing Schedule (GSTR-1)</h3>
+                        <p className="text-xs text-gray-500">Period: {fromDate} to {toDate} • Detailed itemized tax breakdown</p>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={e => setFromDate(e.target.value)}
+                            className="p-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 bg-gray-50"
+                        />
+                        <span className="text-xs text-gray-400">to</span>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={e => setToDate(e.target.value)}
+                            className="p-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 bg-gray-50"
+                        />
+                        <input
+                            type="text"
+                            placeholder="Search party or invoice..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="p-2 border border-gray-200 rounded-xl text-xs font-bold flex-1 sm:w-44 focus:outline-none focus:border-blue-500"
+                        />
+                        <button
+                            onClick={exportGstCsv}
+                            className="p-2 bg-slate-900 hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shrink-0"
+                        >
+                            <span>📥</span>
+                            <span>Export CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-gray-50/80 border-b border-gray-100">
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Invoice No</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Party Name</th>
+                                <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Party GSTIN</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Taxable (₹)</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">CGST (₹)</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">SGST (₹)</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">IGST (₹)</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Total GST (₹)</th>
+                                <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Invoice Total (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredRows.length === 0 ? (
+                                <tr>
+                                    <td colSpan={10} className="text-center py-12 text-gray-400 font-semibold">
+                                        No invoices found for the selected period.
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredRows.map(r => (
+                                    <tr key={r.invoiceNo + r.lrNo} className="hover:bg-gray-50 transition">
+                                        <td className="px-4 py-3 font-mono font-bold text-blue-700">
+                                            {r.invoiceNo}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600 text-xs">
+                                            {r.invoiceDate}
+                                        </td>
+                                        <td className="px-4 py-3 font-bold text-gray-900 truncate max-w-[160px]">
+                                            {r.party}
+                                        </td>
+                                        <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                                            {r.partyGst}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                                            {fmt(r.taxable)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold text-blue-700">
+                                            {fmt(r.cgst)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold text-indigo-700">
+                                            {fmt(r.sgst)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold text-purple-700">
+                                            {fmt(r.igst)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-emerald-700">
+                                            {fmt(r.totalGst)}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-black text-gray-900">
+                                            {fmt(r.invoiceTotal)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                        <tfoot>
+                            <tr className="border-t-2 border-gray-300 bg-gray-50 font-black text-gray-900">
+                                <td colSpan={4} className="px-4 py-3 uppercase text-xs">TOTALS ({filteredRows.length} INVOICES)</td>
+                                <td className="px-4 py-3 text-right text-blue-900">{fmt(totalTaxable)}</td>
+                                <td className="px-4 py-3 text-right text-blue-900">{fmt(totalCGST)}</td>
+                                <td className="px-4 py-3 text-right text-indigo-900">{fmt(totalSGST)}</td>
+                                <td className="px-4 py-3 text-right text-purple-900">{fmt(totalIGST)}</td>
+                                <td className="px-4 py-3 text-right text-emerald-900">{fmt(totalGST)}</td>
+                                <td className="px-4 py-3 text-right text-slate-950">{fmt(totalInvoiceValue)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    );
+};
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyDetails, savedParties, onBack }) => {
+const AccountingView: React.FC<AccountingViewProps> = ({ 
+    lorryReceipts, 
+    companyDetails, 
+    savedParties, 
+    savedTrucks = [],
+    onBack,
+    onOpenGarage
+}) => {
     const [activeTab, setActiveTab] = useState<AccTab>('overview');
     const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -1479,8 +2174,10 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    const TABS: { id: AccTab; label: string; icon: string }[] = [
+    const TABS: { id: AccTab; label: string; icon: string; badge?: string }[] = [
         { id: 'overview', label: 'Overview', icon: '📊' },
+        { id: 'truck-pnl', label: 'Truck P&L', icon: '🚛', badge: 'PROFIT' },
+        { id: 'gst', label: 'GST Collection', icon: '🏛️', badge: 'TAX' },
         { id: 'ledger', label: 'Ledger', icon: '📒' },
         { id: 'invoices', label: 'Invoices', icon: '🧾' },
         { id: 'payments', label: 'Payments', icon: '💰' },
@@ -1494,7 +2191,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
             <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6">
                     <div className="flex items-center gap-4 py-3">
-                        <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition font-semibold text-sm">
+                        <button onClick={onBack} className="flex items-center gap-2 text-gray-500 hover:text-gray-800 transition font-semibold text-sm cursor-pointer">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                             Back
                         </button>
@@ -1502,12 +2199,20 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
                         <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg flex items-center justify-center text-white font-black text-sm">₹</div>
                             <div>
-                                <div className="font-black text-gray-800 leading-tight">Accounting</div>
+                                <div className="font-black text-gray-800 leading-tight">Advanced Accounting</div>
                                 <div className="text-xs text-gray-500 leading-tight">{companyDetails.name || 'Your Company'}</div>
                             </div>
                         </div>
-                        <div className="ml-auto">
-                            <button onClick={loadData} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition">
+                        <div className="ml-auto flex items-center gap-2">
+                            {onOpenGarage && (
+                                <button
+                                    onClick={() => onOpenGarage()}
+                                    className="px-3 py-1.5 text-xs bg-slate-900 text-white rounded-lg font-bold hover:bg-blue-600 transition cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <span>🚛 Truck Garage</span>
+                                </button>
+                            )}
+                            <button onClick={loadData} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition cursor-pointer">
                                 ↻ Refresh
                             </button>
                         </div>
@@ -1517,11 +2222,16 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
                     <div className="flex gap-1 -mb-px overflow-x-auto scrollbar-hide">
                         {TABS.map(tab => (
                             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
+                                className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.id
                                     ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
                                 <span>{tab.icon}</span>
                                 <span>{tab.label}</span>
+                                {tab.badge && (
+                                    <span className="text-[9px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                                        {tab.badge}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -1538,6 +2248,8 @@ const AccountingView: React.FC<AccountingViewProps> = ({ lorryReceipts, companyD
                 ) : (
                     <>
                         {activeTab === 'overview' && <OverviewTab lorryReceipts={lorryReceipts} vouchers={vouchers} payments={payments} ledgerEntries={ledgerEntries} />}
+                        {activeTab === 'truck-pnl' && <TruckPnlTab lorryReceipts={lorryReceipts} vouchers={vouchers} savedTrucks={savedTrucks} onOpenGarage={onOpenGarage} />}
+                        {activeTab === 'gst' && <GSTCenterTab lorryReceipts={lorryReceipts} companyDetails={companyDetails} />}
                         {activeTab === 'ledger' && <LedgerTab lorryReceipts={lorryReceipts} ledgerEntries={ledgerEntries} payments={payments} onRefresh={loadData} />}
                         {activeTab === 'invoices' && <InvoicesTab lorryReceipts={lorryReceipts} payments={payments} />}
                         {activeTab === 'payments' && <PaymentsTab payments={payments} lorryReceipts={lorryReceipts} onRefresh={loadData} />}

@@ -1016,15 +1016,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <span>{isHi ? 'पार्टियां' : 'Parties'}</span>
                             </button>
 
-                            {/* Trucks */}
+                            {/* Trucks / Garage */}
                             <button
-                                onClick={() => setCurrentView('trucks')}
+                                onClick={() => setCurrentView('garage')}
                                 className="w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-slate-400 hover:text-white hover:bg-slate-800/60 font-medium text-sm transition-colors cursor-pointer text-left group"
                             >
                                 <svg className="w-5 h-5 shrink-0 group-hover:text-orange-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 17a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4zM3 4h11v10H3V4zm11 3h4l3 4v3h-7V7z" />
                                 </svg>
-                                <span>{isHi ? 'ट्रक' : 'Trucks'}</span>
+                                <span className="flex items-center gap-2">
+                                    <span>{isHi ? 'ट्रक गैराज' : 'Truck Garage'}</span>
+                                    <span className="text-[9px] bg-orange-500/20 text-orange-400 border border-orange-500/30 px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider">3D</span>
+                                </span>
                             </button>
 
                             {/* Bookings */}
@@ -1437,7 +1440,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                             {/* Card 4: Active Trucks */}
                             <div 
-                                onClick={() => setCurrentView('trucks')}
+                                onClick={() => setCurrentView('garage')}
                                 className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group"
                             >
                                 <div className="flex items-start justify-between">
@@ -1595,6 +1598,50 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         </span>
                                     </div>
                                     <div className="w-11 h-11 rounded-full bg-white text-blue-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                        <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 4: Truck Garage (Bronze / Sunset Orange) */}
+                            <div
+                                onClick={() => setCurrentView('garage')}
+                                className="group relative overflow-hidden rounded-3xl p-6 sm:p-8 text-left transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl cursor-pointer flex flex-col justify-between min-h-[220px]"
+                                style={{
+                                    background: 'linear-gradient(135deg, #c2410c 0%, #ea580c 50%, #9a3412 100%)',
+                                    boxShadow: '0 20px 40px -10px rgba(234, 88, 12, 0.45)'
+                                }}
+                            >
+                                <div>
+                                    {/* Icon */}
+                                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white mb-4 border border-white/20 shadow-inner text-2xl">
+                                        🚛
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight group-hover:text-orange-100 transition-colors">
+                                            {isHi ? 'ट्रक गैराज' : 'Truck Garage'}
+                                        </h2>
+                                        <span className="text-[10px] bg-white/20 text-white border border-white/30 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">3D FLEET</span>
+                                    </div>
+                                    <p className="text-orange-100/90 text-xs sm:text-sm font-medium mt-1.5 max-w-sm">
+                                        {isHi
+                                            ? 'CRED स्टाइल गैराज, 3D ट्रक, बीमा, PUCC, फास्टैग, EMI और फिटनेस अलर्ट।'
+                                            : 'CRED-style Garage, 3D truck models, Insurance, PUCC, FASTag, EMI & Compliance alerts.'}
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-6 mt-4 border-t border-white/15">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-orange-950/60 text-white border border-white/10">
+                                            {activeTrucksDisplay} {isHi ? 'सक्रिय ट्रक' : 'Trucks'}
+                                        </span>
+                                        <span className="px-3 py-1.5 rounded-xl text-xs font-black bg-amber-900/60 text-amber-200 border border-amber-400/20">
+                                            {isHi ? 'दस्तावेज' : 'Docs & EMI'}
+                                        </span>
+                                    </div>
+                                    <div className="w-11 h-11 rounded-full bg-white text-orange-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                                         <svg className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                                         </svg>

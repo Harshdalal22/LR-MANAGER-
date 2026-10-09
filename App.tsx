@@ -886,19 +886,24 @@ const App: React.FC = () => {
                     />
                 );
             case 'trucks':
+            case 'garage':
                 return (
                     <TruckManagement
                         savedTrucks={savedTrucks}
+                        lorryReceipts={lorryReceipts}
                         onSave={async (t) => {
                             await saveSavedTruck(t);
                             setSavedTrucks(await getSavedTrucks());
-                            toast.success("Truck saved");
+                            toast.success("Truck saved to Garage");
                         }}
-                        onDelete={async (id) => {
-                            await deleteSavedTruck(id);
+                        onDelete={async (id, truckNo) => {
+                            await deleteSavedTruck(id, truckNo);
                             setSavedTrucks(prev => prev.filter(x => x.id !== id));
                         }}
                         onBack={() => setCurrentView('dashboard')}
+                        onNavigateToExpenses={() => {
+                            setCurrentView('accounting');
+                        }}
                     />
                 );
             case 'invoices':
@@ -926,7 +931,11 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
                         savedParties={savedParties}
+                        savedTrucks={savedTrucks}
                         onBack={() => setCurrentView('dashboard')}
+                        onOpenGarage={() => {
+                            setCurrentView('garage');
+                        }}
                     />
                 );
             default:

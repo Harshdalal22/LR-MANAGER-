@@ -140,6 +140,36 @@ export interface SavedTruck {
     ownerName?: string;
     contactNumber?: string;
     user_id?: string;
+
+    // CRED Garage & Fleet Management Extended Fields
+    make?: string;                  // e.g. 'Tata Motors', 'Ashok Leyland', 'BharatBenz', 'Eicher', 'Mahindra', 'Volvo'
+    model?: string;                 // e.g. 'Signa 4825.TK', '4220 HG', 'Pro 6028', '2823R'
+    truckType?: string;             // e.g. '16 Wheeler Container', '14 Wheeler Open Body', '12 Wheeler Tipper', 'Trailer', 'Closed Container'
+    capacity?: string;              // e.g. '25 Ton', '40 Ton'
+    color?: string;                 // e.g. 'White', 'Blue', 'Silver', 'Yellow', 'Red'
+    driverName?: string;
+    driverContact?: string;
+    
+    // Compliance & Documentation
+    insuranceExpiry?: string;       // YYYY-MM-DD
+    insurancePolicyNo?: string;
+    insuranceProvider?: string;
+    pollutionExpiry?: string;       // PUCC expiry YYYY-MM-DD
+    fitnessExpiry?: string;         // YYYY-MM-DD
+    nationalPermitExpiry?: string;  // YYYY-MM-DD
+    roadTaxExpiry?: string;         // YYYY-MM-DD
+    
+    // FASTag & Finances
+    fastagBalance?: number;
+    fastagBank?: string;
+    challanCount?: number;
+    challanAmount?: number;
+    emiAmount?: number;             // Monthly EMI in ₹
+    emiDueDay?: number;             // Day of month (1-31)
+    financerName?: string;          // Bank / NBFC name
+    status?: 'Active' | 'On Trip' | 'In Garage' | 'Idle' | 'Maintenance';
+    notes?: string;
+    documents?: { [key: string]: { url?: string; docNo?: string; expiry?: string; notes?: string } };
 }
 
 export interface PaymentRecord {
@@ -310,4 +340,4 @@ export interface LedgerStatement {
     created_at: string;
 }
 
-export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager' | 'reports' | 'accounting';
+export type View = 'dashboard' | 'list' | 'form' | 'vehicle-hiring' | 'booking-register' | 'data-management' | 'parties' | 'trucks' | 'invoices' | 'vouchers' | 'gps-panel' | 'register-manager' | 'reports' | 'accounting' | 'garage';

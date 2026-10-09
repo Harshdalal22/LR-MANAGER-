@@ -25,15 +25,15 @@ const supabaseSecondary = createClient(supabaseUrl, supabaseKey, {
 
 const getSupabase = () => supabase;
 
-const withTimeout = async <T>(promise: Promise<T>, timeoutMs = 30000): Promise<T> => {
+const withTimeout = async <T>(promise: Promise<T> | PromiseLike<T>, timeoutMs = 30000): Promise<T> => {
     return Promise.race([
-        promise,
+        Promise.resolve(promise),
         new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Network timeout: The server took too long to respond. Please check your connection and try again.')), timeoutMs))
     ]);
 };
 
 // Retry a database call up to `attempts` times with exponential backoff
-const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 1500): Promise<T> => {
+const withRetry = async <T>(fn: () => Promise<T> | PromiseLike<T>, attempts = 3, delayMs = 1500): Promise<T> => {
     let lastError: any;
     for (let i = 0; i < attempts; i++) {
         try {
@@ -790,25 +790,105 @@ export const deleteSavedParty = async (id: string) => {
 };
 
 export const getSavedTrucks = async (): Promise<SavedTruck[]> => {
-    const { data, error } = await supabase.from('saved_trucks').select('*');
-    if (error) throw error;
-    return data || [];
+    try {
+        const { data, error } = await supabase.from('saved_trucks').select('*');
+        if (error) {
+            console.warn('Supabase getSavedTrucks error, falling back to local cache:', error);
+            const cached = localStorage.getItem('bilty_cached_trucks');
+            return cached ? JSON.parse(cached) : [];
+        }
+        
+        // Merge with local extended garage properties if DB didn't have them
+        const merged = (data || []).map((trk: any) => {
+            try {
+                const extRaw = localStorage.getItem(`bilty_truck_extended_${trk.truckNo}`);
+                if (extRaw) {
+                    const ext = JSON.parse(extRaw);
+                    return { ...ext, ...trk };
+                }
+            } catch (e) {}
+            return trk;
+        });
+
+        return merged;
+    } catch (err) {
+        console.warn('getSavedTrucks exception:', err);
+        const cached = localStorage.getItem('bilty_cached_trucks');
+        return cached ? JSON.parse(cached) : [];
+    }
 };
 
 export const saveSavedTruck = async (truck: SavedTruck): Promise<SavedTruck> => {
     const effectiveUserId = await getEffectiveUserId();
     const payload = { ...truck, user_id: effectiveUserId };
-    const { data, error } = await withTimeout(
-        supabase.from('saved_trucks').upsert(payload).select().single(),
-        15000
-    );
-    if (error) throw error;
-    return data;
+
+    // Always persist to local extended storage immediately so data is never lost
+    try {
+        localStorage.setItem(`bilty_truck_extended_${truck.truckNo}`, JSON.stringify(truck));
+    } catch (e) {
+        console.warn('Failed saving truck to localStorage:', e);
+    }
+
+    try {
+        // Try saving full payload to Supabase
+        const { data, error } = await withTimeout(
+            supabase.from('saved_trucks').upsert(payload).select().single(),
+            12000
+        );
+
+        if (error) {
+            // Check if error is due to missing columns in DB schema
+            const errMsg = error.message?.toLowerCase() || '';
+            if (errMsg.includes('column') || errMsg.includes('schema cache') || error.code === '42703' || error.code === 'PGRST204') {
+                console.warn('⚠️ Supabase schema missing extended truck columns, falling back to basic truck fields in DB:', error.message);
+                
+                // Fallback: save only base fields in DB, extended fields remain in local storage
+                const basePayload: any = {
+                    truckNo: truck.truckNo,
+                    ownerName: truck.ownerName || '',
+                    contactNumber: truck.contactNumber || '',
+                    user_id: effectiveUserId
+                };
+                if (truck.id) basePayload.id = truck.id;
+
+                const { data: baseData, error: baseErr } = await withTimeout(
+                    supabase.from('saved_trucks').upsert(basePayload).select().single(),
+                    10000
+                );
+                if (baseErr) throw baseErr;
+                return { ...truck, id: baseData?.id || truck.id };
+            }
+            throw error;
+        }
+
+        return { ...truck, ...data };
+    } catch (err: any) {
+        console.warn('saveSavedTruck DB error, fallback to offline local save:', err);
+        // If network or permission error, still return truck with an ID so UI functions smoothly
+        const offlineTruck = { ...truck, id: truck.id || `local_${Date.now()}` };
+        try {
+            const cached = JSON.parse(localStorage.getItem('bilty_cached_trucks') || '[]');
+            const idx = cached.findIndex((t: SavedTruck) => t.truckNo === truck.truckNo);
+            if (idx >= 0) cached[idx] = offlineTruck;
+            else cached.push(offlineTruck);
+            localStorage.setItem('bilty_cached_trucks', JSON.stringify(cached));
+        } catch (e) {}
+        return offlineTruck;
+    }
 };
 
-export const deleteSavedTruck = async (id: string) => {
-    const { error } = await supabase.from('saved_trucks').delete().eq('id', id);
-    if (error) throw error;
+export const deleteSavedTruck = async (id: string, truckNo?: string) => {
+    try {
+        if (truckNo) {
+            localStorage.removeItem(`bilty_truck_extended_${truckNo}`);
+        }
+        if (!id.startsWith('local_')) {
+            const { error } = await supabase.from('saved_trucks').delete().eq('id', id);
+            if (error) console.warn('Supabase deleteSavedTruck error:', error);
+        }
+    } catch (e) {
+        console.warn('deleteSavedTruck error:', e);
+    }
 };
 
 // --- Vehicle Hiring ---

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { LorryReceipt, CompanyDetails, SavedParty, LedgerEntry, Voucher, PaymentReceipt } from '../types';
 import {
     getLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry,
-    getVouchers, addVoucher, updateVoucher,
+    getVouchers, addVoucher, updateVoucher, deleteVoucher,
     getPaymentReceipts, savePaymentReceipt, deletePaymentReceipt
 } from '../services/supabaseService';
 import { toast } from 'react-hot-toast';
@@ -22,6 +22,7 @@ const fmt = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', c
 const fmtNum = (n: number) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(n);
 const today = () => new Date().toISOString().split('T')[0];
 const parseDate = (d: string) => new Date(d);
+const isExpenseVoucher = (v: Voucher) => !v.voucher_no?.startsWith('VCH-');
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -78,7 +79,8 @@ const OverviewTab = ({ lorryReceipts, vouchers, payments, ledgerEntries }: {
     const totalRevenue = invoicedLRs.reduce((s, lr) => s + (lr.freight || 0), 0);
     const totalReceived = payments.reduce((s, p) => s + p.amount, 0);
     const totalOutstanding = Math.max(0, totalRevenue - totalReceived);
-    const totalExpenses = vouchers.reduce((s, v) => s + v.amount, 0);
+    const expenseVouchers = useMemo(() => vouchers.filter(isExpenseVoucher), [vouchers]);
+    const totalExpenses = expenseVouchers.reduce((s, v) => s + v.amount, 0);
     const netProfit = totalRevenue - totalExpenses;
 
     // Chart data — last 6 months
@@ -89,18 +91,18 @@ const OverviewTab = ({ lorryReceipts, vouchers, payments, ledgerEntries }: {
             const label = MONTHS[d.getMonth()];
             const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
             const revenue = invoicedLRs.filter(lr => lr.date?.startsWith(monthStr)).reduce((s, lr) => s + (lr.freight || 0), 0);
-            const expenses = vouchers.filter(v => v.date?.startsWith(monthStr)).reduce((s, v) => s + v.amount, 0);
+            const expenses = expenseVouchers.filter(v => v.date?.startsWith(monthStr)).reduce((s, v) => s + v.amount, 0);
             return { month: label, revenue, expenses };
         });
-    }, [invoicedLRs, vouchers]);
+    }, [invoicedLRs, expenseVouchers]);
 
     // Recent transactions
     const recentTx = useMemo(() => {
         const txs: { date: string; label: string; amount: number; type: 'credit' | 'debit' }[] = [];
         payments.slice(0, 5).forEach(p => txs.push({ date: p.date, label: `Received from ${p.party_name}`, amount: p.amount, type: 'credit' }));
-        vouchers.slice(0, 5).forEach(v => txs.push({ date: v.date, label: v.description, amount: v.amount, type: 'debit' }));
+        expenseVouchers.slice(0, 5).forEach(v => txs.push({ date: v.date, label: v.description, amount: v.amount, type: 'debit' }));
         return txs.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
-    }, [payments, vouchers]);
+    }, [payments, expenseVouchers]);
 
     return (
         <div className="space-y-6">
@@ -133,7 +135,7 @@ const OverviewTab = ({ lorryReceipts, vouchers, payments, ledgerEntries }: {
                             { label: 'Collection Rate', value: totalRevenue > 0 ? `${Math.round((totalReceived / totalRevenue) * 100)}%` : '0%', color: 'text-green-600' },
                             { label: 'Total LRs', value: `${lorryReceipts.length}`, color: 'text-blue-600' },
                             { label: 'Invoiced LRs', value: `${invoicedLRs.length}`, color: 'text-purple-600' },
-                            { label: 'Expense Count', value: `${vouchers.length}`, color: 'text-red-600' },
+                            { label: 'Expense Count', value: `${expenseVouchers.length}`, color: 'text-red-600' },
                         ].map(s => (
                             <div key={s.label} className="flex justify-between items-center">
                                 <span className="text-sm text-gray-600">{s.label}</span>
@@ -761,6 +763,11 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
 
     const GEN_CATEGORIES = ['All', 'Fuel', 'Toll', 'Driver Payment', 'Hamali', 'Maintenance', 'Commission', 'Office', 'Other'];
 
+    // ── Filter only real expenses (exclude VCH- vouchers from LR List) ─────────────
+    const expenseList = useMemo(() => {
+        return vouchers.filter(isExpenseVoucher);
+    }, [vouchers]);
+
     // ── Derived ─────────────────────────────────────────────────────────────────
     const trucks = useMemo(() => {
         const set = new Set<string>();
@@ -777,32 +784,32 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
     [selectedTruck, lorryReceipts]);
 
     const filtered = filterCat === 'All'
-        ? vouchers
-        : vouchers.filter(v =>
+        ? expenseList
+        : expenseList.filter(v =>
             v.description?.toLowerCase().includes(filterCat.toLowerCase()) ||
             v.party_name?.toLowerCase().includes(filterCat.toLowerCase()));
 
-    const totalExpAll      = vouchers.reduce((s, v) => s + v.amount, 0);
+    const totalExpAll      = expenseList.reduce((s, v) => s + v.amount, 0);
     const totalExpFiltered = filtered.reduce((s, v) => s + v.amount, 0);
     const truckExpTotal    = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
 
     const breakdown = GEN_CATEGORIES.slice(1).map(cat => ({
         cat,
-        total: vouchers.filter(v => v.description?.toLowerCase().includes(cat.toLowerCase())).reduce((s, v) => s + v.amount, 0)
+        total: expenseList.filter(v => v.description?.toLowerCase().includes(cat.toLowerCase())).reduce((s, v) => s + v.amount, 0)
     })).filter(b => b.total > 0);
 
     // Expenses grouped by truck
     const byTruck = useMemo(() => {
         const map: Record<string, { amount: number; count: number }> = {};
-        vouchers.forEach(v => {
+        expenseList.forEach(v => {
             const match = v.description?.match(/\[Truck:\s*([^\]]+)\]/);
-            const key = match ? match[1] : '(General)';
+            const key = match ? match[1] : (v.party_name && (v.party_name.startsWith('HR') || v.party_name.startsWith('DL') || v.party_name.match(/^[A-Z]{2}\s*\d/)) ? v.party_name : '(General)');
             if (!map[key]) map[key] = { amount: 0, count: 0 };
             map[key].amount += v.amount;
             map[key].count  += 1;
         });
         return Object.entries(map).sort((a, b) => b[1].amount - a[1].amount);
-    }, [vouchers]);
+    }, [expenseList]);
 
     // ── Handlers ────────────────────────────────────────────────────────────────
     const updateExpense = (idx: number, field: keyof TruckExpenseEntry, value: string | number) =>
@@ -859,8 +866,8 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                         <div className="text-xl font-black text-red-600">{fmt(totalExpAll)}</div>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3">
-                        <div className="text-xs text-gray-500 font-bold">VOUCHERS</div>
-                        <div className="text-xl font-black text-orange-600">{vouchers.length}</div>
+                        <div className="text-xs text-gray-500 font-bold">TOTAL ENTRIES</div>
+                        <div className="text-xl font-black text-orange-600">{expenseList.length}</div>
                     </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -1063,27 +1070,67 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50">
-                                {['Date', 'Voucher No', 'Description', 'Truck / Vendor', 'Mode', 'Amount'].map(h => (
+                                {['Date', 'Truck / Vehicle', 'Expense / Description', 'Vendor / Paid To', 'Mode', 'Amount', ''].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={6} className="text-center py-12 text-gray-400">No expenses recorded</td></tr>
+                                <tr><td colSpan={7} className="text-center py-12 text-gray-400">No expenses recorded</td></tr>
                             ) : filtered.map((v, i) => {
-                                const isTruck = v.description?.includes('[Truck:');
+                                const truckMatch = v.description?.match(/\[Truck:\s*([^\]]+)\]/);
+                                const truckNo = truckMatch ? truckMatch[1] : (v.party_name && (v.party_name.startsWith('HR') || v.party_name.startsWith('DL') || v.party_name.match(/^[A-Z]{2}\s*\d/)) ? v.party_name : null);
+                                const lrMatch = v.description?.match(/LR#\s*([^\s|)]+)/);
+                                const lrNo = lrMatch ? lrMatch[1] : null;
+
+                                const cleanDesc = v.description
+                                    ?.replace(/\[Truck:[^\]]+\]\s*/, '')
+                                    ?.replace(/\|\s*LR#[^|]+(\||$)/, '')
+                                    ?.trim() || 'Expense';
+
+                                const vendor = (truckNo && v.party_name === truckNo) ? '—' : (v.party_name || '—');
+
                                 return (
                                     <tr key={v.id || i} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{v.date}</td>
-                                        <td className="px-4 py-3 font-bold text-red-700">{v.voucher_no}</td>
-                                        <td className="px-4 py-3 text-gray-700 max-w-xs truncate" title={v.description}>
-                                            {isTruck && <span className="inline-block bg-orange-100 text-orange-700 text-xs font-bold px-1.5 py-0.5 rounded mr-1">🚛</span>}
-                                            {v.description?.replace(/\[Truck:[^\]]+\]\s*/, '')}
+                                        <td className="px-4 py-3 whitespace-nowrap">
+                                            {truckNo ? (
+                                                <div>
+                                                    <span className="font-bold text-gray-800 text-xs">🚛 {truckNo}</span>
+                                                    {lrNo && <span className="block text-[11px] text-blue-600 font-semibold">LR #{lrNo}</span>}
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 font-medium">General</span>
+                                            )}
                                         </td>
-                                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.party_name || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-700 max-w-sm truncate" title={v.description}>
+                                            <span className="font-medium">{cleanDesc}</span>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{vendor}</td>
                                         <td className="px-4 py-3"><Badge color="bg-gray-100 text-gray-600">{v.payment_mode}</Badge></td>
                                         <td className="px-4 py-3 font-black text-red-600 whitespace-nowrap">{fmt(v.amount)}</td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            {v.id && (
+                                                <button
+                                                    onClick={async () => {
+                                                        if (window.confirm(`Kya aap ye expense (${cleanDesc} - ${fmt(v.amount)}) delete karna chahte hain?`)) {
+                                                            try {
+                                                                await deleteVoucher(v.id!);
+                                                                toast.success('Expense deleted ✅');
+                                                                onRefresh();
+                                                            } catch (err: any) {
+                                                                toast.error('Delete failed: ' + err.message);
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="text-gray-400 hover:text-red-600 p-1 rounded transition text-xs font-semibold"
+                                                    title="Delete expense"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 );
                             })}
@@ -1093,6 +1140,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                                 <tr className="bg-gray-50 border-t-2 border-gray-200">
                                     <td colSpan={5} className="px-4 py-3 font-black text-gray-700">TOTAL ({filtered.length} entries)</td>
                                     <td className="px-4 py-3 font-black text-red-700">{fmt(totalExpFiltered)}</td>
+                                    <td></td>
                                 </tr>
                             </tfoot>
                         )}
@@ -1120,7 +1168,7 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
     const filteredLRs = useMemo(() =>
         invoicedLRs.filter(lr => lr.date >= fromDate && lr.date <= toDate), [invoicedLRs, fromDate, toDate]);
     const filteredVouchers = useMemo(() =>
-        vouchers.filter(v => v.date >= fromDate && v.date <= toDate), [vouchers, fromDate, toDate]);
+        vouchers.filter(v => isExpenseVoucher(v) && v.date >= fromDate && v.date <= toDate), [vouchers, fromDate, toDate]);
     const filteredPayments = useMemo(() =>
         payments.filter(p => p.date >= fromDate && p.date <= toDate), [payments, fromDate, toDate]);
 

@@ -927,6 +927,20 @@ export const updateVoucher = async (id: string, voucherUpdates: Partial<Voucher>
     }, 3, 2000);
 };
 
+export const deleteVoucher = async (id: string) => {
+    return withRetry(async () => {
+        const { error } = await supabase
+            .from('vouchers')
+            .delete()
+            .eq('id', id);
+        if (error) {
+            console.error('SUPABASE VOUCHER DELETE ERROR:', JSON.stringify(error));
+            throw new Error(`Voucher Delete Error [${error.code}]: ${error.message}`);
+        }
+        return true;
+    }, 3, 2000);
+};
+
 export const subscribeToVouchers = (callback: (payload: any) => void) => {
     return supabase.channel('vouchers_changes')
         .on('postgres_changes', {

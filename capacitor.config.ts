@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.biltybook.app',
-  appName: 'bilty-book',
+  appName: 'LR Manager',
   webDir: 'dist'
 };
 

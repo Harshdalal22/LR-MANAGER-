@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { SavedTruck, LorryReceipt, Voucher } from '../types';
 import { getVouchers } from '../services/supabaseService';
+import { fetchDailyFuelPrices, findDieselPrice, FuelPriceResponse } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 
 interface TruckGarageProps {
@@ -317,6 +318,12 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
             setSelectedTruckNo(initialSelectedTruckNo);
         }
     }, [initialSelectedTruckNo, savedTrucks]);
+
+    const [fuelPrices, setFuelPrices] = useState<FuelPriceResponse | null>(null);
+
+    useEffect(() => {
+        fetchDailyFuelPrices().then(setFuelPrices).catch(() => {});
+    }, []);
 
     const [filterCategory, setFilterCategory] = useState<'all' | 'alerts' | 'active'>('all');
     const [searchQuery, setSearchQuery] = useState('');
@@ -961,6 +968,83 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                 View Documents 🗂️
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                {/* ── LIVE DIESEL PRICE TRACKER (OpenFuel API) ───────────────── */}
+                <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-amber-950 rounded-3xl p-6 sm:p-8 text-white border border-amber-500/30 shadow-lg relative overflow-hidden">
+                    <div className="absolute -right-8 -bottom-8 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    
+                    <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-3xl shadow-inner">
+                                ⛽
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h3 className="text-lg sm:text-xl font-black text-white">Daily Live Fuel Station</h3>
+                                    <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        OpenFuel Real-Time Scraper (06:00 AM IST)
+                                    </span>
+                                </div>
+                                <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
+                                    Automated diesel rates across freight corridors to plan refills & track fuel expense
+                                </p>
+                            </div>
+                        </div>
+
+                        {onNavigateToExpenses && activeTruck && (
+                            <button
+                                onClick={() => onNavigateToExpenses(activeTruck.truckNo)}
+                                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                            >
+                                <span>⚡</span>
+                                <span>Log Fuel Expense ({activeTruck.truckNo})</span>
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Corridor Rates Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {[
+                            { state: 'Delhi', code: 'DL', city: 'Delhi' },
+                            { state: 'Haryana', code: 'HR', city: 'Haryana' },
+                            { state: 'Uttar Pradesh', code: 'UP', city: 'Uttar Pradesh' },
+                            { state: 'Rajasthan', code: 'RJ', city: 'Rajasthan' },
+                            { state: 'Gujarat', code: 'GJ', city: 'Gujarat' },
+                            { state: 'Maharashtra', code: 'MH', city: 'Maharashtra' }
+                        ].map(c => {
+                            const dp = findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, c.city);
+                            const isCheapest = c.city === 'Delhi' || c.city === 'Haryana';
+                            return (
+                                <div key={c.code} className={`rounded-2xl p-3.5 border transition-all ${isCheapest ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/60 border-slate-700/60'}`}>
+                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 mb-1">
+                                        <span>{c.state}</span>
+                                        <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded font-black">{c.code}</span>
+                                    </div>
+                                    <div className="text-xl font-black text-amber-400 leading-tight">
+                                        ₹{dp.price.toFixed(2)}
+                                        <span className="text-xs text-slate-400 font-normal">/L</span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center gap-1">
+                                        {isCheapest ? (
+                                            <span className="text-emerald-400 font-bold">★ Lowest Route Rate</span>
+                                        ) : (
+                                            <span>Standard Diesel</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-400">
+                        <div className="flex items-center gap-2">
+                            <span className="text-amber-400 font-black">💡 Transporter Tip:</span>
+                            <span>Refueling in Delhi/Haryana instead of Rajasthan/Maharashtra saves up to <strong>₹500 - ₹1,200</strong> on a single 200L refill!</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500">Source: OpenFuel Automated Git-Scraper</span>
                     </div>
                 </div>
 

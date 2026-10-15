@@ -6,6 +6,10 @@ import {
     getVouchers, addVoucher, updateVoucher, deleteVoucher,
     getPaymentReceipts, savePaymentReceipt, deletePaymentReceipt
 } from '../services/supabaseService';
+import {
+    fetchDailyFuelPrices, findDieselPrice, getAvailableFuelLocations,
+    calculateTripFuel, FuelPriceResponse
+} from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -756,6 +760,159 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
     );
     const [saving,        setSaving]          = useState(false);
 
+    // ── OpenFuel Live Price & Auto-Calculator State ─────────────────────────────
+    const [fuelPrices, setFuelPrices] = useState<FuelPriceResponse | null>(null);
+    const [loadingFuel, setLoadingFuel] = useState(false);
+    const [selectedFuelCity, setSelectedFuelCity] = useState('Delhi');
+    const [customDieselRate, setCustomDieselRate] = useState<number | ''>('');
+    const [showFuelCalc, setShowFuelCalc] = useState(false);
+    const [fuelCalcMode, setFuelCalcMode] = useState<'liters' | 'distance'>('liters');
+    const [fuelLiters, setFuelLiters] = useState<number | ''>('');
+    const [fuelDistanceKm, setFuelDistanceKm] = useState<number | ''>('');
+    const [fuelMileageKmpl, setFuelMileageKmpl] = useState<number>(3.5);
+
+    // ── Quick Fuel Modal State ─────────────────────────────────────────────────
+    const [showQuickFuelModal, setShowQuickFuelModal] = useState(false);
+    const [quickTruck, setQuickTruck] = useState('');
+    const [quickLR, setQuickLR] = useState('');
+    const [quickDate, setQuickDate] = useState(today());
+    const [quickPayMode, setQuickPayMode] = useState('Cash');
+    const [quickCity, setQuickCity] = useState('Delhi');
+    const [quickLiters, setQuickLiters] = useState<number | ''>('');
+    const [quickDistanceKm, setQuickDistanceKm] = useState<number | ''>('');
+    const [quickMileageKmpl, setQuickMileageKmpl] = useState<number>(3.5);
+    const [quickMode, setQuickMode] = useState<'liters' | 'distance'>('liters');
+    const [quickCustomRate, setQuickCustomRate] = useState<number | ''>('');
+    const [quickSaving, setQuickSaving] = useState(false);
+
+    // ── Fetch Daily Fuel Prices (OpenFuel API) ──────────────────────────────────
+    const loadFuelPrices = useCallback(async (force = false) => {
+        setLoadingFuel(true);
+        try {
+            const res = await fetchDailyFuelPrices(force);
+            setFuelPrices(res);
+            const defaultRate = findDieselPrice(res, selectedFuelCity).price;
+            setCustomDieselRate(defaultRate);
+            setQuickCustomRate(defaultRate);
+            if (force) toast.success('OpenFuel live diesel rates refreshed! ⛽');
+        } catch (e: any) {
+            console.warn('Fuel price load error:', e);
+        } finally {
+            setLoadingFuel(false);
+        }
+    }, [selectedFuelCity]);
+
+    useEffect(() => {
+        loadFuelPrices();
+    }, [loadFuelPrices]);
+
+    const currentDiesel = useMemo(() => {
+        if (!fuelPrices) return { city: selectedFuelCity, price: 95.20 };
+        return findDieselPrice(fuelPrices, selectedFuelCity);
+    }, [fuelPrices, selectedFuelCity]);
+
+    const quickCurrentDiesel = useMemo(() => {
+        if (!fuelPrices) return { city: quickCity, price: 95.20 };
+        return findDieselPrice(fuelPrices, quickCity);
+    }, [fuelPrices, quickCity]);
+
+    useEffect(() => {
+        if (currentDiesel?.price) setCustomDieselRate(currentDiesel.price);
+    }, [currentDiesel]);
+
+    useEffect(() => {
+        if (quickCurrentDiesel?.price) setQuickCustomRate(quickCurrentDiesel.price);
+    }, [quickCurrentDiesel]);
+
+    // Auto-detect fuel location from selected LR (From Place / To Place)
+    useEffect(() => {
+        if (selectedLR && lorryReceipts && fuelPrices?.diesel) {
+            const lr = lorryReceipts.find(l => l.lrNo === selectedLR);
+            if (lr) {
+                const match = fuelPrices.diesel.find(d => 
+                    (lr.fromPlace && (lr.fromPlace.toLowerCase().includes(d.city.toLowerCase()) || d.city.toLowerCase().includes(lr.fromPlace.toLowerCase()))) ||
+                    (lr.toPlace && (lr.toPlace.toLowerCase().includes(d.city.toLowerCase()) || d.city.toLowerCase().includes(lr.toPlace.toLowerCase())))
+                );
+                if (match) {
+                    setSelectedFuelCity(match.city);
+                }
+            }
+        }
+    }, [selectedLR, lorryReceipts, fuelPrices]);
+
+    // Apply auto-calculated fuel expense to Truck Expense form
+    const handleApplyFuelCalc = () => {
+        const rate = Number(customDieselRate) || currentDiesel.price;
+        const fuelIdx = TRUCK_EXPENSE_CATEGORIES.findIndex(c => c.key === 'Fuel');
+        if (fuelIdx === -1) return;
+
+        if (fuelCalcMode === 'liters') {
+            const ltr = Number(fuelLiters) || 0;
+            if (ltr <= 0) return toast.error('Kripya Liters daalo (e.g. 150)');
+            const total = Math.round(ltr * rate);
+            const note = `Fuel: ${ltr} L @ ₹${rate.toFixed(2)}/L (${selectedFuelCity})`;
+            setExpenses(prev => prev.map((e, i) => i === fuelIdx ? { ...e, amount: total, note } : e));
+            toast.success(`Fuel auto-filled: ₹${total.toLocaleString('en-IN')} (${ltr} L @ ₹${rate}/L) ⛽`);
+            setShowFuelCalc(false);
+        } else {
+            const dist = Number(fuelDistanceKm) || 0;
+            const mil = Number(fuelMileageKmpl) || 3.5;
+            if (dist <= 0) return toast.error('Kripya Trip Distance (KM) daalo');
+            const res = calculateTripFuel(dist, mil, rate);
+            const note = `Trip Fuel: ${dist} km @ ${mil} km/L (${res.liters} L @ ₹${rate.toFixed(2)}/L - ${selectedFuelCity})`;
+            setExpenses(prev => prev.map((e, i) => i === fuelIdx ? { ...e, amount: res.totalCost, note } : e));
+            toast.success(`Trip Fuel auto-filled: ₹${res.totalCost.toLocaleString('en-IN')} (${res.liters} L) ⛽`);
+            setShowFuelCalc(false);
+        }
+    };
+
+    // Quick Fuel Voucher Direct Save
+    const handleQuickFuelSave = async () => {
+        if (!quickTruck) return toast.error('Pehle truck select karo');
+        const rate = Number(quickCustomRate) || quickCurrentDiesel.price;
+        let amount = 0;
+        let note = '';
+
+        if (quickMode === 'liters') {
+            const ltr = Number(quickLiters) || 0;
+            if (ltr <= 0) return toast.error('Kripya Liters daalo');
+            amount = Math.round(ltr * rate);
+            note = `Fuel: ${ltr} L @ ₹${rate.toFixed(2)}/L (${quickCity})`;
+        } else {
+            const dist = Number(quickDistanceKm) || 0;
+            const mil = Number(quickMileageKmpl) || 3.5;
+            if (dist <= 0) return toast.error('Kripya Distance (KM) daalo');
+            const res = calculateTripFuel(dist, mil, rate);
+            amount = res.totalCost;
+            note = `Trip Fuel: ${dist} km @ ${mil} km/L (${res.liters} L @ ₹${rate.toFixed(2)}/L - ${quickCity})`;
+        }
+
+        const lr = lorryReceipts.find(l => l.lrNo === quickLR);
+        const lrTag = lr ? ` | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace})` : '';
+
+        setQuickSaving(true);
+        try {
+            await addVoucher({
+                date: quickDate,
+                voucher_no: `FUEL-${quickTruck}-${Date.now().toString().slice(-5)}`,
+                description: `[Truck: ${quickTruck}] Fuel${lrTag} | ${note}`,
+                amount,
+                payment_mode: quickPayMode,
+                party_name: quickTruck
+            });
+            toast.success(`Fuel expense ₹${amount.toLocaleString('en-IN')} saved for ${quickTruck} ⛽✅`);
+            setShowQuickFuelModal(false);
+            setQuickLiters('');
+            setQuickDistanceKm('');
+            setQuickLR('');
+            onRefresh();
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setQuickSaving(false);
+        }
+    };
+
     // ── General form state ──────────────────────────────────────────────────────
     const [genForm, setGenForm] = useState<Partial<Voucher>>({
         date: today(), description: '', amount: 0, payment_mode: 'Cash',
@@ -861,6 +1018,60 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
     return (
         <div className="space-y-5">
 
+            {/* ── OpenFuel Live Daily Fuel Ticker Banner ── */}
+            <div className="bg-gradient-to-r from-amber-500 via-orange-600 to-rose-600 text-white rounded-2xl p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-2xl shadow-inner">
+                            ⛽
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-sm uppercase tracking-wider">DAILY LIVE DIESEL PRICES (INDIA)</span>
+                                <span className="inline-flex items-center gap-1.5 text-[10px] bg-white/25 backdrop-blur px-2.5 py-0.5 rounded-full font-bold">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                    OpenFuel API (Daily 06:00 AM IST)
+                                </span>
+                            </div>
+                            <div className="text-xs text-white/95 mt-1 flex items-center gap-2.5 flex-wrap font-medium">
+                                <span>Delhi: <strong>₹{(findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, 'Delhi').price).toFixed(2)}/L</strong></span>
+                                <span className="text-white/40">•</span>
+                                <span>Haryana: <strong>₹{(findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, 'Haryana').price).toFixed(2)}/L</strong></span>
+                                <span className="text-white/40">•</span>
+                                <span>UP: <strong>₹{(findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, 'Uttar Pradesh').price).toFixed(2)}/L</strong></span>
+                                <span className="text-white/40">•</span>
+                                <span>Rajasthan: <strong>₹{(findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, 'Rajasthan').price).toFixed(2)}/L</strong></span>
+                                <span className="text-white/40">•</span>
+                                <span>Maharashtra: <strong>₹{(findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, 'Maharashtra').price).toFixed(2)}/L</strong></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => loadFuelPrices(true)}
+                            disabled={loadingFuel}
+                            className="px-3 py-1.5 text-xs bg-white/20 hover:bg-white/30 rounded-xl font-bold backdrop-blur transition cursor-pointer flex items-center gap-1.5"
+                            title="Fetch latest rates from OpenFuel API"
+                        >
+                            <span>{loadingFuel ? '⌛' : '↻'}</span>
+                            <span>Refresh Live Rates</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setQuickTruck(selectedTruck || (trucks[0] || ''));
+                                setShowQuickFuelModal(true);
+                            }}
+                            className="px-3.5 py-1.5 text-xs bg-white text-orange-700 hover:bg-amber-50 rounded-xl font-black shadow-sm transition cursor-pointer flex items-center gap-1.5"
+                        >
+                            <span>⚡</span>
+                            <span>+ Quick Refuel</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* ── Top Row ── */}
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex gap-3 flex-wrap">
@@ -874,6 +1085,14 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                     </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => {
+                        setQuickTruck(selectedTruck || (trucks[0] || ''));
+                        setShowQuickFuelModal(true);
+                    }}
+                        className="px-4 py-2.5 bg-amber-600 text-white rounded-xl font-bold shadow hover:bg-amber-700 transition flex items-center gap-2 cursor-pointer">
+                        <span>⛽</span>
+                        <span>+ Quick Fuel (Live API)</span>
+                    </button>
                     <button onClick={() => { setShowTruckForm(v => !v); setShowGenForm(false); }}
                         className="px-4 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow hover:bg-orange-700 transition flex items-center gap-2">
                         🚛 Truck Expense
@@ -937,29 +1156,174 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                             <label className="block text-xs font-black text-orange-700 mb-1">💳 PAYMENT MODE</label>
                             <select value={payMode} onChange={e => setPayMode(e.target.value)}
                                 className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400">
-                                {['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
+                                {['Cash', 'Bank Transfer', 'UPI', 'Cheque', 'NEFT', 'RTGS', 'Fuel Card'].map(m => <option key={m}>{m}</option>)}
                             </select>
                         </div>
                     </div>
 
                     {/* Expense category grid */}
                     <div>
-                        <div className="text-xs font-black text-orange-700 mb-3 uppercase tracking-wider">
-                            💰 Expense Categories — Jo bhi hua daalo (0 wale skip ho jaayenge)
+                        <div className="text-xs font-black text-orange-700 mb-3 uppercase tracking-wider flex items-center justify-between">
+                            <span>💰 Expense Categories — Jo bhi hua daalo (0 wale skip ho jaayenge)</span>
+                            <span className="text-[11px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full font-bold">
+                                ⛽ Fuel me Live Diesel Auto-Calculator active hai
+                            </span>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             {TRUCK_EXPENSE_CATEGORIES.map((cat, idx) => (
                                 <div key={cat.key}
-                                    className={`bg-white rounded-xl border p-3 transition-all ${Number(expenses[idx].amount) > 0 ? 'border-orange-400 shadow-md' : 'border-gray-200'}`}>
-                                    <div className="flex items-center gap-2 mb-2">
+                                    className={`bg-white rounded-xl border p-3 transition-all ${Number(expenses[idx].amount) > 0 ? 'border-orange-400 shadow-md' : 'border-gray-200'} ${cat.key === 'Fuel' ? 'ring-1 ring-amber-300' : ''}`}>
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
                                         <span className="text-base">{cat.icon}</span>
                                         <span className="text-sm font-bold text-gray-700">{cat.label}</span>
-                                        {Number(expenses[idx].amount) > 0 && (
+                                        
+                                        {/* Smart Live Diesel calculator toggle for Fuel */}
+                                        {cat.key === 'Fuel' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFuelCalc(v => !v)}
+                                                className="ml-auto text-[10px] bg-amber-500 hover:bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                                                title="Open OpenFuel live rate calculator"
+                                            >
+                                                <span>⚡ Live ₹{(Number(customDieselRate) || currentDiesel.price).toFixed(2)}/L</span>
+                                                <span>{showFuelCalc ? '▲' : '▼'}</span>
+                                            </button>
+                                        )}
+
+                                        {cat.key !== 'Fuel' && Number(expenses[idx].amount) > 0 && (
                                             <span className="ml-auto text-xs font-black text-orange-600">
                                                 ₹{Number(expenses[idx].amount).toLocaleString('en-IN')}
                                             </span>
                                         )}
                                     </div>
+
+                                    {/* Inline Live Fuel Calculator (OpenFuel API) */}
+                                    {cat.key === 'Fuel' && showFuelCalc && (
+                                        <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-3 mb-2.5 text-xs space-y-2.5 animate-fadeIn">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-black text-amber-900 flex items-center gap-1">
+                                                    <span>⛽ Live Fuel Calculator</span>
+                                                    <span className="text-[9px] bg-amber-200 text-amber-800 px-1 py-0.5 rounded font-black">OpenFuel</span>
+                                                </span>
+                                                <div className="flex bg-amber-200/80 rounded p-0.5 text-[10px] font-bold">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFuelCalcMode('liters')}
+                                                        className={`px-2 py-0.5 rounded cursor-pointer transition ${fuelCalcMode === 'liters' ? 'bg-amber-600 text-white font-black' : 'text-amber-900'}`}
+                                                    >
+                                                        By Litres
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setFuelCalcMode('distance')}
+                                                        className={`px-2 py-0.5 rounded cursor-pointer transition ${fuelCalcMode === 'distance' ? 'bg-amber-600 text-white font-black' : 'text-amber-900'}`}
+                                                    >
+                                                        By Distance (KM)
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {/* Location & Rate */}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Location (City/State)</label>
+                                                    <select
+                                                        value={selectedFuelCity}
+                                                        onChange={e => setSelectedFuelCity(e.target.value)}
+                                                        className="w-full bg-white border border-amber-300 rounded px-1.5 py-1 text-xs font-bold text-gray-800"
+                                                    >
+                                                        {getAvailableFuelLocations(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }).map(c => (
+                                                            <option key={c} value={c}>{c}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Diesel Rate (₹/L)</label>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={customDieselRate}
+                                                        onChange={e => setCustomDieselRate(e.target.value ? +e.target.value : '')}
+                                                        className="w-full bg-white border border-amber-300 rounded px-1.5 py-1 text-xs font-black text-amber-900"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Mode Inputs */}
+                                            {fuelCalcMode === 'liters' ? (
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Litres Filled (L)</label>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <input
+                                                            type="number"
+                                                            placeholder="e.g. 150"
+                                                            value={fuelLiters}
+                                                            onChange={e => setFuelLiters(e.target.value ? +e.target.value : '')}
+                                                            className="flex-1 bg-white border border-amber-300 rounded px-2 py-1 text-xs font-black text-gray-900"
+                                                        />
+                                                        <div className="flex gap-1 text-[10px]">
+                                                            {[50, 100, 150, 200].map(l => (
+                                                                <button
+                                                                    key={l}
+                                                                    type="button"
+                                                                    onClick={() => setFuelLiters(l)}
+                                                                    className="bg-amber-200/90 hover:bg-amber-300 text-amber-900 px-1.5 py-0.5 rounded font-bold cursor-pointer"
+                                                                >
+                                                                    +{l}L
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Trip Distance (KM)</label>
+                                                        <input
+                                                            type="number"
+                                                            placeholder="e.g. 450"
+                                                            value={fuelDistanceKm}
+                                                            onChange={e => setFuelDistanceKm(e.target.value ? +e.target.value : '')}
+                                                            className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-black text-gray-900"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Truck Mileage (KM/L)</label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.1"
+                                                            placeholder="e.g. 3.5"
+                                                            value={fuelMileageKmpl}
+                                                            onChange={e => setFuelMileageKmpl(+e.target.value || 3.5)}
+                                                            className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-black text-gray-900"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Preview & Apply button */}
+                                            <div className="flex items-center justify-between pt-1.5 border-t border-amber-200">
+                                                <div>
+                                                    <span className="text-[10px] text-amber-700 block">Auto Calculated Total</span>
+                                                    <span className="text-sm font-black text-amber-900">
+                                                        ₹{fuelCalcMode === 'liters'
+                                                            ? Math.round((Number(fuelLiters) || 0) * (Number(customDieselRate) || currentDiesel.price)).toLocaleString('en-IN')
+                                                            : calculateTripFuel(Number(fuelDistanceKm) || 0, Number(fuelMileageKmpl) || 3.5, Number(customDieselRate) || currentDiesel.price).totalCost.toLocaleString('en-IN')
+                                                        }
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleApplyFuelCalc}
+                                                    className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1.5 rounded-lg text-xs font-black shadow-xs cursor-pointer flex items-center gap-1"
+                                                >
+                                                    <span>✓</span>
+                                                    <span>Apply to Fuel</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div className="flex gap-2">
                                         <input type="number" placeholder="Amount (₹)"
                                             value={expenses[idx].amount || ''}
@@ -991,6 +1355,243 @@ const ExpensesTab = ({ vouchers, lorryReceipts, onRefresh }: {
                                 disabled={saving || !selectedTruck || truckExpTotal === 0}
                                 className="px-6 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-black shadow hover:bg-orange-700 disabled:opacity-60 disabled:cursor-not-allowed">
                                 {saving ? 'Saving...' : `💾 Save ${expenses.filter(e => Number(e.amount) > 0).length} Expense(s)`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ══ QUICK FUEL ENTRY MODAL (OpenFuel API) ══ */}
+            {showQuickFuelModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+                    <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-amber-200 space-y-4">
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <div className="flex items-center gap-2">
+                                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-xs">
+                                    ⛽
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-gray-900 text-base">Quick Fuel Expense Entry</h3>
+                                    <div className="text-xs text-gray-500 font-medium">Real-time OpenFuel daily diesel pricing</div>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowQuickFuelModal(false)}
+                                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none cursor-pointer"
+                            >
+                                &times;
+                            </button>
+                        </div>
+
+                        {/* Truck & LR */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-black text-gray-700 mb-1">🚛 TRUCK NO *</label>
+                                <select
+                                    value={quickTruck}
+                                    onChange={e => {
+                                        setQuickTruck(e.target.value);
+                                        setQuickLR('');
+                                    }}
+                                    className="w-full border-2 border-amber-300 rounded-xl px-3 py-2 text-sm font-bold bg-amber-50/50 focus:outline-none focus:border-amber-500"
+                                >
+                                    <option value="">— Select Truck —</option>
+                                    {trucks.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-gray-700 mb-1">📋 LINK TRIP LR (Optional)</label>
+                                <select
+                                    value={quickLR}
+                                    onChange={e => {
+                                        setQuickLR(e.target.value);
+                                        const lr = lorryReceipts.find(l => l.lrNo === e.target.value);
+                                        if (lr && fuelPrices?.diesel) {
+                                            const match = fuelPrices.diesel.find(d => 
+                                                (lr.fromPlace && lr.fromPlace.toLowerCase().includes(d.city.toLowerCase())) ||
+                                                (lr.toPlace && lr.toPlace.toLowerCase().includes(d.city.toLowerCase()))
+                                            );
+                                            if (match) setQuickCity(match.city);
+                                        }
+                                    }}
+                                    disabled={!quickTruck}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400 disabled:bg-gray-100 disabled:text-gray-400"
+                                >
+                                    <option value="">— No LR —</option>
+                                    {lorryReceipts
+                                        .filter(lr => lr.truckNo?.trim().toUpperCase() === quickTruck)
+                                        .slice(0, 8)
+                                        .map(lr => (
+                                            <option key={lr.lrNo} value={lr.lrNo}>
+                                                LR# {lr.lrNo} | {lr.fromPlace}→{lr.toPlace}
+                                            </option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Location & Live Diesel Rate */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-black text-amber-900 mb-1">📍 FUEL LOCATION</label>
+                                    <select
+                                        value={quickCity}
+                                        onChange={e => setQuickCity(e.target.value)}
+                                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 focus:outline-none focus:border-amber-500"
+                                    >
+                                        {getAvailableFuelLocations(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }).map(c => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-black text-amber-900 mb-1">
+                                        ⛽ LIVE DIESEL RATE (₹/L)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={quickCustomRate}
+                                        onChange={e => setQuickCustomRate(e.target.value ? +e.target.value : '')}
+                                        className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-amber-900 focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Mode tabs */}
+                            <div className="flex bg-amber-200/60 rounded-xl p-1 text-xs font-bold">
+                                <button
+                                    type="button"
+                                    onClick={() => setQuickMode('liters')}
+                                    className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${quickMode === 'liters' ? 'bg-amber-600 text-white font-black shadow-xs' : 'text-amber-900 hover:text-amber-950'}`}
+                                >
+                                    ⛽ By Litres Filled
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setQuickMode('distance')}
+                                    className={`flex-1 py-1.5 rounded-lg transition cursor-pointer ${quickMode === 'distance' ? 'bg-amber-600 text-white font-black shadow-xs' : 'text-amber-900 hover:text-amber-950'}`}
+                                >
+                                    🗺️ By Distance & Mileage
+                                </button>
+                            </div>
+
+                            {/* Mode input fields */}
+                            {quickMode === 'liters' ? (
+                                <div>
+                                    <label className="block text-xs font-black text-amber-900 mb-1">TOTAL LITRES (L) *</label>
+                                    <div className="flex gap-2 items-center">
+                                        <input
+                                            type="number"
+                                            placeholder="Enter litres (e.g. 150)"
+                                            value={quickLiters}
+                                            onChange={e => setQuickLiters(e.target.value ? +e.target.value : '')}
+                                            className="flex-1 bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500"
+                                        />
+                                        <div className="flex gap-1 text-xs">
+                                            {[50, 100, 150, 200, 300].map(l => (
+                                                <button
+                                                    key={l}
+                                                    type="button"
+                                                    onClick={() => setQuickLiters(l)}
+                                                    className="bg-amber-200 hover:bg-amber-300 text-amber-900 px-2 py-1 rounded-lg font-bold cursor-pointer text-xs"
+                                                >
+                                                    +{l}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-black text-amber-900 mb-1">TRIP DISTANCE (KM) *</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 450"
+                                            value={quickDistanceKm}
+                                            onChange={e => setQuickDistanceKm(e.target.value ? +e.target.value : '')}
+                                            className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-amber-900 mb-1">TRUCK MILEAGE (KM/L)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={quickMileageKmpl}
+                                            onChange={e => setQuickMileageKmpl(+e.target.value || 3.5)}
+                                            className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Live calculation banner */}
+                            <div className="bg-white rounded-xl p-3 border border-amber-200 flex items-center justify-between">
+                                <div>
+                                    <div className="text-[10px] font-bold text-gray-500 uppercase">CALCULATED FUEL EXPENSE</div>
+                                    <div className="text-xl font-black text-amber-900">
+                                        ₹{quickMode === 'liters'
+                                            ? Math.round((Number(quickLiters) || 0) * (Number(quickCustomRate) || quickCurrentDiesel.price)).toLocaleString('en-IN')
+                                            : calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || 3.5, Number(quickCustomRate) || quickCurrentDiesel.price).totalCost.toLocaleString('en-IN')
+                                        }
+                                    </div>
+                                    <div className="text-[11px] text-amber-700 font-semibold">
+                                        {quickMode === 'liters'
+                                            ? `${Number(quickLiters) || 0} L @ ₹${(Number(quickCustomRate) || quickCurrentDiesel.price).toFixed(2)}/L`
+                                            : `${calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || 3.5, Number(quickCustomRate) || quickCurrentDiesel.price).liters} L needed (${Number(quickDistanceKm) || 0} km @ ${quickMileageKmpl} km/L)`
+                                        }
+                                    </div>
+                                </div>
+                                <div className="text-right text-xs text-gray-500">
+                                    <span className="font-bold text-gray-800">{quickCity}</span>
+                                    <div className="text-[10px] text-emerald-600 font-bold">● Live OpenFuel Rate</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Date and Payment Mode */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-black text-gray-700 mb-1">📅 DATE *</label>
+                                <input
+                                    type="date"
+                                    value={quickDate}
+                                    onChange={e => setQuickDate(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-gray-700 mb-1">💳 PAYMENT MODE</label>
+                                <select
+                                    value={quickPayMode}
+                                    onChange={e => setQuickPayMode(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                                >
+                                    {['Cash', 'UPI', 'Fuel Card', 'Bank Transfer', 'NEFT'].map(m => <option key={m}>{m}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowQuickFuelModal(false)}
+                                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleQuickFuelSave}
+                                disabled={quickSaving || !quickTruck || (quickMode === 'liters' ? !quickLiters : !quickDistanceKm)}
+                                className="flex-1 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-xl text-sm font-black shadow-md hover:from-amber-700 hover:to-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                {quickSaving ? 'Saving...' : '💾 Save Fuel Expense'}
                             </button>
                         </div>
                     </div>

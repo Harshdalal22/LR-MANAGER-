@@ -462,7 +462,7 @@ const InvoicesTab = ({ lorryReceipts, payments }: { lorryReceipts: LorryReceipt[
     }, [lorryReceipts]);
 
     const invoices = useMemo(() => {
-        return Object.entries(invoicedLRs).map(([invoiceNo, lrs]) => {
+        return (Object.entries(invoicedLRs) as [string, LorryReceipt[]][]).map(([invoiceNo, lrs]) => {
             const totalFreight = lrs.reduce((s, lr) => s + (lr.freight || 0), 0);
             const received = payments.filter(p => p.invoice_nos?.includes(invoiceNo)).reduce((s, p) => s + p.amount, 0);
             const outstanding = Math.max(0, totalFreight - received);
@@ -497,7 +497,7 @@ const InvoicesTab = ({ lorryReceipts, payments }: { lorryReceipts: LorryReceipt[
         <div className="space-y-5">
             {/* Aging Summary */}
             <div className="grid grid-cols-4 gap-3">
-                {Object.entries(aging).map(([bucket, amount]) => (
+                {(Object.entries(aging) as [string, number][]).map(([bucket, amount]) => (
                     <div key={bucket} className={`bg-white rounded-xl border p-4 shadow-sm text-center ${amount > 0 ? 'border-orange-200' : 'border-gray-100'}`}>
                         <div className="text-xs font-bold text-gray-500 mb-1">{bucket} Days</div>
                         <div className={`text-lg font-black ${amount > 0 ? 'text-orange-600' : 'text-gray-400'}`}>{fmt(amount)}</div>
@@ -667,7 +667,7 @@ const PaymentsTab = ({ payments, lorryReceipts, onRefresh }: {
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-600 mb-1">Link Invoice(s)</label>
-                            <select multiple value={form.invoice_nos || []} onChange={e => setForm(f => ({ ...f, invoice_nos: Array.from(e.target.selectedOptions, o => o.value) }))}
+                            <select multiple value={form.invoice_nos || []} onChange={e => setForm(f => ({ ...f, invoice_nos: Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value) }))}
                                 className="w-full border rounded-lg px-3 py-2 text-sm h-20">
                                 {invoiceOptions.map(inv => <option key={inv} value={inv}>{inv}</option>)}
                             </select>
@@ -1393,7 +1393,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                 className="ml-auto text-[10px] bg-amber-500 hover:bg-amber-600 text-white px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
                                                 title="Open OpenFuel live rate calculator"
                                             >
-                                                <span>⚡ Live ₹{(Number(customDieselRate) || currentDiesel.price).toFixed(2)}/L</span>
+                                                <span>⚡ Live ₹{(Number(customDieselRate) || currentFuel.price).toFixed(2)}/{currentFuel.unit === '₹/kg' ? 'kg' : 'L'}</span>
                                                 <span>{showFuelCalc ? '▲' : '▼'}</span>
                                             </button>
                                         )}
@@ -1515,8 +1515,8 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     <span className="text-[10px] text-amber-700 block">Auto Calculated Total</span>
                                                     <span className="text-sm font-black text-amber-900">
                                                         ₹{fuelCalcMode === 'liters'
-                                                            ? Math.round((Number(fuelLiters) || 0) * (Number(customDieselRate) || currentDiesel.price)).toLocaleString('en-IN')
-                                                            : calculateTripFuel(Number(fuelDistanceKm) || 0, Number(fuelMileageKmpl) || 3.5, Number(customDieselRate) || currentDiesel.price).totalCost.toLocaleString('en-IN')
+                                                            ? Math.round((Number(fuelLiters) || 0) * (Number(customDieselRate) || currentFuel.price)).toLocaleString('en-IN')
+                                                            : calculateTripFuel(Number(fuelDistanceKm) || 0, Number(fuelMileageKmpl) || 3.5, Number(customDieselRate) || currentFuel.price).totalCost.toLocaleString('en-IN')
                                                         }
                                                     </span>
                                                 </div>
@@ -1972,7 +1972,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                         toPlace: lr.toPlace,
                                         truck: trk,
                                         fuelPrices,
-                                        customDistanceKm: customDist
+                                        customDistanceKm: customDist || lr.distanceKm
                                     });
 
                                     return (
@@ -2007,10 +2007,10 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     {lr.fromPlace || 'Origin'} → {lr.toPlace || 'Destination'}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-slate-500 mt-0.5">
-                                                    <span>Highway:</span>
+                                                    <span className="font-semibold text-[10px] text-blue-700">🛣️ OSRM:</span>
                                                     <input
                                                         type="number"
-                                                        value={customDist !== undefined ? customDist : calc.distanceKm}
+                                                        value={customDist !== undefined ? customDist : (lr.distanceKm || calc.distanceKm)}
                                                         onChange={e => {
                                                             const val = parseInt(e.target.value) || 0;
                                                             setCustomLRDistances(prev => ({ ...prev, [lr.lrNo]: val }));
@@ -2018,6 +2018,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                         className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-bold font-mono text-[11px] text-center focus:outline-none focus:border-emerald-500 bg-white"
                                                     />
                                                     <span className="font-semibold text-[10px]">KM</span>
+                                                    <span className="text-[10px] text-slate-500 font-medium">⏱️ {lr.estimatedDuration || calc.duration}</span>
                                                 </div>
                                             </div>
 
@@ -2880,15 +2881,15 @@ const TruckPnlTab = ({
                             Expense Categories for {activeTruckData.truckNo}
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            {Object.entries(activeTruckData.catBreakdown).map(([cat, amt]) => {
-                                const pct = activeTruckData.totalExpenses > 0 ? ((amt / activeTruckData.totalExpenses) * 100).toFixed(0) : '0';
+                            {(Object.entries(activeTruckData.catBreakdown) as [string, number][]).map(([cat, amt]) => {
+                                const pct = activeTruckData.totalExpenses > 0 ? (((amt || 0) / activeTruckData.totalExpenses) * 100).toFixed(0) : '0';
                                 return (
                                     <div key={cat} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
                                         <div className="flex items-center justify-between text-xs mb-1">
                                             <span className="font-bold text-gray-700">{cat}</span>
                                             <span className="text-[10px] text-gray-400 font-semibold">{pct}%</span>
                                         </div>
-                                        <div className="text-sm font-black text-gray-900">{fmt(amt)}</div>
+                                        <div className="text-sm font-black text-gray-900">{fmt(amt || 0)}</div>
                                         <div className="w-full bg-gray-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
                                             <div 
                                                 className="bg-orange-500 h-full rounded-full transition-all" 

@@ -421,6 +421,9 @@ export const getLorryReceipts = async (limit?: number): Promise<LorryReceipt[]> 
             hsnCode: item.hsnCode ?? charges.hsnCode ?? '',
             templateStyle: item.templateStyle ?? charges.templateStyle ?? 'modern-gst',
             copyType: item.copyType ?? charges.copyType ?? 'CONSIGNOR COPY',
+            distanceKm: Number(item.distanceKm ?? charges.distanceKm ?? 0),
+            estimatedDuration: item.estimatedDuration ?? charges.estimatedDuration ?? '',
+            distanceSource: item.distanceSource ?? charges.distanceSource ?? '',
         };
     });
 };
@@ -455,6 +458,9 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         hsnCode,
         templateStyle,
         copyType,
+        distanceKm,
+        estimatedDuration,
+        distanceSource,
         ...rest
     } = lr;
 
@@ -488,6 +494,9 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         hsnCode: hsnCode || '',
         templateStyle: templateStyle || 'modern-gst',
         copyType: copyType || 'CONSIGNOR COPY',
+        distanceKm: Number(distanceKm) || 0,
+        estimatedDuration: estimatedDuration || '',
+        distanceSource: distanceSource || 'OSRM',
     };
 
     const payload = {
@@ -535,6 +544,9 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         hsnCode: data.hsnCode ?? charges.hsnCode ?? hsnCode ?? '',
         templateStyle: data.templateStyle ?? charges.templateStyle ?? templateStyle ?? 'modern-gst',
         copyType: data.copyType ?? charges.copyType ?? copyType ?? 'CONSIGNOR COPY',
+        distanceKm: Number(data.distanceKm ?? charges.distanceKm ?? distanceKm ?? 0),
+        estimatedDuration: data.estimatedDuration ?? charges.estimatedDuration ?? estimatedDuration ?? '',
+        distanceSource: data.distanceSource ?? charges.distanceSource ?? distanceSource ?? '',
     };
 };
 

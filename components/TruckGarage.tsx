@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { SavedTruck, LorryReceipt, Voucher } from '../types';
 import { getVouchers } from '../services/supabaseService';
-import { fetchDailyFuelPrices, findDieselPrice, findFuelPrice, FuelPriceResponse, FuelType } from '../services/fuelPriceService';
+import { fetchDailyFuelPrices, findDieselPrice, findFuelPrice, FuelPriceResponse, FuelType, getResolvedDistance } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 
 interface TruckGarageProps {
@@ -390,12 +390,26 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
         const netProfit = freightEarned - totalExpenses;
         const margin = freightEarned > 0 ? (netProfit / freightEarned) * 100 : 0;
 
+        // 3. Driving Distance & Fuel Metrics across all trips for this truck
+        const totalDistanceKm = matchedLRs.reduce((sum, lr) => {
+            const km = lr.distanceKm && lr.distanceKm > 0 ? lr.distanceKm : getResolvedDistance(lr.fromPlace, lr.toPlace).distanceKm;
+            return sum + km;
+        }, 0);
+        const avgTripKm = matchedLRs.length > 0 ? Math.round(totalDistanceKm / matchedLRs.length) : 0;
+        const truckMileage = activeTruck.mileage && activeTruck.mileage > 0 
+            ? activeTruck.mileage 
+            : ((activeTruck.fuelType || 'Diesel') === 'CNG' ? 10.0 : 3.5);
+        const estFuelConsumed = Math.round((totalDistanceKm / truckMileage) * 10) / 10;
+
         return {
             freightEarned,
             totalExpenses,
             netProfit,
             tripsCount: matchedLRs.length,
             margin,
+            totalDistanceKm,
+            avgTripKm,
+            estFuelConsumed,
             recentLRs: matchedLRs.slice(0, 5),
             recentExpenses: matchedVouchers.slice(0, 5)
         };
@@ -1148,6 +1162,39 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                         </div>
                     </div>
 
+                    {/* Fleet Highway Travel & Fuel Utilization Bar */}
+                    <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-blue-600/40 border border-blue-400/30 flex items-center justify-center text-lg shadow-inner">
+                                🛣️
+                            </div>
+                            <div>
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-300">Total Distance Run</div>
+                                <div className="text-xl font-black text-white">
+                                    {(truckFinancials.totalDistanceKm || 0).toLocaleString('en-IN')} <span className="text-xs text-blue-300 font-normal">KM</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block h-7 w-px bg-white/15" />
+
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Est. Fuel Consumed</div>
+                            <div className="text-sm font-bold text-amber-300">
+                                ~{(truckFinancials.estFuelConsumed || 0).toLocaleString('en-IN')} {(activeTruck.fuelType || 'Diesel') === 'CNG' ? 'Kg CNG' : 'L Diesel'}
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block h-7 w-px bg-white/15" />
+
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Avg Trip Length</div>
+                            <div className="text-sm font-bold text-emerald-400">
+                                {truckFinancials.avgTripKm || 0} <span className="text-xs text-slate-300 font-normal">KM / trip</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Recent LRs for this truck */}
                     {truckFinancials.recentLRs && truckFinancials.recentLRs.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-slate-100">
@@ -1156,9 +1203,21 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                 {truckFinancials.recentLRs.map(lr => (
                                     <div key={lr.lrNo} className="py-2.5 flex items-center justify-between text-xs sm:text-sm">
                                         <div>
-                                            <span className="font-bold text-blue-700">LR #{lr.lrNo}</span>
-                                            <span className="text-slate-400 mx-1.5">•</span>
-                                            <span className="text-slate-600 font-medium">{lr.fromPlace} → {lr.toPlace}</span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-bold text-blue-700">LR #{lr.lrNo}</span>
+                                                <span className="text-slate-400 mx-1">•</span>
+                                                <span className="text-slate-700 font-semibold">{lr.fromPlace} → {lr.toPlace}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                    <span>🛣️</span>
+                                                    <span>{lr.distanceKm || getResolvedDistance(lr.fromPlace, lr.toPlace).distanceKm} KM</span>
+                                                </span>
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                                                    <span>⏱️</span>
+                                                    <span>{lr.estimatedDuration || getResolvedDistance(lr.fromPlace, lr.toPlace).formattedDuration}</span>
+                                                </span>
+                                            </div>
                                         </div>
                                         <div className="text-right">
                                             <span className="font-black text-slate-900">{fmt(Number(lr.freight) || 0)}</span>

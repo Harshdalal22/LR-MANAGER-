@@ -104,6 +104,11 @@ export interface LorryReceipt {
     hsnCode?: string;
     templateStyle?: 'modern-gst' | 'classic';
     copyType?: 'CONSIGNOR COPY' | 'CONSIGNEE COPY' | 'TRANSPORTER COPY' | 'DRIVER COPY' | string;
+
+    // Driving Distance & Duration Fields (OSRM / OpenStreetMap Engine)
+    distanceKm?: number;
+    estimatedDuration?: string;
+    distanceSource?: 'OSRM' | 'CorridorMatrix' | 'Haversine' | 'Manual';
 }
 
 export interface CompanyDetails {

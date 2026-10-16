@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LorryReceipt, Item, PartyDetails, DetailedCharges, CompanyDetails, SavedParty, SavedTruck } from '../types';
 import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon, DownloadIcon, WhatsAppIcon, PrintIcon } from './icons';
-import { suggestLRDetails } from '../services/geminiService';
+import { SuggestionField, suggestLRDetails } from '../services/geminiService';
+import { fetchDrivingDistance, getResolvedDistance, DrivingDistanceResult } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
 import { getNextSequence } from '../utils/sequenceUtils';
@@ -66,7 +67,10 @@ const initialLRState: LorryReceipt = {
     transitRisk: "Owner's Risk (Consignor Insured)",
     hsnCode: '',
     templateStyle: 'modern-gst',
-    copyType: 'CONSIGNOR COPY'
+    copyType: 'CONSIGNOR COPY',
+    distanceKm: 0,
+    estimatedDuration: '',
+    distanceSource: 'OSRM'
 };
 
 const VEHICLE_PRESETS = ['14 Ft Open', '19 Ft Container', '20 Ft Container', '32 Ft SXL', '32 Ft MXL', '40 Ft Trailer', 'Taurus 10-Wheeler'];
@@ -87,6 +91,58 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
     const isInitialMount = useRef(true);
     const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // ── OSRM Driving Distance & Route Engine State ──
+    const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
+    const [routeDistanceInfo, setRouteDistanceInfo] = useState<DrivingDistanceResult | null>(null);
+
+    // Auto calculate driving distance via OSRM API when origin or destination changes
+    useEffect(() => {
+        if (!formData.fromPlace || !formData.toPlace || formData.fromPlace.trim().length < 2 || formData.toPlace.trim().length < 2) {
+            return;
+        }
+        const timer = setTimeout(async () => {
+            setIsCalculatingDistance(true);
+            try {
+                const res = await fetchDrivingDistance(formData.fromPlace, formData.toPlace);
+                setRouteDistanceInfo(res);
+                setFormData(prev => ({
+                    ...prev,
+                    distanceKm: prev.distanceKm && prev.distanceKm > 0 ? prev.distanceKm : res.distanceKm,
+                    estimatedDuration: res.formattedDuration,
+                    distanceSource: res.source
+                }));
+            } catch (_) {}
+            finally {
+                setIsCalculatingDistance(false);
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [formData.fromPlace, formData.toPlace]);
+
+    const handleRecalculateDistance = async () => {
+        if (!formData.fromPlace || !formData.toPlace) {
+            toast.error('Pehle Origin aur Destination city daalo');
+            return;
+        }
+        setIsCalculatingDistance(true);
+        const toastId = toast.loading('Calculating driving distance via OSRM API...');
+        try {
+            const res = await fetchDrivingDistance(formData.fromPlace, formData.toPlace);
+            setRouteDistanceInfo(res);
+            setFormData(prev => ({
+                ...prev,
+                distanceKm: res.distanceKm,
+                estimatedDuration: res.formattedDuration,
+                distanceSource: res.source
+            }));
+            toast.success(`Distance: ${res.distanceKm} KM (~${res.formattedDuration}) via ${res.source}`, { id: toastId });
+        } catch (e: any) {
+            toast.error('Distance calculation error: ' + e.message, { id: toastId });
+        } finally {
+            setIsCalculatingDistance(false);
+        }
+    };
 
     const updateBillingPartyType = (lr: LorryReceipt) => {
         if (lr.billingTo?.name && lr.consignor?.name && JSON.stringify(lr.billingTo) === JSON.stringify(lr.consignor)) {
@@ -881,6 +937,68 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                     className={`${inputBase} uppercase font-bold text-slate-800`}
                                     required
                                 />
+                            </div>
+
+                            {/* ── Live Driving Distance & Duration (OSRM + OpenStreetMap Engine) ── */}
+                            <div className="lg:col-span-12 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-slate-50 border border-blue-200/90 rounded-2xl p-3 sm:p-4 my-1 shadow-2xs">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg shadow-sm">
+                                            🛣️
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs font-black uppercase tracking-wider text-blue-900">
+                                                    Driving Distance & Duration (OSRM API)
+                                                </span>
+                                                <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded border border-blue-200">
+                                                    {formData.distanceSource || routeDistanceInfo?.source || 'OpenStreetMap'}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs text-slate-600 mt-0.5">
+                                                {formData.fromPlace && formData.toPlace ? (
+                                                    <span>Route: <strong className="text-slate-800 uppercase">{formData.fromPlace}</strong> ➔ <strong className="text-slate-800 uppercase">{formData.toPlace}</strong></span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">Origin aur Destination bharte hi distance automatic update ho jayega</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Distance & Duration Inputs */}
+                                    <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+                                        <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-300 shadow-2xs">
+                                            <span className="text-xs font-bold text-slate-500">Total Distance:</span>
+                                            <input
+                                                type="number"
+                                                name="distanceKm"
+                                                value={formData.distanceKm || ''}
+                                                onChange={(e) => setFormData(prev => ({ ...prev, distanceKm: Number(e.target.value) || 0, distanceSource: 'Manual' }))}
+                                                placeholder="KM"
+                                                className="w-20 font-black text-blue-900 text-sm outline-none text-right"
+                                            />
+                                            <span className="text-xs font-bold text-slate-600">KM</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-slate-300 shadow-2xs">
+                                            <span className="text-xs font-bold text-slate-500">⏱️ Est. Time:</span>
+                                            <span className="font-bold text-slate-800 text-xs">
+                                                {formData.estimatedDuration || routeDistanceInfo?.formattedDuration || (formData.distanceKm ? `~${Math.round(formData.distanceKm / 45)}h` : '--')}
+                                            </span>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={handleRecalculateDistance}
+                                            disabled={isCalculatingDistance || !formData.fromPlace || !formData.toPlace}
+                                            className="px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-xs"
+                                            title="Recalculate distance via OSRM API"
+                                        >
+                                            <span className={isCalculatingDistance ? 'animate-spin' : ''}>🔄</span>
+                                            <span className="hidden sm:inline">{isCalculatingDistance ? 'Calculating...' : 'Recalculate'}</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Vehicle Number */}

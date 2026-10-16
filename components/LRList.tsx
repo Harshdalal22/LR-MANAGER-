@@ -7,6 +7,7 @@ import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import InvoiceModal from './InvoiceModal';
 import { Language, t } from '../utils/translations';
 import { addLedgerEntry, getVouchers, addVoucher, subscribeToVouchers, updateVoucher } from '../services/supabaseService';
+import { calculateFleetTotalDistance, getResolvedDistance, batchUpdateLRDistances } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 import { Voucher } from '../types';
 
@@ -121,6 +122,31 @@ const LRList: React.FC<LRListProps> = ({
             return matchesSearch && matchesStatus;
         });
     }, [lorryReceipts, searchTerm, statusFilter]);
+
+    // ── Fleet Total Distance & Driving Duration Engine (OSRM + OpenStreetMap) ──
+    const fleetDistanceMetrics = useMemo(() => {
+        return calculateFleetTotalDistance(filteredLRs);
+    }, [filteredLRs]);
+
+    const [isSyncingDistances, setIsSyncingDistances] = useState(false);
+    const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+
+    const handleSyncAllDistances = async () => {
+        if (filteredLRs.length === 0) return toast.error('No LRs to calculate distance');
+        setIsSyncingDistances(true);
+        setSyncProgress({ done: 0, total: filteredLRs.length });
+        const toastId = toast.loading('Calculating driving distances via OSRM API...');
+        try {
+            const { updatedCount } = await batchUpdateLRDistances(filteredLRs, (done, total) => {
+                setSyncProgress({ done, total });
+            });
+            toast.success(`Updated ${updatedCount} LR routes via OSRM Driving Road API! 🛣️`, { id: toastId });
+        } catch (e: any) {
+            toast.error('Distance calculation error: ' + e.message, { id: toastId });
+        } finally {
+            setIsSyncingDistances(false);
+        }
+    };
 
     const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.checked) {
@@ -389,6 +415,56 @@ const LRList: React.FC<LRListProps> = ({
                 </div>
             )}
 
+            {/* ── Fleet Route & Total Distance Intelligence Banner (OSRM API) ── */}
+            {viewMode === 'lrs' && filteredLRs.length > 0 && (
+                <div className="mb-4 bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white p-4 rounded-2xl shadow-md border border-blue-800/40 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/30 flex items-center justify-center text-xl shadow-inner">
+                                🛣️
+                            </div>
+                            <div>
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-blue-300">Total Fleet Distance</div>
+                                <div className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                                    {fleetDistanceMetrics.totalDistanceKm.toLocaleString('en-IN')} <span className="text-xs font-semibold text-blue-300">KM</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block h-8 w-px bg-white/15" />
+
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Driving Hours</div>
+                            <div className="text-base font-bold text-slate-200">
+                                ~{Math.round(fleetDistanceMetrics.totalDurationHours).toLocaleString('en-IN')} <span className="text-xs text-slate-400">Hours</span>
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block h-8 w-px bg-white/15" />
+
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average Trip Distance</div>
+                            <div className="text-base font-bold text-emerald-400">
+                                {fleetDistanceMetrics.avgDistanceKm} <span className="text-xs text-slate-300">KM / trip</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Auto-Sync All Distances Action */}
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleSyncAllDistances}
+                            disabled={isSyncingDistances}
+                            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm cursor-pointer"
+                            title="Automatically update driving distance and duration for all LRs via OSRM OpenStreetMap API"
+                        >
+                            <span className={isSyncingDistances ? 'animate-spin' : ''}>🔄</span>
+                            <span>{isSyncingDistances ? `Syncing (${syncProgress.done}/${syncProgress.total})...` : '⚡ Auto-Sync Distances (OSRM)'}</span>
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Table */}
             {viewMode === 'lrs' ? (
                 <div className="overflow-x-auto bg-white rounded-lg shadow-sm border border-gray-200 flex-grow">
@@ -439,7 +515,7 @@ const LRList: React.FC<LRListProps> = ({
                                         <div className="font-bold text-gray-900">{lr.lrNo}</div>
                                         <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
                                         {lr.isInvoiceGenerated ? (
-                                            <div className="text-[9px] text-green-700 font-bold bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 inline-block whitespace-nowrap">
+                                             <div className="text-[9px] text-green-700 font-bold bg-green-100 px-1.5 py-0.5 rounded border border-green-200 mt-1 inline-block whitespace-nowrap">
                                                 GENERATED
                                             </div>
                                         ) : (
@@ -460,7 +536,23 @@ const LRList: React.FC<LRListProps> = ({
                                         <div className="flex items-center gap-1 font-mono text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded w-fit mb-1">
                                             <TruckIcon className="w-3 h-3" /> {lr.truckNo}
                                         </div>
-                                        <div className="text-xs text-gray-500">{lr.fromPlace} &rarr; {lr.toPlace}</div>
+                                        <div className="text-xs text-gray-700 font-semibold">{lr.fromPlace} &rarr; {lr.toPlace}</div>
+                                        {/* OSRM Driving Distance Badge */}
+                                        {(() => {
+                                            const dist = getResolvedDistance(lr.fromPlace, lr.toPlace, lr.distanceKm);
+                                            return (
+                                                <div className="mt-1 flex items-center gap-1 flex-wrap">
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200" title={`Road Distance: ${dist.distanceKm} KM (${dist.source} Engine)`}>
+                                                        <span>🛣️</span>
+                                                        <span>{dist.distanceKm} KM</span>
+                                                    </span>
+                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200" title="Estimated Driving Duration">
+                                                        <span>⏱️</span>
+                                                        <span>{lr.estimatedDuration || dist.formattedDuration}</span>
+                                                    </span>
+                                                </div>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-3 text-right font-bold text-gray-700">
                                         ₹{Number(lr.freight).toLocaleString('en-IN')}

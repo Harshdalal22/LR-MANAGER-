@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { SavedTruck, LorryReceipt, Voucher } from '../types';
 import { getVouchers } from '../services/supabaseService';
-import { fetchDailyFuelPrices, findDieselPrice, FuelPriceResponse } from '../services/fuelPriceService';
+import { fetchDailyFuelPrices, findDieselPrice, findFuelPrice, FuelPriceResponse, FuelType } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
 
 interface TruckGarageProps {
@@ -333,6 +333,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
     const [lightsOn, setLightsOn] = useState(true);
     const [truckColor, setTruckColor] = useState('#1e3a8a');
     const [quickDocModal, setQuickDocModal] = useState<{ isOpen: boolean; docType: string; label: string; currentVal: string } | null>(null);
+    const [stationFuelType, setStationFuelType] = useState<FuelType>('Diesel');
 
     // Initial Truck Form State
     const initialFormState: SavedTruck = {
@@ -356,6 +357,9 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
         emiAmount: 38500,
         emiDueDay: 10,
         financerName: 'HDFC Bank Vehicle Finance',
+        fuelType: 'Diesel',
+        mileage: 3.5,
+        tankCapacity: 300,
         status: 'Active'
     };
 
@@ -574,6 +578,33 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                         {/* Bold Indian HSRP Number Plate */}
                         <div className="py-1">
                             <IndianNumberPlate plateNo={activeTruck.truckNo || 'SELECT TRUCK'} size="lg" />
+                        </div>
+
+                        {/* Fuel Type & Mileage Badges */}
+                        <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black shadow-xs ${
+                                (activeTruck.fuelType || 'Diesel') === 'CNG'
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
+                                    : (activeTruck.fuelType || 'Diesel') === 'Petrol'
+                                    ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                                    : 'bg-blue-50 text-blue-800 border border-blue-300'
+                            }`}>
+                                <span>{(activeTruck.fuelType || 'Diesel') === 'CNG' ? '🌿' : '⛽'}</span>
+                                <span>{activeTruck.fuelType || 'Diesel'}</span>
+                            </span>
+
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-slate-100 text-slate-800 border border-slate-200">
+                                <span>⚡ Mileage:</span>
+                                <span className="font-mono text-blue-700">
+                                    {activeTruck.mileage || ((activeTruck.fuelType || 'Diesel') === 'CNG' ? 10.0 : 3.5)} { (activeTruck.fuelType || 'Diesel') === 'CNG' ? 'km/kg' : 'km/L' }
+                                </span>
+                            </span>
+
+                            {activeTruck.tankCapacity && (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-slate-50 text-slate-600 border border-slate-200">
+                                    <span>🛢️ Tank: {activeTruck.tankCapacity} { (activeTruck.fuelType || 'Diesel') === 'CNG' ? 'kg' : 'L' }</span>
+                                </span>
+                            )}
                         </div>
 
                         {activeTruck.ownerName && (
@@ -978,31 +1009,51 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                     <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
                         <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-3xl shadow-inner">
-                                ⛽
+                                {stationFuelType === 'CNG' ? '🌿' : '⛽'}
                             </div>
                             <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="text-lg sm:text-xl font-black text-white">Daily Live Fuel Station</h3>
                                     <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                        OpenFuel Real-Time Scraper (06:00 AM IST)
+                                        OpenFuel & IndianAPI Live Real-Time Data
                                     </span>
                                 </div>
                                 <p className="text-slate-400 text-xs sm:text-sm mt-0.5">
-                                    Automated diesel rates across freight corridors to plan refills & track fuel expense
+                                    Live rates across freight corridors to plan refills & track fuel expense (Diesel, CNG & Petrol)
                                 </p>
                             </div>
                         </div>
 
-                        {onNavigateToExpenses && activeTruck && (
-                            <button
-                                onClick={() => onNavigateToExpenses(activeTruck.truckNo)}
-                                className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-2.5 rounded-xl font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
-                            >
-                                <span>⚡</span>
-                                <span>Log Fuel Expense ({activeTruck.truckNo})</span>
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {/* Fuel Type Switcher */}
+                            <div className="flex items-center bg-slate-800/90 p-1 rounded-xl border border-slate-700">
+                                {(['Diesel', 'CNG', 'Petrol'] as FuelType[]).map(ft => (
+                                    <button
+                                        key={ft}
+                                        onClick={() => setStationFuelType(ft)}
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                                            stationFuelType === ft
+                                                ? (ft === 'CNG' ? 'bg-emerald-600 text-white shadow-xs' : ft === 'Petrol' ? 'bg-amber-600 text-white shadow-xs' : 'bg-blue-600 text-white shadow-xs')
+                                                : 'text-slate-400 hover:text-white'
+                                        }`}
+                                    >
+                                        <span>{ft === 'CNG' ? '🌿' : '⛽'}</span>
+                                        <span>{ft}</span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {onNavigateToExpenses && activeTruck && (
+                                <button
+                                    onClick={() => onNavigateToExpenses(activeTruck.truckNo)}
+                                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-4 py-2 rounded-xl font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                                >
+                                    <span>⚡</span>
+                                    <span>Log Fuel Expense ({activeTruck.truckNo})</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* Corridor Rates Grid */}
@@ -1015,7 +1066,8 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                             { state: 'Gujarat', code: 'GJ', city: 'Gujarat' },
                             { state: 'Maharashtra', code: 'MH', city: 'Maharashtra' }
                         ].map(c => {
-                            const dp = findDieselPrice(fuelPrices || { last_updated_ist: '', petrol: [], diesel: [] }, c.city);
+                            const fp = findFuelPrice(fuelPrices, stationFuelType, c.city);
+                            const unitText = fp.unit.replace('₹/', '');
                             const isCheapest = c.city === 'Delhi' || c.city === 'Haryana';
                             return (
                                 <div key={c.code} className={`rounded-2xl p-3.5 border transition-all ${isCheapest ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-800/60 border-slate-700/60'}`}>
@@ -1024,14 +1076,14 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                         <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.2 rounded font-black">{c.code}</span>
                                     </div>
                                     <div className="text-xl font-black text-amber-400 leading-tight">
-                                        ₹{dp.price.toFixed(2)}
-                                        <span className="text-xs text-slate-400 font-normal">/L</span>
+                                        ₹{fp.price.toFixed(2)}
+                                        <span className="text-xs text-slate-400 font-normal">/{unitText}</span>
                                     </div>
                                     <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center gap-1">
                                         {isCheapest ? (
                                             <span className="text-emerald-400 font-bold">★ Lowest Route Rate</span>
                                         ) : (
-                                            <span>Standard Diesel</span>
+                                            <span>Live {stationFuelType}</span>
                                         )}
                                     </div>
                                 </div>
@@ -1041,12 +1093,17 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
 
                     <div className="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-400">
                         <div className="flex items-center gap-2">
-                            <span className="text-amber-400 font-black">💡 Transporter Tip:</span>
-                            <span>Refueling in Delhi/Haryana instead of Rajasthan/Maharashtra saves up to <strong>₹500 - ₹1,200</strong> on a single 200L refill!</span>
+                            <span className="text-amber-400 font-black">💡 Transporter Route Tip:</span>
+                            <span>
+                                {stationFuelType === 'CNG'
+                                    ? 'CNG in Delhi NCR (₹75.09/kg) is lowest along NH48/NH44 corridor!'
+                                    : 'Refueling Diesel in Delhi/Haryana instead of Rajasthan/Maharashtra saves up to ₹500 - ₹1,200 per 200L refill!'}
+                            </span>
                         </div>
-                        <span className="text-[11px] text-slate-500">Source: OpenFuel Automated Git-Scraper</span>
+                        <span className="text-[11px] text-slate-500">Source: OpenFuel & IndianAPI (Daily 06:00 AM IST)</span>
                     </div>
                 </div>
+
 
                 {/* ── VEHICLE SPENDS & PROFIT REPORT (Truck Accounting) ───────── */}
                 <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-5 shadow-xs">
@@ -1247,6 +1304,71 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                             value={formState.driverContact || ''}
                                             onChange={e => setFormState({ ...formState, driverContact: e.target.value })}
                                             placeholder="10-digit phone number"
+                                            className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Section 2.5: Fuel & Mileage Specifications */}
+                            <div className="bg-slate-50 rounded-2xl p-4 space-y-3 border border-amber-200/60">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="text-xs font-black uppercase text-amber-800 tracking-wider flex items-center gap-1.5">
+                                        <span>⛽</span>
+                                        <span>Fuel Type & Mileage (Auto-Expense Sync)</span>
+                                    </div>
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                                        Used for Automatic Trip Fuel Calculation
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">Fuel Type *</label>
+                                        <select
+                                            value={formState.fuelType || 'Diesel'}
+                                            onChange={e => {
+                                                const fType = e.target.value as FuelType;
+                                                setFormState({
+                                                    ...formState,
+                                                    fuelType: fType,
+                                                    mileage: formState.mileage || (fType === 'CNG' ? 10.0 : 3.5)
+                                                });
+                                            }}
+                                            className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        >
+                                            <option value="Diesel">⛽ Diesel</option>
+                                            <option value="CNG">🌿 CNG (Compressed Natural Gas)</option>
+                                            <option value="Petrol">⚡ Petrol</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Average Mileage ({(formState.fuelType || 'Diesel') === 'CNG' ? 'KM/kg' : 'KM/Ltr'}) *
+                                        </label>
+                                        <input 
+                                            type="number"
+                                            step="0.1"
+                                            min="0.5"
+                                            max="35"
+                                            value={formState.mileage || ''}
+                                            onChange={e => setFormState({ ...formState, mileage: parseFloat(e.target.value) || 0 })}
+                                            placeholder={(formState.fuelType || 'Diesel') === 'CNG' ? 'e.g. 10.5 km/kg' : 'e.g. 3.5 km/L'}
+                                            className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        />
+                                        <span className="text-[10px] text-slate-400">Determines fuel cost based on route KM</span>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Tank Capacity ({(formState.fuelType || 'Diesel') === 'CNG' ? 'Kg' : 'Litres'})
+                                        </label>
+                                        <input 
+                                            type="number"
+                                            step="1"
+                                            value={formState.tankCapacity || ''}
+                                            onChange={e => setFormState({ ...formState, tankCapacity: parseInt(e.target.value) || 0 })}
+                                            placeholder={(formState.fuelType || 'Diesel') === 'CNG' ? 'e.g. 60 kg' : 'e.g. 300 Litres'}
                                             className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                                         />
                                     </div>

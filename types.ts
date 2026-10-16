@@ -150,6 +150,11 @@ export interface SavedTruck {
     driverName?: string;
     driverContact?: string;
     
+    // Fuel & Mileage Specifications
+    fuelType?: 'Diesel' | 'CNG' | 'Petrol'; // Fuel type: Diesel, CNG, or Petrol (default: Diesel)
+    mileage?: number;                       // Average mileage in km/l (or km/kg for CNG)
+    tankCapacity?: number;                  // Tank capacity in Liters or Kg
+    
     // Compliance & Documentation
     insuranceExpiry?: string;       // YYYY-MM-DD
     insurancePolicyNo?: string;

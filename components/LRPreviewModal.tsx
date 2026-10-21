@@ -428,28 +428,17 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             GST & STATUTORY COMPLIANCE DETAILS
                         </div>
 
-                        {/* GST on Freight Liability - Shows BOTH RCM and FCM clearly */}
-                        <div className="mt-1 p-1.5 rounded-xs border border-indigo-200 bg-indigo-50/40 space-y-1 text-[7.5px]">
-                            {/* RCM Row */}
-                            <div className="flex items-start justify-between border-b border-indigo-100 pb-1">
+                        {/* GST on Freight Liability - Shows 18% GST FCM clearly */}
+                        <div className="mt-1 p-1.5 rounded-xs border border-emerald-200 bg-emerald-50/40 space-y-1 text-[7.5px]">
+                            {/* FCM 18% Row */}
+                            <div className="flex items-start justify-between">
                                 <div>
-                                    <span className="font-bold text-indigo-900 uppercase">GST on Freight (RCM): </span>
-                                    <span className="font-black text-blue-800">REVERSE CHARGE APPLICABLE @ 5%</span>
-                                    <p className="text-slate-600 text-[7px] leading-tight">Tax payable by Consignor / Consignee under Notif. No. 11/2017-CT(R) & 13/2017-CT(R).</p>
-                                </div>
-                                <span className="font-mono font-bold text-blue-900 text-[8px] bg-blue-100 px-1.5 py-0.5 rounded-xs shrink-0 ml-1">
-                                    5% RCM
-                                </span>
-                            </div>
-                            {/* FCM Row */}
-                            <div className="flex items-start justify-between pt-0.5">
-                                <div>
-                                    <span className="font-bold text-indigo-900 uppercase">GST on Freight (FCM): </span>
+                                    <span className="font-bold text-emerald-950 uppercase">GST on Freight: </span>
                                     <span className="font-black text-emerald-800">FORWARD CHARGE APPLICABLE @ 18%</span>
-                                    <p className="text-slate-600 text-[7px] leading-tight">Tax payable by Transporter/GTA under Notif. No. 05/2022-CT(R) with Full ITC.</p>
+                                    <p className="text-slate-600 text-[7px] leading-tight">CGST 9% + SGST 9% (Intra-State) or IGST 18% (Inter-State) with Full ITC.</p>
                                 </div>
                                 <span className="font-mono font-bold text-emerald-900 text-[8px] bg-emerald-100 px-1.5 py-0.5 rounded-xs shrink-0 ml-1">
-                                    18% FCM
+                                    18% GST
                                 </span>
                             </div>
                         </div>
@@ -540,14 +529,14 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
                         </div>
 
-                        {/* GST on Freight Row (Shows RCM 5% and FCM 18%) */}
+                        {/* GST on Freight Row (18% GST) */}
                         <div className="flex justify-between p-1">
                             <span className="text-slate-700">
-                                GST on Freight (5% RCM / 18% FCM):
+                                GST on Freight (@18%):
                             </span>
                             <span className="font-mono text-slate-800 font-bold">
                                 {showAmounts 
-                                    ? `₹ 0.00 (RCM) | ${formatINR(basicFreight * 0.18)} (18% FCM)` 
+                                    ? formatINR(basicFreight * 0.18) 
                                     : '₹ 0.00'}
                             </span>
                         </div>
@@ -952,12 +941,12 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [customEmail, setCustomEmail] = useState<string>('');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
-    // GST Liability State (RCM @ 5% vs FCM @ 18% / 12%)
-    const [gstLiability, setGstLiability] = useState<'RCM' | 'FCM_18' | 'FCM_12'>(() => {
+    // GST Liability State (Defaults to 18% GST)
+    const [gstLiability, setGstLiability] = useState<'FCM_18' | 'RCM' | 'FCM_12'>(() => {
         const p = (lr.gstPaidBy || '').toLowerCase();
-        if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
+        if (p.includes('5') || p.includes('rcm')) return 'RCM';
         if (p.includes('12')) return 'FCM_12';
-        return 'RCM';
+        return 'FCM_18';
     });
 
     const effectiveTemplate = viewMode === 'compare' ? 'modern-gst' : viewMode;
@@ -1476,16 +1465,16 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             </select>
                         </div>
 
-                        {/* GST Liability Selector (RCM 5% vs FCM 18% vs FCM 12%) */}
+                        {/* GST Liability Selector (Defaults to 18%) */}
                         <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">GST Tax:</span>
                             <select
                                 value={gstLiability}
                                 onChange={(e) => setGstLiability(e.target.value as any)}
-                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
+                                className="bg-transparent text-emerald-400 font-bold text-xs outline-none cursor-pointer"
                             >
+                                <option value="FCM_18" className="bg-slate-900 text-white">GST @ 18% (Forward Charge)</option>
                                 <option value="RCM" className="bg-slate-900 text-white">RCM @ 5% (Reverse Charge)</option>
-                                <option value="FCM_18" className="bg-slate-900 text-white">FCM @ 18% (Forward Charge)</option>
                                 <option value="FCM_12" className="bg-slate-900 text-white">FCM @ 12% (Forward Charge)</option>
                             </select>
                         </div>

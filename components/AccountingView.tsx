@@ -3264,17 +3264,9 @@ const GSTCenterTab = ({
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
-                        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
-                            <span className="text-[11px] font-bold text-gray-500 uppercase">GST Rate:</span>
-                            <select
-                                value={selectedGstRate}
-                                onChange={e => setSelectedGstRate(Number(e.target.value))}
-                                className="bg-transparent text-xs font-black text-blue-700 focus:outline-none cursor-pointer"
-                            >
-                                <option value={18}>18% (9% CGST + 9% SGST)</option>
-                                <option value={12}>12% (6% CGST + 6% SGST)</option>
-                                <option value={5}>5% (2.5% CGST + 2.5% SGST)</option>
-                            </select>
+                        <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 shadow-2xs">
+                            <span className="text-[11px] font-black text-emerald-950 uppercase">GST Rate:</span>
+                            <span className="text-xs font-black text-emerald-700">18% (9% CGST + 9% SGST / 18% IGST)</span>
                         </div>
                         <input
                             type="date"

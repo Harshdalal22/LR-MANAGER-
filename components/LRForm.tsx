@@ -45,7 +45,7 @@ const initialLRState: LorryReceipt = {
     ewayExDate: '',
     addressOfDelivery: '',
     chargedWeight: 0,
-    gstPaidBy: 'Consignor',
+    gstPaidBy: 'Consignor (18% GST)',
     consignor: { ...initialPartyState },
     consignee: { ...initialPartyState },
     billingTo: { ...initialPartyState },
@@ -1455,10 +1455,11 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             <div>
                                 <label className={labelBase}>GST Liability / Paid By</label>
                                 <select name="gstPaidBy" value={formData.gstPaidBy} onChange={handleChange} className={inputBase}>
-                                    <option value="Consignor (RCM @ 5%)">RCM — Consignor Pays @ 5%</option>
-                                    <option value="Consignee (RCM @ 5%)">RCM — Consignee Pays @ 5%</option>
-                                    <option value="Transporter (FCM @ 18%)">FCM — Transporter / GTA @ 18%</option>
-                                    <option value="Transporter (FCM @ 12%)">FCM — Transporter / GTA @ 12%</option>
+                                    <option value="Consignor (18% GST)">Consignor Pays @ 18% GST</option>
+                                    <option value="Consignee (18% GST)">Consignee Pays @ 18% GST</option>
+                                    <option value="Transporter (FCM @ 18%)">FCM — Transporter / GTA @ 18% GST</option>
+                                    <option value="Consignor (RCM @ 5%)">RCM — Consignor Pays @ 5% (GTA)</option>
+                                    <option value="Consignee (RCM @ 5%)">RCM — Consignee Pays @ 5% (GTA)</option>
                                 </select>
                             </div>
 

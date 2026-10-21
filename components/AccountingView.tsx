@@ -2430,12 +2430,12 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
         return Object.entries(map).map(([party, { debit, credit }]) => ({ party, debit, credit, outstanding: Math.max(0, debit - credit) })).filter(r => r.outstanding > 0).sort((a, b) => b.outstanding - a.outstanding);
     }, [invoicedLRs, payments]);
 
-    // GST Summary from LRs
+    // GST Summary from LRs (18% GST: 9% CGST + 9% SGST)
     const gstSummary = useMemo(() => {
         return filteredLRs.reduce((acc, lr) => {
             const taxable = lr.freight || 0;
-            const cgst = (taxable * 2.5) / 100;
-            const sgst = (taxable * 2.5) / 100;
+            const cgst = (taxable * 9) / 100;
+            const sgst = (taxable * 9) / 100;
             return { taxable: acc.taxable + taxable, cgst: acc.cgst + cgst, sgst: acc.sgst + sgst, igst: acc.igst + 0 };
         }, { taxable: 0, cgst: 0, sgst: 0, igst: 0 });
     }, [filteredLRs]);
@@ -2598,13 +2598,13 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
             {reportType === 'gst' && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
                     <h3 className="font-black text-gray-800 text-lg mb-1">GST Summary</h3>
-                    <p className="text-sm text-gray-500 mb-6">Period: {fromDate} to {toDate} | Based on freight invoices (CGST 2.5% + SGST 2.5%)</p>
+                    <p className="text-sm text-gray-500 mb-6">Period: {fromDate} to {toDate} | Based on freight invoices (CGST 9% + SGST 9% = 18% GST)</p>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         {[
                             { label: 'Taxable Value', value: fmt(gstSummary.taxable), color: 'text-blue-700' },
-                            { label: 'CGST @2.5%', value: fmt(gstSummary.cgst), color: 'text-purple-700' },
-                            { label: 'SGST @2.5%', value: fmt(gstSummary.sgst), color: 'text-indigo-700' },
-                            { label: 'Total GST', value: fmt(gstSummary.cgst + gstSummary.sgst), color: 'text-green-700' },
+                            { label: 'CGST @9.0%', value: fmt(gstSummary.cgst), color: 'text-purple-700' },
+                            { label: 'SGST @9.0%', value: fmt(gstSummary.sgst), color: 'text-indigo-700' },
+                            { label: 'Total GST (18%)', value: fmt(gstSummary.cgst + gstSummary.sgst), color: 'text-green-700' },
                         ].map(s => (
                             <div key={s.label} className="bg-gray-50 rounded-xl p-4 text-center">
                                 <div className="text-xs text-gray-500 font-bold mb-1">{s.label}</div>
@@ -2615,15 +2615,15 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead><tr className="bg-gray-50">
-                                {['Invoice No', 'LR No', 'Date', 'Party', 'Taxable', 'CGST', 'SGST', 'Total'].map(h => (
+                                {['Invoice No', 'LR No', 'Date', 'Party', 'Taxable', 'CGST (9%)', 'SGST (9%)', 'Total (18%)'].map(h => (
                                     <th key={h} className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr></thead>
                             <tbody className="divide-y divide-gray-50">
                                 {filteredLRs.map(lr => {
                                     const taxable = lr.freight || 0;
-                                    const cgst = (taxable * 2.5) / 100;
-                                    const sgst = (taxable * 2.5) / 100;
+                                    const cgst = (taxable * 9) / 100;
+                                    const sgst = (taxable * 9) / 100;
                                     return (
                                         <tr key={lr.lrNo} className="hover:bg-gray-50">
                                             <td className="px-3 py-2 font-bold text-blue-700">{lr.invoiceNo}</td>
@@ -3093,7 +3093,7 @@ const GSTCenterTab = ({
     companyDetails: CompanyDetails;
 }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    const [rateFilter, setRateFilter] = useState<'all' | '5' | '12' | '18'>('all');
+    const [selectedGstRate, setSelectedGstRate] = useState<number>(18);
     const [fromDate, setFromDate] = useState(() => {
         const d = new Date();
         d.setMonth(d.getMonth() - 2);
@@ -3109,8 +3109,8 @@ const GSTCenterTab = ({
     const gstRows = useMemo(() => {
         return invoicedLRs.map(lr => {
             const taxable = Number(lr.freight) || 0;
-            // Standard Goods Transport Agency rate is 5%
-            const rate = 5;
+            // Standard Transport/Logistics invoice GST rate is 18% (9% CGST + 9% SGST / 18% IGST)
+            const rate = selectedGstRate;
             // Check if intra-state or inter-state
             const isInterstate = lr.fromPlace && lr.toPlace && lr.fromPlace.split(',')[0].trim().toLowerCase() !== lr.toPlace.split(',')[0].trim().toLowerCase();
             
@@ -3146,7 +3146,7 @@ const GSTCenterTab = ({
                 isInterstate
             };
         });
-    }, [invoicedLRs]);
+    }, [invoicedLRs, selectedGstRate]);
 
     // Filter by date & search
     const filteredRows = useMemo(() => {
@@ -3207,26 +3207,26 @@ const GSTCenterTab = ({
                 <StatCard 
                     label="Total GST Collected" 
                     value={fmt(totalGST)} 
-                    sub={`${filteredRows.length} Invoices Filed`} 
+                    sub={`${filteredRows.length} Invoices Filed (${selectedGstRate}% Rate)`} 
                     color="bg-emerald-100 text-emerald-700" 
                     icon="🏛️" 
                 />
                 <StatCard 
-                    label="CGST Collected (@2.5%)" 
+                    label={`CGST Collected (@${(selectedGstRate / 2).toFixed(1)}%)`} 
                     value={fmt(totalCGST)} 
                     sub="Central GST Pool" 
                     color="bg-blue-100 text-blue-700" 
                     icon="📊" 
                 />
                 <StatCard 
-                    label="SGST Collected (@2.5%)" 
+                    label={`SGST Collected (@${(selectedGstRate / 2).toFixed(1)}%)`} 
                     value={fmt(totalSGST)} 
                     sub="State GST Pool" 
                     color="bg-indigo-100 text-indigo-700" 
                     icon="📈" 
                 />
                 <StatCard 
-                    label="IGST Collected (@5.0%)" 
+                    label={`IGST Collected (@${selectedGstRate.toFixed(1)}%)`} 
                     value={fmt(totalIGST)} 
                     sub="Inter-state Transport" 
                     color="bg-purple-100 text-purple-700" 
@@ -3264,6 +3264,18 @@ const GSTCenterTab = ({
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+                        <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                            <span className="text-[11px] font-bold text-gray-500 uppercase">GST Rate:</span>
+                            <select
+                                value={selectedGstRate}
+                                onChange={e => setSelectedGstRate(Number(e.target.value))}
+                                className="bg-transparent text-xs font-black text-blue-700 focus:outline-none cursor-pointer"
+                            >
+                                <option value={18}>18% (9% CGST + 9% SGST)</option>
+                                <option value={12}>12% (6% CGST + 6% SGST)</option>
+                                <option value={5}>5% (2.5% CGST + 2.5% SGST)</option>
+                            </select>
+                        </div>
                         <input
                             type="date"
                             value={fromDate}

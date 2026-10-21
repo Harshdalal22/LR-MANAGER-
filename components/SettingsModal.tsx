@@ -3,6 +3,7 @@ import { CompanyDetails } from '../types';
 import { XIcon, SpinnerIcon, UploadIcon } from './icons';
 import { Language } from '../utils/translations';
 import { toast } from 'react-hot-toast';
+import { getTomTomApiKey, saveTomTomApiKey, testTomTomConnection } from '../services/tomtomService';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -27,15 +28,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
     const isHi = language === 'hi';
     const [localDetails, setLocalDetails] = useState<CompanyDetails>(companyDetails);
-    const [activeTab, setActiveTab] = useState<'general' | 'tax_bank' | 'assets' | 'security'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'tax_bank' | 'assets' | 'security' | 'integrations'>('general');
     const [isSaving, setIsSaving] = useState(false);
     const [isUploadingLogo, setIsUploadingLogo] = useState(false);
     const [isUploadingSignature, setIsUploadingSignature] = useState(false);
     const [showAdminKey, setShowAdminKey] = useState(false);
     const [showManagerKey, setShowManagerKey] = useState(false);
 
+    // TomTom API key state
+    const [tomtomKey, setTomtomKey] = useState('');
+    const [showTomtomKey, setShowTomtomKey] = useState(false);
+    const [isTomtomTesting, setIsTomtomTesting] = useState(false);
+    const [tomtomStatus, setTomtomStatus] = useState<{ success: boolean; message: string } | null>(null);
+
     useEffect(() => {
         setLocalDetails(companyDetails);
+        // Prefer Supabase-synced key from companyDetails, fallback to localStorage
+        setTomtomKey(companyDetails.tomtomApiKey || getTomTomApiKey());
+        setTomtomStatus(null);
     }, [companyDetails, isOpen]);
 
     if (!isOpen) return null;
@@ -53,6 +63,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const handleSaveTomTomKey = async () => {
+        setIsTomtomTesting(true);
+        setTomtomStatus(null);
+        // 1. Test connection first
+        const result = await testTomTomConnection(tomtomKey);
+        setTomtomStatus(result);
+        if (result.success) {
+            // 2a. Save to localStorage cache (instant, offline-ready)
+            saveTomTomApiKey(tomtomKey);
+            // 2b. Save to Supabase via onUpdateDetails (persisted to backend)
+            try {
+                const updatedDetails = { ...localDetails, tomtomApiKey: tomtomKey };
+                setLocalDetails(updatedDetails);
+                await onUpdateDetails(updatedDetails);
+                toast.success('TomTom API key saved to Supabase & verified! 🗺️');
+            } catch (err) {
+                // localStorage save succeeded, Supabase failed — still functional
+                toast.success('TomTom key saved locally! (Supabase sync failed — check connection)');
+            }
+        } else {
+            toast.error('TomTom key test failed: ' + result.message);
+        }
+        setIsTomtomTesting(false);
+    };
+
+    const handleRemoveTomTomKey = async () => {
+        saveTomTomApiKey('');
+        setTomtomKey('');
+        setTomtomStatus(null);
+        try {
+            const updatedDetails = { ...localDetails, tomtomApiKey: '' };
+            setLocalDetails(updatedDetails);
+            await onUpdateDetails(updatedDetails);
+        } catch (_) {}
+        toast.success('TomTom key removed');
     };
 
     const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +212,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             🔐 {isHi ? 'सुरक्षा और पासकी' : 'Security & RBAC'}
                         </button>
                     )}
+                    <button
+                        onClick={() => setActiveTab('integrations')}
+                        className={`pb-2.5 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                            activeTab === 'integrations'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        🗺️ Maps & APIs
+                    </button>
                 </div>
 
                 {/* ── Modal Content Body (Scrollable) ── */}
@@ -526,6 +583,103 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-1">Required for manager role access.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* TAB 5: Maps & API Integrations */}
+                    {activeTab === 'integrations' && (
+                        <div className="space-y-5">
+                            {/* TomTom API Section */}
+                            <div className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white text-base shadow">🗺️</div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-blue-900">TomTom Maps & Routing API</h4>
+                                        <p className="text-[11px] text-blue-700 mt-0.5">Powers place autocomplete, truck routing & geocoding in LR forms</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-1.5">API Key</label>
+                                        <div className="relative">
+                                            <input
+                                                type={showTomtomKey ? 'text' : 'password'}
+                                                value={tomtomKey}
+                                                onChange={(e) => { setTomtomKey(e.target.value); setTomtomStatus(null); }}
+                                                placeholder="Paste your TomTom API key here"
+                                                className="w-full pl-3 pr-10 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 bg-white"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTomtomKey(!showTomtomKey)}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                                            >
+                                                {showTomtomKey ? '🙈' : '👁️'}
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 mt-1">
+                                            Get your key at{' '}
+                                            <a href="https://developer.tomtom.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-bold">developer.tomtom.com</a>
+                                            {' '}→ My Apps → Keys
+                                        </p>
+                                    </div>
+
+                                    {tomtomStatus && (
+                                        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border ${
+                                            tomtomStatus.success
+                                                ? 'bg-green-50 border-green-200 text-green-700'
+                                                : 'bg-red-50 border-red-200 text-red-700'
+                                        }`}>
+                                            <span>{tomtomStatus.success ? '✅' : '❌'}</span>
+                                            <span>{tomtomStatus.message}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveTomTomKey}
+                                            disabled={isTomtomTesting || !tomtomKey.trim()}
+                                            className="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer shadow"
+                                        >
+                                            {isTomtomTesting ? (
+                                                <><SpinnerIcon className="w-3.5 h-3.5 animate-spin" /> Testing...</>
+                                            ) : (
+                                                <><span>💾</span> Save & Test Connection</>
+                                            )}
+                                        </button>
+                                        {(tomtomKey || localDetails.tomtomApiKey) && (
+                                            <button
+                                                type="button"
+                                                onClick={handleRemoveTomTomKey}
+                                                className="px-3 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs transition-all cursor-pointer"
+                                                title="Remove TomTom API key"
+                                            >
+                                                🗑️ Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Feature list */}
+                                <div className="mt-4 grid grid-cols-2 gap-2">
+                                    {[
+                                        { icon: '📍', label: 'Place Autocomplete', desc: 'Live suggestions in LR form' },
+                                        { icon: '🛣️', label: 'Truck Routing', desc: 'Accurate driving distance' },
+                                        { icon: '🌐', label: 'Geocoding', desc: 'City → GPS coordinates' },
+                                        { icon: '⏱️', label: 'ETA Calculation', desc: 'Truck travel duration' },
+                                    ].map(f => (
+                                        <div key={f.label} className="flex items-start gap-1.5 p-2 bg-white/60 rounded-xl border border-blue-100">
+                                            <span className="text-base">{f.icon}</span>
+                                            <div>
+                                                <div className="text-[11px] font-bold text-slate-800">{f.label}</div>
+                                                <div className="text-[10px] text-slate-500">{f.desc}</div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </div>

@@ -4,6 +4,7 @@ import LRPreviewModal, { LRContent } from './LRPreviewModal';
 import { PlusIcon, TrashIcon, CreateIcon, ListIcon, SparklesIcon, ArrowLeftIcon, DownloadIcon, WhatsAppIcon, PrintIcon } from './icons';
 import { SuggestionField, suggestLRDetails } from '../services/geminiService';
 import { fetchDrivingDistance, getResolvedDistance, DrivingDistanceResult } from '../services/fuelPriceService';
+import { tomtomSearchSuggestions, hasTomTomApiKey } from '../services/tomtomService';
 import { toast } from 'react-hot-toast';
 import { Language, t } from '../utils/translations';
 import { getNextSequence } from '../utils/sequenceUtils';
@@ -92,9 +93,15 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
     const isInitialMount = useRef(true);
     const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    // ── OSRM Driving Distance & Route Engine State ──
+    // ── OSRM / TomTom Driving Distance & Route Engine State ──
     const [isCalculatingDistance, setIsCalculatingDistance] = useState(false);
     const [routeDistanceInfo, setRouteDistanceInfo] = useState<DrivingDistanceResult | null>(null);
+
+    // ── TomTom Place Autocomplete State ──
+    const [fromSuggestions, setFromSuggestions] = useState<string[]>([]);
+    const [toSuggestions, setToSuggestions] = useState<string[]>([]);
+    const fromSuggestTimer = useRef<NodeJS.Timeout | null>(null);
+    const toSuggestTimer = useRef<NodeJS.Timeout | null>(null);
 
     // Auto calculate driving distance via OSRM API when origin or destination changes
     useEffect(() => {
@@ -912,34 +919,94 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                             </div>
 
                             {/* Origin / Source */}
-                            <div className="lg:col-span-3">
+                            <div className="lg:col-span-3 relative">
                                 <label className={labelBase}>Origin / Source City *</label>
                                 <input
                                     type="text"
                                     name="fromPlace"
                                     placeholder="e.g. GURGAON (HR)"
                                     value={formData.fromPlace}
-                                    onChange={handleChange}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        if (fromSuggestTimer.current) clearTimeout(fromSuggestTimer.current);
+                                        const val = e.target.value;
+                                        if (val.trim().length >= 2 && hasTomTomApiKey()) {
+                                            fromSuggestTimer.current = setTimeout(async () => {
+                                                const s = await tomtomSearchSuggestions(val);
+                                                setFromSuggestions(s);
+                                            }, 350);
+                                        } else {
+                                            setFromSuggestions([]);
+                                        }
+                                    }}
+                                    onBlur={() => setTimeout(() => setFromSuggestions([]), 180)}
                                     className={`${inputBase} uppercase font-bold text-slate-800`}
                                     required
+                                    autoComplete="off"
                                 />
+                                {fromSuggestions.length > 0 && (
+                                    <ul className="absolute z-50 mt-1 w-full bg-white border border-blue-200 rounded-xl shadow-lg overflow-hidden text-sm">
+                                        {fromSuggestions.map((s, i) => (
+                                            <li
+                                                key={i}
+                                                className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-slate-800 font-semibold border-b border-slate-100 last:border-0 flex items-center gap-2"
+                                                onMouseDown={() => {
+                                                    setFormData(prev => ({ ...prev, fromPlace: s }));
+                                                    setFromSuggestions([]);
+                                                }}
+                                            >
+                                                <span className="text-blue-500 text-xs">📍</span> {s}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
 
                             {/* Destination */}
-                            <div className="lg:col-span-3">
+                            <div className="lg:col-span-3 relative">
                                 <label className={labelBase}>Destination / Delivery City *</label>
                                 <input
                                     type="text"
                                     name="toPlace"
                                     placeholder="e.g. MUMBAI (MH)"
                                     value={formData.toPlace}
-                                    onChange={handleChange}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        if (toSuggestTimer.current) clearTimeout(toSuggestTimer.current);
+                                        const val = e.target.value;
+                                        if (val.trim().length >= 2 && hasTomTomApiKey()) {
+                                            toSuggestTimer.current = setTimeout(async () => {
+                                                const s = await tomtomSearchSuggestions(val);
+                                                setToSuggestions(s);
+                                            }, 350);
+                                        } else {
+                                            setToSuggestions([]);
+                                        }
+                                    }}
+                                    onBlur={() => setTimeout(() => setToSuggestions([]), 180)}
                                     className={`${inputBase} uppercase font-bold text-slate-800`}
                                     required
+                                    autoComplete="off"
                                 />
+                                {toSuggestions.length > 0 && (
+                                    <ul className="absolute z-50 mt-1 w-full bg-white border border-blue-200 rounded-xl shadow-lg overflow-hidden text-sm">
+                                        {toSuggestions.map((s, i) => (
+                                            <li
+                                                key={i}
+                                                className="px-3 py-2 cursor-pointer hover:bg-blue-50 text-slate-800 font-semibold border-b border-slate-100 last:border-0 flex items-center gap-2"
+                                                onMouseDown={() => {
+                                                    setFormData(prev => ({ ...prev, toPlace: s }));
+                                                    setToSuggestions([]);
+                                                }}
+                                            >
+                                                <span className="text-blue-500 text-xs">📍</span> {s}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
 
-                            {/* ── Live Driving Distance & Duration (OSRM + OpenStreetMap Engine) ── */}
+                            {/* ── Live Driving Distance & Duration (TomTom / OSRM Engine) ── */}
                             <div className="lg:col-span-12 bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-slate-50 border border-blue-200/90 rounded-2xl p-3 sm:p-4 my-1 shadow-2xs">
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                     <div className="flex items-center gap-3">
@@ -949,11 +1016,14 @@ const LRForm: React.FC<LRFormProps> = ({ onSave, existingLR, onCancel, companyDe
                                         <div>
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="text-xs font-black uppercase tracking-wider text-blue-900">
-                                                    Driving Distance & Duration (OSRM API)
+                                                    Driving Distance & Duration
                                                 </span>
                                                 <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded border border-blue-200">
-                                                    {formData.distanceSource || routeDistanceInfo?.source || 'OpenStreetMap'}
+                                                    {(routeDistanceInfo as any)?.tomtomSource ? 'TomTom' : (formData.distanceSource || routeDistanceInfo?.source || 'OpenStreetMap')}
                                                 </span>
+                                                {hasTomTomApiKey() && (
+                                                    <span className="text-[10px] bg-green-100 text-green-700 font-bold px-1.5 py-0.5 rounded border border-green-200">🗺️ TomTom Active</span>
+                                                )}
                                             </div>
                                             <div className="text-xs text-slate-600 mt-0.5">
                                                 {formData.fromPlace && formData.toPlace ? (

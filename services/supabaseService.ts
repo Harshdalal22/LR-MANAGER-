@@ -687,7 +687,8 @@ export const getCompanyDetails = async (): Promise<CompanyDetails | null> => {
         adminPasskey: data.admin_passkey,
         managerPasskey: data.manager_passkey,
         logoUrl: data.logo_url,
-        signatureImageUrl: data.signature_image_url
+        signatureImageUrl: data.signature_image_url,
+        tomtomApiKey: data.tomtom_api_key || ''
     };
 };
 
@@ -702,7 +703,8 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         admin_passkey: details.adminPasskey,
         manager_passkey: details.managerPasskey,
         logo_url: details.logoUrl,
-        signature_image_url: details.signatureImageUrl
+        signature_image_url: details.signatureImageUrl,
+        tomtom_api_key: details.tomtomApiKey || null
     };
 
     // Remove camelCase fields to prevent "Column not found" errors
@@ -711,6 +713,7 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
     delete payload.managerPasskey;
     delete payload.logoUrl;
     delete payload.signatureImageUrl;
+    delete payload.tomtomApiKey;
 
     console.log('💾 Saving company details with payload:', {
         ...payload,
@@ -773,7 +776,8 @@ export const saveCompanyDetails = async (details: CompanyDetails): Promise<Compa
         adminPasskey: result.data.admin_passkey,
         managerPasskey: result.data.manager_passkey,
         logoUrl: result.data.logo_url,
-        signatureImageUrl: result.data.signature_image_url
+        signatureImageUrl: result.data.signature_image_url,
+        tomtomApiKey: result.data.tomtom_api_key || ''
     };
 };
 

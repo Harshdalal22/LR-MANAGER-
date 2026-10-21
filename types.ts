@@ -131,6 +131,7 @@ export interface CompanyDetails {
     rbacEnabled?: boolean;
     adminPasskey?: string;
     managerPasskey?: string;
+    tomtomApiKey?: string; // TomTom Maps & Routing API key (saved to Supabase)
 }
 
 export interface SavedParty extends PartyDetails {

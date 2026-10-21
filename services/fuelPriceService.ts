@@ -676,7 +676,8 @@ export function formatDuration(seconds: number): string {
  * Resolve [latitude, longitude] for any Indian town or city:
  * 1. Fast built-in Indian transport dictionary (0ms)
  * 2. Persistent localStorage geocache
- * 3. OpenStreetMap Nominatim Geocoding API with fallback
+ * 3. TomTom Geocoding API (primary, if key configured) — high accuracy
+ * 4. OpenStreetMap Nominatim Geocoding API (free fallback, rate-limited)
  */
 export async function resolvePlaceCoordinates(place: string): Promise<[number, number] | null> {
     if (!place || !place.trim()) return null;
@@ -696,7 +697,17 @@ export async function resolvePlaceCoordinates(place: string): Promise<[number, n
         }
     } catch (_) {}
 
-    // 3. OpenStreetMap Nominatim API (Rate-limited, free, zero API key)
+    // 3. TomTom Geocoding API (primary — high accuracy, India-biased)
+    try {
+        const { tomtomGeocode } = await import('./tomtomService');
+        const ttCoords = await tomtomGeocode(place);
+        if (ttCoords) {
+            try { localStorage.setItem(cacheKey, JSON.stringify(ttCoords)); } catch (_) {}
+            return ttCoords;
+        }
+    } catch (_) {}
+
+    // 4. OpenStreetMap Nominatim API (Rate-limited, free, zero API key fallback)
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2500);
@@ -777,13 +788,17 @@ export function estimateRouteDistance(fromPlace: string, toPlace: string): {
 }
 
 /**
- * Real-Time Driving Distance & Duration API (OSRM + OpenStreetMap)
- * Based on: http://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}
+ * Real-Time Driving Distance & Duration API
+ * Priority engine order:
+ * 1. TomTom Routing API (primary, if key configured) — truck-optimised, most accurate
+ * 2. OSRM / OpenStreetMap (free fallback, no key)
+ * 3. Indian highway corridor matrix (offline)
+ * 4. Haversine formula with 1.28x road factor (pure offline)
  * Features:
- * - Real highway road network distance (in KM)
+ * - Real truck road network distance (in KM)
  * - Real commercial driving duration (in hours & minutes)
  * - 30-day persistent caching to avoid redundant network calls
- * - Seamless zero-failure fallback to Indian corridor matrix & Haversine formula
+ * - Seamless zero-failure fallback chain
  */
 export async function fetchDrivingDistance(fromPlace: string, toPlace: string): Promise<DrivingDistanceResult> {
     const c1 = normalizeCity(fromPlace);
@@ -836,7 +851,23 @@ export async function fetchDrivingDistance(fromPlace: string, toPlace: string): 
         resolvePlaceCoordinates(toPlace)
     ]);
 
-    // 4. Query OSRM Driving Distance API if coordinates found
+    // 4a. TomTom Routing API (primary — truck-optimised routing)
+    if (p1 && p2) {
+        try {
+            const { tomtomDrivingRoute, hasTomTomApiKey } = await import('./tomtomService');
+            if (hasTomTomApiKey()) {
+                const ttResult = await tomtomDrivingRoute(fromPlace, toPlace, p1, p2);
+                if (ttResult) {
+                    try { localStorage.setItem(cacheKey, JSON.stringify(ttResult)); } catch (_) {}
+                    return ttResult;
+                }
+            }
+        } catch (_) {
+            // TomTom unavailable — fall through to OSRM
+        }
+    }
+
+    // 4b. Query OSRM Driving Distance API (free fallback) if coordinates found
     if (p1 && p2) {
         try {
             const controller = new AbortController();

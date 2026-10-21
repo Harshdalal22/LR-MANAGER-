@@ -8,7 +8,7 @@ import {
 } from '../services/supabaseService';
 import {
     fetchDailyFuelPrices, findDieselPrice, findFuelPrice, getAvailableFuelLocations,
-    calculateTripFuel, estimateRouteDistance, calculateLRTripFuel,
+    calculateTripFuel, estimateRouteDistance, calculateLRTripFuel, getResolvedDistance,
     getIndianApiKey, saveIndianApiKey, testIndianApiConnection,
     FuelPriceResponse, FuelType
 } from '../services/fuelPriceService';
@@ -790,15 +790,37 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
     const [quickCustomRate, setQuickCustomRate] = useState<number | ''>('');
     const [quickSaving, setQuickSaving] = useState(false);
 
-    // ── Auto LR Trip Fuel Modal State ──────────────────────────────────────────
+    // ── Petrol Expense Tracker (Per LR & Truck - View Only, No Ledger) ────────
     const [showAutoLRFuelModal, setShowAutoLRFuelModal] = useState(false);
-    const [autoLRFilter, setAutoLRFilter] = useState<'pending' | 'all'>('pending');
+    const [petrolViewTab, setPetrolViewTab] = useState<'truck' | 'lr'>('truck');
+    const [petrolRateInput, setPetrolRateInput] = useState<number>(94.77);
+    const [petrolMileageInput, setPetrolMileageInput] = useState<number>(6.0);
     const [autoLRSearch, setAutoLRSearch] = useState('');
-    const [autoSyncSaving, setAutoSyncSaving] = useState(false);
-    const [customLRDistances, setCustomLRDistances] = useState<{ [lrNo: string]: number }>({});
-    const [autoSyncFuelType, setAutoSyncFuelType] = useState<'Petrol' | 'Diesel' | 'CNG' | 'Auto'>('Petrol');
-    const [autoSyncMileage, setAutoSyncMileage] = useState<number>(6.0);
-    const [customLRFuelTypes, setCustomLRFuelTypes] = useState<{ [lrNo: string]: FuelType }>({});
+
+    const truckPetrolSummary = useMemo(() => {
+        const map = new Map<string, { truckNo: string; trips: number; totalKm: number; litres: number; cost: number; routes: string[] }>();
+        lorryReceipts.forEach(lr => {
+            const truck = (lr.truckNo || 'Unassigned').trim().toUpperCase();
+            const dist = lr.distanceKm && lr.distanceKm > 0 ? lr.distanceKm : getResolvedDistance(lr.fromPlace, lr.toPlace).distanceKm;
+            const entry = map.get(truck) || { truckNo: truck, trips: 0, totalKm: 0, litres: 0, cost: 0, routes: [] };
+            entry.trips += 1;
+            entry.totalKm += dist;
+            if (lr.fromPlace && lr.toPlace && entry.routes.length < 2) {
+                entry.routes.push(`${lr.fromPlace}→${lr.toPlace}`);
+            }
+            map.set(truck, entry);
+        });
+
+        return Array.from(map.values()).map(t => {
+            const litres = Math.round((t.totalKm / (petrolMileageInput || 6.0)) * 10) / 10;
+            const cost = Math.round(litres * (petrolRateInput || 94.77));
+            return { ...t, litres, cost };
+        }).sort((a, b) => b.cost - a.cost);
+    }, [lorryReceipts, petrolMileageInput, petrolRateInput]);
+
+    const totalFleetKm = useMemo(() => truckPetrolSummary.reduce((sum, t) => sum + t.totalKm, 0), [truckPetrolSummary]);
+    const totalFleetPetrolLitres = useMemo(() => Math.round((totalFleetKm / (petrolMileageInput || 6.0)) * 10) / 10, [totalFleetKm, petrolMileageInput]);
+    const totalFleetPetrolCost = useMemo(() => Math.round(totalFleetPetrolLitres * (petrolRateInput || 94.77)), [totalFleetPetrolLitres, petrolRateInput]);
 
     // ── IndianAPI Key Settings Modal State ──────────────────────────────────────
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -1287,18 +1309,17 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                     </div>
                 </div>
                 <div className="flex gap-2 flex-wrap items-center">
-                    {/* Auto-Sync LR Fuel Button */}
+                    {/* Petrol Expense Tracker Button */}
                     <button
                         onClick={() => setShowAutoLRFuelModal(true)}
-                        className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl font-black shadow-md transition flex items-center gap-2 cursor-pointer"
+                        className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white rounded-xl font-black shadow-md transition flex items-center gap-2 cursor-pointer"
+                        title="View live Petrol expense calculated per LR and per Truck (No ledger entries created)"
                     >
-                        <span>⚡</span>
-                        <span>Auto-Sync LR Fuel</span>
-                        {lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length > 0 && (
-                            <span className="bg-amber-300 text-amber-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">
-                                {lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length} Pending
-                            </span>
-                        )}
+                        <span>⛽</span>
+                        <span>Petrol Expense Tracker</span>
+                        <span className="bg-amber-100 text-amber-950 text-[10px] font-black px-1.5 py-0.5 rounded-full">
+                            {lorryReceipts.length} LRs
+                        </span>
                     </button>
 
                     <button onClick={() => {
@@ -1320,6 +1341,35 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                 </div>
             </div>
 
+            {/* ── Real-Time Petrol Expense by Truck Banner (Pure Analytics - No Ledger) ── */}
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 rounded-2xl p-4 text-white shadow-md flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-2xl">
+                        ⛽
+                    </div>
+                    <div>
+                        <div className="text-xs font-black uppercase tracking-wider text-amber-100">
+                            LIVE PETROL EXPENSE (PER TRUCK & LR @ {petrolMileageInput} KM/L)
+                        </div>
+                        <div className="text-2xl font-black mt-0.5">
+                            ₹{totalFleetPetrolCost.toLocaleString('en-IN')}{' '}
+                            <span className="text-xs font-normal text-amber-100">
+                                ({totalFleetPetrolLitres.toLocaleString('en-IN')} L across {totalFleetKm.toLocaleString('en-IN')} KM)
+                            </span>
+                        </div>
+                        <div className="text-[11px] text-amber-100/90 mt-0.5">
+                            🛡️ Calculated distance-wise • Ledger me koi entry nahi jaati (Ledger 100% clean)
+                        </div>
+                    </div>
+                </div>
+                <button
+                    onClick={() => setShowAutoLRFuelModal(true)}
+                    className="px-4 py-2 bg-white text-amber-900 hover:bg-amber-50 rounded-xl font-black text-xs shadow-sm transition cursor-pointer flex items-center gap-1.5"
+                >
+                    <span>🔍</span>
+                    <span>View Per Truck & LR Details</span>
+                </button>
+            </div>
 
             {/* ── Truck-wise summary ── */}
             {byTruck.length > 0 && (
@@ -1854,321 +1904,244 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                 </div>
             )}
 
-            {/* ══ AUTO LR FUEL EXPENSE GENERATOR MODAL ══ */}
+            {/* ══ PETROL EXPENSE TRACKER MODAL (PER LR & TRUCK - VIEW ONLY, NO LEDGER) ══ */}
             {showAutoLRFuelModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-                    <div className="bg-white rounded-3xl max-w-4xl w-full p-6 shadow-2xl border border-emerald-200 space-y-4 max-h-[92vh] flex flex-col">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
+                    <div className="bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-6 shadow-2xl border border-amber-200 space-y-4 max-h-[92vh] flex flex-col">
                         {/* Header */}
                         <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                             <div className="flex items-center gap-3">
-                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-2xl shadow-sm">
-                                    ⚡
+                                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-2xl shadow-sm">
+                                    ⛽
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-gray-900 text-lg">Auto LR Trip Fuel Expense Generator</h3>
-                                    <p className="text-xs text-gray-500">
-                                        Calculates route distance (KM) & gadi mileage (Diesel/CNG/Petrol) to auto-fill trip fuel expenses
+                                    <h3 className="font-black text-gray-900 text-lg flex items-center gap-2">
+                                        <span>Petrol Expense Tracker</span>
+                                        <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
+                                            Per LR & Truck
+                                        </span>
+                                    </h3>
+                                    <p className="text-xs text-slate-500">
+                                        🛡️ Pure Analytics View — Ledger me koi voucher add nahi hota. Main accounts 100% clean rahenge.
                                     </p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowAutoLRFuelModal(false)}
-                                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none cursor-pointer"
+                                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none cursor-pointer p-1"
                             >
                                 &times;
                             </button>
                         </div>
 
                         {/* Summary Metrics */}
-                        {(() => {
-                            const pendingLRs = lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo));
-                            const totalPendingCost = pendingLRs.reduce((sum, lr) => {
-                                const trk = getTruckDetails(lr.truckNo || '');
-                                const cDist = customLRDistances[lr.lrNo];
-                                const chosenFuelType: FuelType = customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
-                                const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
-                                const calc = calculateLRTripFuel({
-                                    fromPlace: lr.fromPlace,
-                                    toPlace: lr.toPlace,
-                                    truck: { fuelType: chosenFuelType, mileage: chosenMileage },
-                                    fuelPrices,
-                                    customDistanceKm: cDist || lr.distanceKm
-                                });
-                                return sum + calc.totalCost;
-                            }, 0);
-                            const totalHighwayKm = pendingLRs.reduce((sum, lr) => {
-                                const cDist = customLRDistances[lr.lrNo];
-                                const d = cDist || (lr.distanceKm ? lr.distanceKm : estimateRouteDistance(lr.fromPlace, lr.toPlace).distanceKm);
-                                return sum + d;
-                            }, 0);
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center">
+                                <div className="text-[10px] font-bold text-slate-500 uppercase">ACTIVE TRUCKS</div>
+                                <div className="text-xl font-black text-slate-900 mt-0.5">{truckPetrolSummary.length}</div>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-center">
+                                <div className="text-[10px] font-bold text-blue-700 uppercase">TOTAL FLEET DISTANCE</div>
+                                <div className="text-xl font-black text-blue-900 mt-0.5">{totalFleetKm.toLocaleString('en-IN')} KM</div>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
+                                <div className="text-[10px] font-bold text-amber-700 uppercase">PETROL REQUIRED (@ {petrolMileageInput} KM/L)</div>
+                                <div className="text-xl font-black text-amber-900 mt-0.5">{totalFleetPetrolLitres.toLocaleString('en-IN')} L</div>
+                            </div>
+                            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3 text-center">
+                                <div className="text-[10px] font-bold text-emerald-800 uppercase">TOTAL PETROL EXPENSE</div>
+                                <div className="text-xl font-black text-emerald-800 mt-0.5">₹{totalFleetPetrolCost.toLocaleString('en-IN')}</div>
+                            </div>
+                        </div>
 
-                            return (
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center">
-                                        <div className="text-[10px] font-bold text-slate-500 uppercase">TOTAL LRS</div>
-                                        <div className="text-xl font-black text-slate-900 mt-0.5">{lorryReceipts.length}</div>
-                                    </div>
-                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
-                                        <div className="text-[10px] font-bold text-amber-700 uppercase">PENDING FUEL EXPENSE</div>
-                                        <div className="text-xl font-black text-amber-800 mt-0.5">{pendingLRs.length} LRs</div>
-                                    </div>
-                                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
-                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">EST. PENDING COST ({autoSyncFuelType})</div>
-                                        <div className="text-xl font-black text-emerald-800 mt-0.5">₹{totalPendingCost.toLocaleString('en-IN')}</div>
-                                    </div>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-center">
-                                        <div className="text-[10px] font-bold text-blue-700 uppercase">PENDING DISTANCE</div>
-                                        <div className="text-xl font-black text-blue-800 mt-0.5">{totalHighwayKm.toLocaleString('en-IN')} KM</div>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Fuel Type & Mileage Sync Controls */}
-                        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-xs font-black text-amber-950 flex items-center gap-1">
-                                    <span>⛽ Sync Fuel Type:</span>
-                                </span>
-                                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-amber-200 shadow-2xs">
-                                    {(['Petrol', 'Diesel', 'CNG', 'Auto'] as const).map(fType => (
-                                        <button
-                                            key={fType}
-                                            type="button"
-                                            onClick={() => setAutoSyncFuelType(fType)}
-                                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1 ${
-                                                autoSyncFuelType === fType
-                                                    ? 'bg-amber-600 text-white shadow-xs'
-                                                    : 'text-slate-700 hover:bg-amber-100'
-                                            }`}
-                                        >
-                                            {fType === 'Petrol' && '⚡ Petrol'}
-                                            {fType === 'Diesel' && '⛽ Diesel'}
-                                            {fType === 'CNG' && '🌿 CNG (₹95/kg)'}
-                                            {fType === 'Auto' && '🔄 Auto (Truck)'}
-                                        </button>
-                                    ))}
-                                </div>
+                        {/* Controls Bar: Rate, Mileage, Search & Tabs */}
+                        <div className="bg-amber-50/70 border border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-amber-200 shadow-2xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setPetrolViewTab('truck')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                                        petrolViewTab === 'truck'
+                                            ? 'bg-amber-600 text-white shadow-xs'
+                                            : 'text-slate-700 hover:bg-amber-100'
+                                    }`}
+                                >
+                                    <span>🚛 By Truck ({truckPetrolSummary.length})</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPetrolViewTab('lr')}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                                        petrolViewTab === 'lr'
+                                            ? 'bg-amber-600 text-white shadow-xs'
+                                            : 'text-slate-700 hover:bg-amber-100'
+                                    }`}
+                                >
+                                    <span>📋 By LR ({lorryReceipts.length})</span>
+                                </button>
                             </div>
 
-                            <div className="flex items-center gap-3 flex-wrap">
-                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
-                                    <span className="text-xs font-bold text-slate-600">⚡ Avg Mileage:</span>
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
+                                    <span className="text-xs font-bold text-slate-600">⚡ Mileage:</span>
                                     <input
                                         type="number"
                                         step="0.1"
-                                        min="0.5"
+                                        min="1"
                                         max="30"
-                                        value={autoSyncMileage}
-                                        onChange={e => setAutoSyncMileage(parseFloat(e.target.value) || 6.0)}
-                                        className="w-14 font-mono font-black text-amber-900 text-xs text-center border-b border-amber-400 outline-none"
+                                        value={petrolMileageInput}
+                                        onChange={e => setPetrolMileageInput(parseFloat(e.target.value) || 6.0)}
+                                        className="w-12 font-mono font-black text-amber-900 text-xs text-center border-b border-amber-400 outline-none"
                                     />
-                                    <span className="text-[11px] font-bold text-slate-500">
-                                        {autoSyncFuelType === 'CNG' ? 'km/kg' : 'km/L'}
-                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-500">KM/L</span>
                                 </div>
 
-                                {autoSyncFuelType === 'CNG' ? (
-                                    <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1.5 rounded-xl border border-emerald-300">
-                                        🌿 CNG Rate: ₹95.00/kg
-                                    </span>
-                                ) : (
-                                    <span className="bg-blue-50 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-blue-200">
-                                        🗺️ TomTom / Road Matrix Active
-                                    </span>
-                                )}
+                                <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
+                                    <span className="text-xs font-bold text-slate-600">⛽ Rate: ₹</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="50"
+                                        max="150"
+                                        value={petrolRateInput}
+                                        onChange={e => setPetrolRateInput(parseFloat(e.target.value) || 94.77)}
+                                        className="w-16 font-mono font-black text-amber-900 text-xs text-center border-b border-amber-400 outline-none"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-500">/L</span>
+                                </div>
+
+                                <input
+                                    type="text"
+                                    placeholder="Search Truck#, LR#, or City..."
+                                    value={autoLRSearch}
+                                    onChange={e => setAutoLRSearch(e.target.value)}
+                                    className="px-3 py-1.5 bg-white border border-amber-200 rounded-xl text-xs w-48 focus:outline-none focus:border-amber-500 shadow-2xs"
+                                />
                             </div>
                         </div>
 
-                        {/* Search & Filter */}
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => setAutoLRFilter('pending')}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                                        autoLRFilter === 'pending'
-                                            ? 'bg-amber-600 text-white shadow-xs'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    🟡 Pending Fuel Entries ({lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length})
-                                </button>
-                                <button
-                                    onClick={() => setAutoLRFilter('all')}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                                        autoLRFilter === 'all'
-                                            ? 'bg-slate-800 text-white shadow-xs'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    📋 All LRs ({lorryReceipts.length})
-                                </button>
-                            </div>
-
-                            <input
-                                type="text"
-                                placeholder="Search by LR#, Truck#, or City..."
-                                value={autoLRSearch}
-                                onChange={e => setAutoLRSearch(e.target.value)}
-                                className="px-3 py-1.5 border border-gray-200 rounded-xl text-xs w-full sm:w-64 focus:outline-none focus:border-emerald-500"
-                            />
+                        {/* Content Area: Truck-wise or LR-wise */}
+                        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-2xl divide-y divide-gray-100 min-h-[300px]">
+                            {petrolViewTab === 'truck' ? (
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[10px] tracking-wider sticky top-0 border-b border-gray-200">
+                                        <tr>
+                                            <th className="p-3">Truck Number</th>
+                                            <th className="p-3 text-center">Trips (LRs)</th>
+                                            <th className="p-3 text-right">Total Distance</th>
+                                            <th className="p-3 text-right">Petrol (@ {petrolMileageInput} km/L)</th>
+                                            <th className="p-3 text-right">Petrol Expense</th>
+                                            <th className="p-3 text-right">Avg / Trip</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {truckPetrolSummary
+                                            .filter(t => !autoLRSearch || t.truckNo.toLowerCase().includes(autoLRSearch.toLowerCase()))
+                                            .map(t => (
+                                                <tr key={t.truckNo} className="hover:bg-amber-50/50 transition">
+                                                    <td className="p-3 font-mono font-black text-slate-900 text-xs flex items-center gap-1.5">
+                                                        <span>🚛</span>
+                                                        <span>{t.truckNo}</span>
+                                                    </td>
+                                                    <td className="p-3 text-center font-bold text-slate-700">
+                                                        <span className="bg-blue-50 text-blue-800 px-2 py-0.5 rounded-full font-mono text-[11px]">
+                                                            {t.trips} trips
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-right font-mono font-bold text-slate-800">
+                                                        {t.totalKm.toLocaleString('en-IN')} KM
+                                                    </td>
+                                                    <td className="p-3 text-right font-mono font-bold text-amber-800">
+                                                        {t.litres.toLocaleString('en-IN')} Litres
+                                                    </td>
+                                                    <td className="p-3 text-right font-black text-sm text-emerald-700">
+                                                        ₹{t.cost.toLocaleString('en-IN')}
+                                                    </td>
+                                                    <td className="p-3 text-right font-mono text-slate-500">
+                                                        ₹{t.trips > 0 ? Math.round(t.cost / t.trips).toLocaleString('en-IN') : 0}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[10px] tracking-wider sticky top-0 border-b border-gray-200">
+                                        <tr>
+                                            <th className="p-3">LR # & Date</th>
+                                            <th className="p-3">Truck</th>
+                                            <th className="p-3">Route (Origin ➔ Destination)</th>
+                                            <th className="p-3 text-right">Distance</th>
+                                            <th className="p-3 text-right">Petrol (@ {petrolMileageInput} km/L)</th>
+                                            <th className="p-3 text-right">Expense (₹)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {lorryReceipts
+                                            .filter(lr => {
+                                                if (!autoLRSearch) return true;
+                                                const q = autoLRSearch.toLowerCase();
+                                                return (
+                                                    (lr.lrNo && lr.lrNo.toLowerCase().includes(q)) ||
+                                                    (lr.truckNo && lr.truckNo.toLowerCase().includes(q)) ||
+                                                    (lr.fromPlace && lr.fromPlace.toLowerCase().includes(q)) ||
+                                                    (lr.toPlace && lr.toPlace.toLowerCase().includes(q))
+                                                );
+                                            })
+                                            .map(lr => {
+                                                const dist = lr.distanceKm && lr.distanceKm > 0 ? lr.distanceKm : getResolvedDistance(lr.fromPlace, lr.toPlace).distanceKm;
+                                                const litres = Math.round((dist / (petrolMileageInput || 6.0)) * 10) / 10;
+                                                const cost = Math.round(litres * (petrolRateInput || 94.77));
+                                                return (
+                                                    <tr key={lr.lrNo} className="hover:bg-amber-50/50 transition">
+                                                        <td className="p-3">
+                                                            <div className="font-mono font-black text-slate-900">LR #{lr.lrNo}</div>
+                                                            <div className="text-[10px] text-slate-400">{lr.date}</div>
+                                                        </td>
+                                                        <td className="p-3 font-mono font-bold text-slate-700">
+                                                            🚛 {lr.truckNo || 'Unassigned'}
+                                                        </td>
+                                                        <td className="p-3 font-bold text-slate-800">
+                                                            {lr.fromPlace || 'Origin'} → {lr.toPlace || 'Destination'}
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-bold text-blue-900">
+                                                            {dist} KM
+                                                        </td>
+                                                        <td className="p-3 text-right font-mono font-bold text-amber-800">
+                                                            {litres} L <span className="text-[10px] text-slate-400 font-normal">(@ ₹{petrolRateInput.toFixed(2)})</span>
+                                                        </td>
+                                                        <td className="p-3 text-right font-black text-sm text-emerald-700">
+                                                            ₹{cost.toLocaleString('en-IN')}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
 
-                        {/* LR List Table */}
-                        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-2xl divide-y divide-gray-100">
-                            {lorryReceipts
-                                .filter(lr => {
-                                    if (autoLRFilter === 'pending' && isLRFuelLogged(lr.lrNo)) return false;
-                                    if (autoLRSearch) {
-                                        const q = autoLRSearch.toLowerCase();
-                                        return (
-                                            (lr.lrNo && lr.lrNo.toLowerCase().includes(q)) ||
-                                            (lr.truckNo && lr.truckNo.toLowerCase().includes(q)) ||
-                                            (lr.fromPlace && lr.fromPlace.toLowerCase().includes(q)) ||
-                                            (lr.toPlace && lr.toPlace.toLowerCase().includes(q))
-                                        );
-                                    }
-                                    return true;
-                                })
-                                .map(lr => {
-                                    const trk = getTruckDetails(lr.truckNo || '');
-                                    const isLogged = isLRFuelLogged(lr.lrNo);
-                                    const customDist = customLRDistances[lr.lrNo];
-                                    const chosenFuelType: FuelType = customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
-                                    const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
-
-                                    const calc = calculateLRTripFuel({
-                                        fromPlace: lr.fromPlace,
-                                        toPlace: lr.toPlace,
-                                        truck: { fuelType: chosenFuelType, mileage: chosenMileage },
-                                        fuelPrices,
-                                        customDistanceKm: customDist || lr.distanceKm
-                                    });
-
-                                    return (
-                                        <div key={lr.lrNo} className="p-3 hover:bg-slate-50 flex items-center justify-between gap-3 flex-wrap">
-                                            {/* LR & Truck */}
-                                            <div className="min-w-[140px]">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="font-mono font-black text-sm text-slate-900">LR #{lr.lrNo}</span>
-                                                    {isLogged ? (
-                                                        <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-                                                            ✓ Added
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full">
-                                                            Pending
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                                                    <span>🚛 {lr.truckNo || 'No Truck'}</span>
-                                                    {/* Quick Fuel Type Toggle */}
-                                                    <select
-                                                        value={chosenFuelType}
-                                                        onChange={e => setCustomLRFuelTypes(prev => ({ ...prev, [lr.lrNo]: e.target.value as FuelType }))}
-                                                        className={`px-1.5 py-0.5 rounded text-[10px] font-black border cursor-pointer ${
-                                                            chosenFuelType === 'Petrol'
-                                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                                                : chosenFuelType === 'CNG'
-                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                                                                : 'bg-blue-100 text-blue-800 border-blue-300'
-                                                        }`}
-                                                    >
-                                                        <option value="Petrol">⚡ Petrol</option>
-                                                        <option value="Diesel">⛽ Diesel</option>
-                                                        <option value="CNG">🌿 CNG</option>
-                                                    </select>
-                                                    <span className="text-[10px] font-bold text-slate-400">
-                                                        ({chosenMileage} {chosenFuelType === 'CNG' ? 'km/kg' : 'km/L'})
-                                                    </span>
-                                                </div>
-                                            </div>
-
-                                            {/* Route & Distance */}
-                                            <div className="min-w-[170px] text-xs">
-                                                <div className="font-bold text-slate-800">
-                                                    {lr.fromPlace || 'Origin'} → {lr.toPlace || 'Destination'}
-                                                </div>
-                                                <div className="flex items-center gap-1.5 text-slate-500 mt-0.5">
-                                                    <span className="font-semibold text-[10px] text-blue-700">🛣️ Route:</span>
-                                                    <input
-                                                        type="number"
-                                                        value={customDist !== undefined ? customDist : (lr.distanceKm || calc.distanceKm)}
-                                                        onChange={e => {
-                                                            const val = parseInt(e.target.value) || 0;
-                                                            setCustomLRDistances(prev => ({ ...prev, [lr.lrNo]: val }));
-                                                        }}
-                                                        className="w-16 px-1.5 py-0.5 border border-slate-300 rounded font-bold font-mono text-[11px] text-center focus:outline-none focus:border-emerald-500 bg-white"
-                                                    />
-                                                    <span className="font-semibold text-[10px]">KM</span>
-                                                    <span className="text-[10px] text-slate-500 font-medium">⏱️ {lr.estimatedDuration || calc.duration}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Fuel Requirement & Live Rate */}
-                                            <div className="text-right min-w-[110px] text-xs">
-                                                <div className="font-bold text-slate-700">
-                                                    {calc.fuelRequired} {chosenFuelType === 'CNG' ? 'Kg' : 'Ltrs'}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400">
-                                                    @ ₹{calc.pricePerUnit.toFixed(2)}/{chosenFuelType === 'CNG' ? 'kg' : 'L'} ({calc.location})
-                                                </div>
-                                            </div>
-
-                                            {/* Total Cost & Action */}
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-right">
-                                                    <div className="font-black text-sm text-emerald-700">
-                                                        ₹{calc.totalCost.toLocaleString('en-IN')}
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400">Trip Fuel Cost</div>
-                                                </div>
-
-                                                {isLogged ? (
-                                                    <span className="text-xs text-emerald-600 font-bold px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-200">
-                                                        ✓ Recorded
-                                                    </span>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => handleSaveSingleLRFuel(lr, customDist, chosenFuelType)}
-                                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer flex items-center gap-1"
-                                                    >
-                                                        <span>+ Add Fuel</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            }
-                        </div>
-
-                        {/* Modal Footer / Bulk Action */}
+                        {/* Modal Footer: Informative & Safe (No Ledger Modifications) */}
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100 flex-wrap gap-3">
-                            <div className="text-xs text-slate-500">
-                                💡 Distance is auto-calculated via TomTom / Indian Highway network; edit KM or Fuel Type directly in the table.
+                            <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                                <span className="text-emerald-600 font-bold">🛡️ Ledger Safe:</span>
+                                <span>Ledger me koi entry nahi jaati. Yeh pure calculation & tracking report hai.</span>
                             </div>
                             <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => window.print()}
+                                    className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer flex items-center gap-1"
+                                >
+                                    <span>🖨️</span>
+                                    <span>Print / Export</span>
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setShowAutoLRFuelModal(false)}
-                                    className="px-4 py-2 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
                                 >
                                     Close
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleAutoSyncAllPendingLRs}
-                                    disabled={autoSyncSaving || lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length === 0}
-                                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-black shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center gap-2"
-                                >
-                                    <span>⚡</span>
-                                    <span>
-                                        {autoSyncSaving
-                                            ? 'Auto-Adding Expenses...'
-                                            : `Auto-Generate All Missing Fuel Expenses (${lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length} LRs as ${autoSyncFuelType} @ ${autoSyncMileage} km/L)`}
-                                    </span>
                                 </button>
                             </div>
                         </div>

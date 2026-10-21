@@ -443,9 +443,19 @@ const LRList: React.FC<LRListProps> = ({
                         <div className="hidden sm:block h-8 w-px bg-white/15" />
 
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Average Trip Distance</div>
-                            <div className="text-base font-bold text-emerald-400">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Average Trip Distance</div>
+                            <div className="text-base font-bold text-emerald-300">
                                 {fleetDistanceMetrics.avgDistanceKm} <span className="text-xs text-slate-300">KM / trip</span>
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block h-8 w-px bg-white/15" />
+
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-amber-400">⚡ Fleet Petrol Expense</div>
+                            <div className="text-base font-black text-amber-300">
+                                ₹{Math.round((fleetDistanceMetrics.totalDistanceKm / 6.0) * 94.77).toLocaleString('en-IN')}{' '}
+                                <span className="text-xs text-amber-200/80 font-normal">({Math.round((fleetDistanceMetrics.totalDistanceKm / 6.0))} L @ 6 km/L)</span>
                             </div>
                         </div>
                     </div>
@@ -550,6 +560,13 @@ const LRList: React.FC<LRListProps> = ({
                                                         <span>⏱️</span>
                                                         <span>{lr.estimatedDuration || dist.formattedDuration}</span>
                                                     </span>
+                                                    {dist.distanceKm > 0 && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200" title={`Petrol Expense: ${(dist.distanceKm / 6.0).toFixed(1)}L @ ₹94.77/L (Avg 6.0 km/L)`}>
+                                                            <span>⛽</span>
+                                                            <span>₹{Math.round((dist.distanceKm / 6.0) * 94.77).toLocaleString('en-IN')}</span>
+                                                            <span className="text-[9px] font-medium text-amber-600">({(dist.distanceKm / 6.0).toFixed(1)}L)</span>
+                                                        </span>
+                                                    )}
                                                 </div>
                                             );
                                         })()}

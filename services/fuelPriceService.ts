@@ -171,41 +171,41 @@ const FALLBACK_PRICES: FuelPriceResponse = {
         { city: 'Bihar', price: 105.18 }
     ],
     cng: [
-        { city: 'New Delhi', price: 75.09 },
-        { city: 'Delhi', price: 75.09 },
-        { city: 'Noida', price: 81.20 },
-        { city: 'Greater Noida', price: 81.20 },
-        { city: 'Ghaziabad', price: 81.20 },
-        { city: 'Gurgaon', price: 80.12 },
-        { city: 'Gurugram', price: 80.12 },
-        { city: 'Faridabad', price: 80.12 },
-        { city: 'Haryana', price: 80.12 },
-        { city: 'Mumbai', price: 76.00 },
-        { city: 'Navi Mumbai', price: 76.00 },
-        { city: 'Thane', price: 76.00 },
-        { city: 'Pune', price: 87.00 },
-        { city: 'Maharashtra', price: 76.00 },
-        { city: 'Ahmedabad', price: 76.20 },
-        { city: 'Surat', price: 76.20 },
-        { city: 'Vadodara', price: 76.20 },
-        { city: 'Gujarat', price: 76.20 },
-        { city: 'Jaipur', price: 82.50 },
-        { city: 'Rajasthan', price: 82.50 },
-        { city: 'Lucknow', price: 81.20 },
-        { city: 'Kanpur', price: 81.20 },
-        { city: 'Agra', price: 81.20 },
-        { city: 'Uttar Pradesh', price: 81.20 },
-        { city: 'Chandigarh', price: 85.00 },
-        { city: 'Punjab', price: 85.00 },
-        { city: 'Bangalore', price: 84.00 },
-        { city: 'Bengaluru', price: 84.00 },
-        { city: 'Karnataka', price: 84.00 },
-        { city: 'Hyderabad', price: 88.00 },
-        { city: 'Telangana', price: 88.00 },
-        { city: 'Kolkata', price: 85.00 },
-        { city: 'West Bengal', price: 85.00 },
-        { city: 'Patna', price: 84.50 },
-        { city: 'Bihar', price: 84.50 }
+        { city: 'New Delhi', price: 95.00 },
+        { city: 'Delhi', price: 95.00 },
+        { city: 'Noida', price: 95.00 },
+        { city: 'Greater Noida', price: 95.00 },
+        { city: 'Ghaziabad', price: 95.00 },
+        { city: 'Gurgaon', price: 95.00 },
+        { city: 'Gurugram', price: 95.00 },
+        { city: 'Faridabad', price: 95.00 },
+        { city: 'Haryana', price: 95.00 },
+        { city: 'Mumbai', price: 95.00 },
+        { city: 'Navi Mumbai', price: 95.00 },
+        { city: 'Thane', price: 95.00 },
+        { city: 'Pune', price: 95.00 },
+        { city: 'Maharashtra', price: 95.00 },
+        { city: 'Ahmedabad', price: 95.00 },
+        { city: 'Surat', price: 95.00 },
+        { city: 'Vadodara', price: 95.00 },
+        { city: 'Gujarat', price: 95.00 },
+        { city: 'Jaipur', price: 95.00 },
+        { city: 'Rajasthan', price: 95.00 },
+        { city: 'Lucknow', price: 95.00 },
+        { city: 'Kanpur', price: 95.00 },
+        { city: 'Agra', price: 95.00 },
+        { city: 'Uttar Pradesh', price: 95.00 },
+        { city: 'Chandigarh', price: 95.00 },
+        { city: 'Punjab', price: 95.00 },
+        { city: 'Bangalore', price: 95.00 },
+        { city: 'Bengaluru', price: 95.00 },
+        { city: 'Karnataka', price: 95.00 },
+        { city: 'Hyderabad', price: 95.00 },
+        { city: 'Telangana', price: 95.00 },
+        { city: 'Kolkata', price: 95.00 },
+        { city: 'West Bengal', price: 95.00 },
+        { city: 'Patna', price: 95.00 },
+        { city: 'Bihar', price: 95.00 }
     ]
 };
 
@@ -341,7 +341,7 @@ export function findFuelPrice(
         : activePrices.diesel;
 
     if (!list || list.length === 0) {
-        const defaultRate = fuelType === 'CNG' ? 75.09 : fuelType === 'Petrol' ? 94.77 : 95.20;
+        const defaultRate = fuelType === 'CNG' ? 95.00 : fuelType === 'Petrol' ? 94.77 : 95.20;
         return { city: 'Delhi', price: defaultRate, unit };
     }
 
@@ -1070,7 +1070,7 @@ export function calculateLRTripFuel(params: {
     const fuelType: FuelType = truck?.fuelType || 'Diesel';
     const safeMileage = truck?.mileage && truck.mileage > 0 
         ? truck.mileage 
-        : (fuelType === 'CNG' ? 10.0 : 3.5); // Default 10 km/kg for CNG, 3.5 km/l for Diesel
+        : 6.0; // Default mileage 6.0 across all vehicles (km/L or km/kg)
     
     const distInfo = getResolvedDistance(fromPlace, toPlace, customDistanceKm);
     const distanceKm = distInfo.distanceKm;
@@ -1106,7 +1106,7 @@ export function calculateTripFuel(distanceKm: number, mileageKmpl: number, price
     totalCost: number;
     costPerKm: number;
 } {
-    const safeMileage = mileageKmpl > 0 ? mileageKmpl : 3.5;
+    const safeMileage = mileageKmpl > 0 ? mileageKmpl : 6.0;
     const liters = Math.round((distanceKm / safeMileage) * 10) / 10;
     const totalCost = Math.round(liters * pricePerLiter);
     const costPerKm = distanceKm > 0 ? Math.round((totalCost / distanceKm) * 100) / 100 : 0;

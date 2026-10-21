@@ -773,19 +773,19 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
     const [fuelCalcMode, setFuelCalcMode] = useState<'liters' | 'distance'>('distance');
     const [fuelLiters, setFuelLiters] = useState<number | ''>('');
     const [fuelDistanceKm, setFuelDistanceKm] = useState<number | ''>('');
-    const [fuelMileageKmpl, setFuelMileageKmpl] = useState<number>(3.5);
+    const [fuelMileageKmpl, setFuelMileageKmpl] = useState<number>(6.0);
 
     // ── Quick Fuel Modal State ─────────────────────────────────────────────────
     const [showQuickFuelModal, setShowQuickFuelModal] = useState(false);
     const [quickTruck, setQuickTruck] = useState('');
     const [quickLR, setQuickLR] = useState('');
-    const [quickFuelType, setQuickFuelType] = useState<FuelType>('Diesel');
+    const [quickFuelType, setQuickFuelType] = useState<FuelType>('Petrol');
     const [quickDate, setQuickDate] = useState(today());
     const [quickPayMode, setQuickPayMode] = useState('Cash');
     const [quickCity, setQuickCity] = useState('Delhi');
     const [quickLiters, setQuickLiters] = useState<number | ''>('');
     const [quickDistanceKm, setQuickDistanceKm] = useState<number | ''>('');
-    const [quickMileageKmpl, setQuickMileageKmpl] = useState<number>(3.5);
+    const [quickMileageKmpl, setQuickMileageKmpl] = useState<number>(6.0);
     const [quickMode, setQuickMode] = useState<'liters' | 'distance'>('distance');
     const [quickCustomRate, setQuickCustomRate] = useState<number | ''>('');
     const [quickSaving, setQuickSaving] = useState(false);
@@ -796,6 +796,9 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
     const [autoLRSearch, setAutoLRSearch] = useState('');
     const [autoSyncSaving, setAutoSyncSaving] = useState(false);
     const [customLRDistances, setCustomLRDistances] = useState<{ [lrNo: string]: number }>({});
+    const [autoSyncFuelType, setAutoSyncFuelType] = useState<'Petrol' | 'Diesel' | 'CNG' | 'Auto'>('Petrol');
+    const [autoSyncMileage, setAutoSyncMileage] = useState<number>(6.0);
+    const [customLRFuelTypes, setCustomLRFuelTypes] = useState<{ [lrNo: string]: FuelType }>({});
 
     // ── IndianAPI Key Settings Modal State ──────────────────────────────────────
     const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -808,7 +811,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
         const clean = (truckNo || '').replace(/[\s-]/g, '').toUpperCase();
         const trk = savedTrucks?.find(t => t.truckNo && t.truckNo.replace(/[\s-]/g, '').toUpperCase() === clean);
         const fType: FuelType = trk?.fuelType || 'Diesel';
-        const defaultMil = fType === 'CNG' ? 10.0 : 3.5;
+        const defaultMil = 6.0; // Default mileage 6.0 km/l or km/kg
         return {
             fuelType: fType,
             mileage: trk?.mileage && trk.mileage > 0 ? trk.mileage : defaultMil,
@@ -918,7 +921,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
             setShowFuelCalc(false);
         } else {
             const dist = Number(fuelDistanceKm) || 0;
-            const mil = Number(fuelMileageKmpl) || (selectedFuelType === 'CNG' ? 10.0 : 3.5);
+            const mil = Number(fuelMileageKmpl) || 6.0;
             if (dist <= 0) return toast.error('Kripya Trip Distance (KM) daalo');
             const res = calculateTripFuel(dist, mil, rate);
             const note = `Trip Fuel: ${dist} km @ ${mil} km/${unitLabel} (${res.liters} ${unitLabel} @ ₹${rate.toFixed(2)}/${unitLabel} - ${selectedFuelCity}) [${selectedFuelType}]`;
@@ -944,7 +947,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
             note = `Fuel: ${ltr} ${unitLabel} @ ₹${rate.toFixed(2)}/${unitLabel} (${quickCity}) [${quickFuelType}]`;
         } else {
             const dist = Number(quickDistanceKm) || 0;
-            const mil = Number(quickMileageKmpl) || (quickFuelType === 'CNG' ? 10.0 : 3.5);
+            const mil = Number(quickMileageKmpl) || 6.0;
             if (dist <= 0) return toast.error('Kripya Distance (KM) daalo');
             const res = calculateTripFuel(dist, mil, rate);
             amount = res.totalCost;
@@ -978,26 +981,29 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
     };
 
     // Save individual LR Fuel Expense
-    const handleSaveSingleLRFuel = async (lr: LorryReceipt, customDist?: number) => {
+    const handleSaveSingleLRFuel = async (lr: LorryReceipt, customDist?: number, fuelTypeOverride?: FuelType) => {
         const trk = getTruckDetails(lr.truckNo || '');
+        const chosenFuelType: FuelType = fuelTypeOverride || customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
+        const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
+
         const fuelCalc = calculateLRTripFuel({
             fromPlace: lr.fromPlace,
             toPlace: lr.toPlace,
-            truck: trk,
+            truck: { fuelType: chosenFuelType, mileage: chosenMileage },
             fuelPrices,
-            customDistanceKm: customDist
+            customDistanceKm: customDist || lr.distanceKm
         });
 
         try {
             await addVoucher({
                 date: lr.date || today(),
                 voucher_no: `FUEL-${lr.truckNo || 'TRK'}-${lr.lrNo}`,
-                description: `[Truck: ${lr.truckNo || 'Fleet'}] Fuel | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace}) | ${fuelCalc.description}`,
+                description: `[Truck: ${lr.truckNo || 'Fleet'}] ${chosenFuelType} Fuel | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace}) | ${fuelCalc.description}`,
                 amount: fuelCalc.totalCost,
                 payment_mode: 'Cash',
                 party_name: lr.truckNo || 'Fleet'
             });
-            toast.success(`LR# ${lr.lrNo} Fuel expense ₹${fuelCalc.totalCost.toLocaleString('en-IN')} added! ⛽✅`);
+            toast.success(`LR# ${lr.lrNo} ${chosenFuelType} expense ₹${fuelCalc.totalCost.toLocaleString('en-IN')} added! ⛽✅`);
             onRefresh();
         } catch (e: any) {
             toast.error(e.message || 'Error saving fuel expense');
@@ -1020,18 +1026,21 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
             try {
                 const trk = getTruckDetails(lr.truckNo || '');
                 const cDist = customLRDistances[lr.lrNo];
+                const chosenFuelType: FuelType = customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
+                const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
+
                 const fuelCalc = calculateLRTripFuel({
                     fromPlace: lr.fromPlace,
                     toPlace: lr.toPlace,
-                    truck: trk,
+                    truck: { fuelType: chosenFuelType, mileage: chosenMileage },
                     fuelPrices,
-                    customDistanceKm: cDist
+                    customDistanceKm: cDist || lr.distanceKm
                 });
 
                 await addVoucher({
                     date: lr.date || today(),
                     voucher_no: `FUEL-${lr.truckNo || 'TRK'}-${lr.lrNo}`,
-                    description: `[Truck: ${lr.truckNo || 'Fleet'}] Fuel | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace}) | ${fuelCalc.description}`,
+                    description: `[Truck: ${lr.truckNo || 'Fleet'}] ${chosenFuelType} Fuel | LR# ${lr.lrNo} (${lr.fromPlace}→${lr.toPlace}) | ${fuelCalc.description}`,
                     amount: fuelCalc.totalCost,
                     payment_mode: 'Cash',
                     party_name: lr.truckNo || 'Fleet'
@@ -1044,7 +1053,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
         }
 
         setAutoSyncSaving(false);
-        toast.success(`🎉 ${successCount} LRs ka fuel expense (Total ₹${totalCost.toLocaleString('en-IN')}) successfully add ho gaya! ⛽`);
+        toast.success(`🎉 ${successCount} LRs ka ${autoSyncFuelType} fuel expense (Total ₹${totalCost.toLocaleString('en-IN')} @ ${autoSyncMileage} km/L) successfully sync ho gaya! ⛽`);
         setShowAutoLRFuelModal(false);
         onRefresh();
     };
@@ -1496,13 +1505,13 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Truck Mileage (KM/L)</label>
+                                                        <label className="block text-[10px] font-bold text-amber-800 mb-0.5">Truck Mileage ({selectedFuelType === 'CNG' ? 'KM/kg' : 'KM/L'})</label>
                                                         <input
                                                             type="number"
                                                             step="0.1"
-                                                            placeholder="e.g. 3.5"
+                                                            placeholder="e.g. 6.0"
                                                             value={fuelMileageKmpl}
-                                                            onChange={e => setFuelMileageKmpl(+e.target.value || 3.5)}
+                                                            onChange={e => setFuelMileageKmpl(+e.target.value || 6.0)}
                                                             className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-black text-gray-900"
                                                         />
                                                     </div>
@@ -1516,7 +1525,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     <span className="text-sm font-black text-amber-900">
                                                         ₹{fuelCalcMode === 'liters'
                                                             ? Math.round((Number(fuelLiters) || 0) * (Number(customDieselRate) || currentFuel.price)).toLocaleString('en-IN')
-                                                            : calculateTripFuel(Number(fuelDistanceKm) || 0, Number(fuelMileageKmpl) || 3.5, Number(customDieselRate) || currentFuel.price).totalCost.toLocaleString('en-IN')
+                                                            : calculateTripFuel(Number(fuelDistanceKm) || 0, Number(fuelMileageKmpl) || 6.0, Number(customDieselRate) || currentFuel.price).totalCost.toLocaleString('en-IN')
                                                         }
                                                     </span>
                                                 </div>
@@ -1621,7 +1630,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                     onChange={e => {
                                         const fType = e.target.value as FuelType;
                                         setQuickFuelType(fType);
-                                        setQuickMileageKmpl(fType === 'CNG' ? 10.0 : 3.5);
+                                        setQuickMileageKmpl(6.0);
                                     }}
                                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 focus:outline-none focus:border-amber-500"
                                 >
@@ -1742,7 +1751,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                             type="number"
                                             step="0.1"
                                             value={quickMileageKmpl}
-                                            onChange={e => setQuickMileageKmpl(+e.target.value || 3.5)}
+                                            onChange={e => setQuickMileageKmpl(+e.target.value || 6.0)}
                                             className="w-full bg-white border border-amber-300 rounded-xl px-3 py-2 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500"
                                         />
                                     </div>
@@ -1783,13 +1792,13 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                     <div className="text-xl font-black text-amber-900">
                                         ₹{quickMode === 'liters'
                                             ? Math.round((Number(quickLiters) || 0) * (Number(quickCustomRate) || quickCurrentFuel.price)).toLocaleString('en-IN')
-                                            : calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || (quickFuelType === 'CNG' ? 10.0 : 3.5), Number(quickCustomRate) || quickCurrentFuel.price).totalCost.toLocaleString('en-IN')
+                                            : calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || 6.0, Number(quickCustomRate) || quickCurrentFuel.price).totalCost.toLocaleString('en-IN')
                                         }
                                     </div>
                                     <div className="text-[11px] text-amber-700 font-semibold">
                                         {quickMode === 'liters'
                                             ? `${Number(quickLiters) || 0} ${quickFuelType === 'CNG' ? 'kg' : 'L'} @ ₹${(Number(quickCustomRate) || quickCurrentFuel.price).toFixed(2)} [${quickFuelType}]`
-                                            : `${calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || (quickFuelType === 'CNG' ? 10.0 : 3.5), Number(quickCustomRate) || quickCurrentFuel.price).liters} ${quickFuelType === 'CNG' ? 'kg' : 'L'} needed (${Number(quickDistanceKm) || 0} km @ ${quickMileageKmpl} ${quickFuelType === 'CNG' ? 'km/kg' : 'km/L'})`
+                                            : `${calculateTripFuel(Number(quickDistanceKm) || 0, Number(quickMileageKmpl) || 6.0, Number(quickCustomRate) || quickCurrentFuel.price).liters} ${quickFuelType === 'CNG' ? 'kg' : 'L'} needed (${Number(quickDistanceKm) || 0} km @ ${quickMileageKmpl} ${quickFuelType === 'CNG' ? 'km/kg' : 'km/L'})`
                                         }
                                     </div>
                                 </div>
@@ -1876,18 +1885,20 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                             const totalPendingCost = pendingLRs.reduce((sum, lr) => {
                                 const trk = getTruckDetails(lr.truckNo || '');
                                 const cDist = customLRDistances[lr.lrNo];
+                                const chosenFuelType: FuelType = customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
+                                const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
                                 const calc = calculateLRTripFuel({
                                     fromPlace: lr.fromPlace,
                                     toPlace: lr.toPlace,
-                                    truck: trk,
+                                    truck: { fuelType: chosenFuelType, mileage: chosenMileage },
                                     fuelPrices,
-                                    customDistanceKm: cDist
+                                    customDistanceKm: cDist || lr.distanceKm
                                 });
                                 return sum + calc.totalCost;
                             }, 0);
                             const totalHighwayKm = pendingLRs.reduce((sum, lr) => {
                                 const cDist = customLRDistances[lr.lrNo];
-                                const d = cDist || estimateRouteDistance(lr.fromPlace, lr.toPlace).distanceKm;
+                                const d = cDist || (lr.distanceKm ? lr.distanceKm : estimateRouteDistance(lr.fromPlace, lr.toPlace).distanceKm);
                                 return sum + d;
                             }, 0);
 
@@ -1902,7 +1913,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                         <div className="text-xl font-black text-amber-800 mt-0.5">{pendingLRs.length} LRs</div>
                                     </div>
                                     <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
-                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">EST. PENDING FUEL COST</div>
+                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">EST. PENDING COST ({autoSyncFuelType})</div>
                                         <div className="text-xl font-black text-emerald-800 mt-0.5">₹{totalPendingCost.toLocaleString('en-IN')}</div>
                                     </div>
                                     <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 text-center">
@@ -1912,6 +1923,62 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                 </div>
                             );
                         })()}
+
+                        {/* Fuel Type & Mileage Sync Controls */}
+                        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-black text-amber-950 flex items-center gap-1">
+                                    <span>⛽ Sync Fuel Type:</span>
+                                </span>
+                                <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-amber-200 shadow-2xs">
+                                    {(['Petrol', 'Diesel', 'CNG', 'Auto'] as const).map(fType => (
+                                        <button
+                                            key={fType}
+                                            type="button"
+                                            onClick={() => setAutoSyncFuelType(fType)}
+                                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1 ${
+                                                autoSyncFuelType === fType
+                                                    ? 'bg-amber-600 text-white shadow-xs'
+                                                    : 'text-slate-700 hover:bg-amber-100'
+                                            }`}
+                                        >
+                                            {fType === 'Petrol' && '⚡ Petrol'}
+                                            {fType === 'Diesel' && '⛽ Diesel'}
+                                            {fType === 'CNG' && '🌿 CNG (₹95/kg)'}
+                                            {fType === 'Auto' && '🔄 Auto (Truck)'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
+                                    <span className="text-xs font-bold text-slate-600">⚡ Avg Mileage:</span>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0.5"
+                                        max="30"
+                                        value={autoSyncMileage}
+                                        onChange={e => setAutoSyncMileage(parseFloat(e.target.value) || 6.0)}
+                                        className="w-14 font-mono font-black text-amber-900 text-xs text-center border-b border-amber-400 outline-none"
+                                    />
+                                    <span className="text-[11px] font-bold text-slate-500">
+                                        {autoSyncFuelType === 'CNG' ? 'km/kg' : 'km/L'}
+                                    </span>
+                                </div>
+
+                                {autoSyncFuelType === 'CNG' ? (
+                                    <span className="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1.5 rounded-xl border border-emerald-300">
+                                        🌿 CNG Rate: ₹95.00/kg
+                                    </span>
+                                ) : (
+                                    <span className="bg-blue-50 text-blue-800 text-xs font-bold px-3 py-1.5 rounded-xl border border-blue-200">
+                                        🗺️ TomTom / Road Matrix Active
+                                    </span>
+                                )}
+                            </div>
+                        </div>
 
                         {/* Search & Filter */}
                         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1967,10 +2034,13 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                     const trk = getTruckDetails(lr.truckNo || '');
                                     const isLogged = isLRFuelLogged(lr.lrNo);
                                     const customDist = customLRDistances[lr.lrNo];
+                                    const chosenFuelType: FuelType = customLRFuelTypes[lr.lrNo] || (autoSyncFuelType === 'Auto' ? trk.fuelType : autoSyncFuelType);
+                                    const chosenMileage: number = autoSyncMileage || trk.mileage || 6.0;
+
                                     const calc = calculateLRTripFuel({
                                         fromPlace: lr.fromPlace,
                                         toPlace: lr.toPlace,
-                                        truck: trk,
+                                        truck: { fuelType: chosenFuelType, mileage: chosenMileage },
                                         fuelPrices,
                                         customDistanceKm: customDist || lr.distanceKm
                                     });
@@ -1991,12 +2061,26 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                                                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
                                                     <span>🚛 {lr.truckNo || 'No Truck'}</span>
-                                                    <span className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
-                                                        trk.fuelType === 'CNG' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
-                                                    }`}>
-                                                        {trk.fuelType} ({trk.mileage} {trk.fuelType === 'CNG' ? 'km/kg' : 'km/l'})
+                                                    {/* Quick Fuel Type Toggle */}
+                                                    <select
+                                                        value={chosenFuelType}
+                                                        onChange={e => setCustomLRFuelTypes(prev => ({ ...prev, [lr.lrNo]: e.target.value as FuelType }))}
+                                                        className={`px-1.5 py-0.5 rounded text-[10px] font-black border cursor-pointer ${
+                                                            chosenFuelType === 'Petrol'
+                                                                ? 'bg-amber-100 text-amber-800 border-amber-300'
+                                                                : chosenFuelType === 'CNG'
+                                                                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                                                                : 'bg-blue-100 text-blue-800 border-blue-300'
+                                                        }`}
+                                                    >
+                                                        <option value="Petrol">⚡ Petrol</option>
+                                                        <option value="Diesel">⛽ Diesel</option>
+                                                        <option value="CNG">🌿 CNG</option>
+                                                    </select>
+                                                    <span className="text-[10px] font-bold text-slate-400">
+                                                        ({chosenMileage} {chosenFuelType === 'CNG' ? 'km/kg' : 'km/L'})
                                                     </span>
                                                 </div>
                                             </div>
@@ -2007,7 +2091,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     {lr.fromPlace || 'Origin'} → {lr.toPlace || 'Destination'}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 text-slate-500 mt-0.5">
-                                                    <span className="font-semibold text-[10px] text-blue-700">🛣️ OSRM:</span>
+                                                    <span className="font-semibold text-[10px] text-blue-700">🛣️ Route:</span>
                                                     <input
                                                         type="number"
                                                         value={customDist !== undefined ? customDist : (lr.distanceKm || calc.distanceKm)}
@@ -2025,10 +2109,10 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                             {/* Fuel Requirement & Live Rate */}
                                             <div className="text-right min-w-[110px] text-xs">
                                                 <div className="font-bold text-slate-700">
-                                                    {calc.fuelRequired} {trk.fuelType === 'CNG' ? 'Kg' : 'Ltrs'}
+                                                    {calc.fuelRequired} {chosenFuelType === 'CNG' ? 'Kg' : 'Ltrs'}
                                                 </div>
                                                 <div className="text-[10px] text-slate-400">
-                                                    @ ₹{calc.pricePerUnit.toFixed(2)}/{trk.fuelType === 'CNG' ? 'kg' : 'L'} ({calc.location})
+                                                    @ ₹{calc.pricePerUnit.toFixed(2)}/{chosenFuelType === 'CNG' ? 'kg' : 'L'} ({calc.location})
                                                 </div>
                                             </div>
 
@@ -2047,7 +2131,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     </span>
                                                 ) : (
                                                     <button
-                                                        onClick={() => handleSaveSingleLRFuel(lr, customDist)}
+                                                        onClick={() => handleSaveSingleLRFuel(lr, customDist, chosenFuelType)}
                                                         className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-xs transition cursor-pointer flex items-center gap-1"
                                                     >
                                                         <span>+ Add Fuel</span>
@@ -2063,7 +2147,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                         {/* Modal Footer / Bulk Action */}
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100 flex-wrap gap-3">
                             <div className="text-xs text-slate-500">
-                                💡 Distance is auto-calculated via Indian Highway Network matrix; edit KM directly in the table if required.
+                                💡 Distance is auto-calculated via TomTom / Indian Highway network; edit KM or Fuel Type directly in the table.
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
@@ -2083,7 +2167,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                     <span>
                                         {autoSyncSaving
                                             ? 'Auto-Adding Expenses...'
-                                            : `Auto-Generate All Missing Fuel Expenses (${lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length} LRs)`}
+                                            : `Auto-Generate All Missing Fuel Expenses (${lorryReceipts.filter(lr => !isLRFuelLogged(lr.lrNo)).length} LRs as ${autoSyncFuelType} @ ${autoSyncMileage} km/L)`}
                                     </span>
                                 </button>
                             </div>

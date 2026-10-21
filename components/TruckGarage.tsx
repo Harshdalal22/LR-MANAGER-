@@ -358,7 +358,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
         emiDueDay: 10,
         financerName: 'HDFC Bank Vehicle Finance',
         fuelType: 'Diesel',
-        mileage: 3.5,
+        mileage: 6.0,
         tankCapacity: 300,
         status: 'Active'
     };
@@ -398,7 +398,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
         const avgTripKm = matchedLRs.length > 0 ? Math.round(totalDistanceKm / matchedLRs.length) : 0;
         const truckMileage = activeTruck.mileage && activeTruck.mileage > 0 
             ? activeTruck.mileage 
-            : ((activeTruck.fuelType || 'Diesel') === 'CNG' ? 10.0 : 3.5);
+            : 6.0;
         const estFuelConsumed = Math.round((totalDistanceKm / truckMileage) * 10) / 10;
 
         return {
@@ -610,7 +610,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-slate-100 text-slate-800 border border-slate-200">
                                 <span>⚡ Mileage:</span>
                                 <span className="font-mono text-blue-700">
-                                    {activeTruck.mileage || ((activeTruck.fuelType || 'Diesel') === 'CNG' ? 10.0 : 3.5)} { (activeTruck.fuelType || 'Diesel') === 'CNG' ? 'km/kg' : 'km/L' }
+                                    {activeTruck.mileage || 6.0} { (activeTruck.fuelType || 'Diesel') === 'CNG' ? 'km/kg' : 'km/L' }
                                 </span>
                             </span>
 
@@ -1390,7 +1390,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                                 setFormState({
                                                     ...formState,
                                                     fuelType: fType,
-                                                    mileage: formState.mileage || (fType === 'CNG' ? 10.0 : 3.5)
+                                                    mileage: formState.mileage || 6.0
                                                 });
                                             }}
                                             className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"

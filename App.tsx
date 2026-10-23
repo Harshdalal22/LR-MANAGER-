@@ -10,21 +10,46 @@ import LRForm from './components/LRForm';
 import AdBanner from './components/AdBanner';
 import { RunningTruckLoader } from './components/BookTruckAnimation';
 
-// Heavy components — lazy loaded to reduce initial bundle size
-const VehicleHiring = lazy(() => import('./components/VehicleHiring'));
-const BookingRegister = lazy(() => import('./components/BookingRegister'));
-const DataManagement = lazy(() => import('./components/DataManagement'));
-const PartyManagement = lazy(() => import('./components/PartyManagement'));
-const TruckManagement = lazy(() => import('./components/TruckManagement'));
-const InvoiceList = lazy(() => import('./components/InvoiceList'));
-const PODUploadModal = lazy(() => import('./components/PODUploadModal'));
-const PasswordResetModal = lazy(() => import('./components/PasswordResetModal'));
-const RoleSelection = lazy(() => import('./components/RoleSelection'));
-const AdminPanel3D = lazy(() => import('./components/AdminPanel3D'));
-const GPSPanel = lazy(() => import('./components/GPSPanel'));
-const ReportsView = lazy(() => import('./components/ReportsView'));
-const SettingsModal = lazy(() => import('./components/SettingsModal'));
-const AccountingView = lazy(() => import('./components/AccountingView'));
+// Helper to auto-recover when a new deployment creates new chunk hashes
+function lazyRetry<T extends React.ComponentType<any>>(
+    factory: () => Promise<{ default: T }>
+) {
+    return lazy(async () => {
+        try {
+            return await factory();
+        } catch (error: any) {
+            const msg = error?.message || '';
+            const isChunkError =
+                msg.includes('Failed to fetch dynamically imported module') ||
+                msg.includes('Importing a module script failed') ||
+                msg.includes('error loading dynamically imported module');
+
+            const lastReload = sessionStorage.getItem('chunk_retry_reload');
+            const now = Date.now();
+            if (isChunkError && (!lastReload || now - parseInt(lastReload, 10) > 10000)) {
+                sessionStorage.setItem('chunk_retry_reload', now.toString());
+                window.location.reload();
+            }
+            throw error;
+        }
+    });
+}
+
+// Heavy components — lazy loaded with auto-retry
+const VehicleHiring = lazyRetry(() => import('./components/VehicleHiring'));
+const BookingRegister = lazyRetry(() => import('./components/BookingRegister'));
+const DataManagement = lazyRetry(() => import('./components/DataManagement'));
+const PartyManagement = lazyRetry(() => import('./components/PartyManagement'));
+const TruckManagement = lazyRetry(() => import('./components/TruckManagement'));
+const InvoiceList = lazyRetry(() => import('./components/InvoiceList'));
+const PODUploadModal = lazyRetry(() => import('./components/PODUploadModal'));
+const PasswordResetModal = lazyRetry(() => import('./components/PasswordResetModal'));
+const RoleSelection = lazyRetry(() => import('./components/RoleSelection'));
+const AdminPanel3D = lazyRetry(() => import('./components/AdminPanel3D'));
+const GPSPanel = lazyRetry(() => import('./components/GPSPanel'));
+const ReportsView = lazyRetry(() => import('./components/ReportsView'));
+const SettingsModal = lazyRetry(() => import('./components/SettingsModal'));
+const AccountingView = lazyRetry(() => import('./components/AccountingView'));
 import {
     LorryReceipt,
     CompanyDetails,

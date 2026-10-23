@@ -7,6 +7,15 @@
     <title>Bilty Book</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
+      // Automatically reload page when a new deployment invalidates cached chunk hashes
+      window.addEventListener('vite:preloadError', (event) => {
+        const lastReload = sessionStorage.getItem('vite_preload_reload');
+        const now = Date.now();
+        if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+          sessionStorage.setItem('vite_preload_reload', now.toString());
+          window.location.reload();
+        }
+      });
       tailwind.config = {
         theme: {
           extend: {

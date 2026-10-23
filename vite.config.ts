@@ -42,9 +42,7 @@ export default defineConfig(({ mode }) => {
               if (id.includes('xlsx')) return 'xlsx';
               // Google AI
               if (id.includes('@google/genai')) return 'genai';
-              // React core — must come before generic 'vendor' check
-              if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/react-hot-toast/') || id.includes('/scheduler/')) return 'react-vendor';
-              // All other vendor libs
+              // All vendor libs
               if (id.includes('node_modules')) return 'vendor';
             }
           }

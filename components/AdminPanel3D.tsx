@@ -395,6 +395,101 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
         return () => sub.unsubscribe();
     }, []);
 
+    // Accounts list & mapping for multi-tenant / multi-account management
+    const userAccounts = useMemo(() => {
+        const list: {
+            id: string;
+            email: string;
+            role: string;
+            label: string;
+            total_lrs: number;
+            total_trucks: number;
+            total_parties: number;
+            total_vouchers: number;
+            created_at?: string;
+        }[] = [];
+
+        const addedIds = new Set<string>();
+
+        // 1. Current user account
+        if (currentUser) {
+            const isSuper = currentUser.email === 'admin@ssk.com' || propIsSuperAdmin;
+            addedIds.add(currentUser.id);
+            list.push({
+                id: currentUser.id,
+                email: currentUser.email || 'admin@ssk.com',
+                role: isSuper ? 'Super Admin' : 'Admin',
+                label: `${currentUser.email || 'admin@ssk.com'} (${isSuper ? 'Super Admin' : 'Admin'})`,
+                total_lrs: allLRs.filter((l) => l.user_id === currentUser.id).length,
+                total_trucks: allTrucks.filter((t) => t.user_id === currentUser.id).length,
+                total_parties: allParties.filter((p) => p.user_id === currentUser.id).length,
+                total_vouchers: allVouchers.filter((v) => v.user_id === currentUser.id).length,
+                created_at: currentUser.created_at,
+            });
+        }
+
+        // 2. Operators / System Users
+        operators.forEach((op) => {
+            const opId = op.operator_id || op.id;
+            if (opId && !addedIds.has(opId)) {
+                addedIds.add(opId);
+                const email = op.email || companyEmailMap[opId] || `user_${opId.slice(0, 6)}@ssk.com`;
+                list.push({
+                    id: opId,
+                    email,
+                    role: op.role || 'Operator',
+                    label: `${email} (${op.role || 'Operator'})`,
+                    total_lrs: op.total_lrs !== undefined ? op.total_lrs : allLRs.filter((l) => l.user_id === opId).length,
+                    total_trucks: op.total_trucks !== undefined ? op.total_trucks : allTrucks.filter((t) => t.user_id === opId).length,
+                    total_parties: op.total_parties !== undefined ? op.total_parties : allParties.filter((p) => p.user_id === opId).length,
+                    total_vouchers: op.total_vouchers !== undefined ? op.total_vouchers : allVouchers.filter((v) => v.user_id === opId).length,
+                    created_at: op.created_at,
+                });
+            }
+        });
+
+        // 3. Any additional accounts found in allLRs, allTrucks, allParties, or companyEmailMap
+        const checkAndAdd = (userId?: string) => {
+            if (!userId || addedIds.has(userId)) return;
+            addedIds.add(userId);
+            const resolvedEmail = companyEmailMap[userId] || `user_${userId.slice(0, 6)}@ssk.com`;
+            list.push({
+                id: userId,
+                email: resolvedEmail,
+                role: 'User',
+                label: `${resolvedEmail} (User)`,
+                total_lrs: allLRs.filter((l) => l.user_id === userId).length,
+                total_trucks: allTrucks.filter((t) => t.user_id === userId).length,
+                total_parties: allParties.filter((p) => p.user_id === userId).length,
+                total_vouchers: allVouchers.filter((v) => v.user_id === userId).length,
+            });
+        };
+
+        allLRs.forEach((lr) => checkAndAdd(lr.user_id));
+        allTrucks.forEach((t) => checkAndAdd(t.user_id));
+        allParties.forEach((p) => checkAndAdd(p.user_id));
+        allVouchers.forEach((v) => checkAndAdd(v.user_id));
+        Object.keys(companyEmailMap).forEach((uid) => checkAndAdd(uid));
+
+        return list;
+    }, [currentUser, operators, allLRs, allTrucks, allParties, allVouchers, companyEmailMap, propIsSuperAdmin]);
+
+    const filteredUserAccounts = useMemo(() => {
+        return userAccounts.filter((u) => {
+            if (!userSearchQuery.trim()) return true;
+            const q = userSearchQuery.toLowerCase();
+            return u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+        });
+    }, [userAccounts, userSearchQuery]);
+
+    const getUserEmailById = (uid?: string) => {
+        if (!uid) return currentUser?.email || 'admin@ssk.com';
+        const match = userAccounts.find((u) => u.id === uid);
+        if (match) return match.email;
+        if (companyEmailMap[uid]) return companyEmailMap[uid];
+        return `user_${uid.slice(0, 6)}@ssk.com`;
+    };
+
     // Summary calculations (reacts dynamically to selectedAccountFilter)
     const stats = useMemo(() => {
         const targetLRs = selectedAccountFilter === 'ALL' ? allLRs : allLRs.filter((l) => l.user_id === selectedAccountFilter);
@@ -416,7 +511,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
             totalParties: targetParties.length,
             totalVouchers: targetVouchers.length,
         };
-    }, [allLRs, allVouchers, allTrucks, allParties, userAccounts.length, selectedAccountFilter]);
+    }, [allLRs, allVouchers, allTrucks, allParties, userAccounts, selectedAccountFilter]);
 
     // Global Power Search matches
     const searchResults = useMemo(() => {
@@ -465,101 +560,6 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
 
         return { matchedLRs, matchedTrucks, matchedParties, matchedVouchers, matchedUsers };
     }, [globalSearch, allLRs, allTrucks, allParties, allVouchers, operators]);
-
-    // Accounts list & mapping for multi-tenant / multi-account management
-    const userAccounts = useMemo(() => {
-        const list: {
-            id: string;
-            email: string;
-            role: string;
-            label: string;
-            total_lrs: number;
-            total_trucks: number;
-            total_parties: number;
-            total_vouchers: number;
-            created_at?: string;
-        }[] = [];
-
-        const addedIds = new Set<string>();
-
-        // 1. Current user account
-        if (currentUser) {
-            const isSuper = currentUser.email === 'admin@ssk.com' || propIsSuperAdmin;
-            addedIds.add(currentUser.id);
-            list.push({
-                id: currentUser.id,
-                email: currentUser.email || 'admin@ssk.com',
-                role: isSuper ? 'Super Admin' : 'Admin',
-                label: `${currentUser.email || 'admin@ssk.com'} (${isSuper ? 'Super Admin' : 'Admin'})`,
-                total_lrs: allLRs.filter(l => l.user_id === currentUser.id).length,
-                total_trucks: allTrucks.filter(t => t.user_id === currentUser.id).length,
-                total_parties: allParties.filter(p => p.user_id === currentUser.id).length,
-                total_vouchers: allVouchers.filter(v => v.user_id === currentUser.id).length,
-                created_at: currentUser.created_at,
-            });
-        }
-
-        // 2. Operators / System Users
-        operators.forEach((op) => {
-            const opId = op.operator_id || op.id;
-            if (opId && !addedIds.has(opId)) {
-                addedIds.add(opId);
-                const email = op.email || companyEmailMap[opId] || `user_${opId.slice(0, 6)}@ssk.com`;
-                list.push({
-                    id: opId,
-                    email,
-                    role: op.role || 'Operator',
-                    label: `${email} (${op.role || 'Operator'})`,
-                    total_lrs: op.total_lrs !== undefined ? op.total_lrs : allLRs.filter(l => l.user_id === opId).length,
-                    total_trucks: op.total_trucks !== undefined ? op.total_trucks : allTrucks.filter(t => t.user_id === opId).length,
-                    total_parties: op.total_parties !== undefined ? op.total_parties : allParties.filter(p => p.user_id === opId).length,
-                    total_vouchers: op.total_vouchers !== undefined ? op.total_vouchers : allVouchers.filter(v => v.user_id === opId).length,
-                    created_at: op.created_at,
-                });
-            }
-        });
-
-        // 3. Any additional accounts found in allLRs, allTrucks, allParties, or companyEmailMap
-        const checkAndAdd = (userId?: string) => {
-            if (!userId || addedIds.has(userId)) return;
-            addedIds.add(userId);
-            const resolvedEmail = companyEmailMap[userId] || `user_${userId.slice(0, 6)}@ssk.com`;
-            list.push({
-                id: userId,
-                email: resolvedEmail,
-                role: 'User',
-                label: `${resolvedEmail} (User)`,
-                total_lrs: allLRs.filter(l => l.user_id === userId).length,
-                total_trucks: allTrucks.filter(t => t.user_id === userId).length,
-                total_parties: allParties.filter(p => p.user_id === userId).length,
-                total_vouchers: allVouchers.filter(v => v.user_id === userId).length,
-            });
-        };
-
-        allLRs.forEach(lr => checkAndAdd(lr.user_id));
-        allTrucks.forEach(t => checkAndAdd(t.user_id));
-        allParties.forEach(p => checkAndAdd(p.user_id));
-        allVouchers.forEach(v => checkAndAdd(v.user_id));
-        Object.keys(companyEmailMap).forEach(uid => checkAndAdd(uid));
-
-        return list;
-    }, [currentUser, operators, allLRs, allTrucks, allParties, allVouchers, companyEmailMap, propIsSuperAdmin]);
-
-    const filteredUserAccounts = useMemo(() => {
-        return userAccounts.filter((u) => {
-            if (!userSearchQuery.trim()) return true;
-            const q = userSearchQuery.toLowerCase();
-            return u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
-        });
-    }, [userAccounts, userSearchQuery]);
-
-    const getUserEmailById = (uid?: string) => {
-        if (!uid) return currentUser?.email || 'admin@ssk.com';
-        const match = userAccounts.find((u) => u.id === uid);
-        if (match) return match.email;
-        if (companyEmailMap[uid]) return companyEmailMap[uid];
-        return `user_${uid.slice(0, 6)}@ssk.com`;
-    };
 
     // Filtered LRs
     const filteredLRs = useMemo(() => {

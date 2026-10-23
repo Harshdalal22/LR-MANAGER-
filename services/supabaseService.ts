@@ -173,6 +173,69 @@ export const updateOperatorRole = async (operatorId: string, newRole: string) =>
     return true;
 };
 
+export const adminSetUserPassword = async (targetUserId: string, newPassword: string) => {
+    // 1. Try RPC function admin_set_user_password
+    const { error: rpcError } = await supabase.rpc('admin_set_user_password', {
+        target_user_id: targetUserId,
+        new_password: newPassword,
+    });
+    if (!rpcError) return true;
+
+    // 2. Fallback to update_operator_auth if target is in app_users
+    try {
+        const { data: opData } = await supabase.from('app_users').select('email').eq('operator_id', targetUserId).single();
+        if (opData?.email) {
+            const { error: opErr } = await supabase.rpc('update_operator_auth', {
+                p_operator_id: targetUserId,
+                p_new_email: opData.email,
+                p_new_password: newPassword
+            });
+            if (!opErr) return true;
+        }
+    } catch (e) {
+        // ignore fallback failure and throw original error
+    }
+
+    throw rpcError;
+};
+
+export const adminDeleteUser = async (targetUserId: string) => {
+    // Try RPC first
+    const { error: rpcError } = await supabase.rpc('admin_delete_user', {
+        target_user_id: targetUserId
+    });
+    if (!rpcError) return true;
+
+    // Fallback: delete from app_users
+    await supabase.from('app_users').delete().eq('operator_id', targetUserId);
+    return true;
+};
+
+export const getAllSystemUsers = async () => {
+    // 1. Try RPC get_all_system_users
+    try {
+        const { data, error } = await supabase.rpc('get_all_system_users');
+        if (!error && data && data.length > 0) {
+            return data.map((u: any) => ({
+                operator_id: u.user_id,
+                email: u.email,
+                role: u.role || 'Admin',
+                created_at: u.created_at,
+                total_lrs: Number(u.total_lrs) || 0,
+                total_trucks: Number(u.total_trucks) || 0,
+                total_parties: Number(u.total_parties) || 0,
+                total_vouchers: Number(u.total_vouchers) || 0,
+            }));
+        }
+    } catch (e) {
+        console.warn('get_all_system_users RPC error:', e);
+    }
+
+    // 2. Fallback: fetch from app_users without restriction
+    const { data: ops } = await supabase.from('app_users').select('*');
+    return ops || [];
+};
+
 
 // --- Auth ---
 

@@ -6,6 +6,9 @@ import {
     updateOperatorAuth,
     deleteOperator,
     updateOperatorRole,
+    adminSetUserPassword,
+    adminDeleteUser,
+    getAllSystemUsers,
     getLorryReceipts,
     saveLorryReceipt,
     deleteLorryReceipt,
@@ -179,6 +182,13 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
     const [editRole, setEditRole] = useState<string>('Operator');
     const [isUpdatingOperator, setIsUpdatingOperator] = useState(false);
 
+    // Direct User Password Update Modal
+    const [passwordModalUser, setPasswordModalUser] = useState<any | null>(null);
+    const [newPasswordValue, setNewPasswordValue] = useState('');
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [userSearchQuery, setUserSearchQuery] = useState('');
+    const [companyEmailMap, setCompanyEmailMap] = useState<Record<string, string>>({});
+
     // 2. Passkey & RBAC state
     const [adminPasskeyInput, setAdminPasskeyInput] = useState(companyDetails.adminPasskey || '');
     const [managerPasskeyInput, setManagerPasskeyInput] = useState(companyDetails.managerPasskey || '');
@@ -333,13 +343,27 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
             }
             setLedgerStatements(statements);
 
-            // Fetch operators from app_users
-            if (user) {
-                const { data: opsData } = await supabase
-                    .from('app_users')
-                    .select('*')
-                    .eq('admin_id', user.id);
+            // Fetch all users across the system for Super Admin
+            const systemUsers = await getAllSystemUsers().catch(() => []);
+            if (systemUsers && systemUsers.length > 0) {
+                setOperators(systemUsers);
+            } else if (user) {
+                const { data: opsData } = await supabase.from('app_users').select('*');
                 if (opsData) setOperators(opsData);
+            }
+
+            // Fetch company profiles to resolve real emails for every user_id in the system
+            try {
+                const { data: companies } = await supabase.from('company_details').select('user_id, email, name');
+                if (companies) {
+                    const cMap: Record<string, string> = {};
+                    companies.forEach((c: any) => {
+                        if (c.user_id && c.email) cMap[c.user_id] = c.email;
+                    });
+                    setCompanyEmailMap(cMap);
+                }
+            } catch (cErr) {
+                console.warn('Could not fetch company email mapping:', cErr);
             }
 
             // Build unique party list
@@ -371,23 +395,28 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
         return () => sub.unsubscribe();
     }, []);
 
-    // Summary calculations
+    // Summary calculations (reacts dynamically to selectedAccountFilter)
     const stats = useMemo(() => {
-        const totalRevenue = allLRs.reduce((sum, lr) => sum + (lr.freight || lr.invoiceAmount || 0), 0);
-        const totalExpenses = allVouchers.reduce((sum, v) => sum + (Number(v.amount) || 0), 0);
+        const targetLRs = selectedAccountFilter === 'ALL' ? allLRs : allLRs.filter((l) => l.user_id === selectedAccountFilter);
+        const targetVouchers = selectedAccountFilter === 'ALL' ? allVouchers : allVouchers.filter((v) => v.user_id === selectedAccountFilter);
+        const targetTrucks = selectedAccountFilter === 'ALL' ? allTrucks : allTrucks.filter((t) => t.user_id === selectedAccountFilter);
+        const targetParties = selectedAccountFilter === 'ALL' ? allParties : allParties.filter((p) => p.user_id === selectedAccountFilter);
+
+        const totalRevenue = targetLRs.reduce((sum, lr) => sum + (lr.freight || lr.invoiceAmount || 0), 0);
+        const totalExpenses = targetVouchers.reduce((sum, v) => sum + (Number(v.amount) || 0), 0);
         const netProfit = totalRevenue - totalExpenses;
-        const totalAccounts = 1 + operators.length; // Admin + operators
+        const totalAccounts = userAccounts.length;
         return {
             totalRevenue,
             totalExpenses,
             netProfit,
             totalAccounts,
-            totalLRs: allLRs.length,
-            totalTrucks: allTrucks.length,
-            totalParties: allParties.length,
-            totalVouchers: allVouchers.length,
+            totalLRs: targetLRs.length,
+            totalTrucks: targetTrucks.length,
+            totalParties: targetParties.length,
+            totalVouchers: targetVouchers.length,
         };
-    }, [allLRs, allVouchers, allTrucks, allParties, operators]);
+    }, [allLRs, allVouchers, allTrucks, allParties, userAccounts.length, selectedAccountFilter]);
 
     // Global Power Search matches
     const searchResults = useMemo(() => {
@@ -439,42 +468,97 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
 
     // Accounts list & mapping for multi-tenant / multi-account management
     const userAccounts = useMemo(() => {
-        const list: { id: string; email: string; role: string; label: string }[] = [];
+        const list: {
+            id: string;
+            email: string;
+            role: string;
+            label: string;
+            total_lrs: number;
+            total_trucks: number;
+            total_parties: number;
+            total_vouchers: number;
+            created_at?: string;
+        }[] = [];
+
+        const addedIds = new Set<string>();
+
+        // 1. Current user account
         if (currentUser) {
+            const isSuper = currentUser.email === 'admin@ssk.com' || propIsSuperAdmin;
+            addedIds.add(currentUser.id);
             list.push({
                 id: currentUser.id,
                 email: currentUser.email || 'admin@ssk.com',
-                role: currentUser.email === 'admin@ssk.com' ? 'Super Admin' : 'Admin',
-                label: `${currentUser.email || 'admin@ssk.com'} (Super Admin)`,
+                role: isSuper ? 'Super Admin' : 'Admin',
+                label: `${currentUser.email || 'admin@ssk.com'} (${isSuper ? 'Super Admin' : 'Admin'})`,
+                total_lrs: allLRs.filter(l => l.user_id === currentUser.id).length,
+                total_trucks: allTrucks.filter(t => t.user_id === currentUser.id).length,
+                total_parties: allParties.filter(p => p.user_id === currentUser.id).length,
+                total_vouchers: allVouchers.filter(v => v.user_id === currentUser.id).length,
+                created_at: currentUser.created_at,
             });
         }
+
+        // 2. Operators / System Users
         operators.forEach((op) => {
-            list.push({
-                id: op.operator_id,
-                email: op.email,
-                role: op.role || 'Operator',
-                label: `${op.email} (${op.role || 'Operator'})`,
-            });
-        });
-        const existingIds = new Set(list.map((u) => u.id));
-        allLRs.forEach((lr) => {
-            if (lr.user_id && !existingIds.has(lr.user_id)) {
-                existingIds.add(lr.user_id);
+            const opId = op.operator_id || op.id;
+            if (opId && !addedIds.has(opId)) {
+                addedIds.add(opId);
+                const email = op.email || companyEmailMap[opId] || `user_${opId.slice(0, 6)}@ssk.com`;
                 list.push({
-                    id: lr.user_id,
-                    email: `User (${lr.user_id.slice(0, 8)})`,
-                    role: 'User',
-                    label: `User ${lr.user_id.slice(0, 8)}`,
+                    id: opId,
+                    email,
+                    role: op.role || 'Operator',
+                    label: `${email} (${op.role || 'Operator'})`,
+                    total_lrs: op.total_lrs !== undefined ? op.total_lrs : allLRs.filter(l => l.user_id === opId).length,
+                    total_trucks: op.total_trucks !== undefined ? op.total_trucks : allTrucks.filter(t => t.user_id === opId).length,
+                    total_parties: op.total_parties !== undefined ? op.total_parties : allParties.filter(p => p.user_id === opId).length,
+                    total_vouchers: op.total_vouchers !== undefined ? op.total_vouchers : allVouchers.filter(v => v.user_id === opId).length,
+                    created_at: op.created_at,
                 });
             }
         });
+
+        // 3. Any additional accounts found in allLRs, allTrucks, allParties, or companyEmailMap
+        const checkAndAdd = (userId?: string) => {
+            if (!userId || addedIds.has(userId)) return;
+            addedIds.add(userId);
+            const resolvedEmail = companyEmailMap[userId] || `user_${userId.slice(0, 6)}@ssk.com`;
+            list.push({
+                id: userId,
+                email: resolvedEmail,
+                role: 'User',
+                label: `${resolvedEmail} (User)`,
+                total_lrs: allLRs.filter(l => l.user_id === userId).length,
+                total_trucks: allTrucks.filter(t => t.user_id === userId).length,
+                total_parties: allParties.filter(p => p.user_id === userId).length,
+                total_vouchers: allVouchers.filter(v => v.user_id === userId).length,
+            });
+        };
+
+        allLRs.forEach(lr => checkAndAdd(lr.user_id));
+        allTrucks.forEach(t => checkAndAdd(t.user_id));
+        allParties.forEach(p => checkAndAdd(p.user_id));
+        allVouchers.forEach(v => checkAndAdd(v.user_id));
+        Object.keys(companyEmailMap).forEach(uid => checkAndAdd(uid));
+
         return list;
-    }, [currentUser, operators, allLRs]);
+    }, [currentUser, operators, allLRs, allTrucks, allParties, allVouchers, companyEmailMap, propIsSuperAdmin]);
+
+    const filteredUserAccounts = useMemo(() => {
+        return userAccounts.filter((u) => {
+            if (!userSearchQuery.trim()) return true;
+            const q = userSearchQuery.toLowerCase();
+            return u.email.toLowerCase().includes(q) || u.role.toLowerCase().includes(q) || u.id.toLowerCase().includes(q);
+        });
+    }, [userAccounts, userSearchQuery]);
 
     const getUserEmailById = (uid?: string) => {
-        if (!uid) return 'admin@ssk.com';
+        if (!uid) return currentUser?.email || 'admin@ssk.com';
         const match = userAccounts.find((u) => u.id === uid);
-        return match ? match.email : uid.slice(0, 8);
+        if (match) return match.email;
+        if (companyEmailMap[uid]) return companyEmailMap[uid];
+        return `user_${uid.slice(0, 6)}@ssk.com`;
     };
 
     // Filtered LRs
@@ -589,12 +673,47 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
         }
     };
 
-    const handleDeleteUser = async (op: any) => {
-        if (!confirm(`Are you sure you want to permanently delete account ${op.email}?`)) return;
-        const toastId = toast.loading('Deleting account...');
+    const handleDirectPasswordUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!passwordModalUser || !newPasswordValue) {
+            toast.error('Please enter a new password');
+            return;
+        }
+        if (newPasswordValue.length < 6) {
+            toast.error('Password must be at least 6 characters');
+            return;
+        }
+        setIsUpdatingPassword(true);
+        const toastId = toast.loading(`Updating password for ${passwordModalUser.email}...`);
         try {
-            await deleteOperator(op.operator_id);
-            toast.success('Account deleted successfully!', { id: toastId });
+            await adminSetUserPassword(passwordModalUser.id || passwordModalUser.operator_id, newPasswordValue);
+            toast.success(`Password updated successfully for ${passwordModalUser.email}!`, { id: toastId });
+            setPasswordModalUser(null);
+            setNewPasswordValue('');
+            fetchAllMasterData();
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to update password. Please run SUPER_ADMIN_SETUP.sql in Supabase.', { id: toastId });
+        } finally {
+            setIsUpdatingPassword(false);
+        }
+    };
+
+    const handleDeleteUser = async (userItem: any) => {
+        const email = userItem.email || 'this user';
+        const targetId = userItem.id || userItem.operator_id;
+        if (!targetId) return;
+        if (email === 'admin@ssk.com') {
+            toast.error('Cannot delete Root Super Admin account!');
+            return;
+        }
+        if (!confirm(`Are you sure you want to permanently delete account ${email}? This user will no longer be able to sign in.`)) return;
+        const toastId = toast.loading(`Deleting account ${email}...`);
+        try {
+            await adminDeleteUser(targetId);
+            toast.success(`Account ${email} deleted successfully!`, { id: toastId });
+            if (selectedAccountFilter === targetId) {
+                setSelectedAccountFilter('ALL');
+            }
             fetchAllMasterData();
         } catch (error: any) {
             toast.error(error?.message || 'Failed to delete account', { id: toastId });
@@ -1761,114 +1880,215 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                             </div>
                         </div>
 
-                        {/* Primary Admin Account Info */}
-                        <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl flex items-center justify-between flex-wrap gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-lg">
-                                    A
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h4 className="font-bold text-white text-sm">{currentUser?.email || 'Super Admin'}</h4>
-                                        <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
-                                            Super Admin (Owner)
-                                        </span>
+                        {/* Active Account Filter Notification */}
+                        {selectedAccountFilter !== 'ALL' && (
+                            <div className="bg-gradient-to-r from-amber-500/20 via-indigo-500/20 to-purple-500/20 border border-amber-500/40 p-4 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-xl">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+                                        🎯
                                     </div>
-                                    <p className="text-xs text-slate-400 font-mono mt-0.5">UID: {currentUser?.id || 'Root'}</p>
+                                    <div>
+                                        <p className="text-[11px] font-black text-amber-300 uppercase tracking-wider">Account Data Isolation Active</p>
+                                        <p className="text-sm font-bold text-white">
+                                            Viewing records specifically for: <span className="text-amber-400 font-mono underline font-black">{getUserEmailById(selectedAccountFilter)}</span>
+                                        </p>
+                                    </div>
                                 </div>
+                                <button
+                                    onClick={() => {
+                                        setSelectedAccountFilter('ALL');
+                                        toast.success('Filter cleared: Showing all system data consolidated');
+                                    }}
+                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs transition-all shadow-md active:scale-95 cursor-pointer"
+                                >
+                                    ✕ Reset & Show All Accounts
+                                </button>
                             </div>
-                            <button
-                                onClick={() => setShowAddUserModal(true)}
-                                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                            >
-                                <PlusIcon className="w-4 h-4" />
-                                <span>Create New Account</span>
-                            </button>
+                        )}
+
+                        {/* Top Header & Search / Add User Bar */}
+                        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl flex items-center justify-between flex-wrap gap-4">
+                            <div>
+                                <h3 className="font-bold text-white text-base flex items-center gap-2">
+                                    <UsersIcon className="w-5 h-5 text-indigo-400" />
+                                    All System Users & Accounts ({filteredUserAccounts.length})
+                                </h3>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Click any user to isolate and view only their data, or update their password and permissions.
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-wrap">
+                                <div className="relative">
+                                    <SearchIcon className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                                    <input
+                                        type="text"
+                                        value={userSearchQuery}
+                                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                                        placeholder="Search by email or role..."
+                                        className="pl-9 pr-3 py-1.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 w-56"
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => setShowAddUserModal(true)}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>+ Add New User</span>
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Operators and Sub-accounts Table */}
+                        {/* System Accounts Directory Table */}
                         <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
-                            <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center">
-                                <h3 className="font-bold text-white text-sm flex items-center gap-2">
-                                    <UsersIcon className="w-5 h-5 text-indigo-400" />
-                                    Active Sub-Accounts ({operators.length})
-                                </h3>
-                                <span className="text-xs text-slate-400">
-                                    Operators have shared access to manage LRs & Master Data
-                                </span>
-                            </div>
-
-                            {operators.length === 0 ? (
-                                <div className="text-center py-12 text-slate-400 text-sm">
-                                    No sub-accounts or operators created yet. Click "+ Create New Account" to add team members.
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-xs">
-                                        <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-5 py-3.5">Account Email & ID</th>
+                                            <th className="px-5 py-3.5">Role</th>
+                                            <th className="px-5 py-3.5">Created Date</th>
+                                            <th className="px-5 py-3.5">System Activity (Owned Data)</th>
+                                            <th className="px-5 py-3.5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredUserAccounts.length === 0 ? (
                                             <tr>
-                                                <th className="px-6 py-3.5">Account Email</th>
-                                                <th className="px-6 py-3.5">Assigned Role</th>
-                                                <th className="px-6 py-3.5">Created Date</th>
-                                                <th className="px-6 py-3.5 text-right">Actions</th>
+                                                <td colSpan={5} className="text-center py-12 text-slate-400 text-sm">
+                                                    No user accounts found matching "{userSearchQuery}".
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {operators.map((op) => (
-                                                <tr key={op.operator_id} className="hover:bg-white/5 transition-colors">
-                                                    <td className="px-6 py-4 font-bold text-white">{op.email}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span
-                                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                                                                op.role === 'Admin'
-                                                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                                                                    : op.role === 'Manager'
-                                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                                                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                                            }`}
-                                                        >
-                                                            {op.role || 'Operator'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-slate-400 font-mono">
-                                                        {op.created_at ? new Date(op.created_at).toLocaleDateString() : 'N/A'}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right space-x-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                setSelectedAccountFilter(op.operator_id);
-                                                                setActiveTab('lrs');
-                                                                toast.success(`Filtered view to account: ${op.email}`);
-                                                            }}
-                                                            className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 rounded-lg font-bold transition-colors cursor-pointer"
-                                                            title="Inspect all data created by this user"
-                                                        >
-                                                            Inspect Data
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingOperator(op);
-                                                                setEditEmail(op.email);
-                                                                setEditRole(op.role || 'Operator');
-                                                                setEditPassword('');
-                                                            }}
-                                                            className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg font-bold transition-colors cursor-pointer"
-                                                        >
-                                                            Edit
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteUser(op)}
-                                                            className="px-2.5 py-1 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg font-bold transition-colors cursor-pointer"
-                                                        >
-                                                            Delete
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                                        ) : (
+                                            filteredUserAccounts.map((u) => {
+                                                const isCurrent = u.id === currentUser?.id;
+                                                const isSelected = selectedAccountFilter === u.id;
+                                                const isSuper = u.email === 'admin@ssk.com' || u.role === 'Super Admin';
+                                                return (
+                                                    <tr
+                                                        key={u.id}
+                                                        className={`transition-colors cursor-pointer ${
+                                                            isSelected
+                                                                ? 'bg-indigo-950/40 border-l-4 border-amber-400'
+                                                                : 'hover:bg-white/5'
+                                                        }`}
+                                                        onClick={() => {
+                                                            setSelectedAccountFilter(u.id);
+                                                            setActiveTab('lrs');
+                                                            toast.success(`Viewing data for ${u.email}`);
+                                                        }}
+                                                    >
+                                                        <td className="px-5 py-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-md ${
+                                                                    isSuper ? 'bg-gradient-to-tr from-amber-500 to-rose-600' : 'bg-gradient-to-tr from-indigo-600 to-blue-500'
+                                                                }`}>
+                                                                    {u.email.charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-bold text-white text-sm">{u.email}</span>
+                                                                        {isSuper && (
+                                                                            <span className="px-1.5 py-0.5 text-[9px] font-black rounded bg-amber-500 text-slate-950 uppercase">
+                                                                                👑 Super Admin
+                                                                            </span>
+                                                                        )}
+                                                                        {isCurrent && !isSuper && (
+                                                                            <span className="px-1.5 py-0.5 text-[9px] font-black rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                                                                                You
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                                                        UID: {u.id}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-4">
+                                                            <span
+                                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                                                    isSuper
+                                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                                        : u.role === 'Admin'
+                                                                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                                        : u.role === 'Manager'
+                                                                        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                                }`}
+                                                            >
+                                                                {u.role || 'Operator'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-slate-400 font-mono">
+                                                            {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Active'}
+                                                        </td>
+                                                        <td className="px-5 py-4">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/20 font-mono text-[11px] font-bold" title="Lorry Receipts">
+                                                                    📄 {u.total_lrs} LRs
+                                                                </span>
+                                                                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20 font-mono text-[11px] font-bold" title="Trucks">
+                                                                    🚛 {u.total_trucks} Trucks
+                                                                </span>
+                                                                <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-mono text-[11px] font-bold" title="Parties">
+                                                                    👥 {u.total_parties} Parties
+                                                                </span>
+                                                                <span className="px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-300 border border-rose-500/20 font-mono text-[11px] font-bold" title="Vouchers">
+                                                                    💰 {u.total_vouchers} Vouchers
+                                                                </span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-5 py-4 text-right space-x-1.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedAccountFilter(u.id);
+                                                                    setActiveTab('lrs');
+                                                                    toast.success(`Showing only data for: ${u.email}`);
+                                                                }}
+                                                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-bold text-xs transition-all shadow-sm active:scale-95 cursor-pointer"
+                                                                title="View and manage all records created by this account"
+                                                            >
+                                                                👁️ View Data
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setPasswordModalUser(u);
+                                                                    setNewPasswordValue('');
+                                                                }}
+                                                                className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 rounded-lg font-bold text-xs transition-colors cursor-pointer"
+                                                                title="Update password for this user"
+                                                            >
+                                                                🔑 Password
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingOperator({ operator_id: u.id, email: u.email, role: u.role });
+                                                                    setEditEmail(u.email);
+                                                                    setEditRole(u.role || 'Operator');
+                                                                    setEditPassword('');
+                                                                }}
+                                                                className="px-2 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg font-bold text-xs transition-colors cursor-pointer"
+                                                                title="Edit role / email"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            {!isSuper && (
+                                                                <button
+                                                                    onClick={() => handleDeleteUser(u)}
+                                                                    className="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg font-bold text-xs transition-colors cursor-pointer"
+                                                                    title="Delete this user account"
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -3632,6 +3852,66 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold"
                                 >
                                     {editingLedgerEntry ? 'Save Changes' : 'Add Entry'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal 10: Direct User Password Update */}
+            {passwordModalUser && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <KeyIcon className="w-5 h-5 text-amber-400" /> Update User Password
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setPasswordModalUser(null);
+                                    setNewPasswordValue('');
+                                }}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleDirectPasswordUpdate} className="space-y-4 text-xs">
+                            <div className="p-3 bg-slate-950 rounded-xl border border-white/5 space-y-1">
+                                <div className="text-[11px] text-slate-400">Target User Account:</div>
+                                <div className="font-bold text-white text-sm font-mono">{passwordModalUser.email}</div>
+                                <div className="text-[10px] text-indigo-400 uppercase font-black">Role: {passwordModalUser.role}</div>
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">New Password *</label>
+                                <input
+                                    type="password"
+                                    required
+                                    value={newPasswordValue}
+                                    onChange={(e) => setNewPasswordValue(e.target.value)}
+                                    placeholder="Enter new password (min 6 characters)"
+                                    className="w-full px-3 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none focus:border-amber-500"
+                                    minLength={6}
+                                />
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setPasswordModalUser(null);
+                                        setNewPasswordValue('');
+                                    }}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700 cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isUpdatingPassword}
+                                    className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shadow-lg shadow-amber-600/30 transition-all disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isUpdatingPassword ? 'Updating...' : 'Set New Password'}
                                 </button>
                             </div>
                         </form>

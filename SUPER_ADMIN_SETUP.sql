@@ -139,3 +139,41 @@ BEGIN
   ORDER BY au.created_at DESC;
 END;
 $$;
+
+-- 11. RPC function to allow admin@ssk.com to update ANY user's password directly
+CREATE OR REPLACE FUNCTION public.admin_set_user_password(target_user_id uuid, new_password text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Only admin@ssk.com can update user passwords';
+  END IF;
+
+  UPDATE auth.users
+  SET encrypted_password = crypt(new_password, gen_salt('bf')),
+      updated_at = now()
+  WHERE id = target_user_id;
+
+  RETURN true;
+END;
+$$;
+
+-- 12. RPC function to allow admin@ssk.com to delete ANY user completely
+CREATE OR REPLACE FUNCTION public.admin_delete_user(target_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NOT public.is_super_admin() THEN
+    RAISE EXCEPTION 'Access Denied: Only admin@ssk.com can delete users';
+  END IF;
+
+  DELETE FROM public.app_users WHERE operator_id = target_user_id;
+  DELETE FROM auth.users WHERE id = target_user_id;
+
+  RETURN true;
+END;
+$$;

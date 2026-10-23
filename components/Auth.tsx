@@ -412,9 +412,24 @@ const Auth: React.FC = () => {
 
                             {/* Email Field */}
                             <div>
-                                <label htmlFor="email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 ml-1">
-                                    {view === 'manager_request' ? "✉️ Your Manager Email" : "✉️ Account Email Address"}
-                                </label>
+                                <div className="flex justify-between items-center mb-1.5 ml-1">
+                                    <label htmlFor="email" className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                        {view === 'manager_request' ? "✉️ Your Manager Email" : "✉️ Account Email Address"}
+                                    </label>
+                                    {view === 'sign_in' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setEmail('admin@ssk.com');
+                                                triggerBadgeFeedback('Selected Super Admin (admin@ssk.com)');
+                                            }}
+                                            className="text-[10px] font-black text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-2 py-0.5 rounded-lg border border-amber-500/30 transition-all flex items-center gap-1 cursor-pointer"
+                                            title="Quick Fill Super Admin Email"
+                                        >
+                                            👑 Super Admin (admin@ssk.com)
+                                        </button>
+                                    )}
+                                </div>
                                 <input
                                     id="email"
                                     name="email"

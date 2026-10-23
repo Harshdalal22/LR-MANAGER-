@@ -96,7 +96,7 @@ export const checkOperatorRole = async () => {
     return { isAdmin: true, role: 'Admin', adminId: user.id };
 };
 
-export const createOperator = async (email: string, password: string) => {
+export const createOperator = async (email: string, password: string, role: string = 'Operator') => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Only an Admin can create an operator");
 
@@ -122,13 +122,14 @@ export const createOperator = async (email: string, password: string) => {
             operator_id: newUserData.user.id,
             admin_id: user.id,
             email: email,
-            role: 'Operator'
+            role: role || 'Operator'
         }]);
 
     if (insertError) throw insertError;
 
     return newUserData.user;
 };
+
 export const updateOperatorAuth = async (operatorId: string, newEmail: string, newPassword: string) => {
     // Ensure the current user is an admin
     const roleInfo = await checkOperatorRole();
@@ -143,6 +144,35 @@ export const updateOperatorAuth = async (operatorId: string, newEmail: string, n
     });
     if (error) throw error;
 };
+
+export const deleteOperator = async (operatorId: string) => {
+    const roleInfo = await checkOperatorRole();
+    if (roleInfo && !roleInfo.isAdmin) {
+        throw new Error("Access Denied: Operators cannot delete users.");
+    }
+
+    const { error } = await supabase
+        .from('app_users')
+        .delete()
+        .eq('operator_id', operatorId);
+    if (error) throw error;
+    return true;
+};
+
+export const updateOperatorRole = async (operatorId: string, newRole: string) => {
+    const roleInfo = await checkOperatorRole();
+    if (roleInfo && !roleInfo.isAdmin) {
+        throw new Error("Access Denied: Operators cannot modify roles.");
+    }
+
+    const { error } = await supabase
+        .from('app_users')
+        .update({ role: newRole })
+        .eq('operator_id', operatorId);
+    if (error) throw error;
+    return true;
+};
+
 
 // --- Auth ---
 
@@ -1007,6 +1037,9 @@ export const addVoucher = async (voucher: Partial<Voucher>) => {
         return data[0];
     }, 3, 2000);
 };
+
+export const saveVoucher = addVoucher;
+
 
 export const updateVoucher = async (id: string, voucherUpdates: Partial<Voucher>) => {
     return withRetry(async () => {

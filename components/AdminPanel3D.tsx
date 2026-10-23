@@ -1,7 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { toast } from 'react-hot-toast';
-import { createOperator, updateOperatorAuth, supabase, getLedgerEntries, subscribeToLedgerEntries, getLorryReceipts, getSavedParties, getSavedTrucks, getVouchers, getCompanyDetails, saveLedgerStatement, getLedgerStatements, deleteLedgerStatement } from '../services/supabaseService';
-import { LedgerEntry, LorryReceipt, SavedParty, Voucher, CompanyDetails, LedgerStatement } from '../types';
+import {
+    supabase,
+    createOperator,
+    updateOperatorAuth,
+    deleteOperator,
+    updateOperatorRole,
+    getLorryReceipts,
+    saveLorryReceipt,
+    deleteLorryReceipt,
+    updateLorryReceiptStatus,
+    getSavedParties,
+    saveSavedParty,
+    deleteSavedParty,
+    getSavedTrucks,
+    saveSavedTruck,
+    deleteSavedTruck,
+    getVouchers,
+    saveVoucher,
+    updateVoucher,
+    deleteVoucher,
+    getLedgerEntries,
+    addLedgerEntry,
+    updateLedgerEntry,
+    deleteLedgerEntry,
+    subscribeToLedgerEntries,
+    getCompanyDetails,
+    saveCompanyDetails,
+    saveLedgerStatement,
+    getLedgerStatements,
+    deleteLedgerStatement,
+    approveAccessRequest,
+    rejectAccessRequest,
+} from '../services/supabaseService';
+import {
+    LedgerEntry,
+    LorryReceipt,
+    SavedParty,
+    SavedTruck,
+    Voucher,
+    CompanyDetails,
+    LedgerStatement,
+    LRStatus,
+} from '../types';
 import {
     UsersIcon,
     CogIcon,
@@ -63,401 +104,466 @@ interface AdminPanel3DProps {
     onApproveManagerRequest?: (request: any) => void;
     onRejectManagerRequest?: (requestId: string) => void;
     onSignOut?: () => void;
+    isSuperAdmin?: boolean;
+    onSwitchToAppMode?: () => void;
 }
 
-interface StatCard3DProps {
-    title: string;
-    value: string | number;
-    icon: React.ReactElement;
-    trend?: 'up' | 'down' | 'neutral';
-    trendValue?: string;
-    color: 'blue' | 'purple' | 'green' | 'orange' | 'red' | 'pink' | 'indigo' | 'teal';
-    delay?: number;
-}
+type AdminTab = 'overview' | 'users' | 'lrs' | 'trucks' | 'parties' | 'vouchers' | 'ledger' | 'system';
 
-interface ActionCardProps {
-    title: string;
-    description: string;
-    icon: React.ReactElement;
-    onClick: () => void;
-    color: 'blue' | 'purple' | 'green' | 'orange' | 'red' | 'pink' | 'indigo' | 'teal';
-    badge?: string;
-}
-
-interface ActivityItem {
-    id: string;
-    user: string;
-    action: string;
-    timestamp: string;
-    type: 'success' | 'warning' | 'error' | 'info';
-}
-
-// 3D Stat Card with Glassmorphism
-const StatCard3D: React.FC<StatCard3DProps> = ({ title, value, icon, trend, trendValue, color, delay = 0 }) => {
-    const [isHovered, setIsHovered] = useState(false);
-
-    const colorThemes = {
-        blue: {
-            gradient: 'from-blue-500 via-blue-600 to-indigo-600',
-            shadow: 'shadow-blue-500/50',
-            glow: 'group-hover:shadow-blue-500/70',
-            text: 'text-blue-600',
-            bg: 'bg-blue-500/10',
-            border: 'border-blue-500/20',
-        },
-        purple: {
-            gradient: 'from-purple-500 via-purple-600 to-pink-600',
-            shadow: 'shadow-purple-500/50',
-            glow: 'group-hover:shadow-purple-500/70',
-            text: 'text-purple-600',
-            bg: 'bg-purple-500/10',
-            border: 'border-purple-500/20',
-        },
-        green: {
-            gradient: 'from-emerald-500 via-green-600 to-teal-600',
-            shadow: 'shadow-green-500/50',
-            glow: 'group-hover:shadow-green-500/70',
-            text: 'text-green-600',
-            bg: 'bg-green-500/10',
-            border: 'border-green-500/20',
-        },
-        orange: {
-            gradient: 'from-orange-500 via-orange-600 to-red-500',
-            shadow: 'shadow-orange-500/50',
-            glow: 'group-hover:shadow-orange-500/70',
-            text: 'text-orange-600',
-            bg: 'bg-orange-500/10',
-            border: 'border-orange-500/20',
-        },
-        red: {
-            gradient: 'from-red-500 via-red-600 to-pink-600',
-            shadow: 'shadow-red-500/50',
-            glow: 'group-hover:shadow-red-500/70',
-            text: 'text-red-600',
-            bg: 'bg-red-500/10',
-            border: 'border-red-500/20',
-        },
-        pink: {
-            gradient: 'from-pink-500 via-pink-600 to-rose-600',
-            shadow: 'shadow-pink-500/50',
-            glow: 'group-hover:shadow-pink-500/70',
-            text: 'text-pink-600',
-            bg: 'bg-pink-500/10',
-            border: 'border-pink-500/20',
-        },
-        indigo: {
-            gradient: 'from-indigo-500 via-indigo-600 to-purple-600',
-            shadow: 'shadow-indigo-500/50',
-            glow: 'group-hover:shadow-indigo-500/70',
-            text: 'text-indigo-600',
-            bg: 'bg-indigo-500/10',
-            border: 'border-indigo-500/20',
-        },
-        teal: {
-            gradient: 'from-teal-500 via-teal-600 to-cyan-600',
-            shadow: 'shadow-teal-500/50',
-            glow: 'group-hover:shadow-teal-500/70',
-            text: 'text-teal-600',
-            bg: 'bg-teal-500/10',
-            border: 'border-teal-500/20',
-        },
-    };
-
-    const theme = colorThemes[color];
-
-    return (
-        <div
-            className={`group relative overflow-hidden rounded-3xl bg-white/80 backdrop-blur-xl border ${theme.border} 
-                       shadow-2xl ${theme.shadow} ${theme.glow} 
-                       transform transition-all duration-700 hover:scale-105 hover:-translate-y-2
-                       animate-fadeInUp`}
-            style={{ animationDelay: `${delay}ms` }}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-        >
-            {/* Animated gradient background */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${theme.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700`}></div>
-
-            {/* Floating orbs */}
-            <div className={`absolute -top-10 -right-10 w-40 h-40 bg-gradient-to-br ${theme.gradient} rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-700`}></div>
-            <div className={`absolute -bottom-10 -left-10 w-40 h-40 bg-gradient-to-tr ${theme.gradient} rounded-full blur-3xl opacity-20 group-hover:opacity-30 transition-opacity duration-700`}></div>
-
-            <div className="relative p-6 z-10">
-                {/* Icon with 3D effect */}
-                <div className={`inline-flex p-4 rounded-2xl bg-gradient-to-br ${theme.gradient} shadow-xl ${theme.shadow} 
-                               transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-6 mb-4`}>
-                    {React.cloneElement(icon, { className: 'w-8 h-8 text-white' })}
-                </div>
-
-                {/* Title */}
-                <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">{title}</h3>
-
-                {/* Value with counter animation */}
-                <div className="flex items-baseline gap-3">
-                    <p className={`text-4xl font-black ${theme.text} transition-all duration-300 ${isHovered ? 'scale-110' : ''}`}>
-                        {value}
-                    </p>
-
-                    {/* Trend indicator */}
-                    {trend && trendValue && (
-                        <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold
-                                       ${trend === 'up' ? 'bg-green-100 text-green-700' :
-                                trend === 'down' ? 'bg-red-100 text-red-700' :
-                                    'bg-gray-100 text-gray-700'}`}>
-                            {trend === 'up' ? <TrendingUpIcon className="w-3 h-3" /> :
-                                trend === 'down' ? <TrendingDownIcon className="w-3 h-3" /> : null}
-                            <span>{trendValue}</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* Shine effect on hover */}
-            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none
-                           bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 
-                           ${isHovered ? 'translate-x-full' : '-translate-x-full'}`}
-                style={{ transition: 'transform 1s ease-in-out' }}>
-            </div>
-        </div>
-    );
-};
-
-// Action Card with 3D depth
-const ActionCard: React.FC<ActionCardProps> = ({ title, description, icon, onClick, color, badge }) => {
-    const colorThemes = {
-        blue: 'from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700',
-        purple: 'from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700',
-        green: 'from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700',
-        orange: 'from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600',
-        red: 'from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700',
-        pink: 'from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700',
-        indigo: 'from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700',
-        teal: 'from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700',
-    };
-
-    return (
-        <div
-            onClick={onClick}
-            className="group relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-xl border border-gray-200/50
-                       shadow-xl hover:shadow-2xl transform transition-all duration-500 hover:scale-105 hover:-translate-y-1
-                       cursor-pointer"
-        >
-            {/* Badge */}
-            {badge && (
-                <div className="absolute top-4 right-4 z-20">
-                    <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full shadow-lg animate-pulse">
-                        {badge}
-                    </span>
-                </div>
-            )}
-
-            {/* Gradient overlay */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${colorThemes[color]} opacity-0 group-hover:opacity-10 transition-opacity duration-500`}></div>
-
-            <div className="relative p-6 z-10">
-                {/* Icon */}
-                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${colorThemes[color]} shadow-lg mb-4
-                               transform transition-all duration-500 group-hover:scale-110 group-hover:rotate-3`}>
-                    {React.cloneElement(icon, { className: 'w-6 h-6 text-white' })}
-                </div>
-
-                {/* Content */}
-                <h3 className="text-lg font-bold text-gray-800 mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
-                    {title}
-                </h3>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                    {description}
-                </p>
-            </div>
-
-            {/* Arrow indicator */}
-            <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300">
-                <ArrowRightIcon className="w-5 h-5 text-gray-400" />
-            </div>
-        </div>
-    );
-};
-
-// Activity Feed Item
-const ActivityFeedItem: React.FC<{ activity: ActivityItem }> = ({ activity }) => {
-    const typeStyles = {
-        success: { bg: 'bg-green-100', text: 'text-green-700', icon: <CheckCircleIcon className="w-4 h-4" /> },
-        warning: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: <ExclamationTriangleIcon className="w-4 h-4" /> },
-        error: { bg: 'bg-red-100', text: 'text-red-700', icon: <XCircleIcon className="w-4 h-4" /> },
-        info: { bg: 'bg-blue-100', text: 'text-blue-700', icon: <InfoIcon className="w-4 h-4" /> },
-    };
-
-    const style = typeStyles[activity.type];
-
-    return (
-        <div className="flex items-start gap-4 p-4 rounded-xl bg-white/50 backdrop-blur-sm border border-gray-100 hover:bg-white/80 transition-all duration-300 group">
-            <div className={`flex-shrink-0 p-2 rounded-lg ${style.bg} ${style.text}`}>
-                {style.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
-                    {activity.user}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">{activity.action}</p>
-                <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                    <ClockIcon className="w-3 h-3" />
-                    {activity.timestamp}
-                </p>
-            </div>
-        </div>
-    );
-};
-
-const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole, onSignOut }) => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'system' | 'analytics' | 'ledger'>('overview');
+const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
+    onClose,
+    currentRole,
+    companyDetails: propCompanyDetails,
+    onUpdateDetails,
+    onUploadAsset,
+    managerRequests = [],
+    onApproveManagerRequest,
+    onRejectManagerRequest,
+    onSignOut,
+    isSuperAdmin: propIsSuperAdmin,
+    onSwitchToAppMode,
+}) => {
+    // Top Tabs
+    const [activeTab, setActiveTab] = useState<AdminTab>('overview');
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [selectedAccountFilter, setSelectedAccountFilter] = useState<string>('ALL');
 
-    // Operator State
-    const [showAddUserModal, setShowAddUserModal] = useState(false);
-    const [operatorEmail, setOperatorEmail] = useState('');
-    const [operatorPassword, setOperatorPassword] = useState('');
-    const [isCreatingUser, setIsCreatingUser] = useState(false);
+    // Global Power Search
+    const [globalSearch, setGlobalSearch] = useState('');
+
+    // Master Datasets State
+    const [allLRs, setAllLRs] = useState<LorryReceipt[]>([]);
+    const [allParties, setAllParties] = useState<SavedParty[]>([]);
+    const [allTrucks, setAllTrucks] = useState<SavedTruck[]>([]);
+    const [allVouchers, setAllVouchers] = useState<Voucher[]>([]);
+    const [allLedgerEntries, setAllLedgerEntries] = useState<LedgerEntry[]>([]);
     const [operators, setOperators] = useState<any[]>([]);
-    const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+    const [currentUser, setCurrentUser] = useState<any>(null);
+    const [companyDetails, setCompanyDetails] = useState<CompanyDetails>(
+        propCompanyDetails || {
+            name: '',
+            logoUrl: '',
+            signatureImageUrl: '',
+            tagline: '',
+            address: '',
+            email: '',
+            web: '',
+            contact: [],
+            pan: '',
+            gstn: '',
+            bankDetails: { name: '', branch: '', accountNo: '', ifscCode: '' },
+            jurisdictionCity: '',
+            branchLocations: [],
+        }
+    );
+
+    // Filter States
+    const [lrFilterStatus, setLrFilterStatus] = useState<string>('ALL');
+    const [lrSearchQuery, setLrSearchQuery] = useState('');
+    const [truckSearchQuery, setTruckSearchQuery] = useState('');
+    const [partySearchQuery, setPartySearchQuery] = useState('');
+    const [voucherSearchQuery, setVoucherSearchQuery] = useState('');
+
+    // Modals & Editing States
+    // 1. Account / Operator Modals
+    const [showAddUserModal, setShowAddUserModal] = useState(false);
+    const [newUserEmail, setNewUserEmail] = useState('');
+    const [newUserPassword, setNewUserPassword] = useState('');
+    const [newUserRole, setNewUserRole] = useState<'Operator' | 'Manager' | 'Admin'>('Operator');
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
 
     const [editingOperator, setEditingOperator] = useState<any>(null);
     const [editEmail, setEditEmail] = useState('');
     const [editPassword, setEditPassword] = useState('');
+    const [editRole, setEditRole] = useState<string>('Operator');
     const [isUpdatingOperator, setIsUpdatingOperator] = useState(false);
 
-    const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
-    const [activeLRCount, setActiveLRCount] = useState(0);
-    const [totalRevenue, setTotalRevenue] = useState(0);
-    const [totalUsersCount, setTotalUsersCount] = useState(0);
+    // 2. Passkey & RBAC state
+    const [adminPasskeyInput, setAdminPasskeyInput] = useState(companyDetails.adminPasskey || '');
+    const [managerPasskeyInput, setManagerPasskeyInput] = useState(companyDetails.managerPasskey || '');
+    const [rbacEnabled, setRbacEnabled] = useState(companyDetails.rbacEnabled || false);
+    const [showAdminPasskey, setShowAdminPasskey] = useState(false);
+    const [showManagerPasskey, setShowManagerPasskey] = useState(false);
 
-    // Party Ledger State
-    const [allLRs, setAllLRs] = useState<LorryReceipt[]>([]);
-    const [allVouchers, setAllVouchers] = useState<Voucher[]>([]);
+    // 3. LR Modals
+    const [viewingLR, setViewingLR] = useState<LorryReceipt | null>(null);
+    const [editingLR, setEditingLR] = useState<LorryReceipt | null>(null);
+    const [showCreateLRModal, setShowCreateLRModal] = useState(false);
+    const [newLRData, setNewLRData] = useState<Partial<LorryReceipt>>({
+        lrNo: '',
+        date: new Date().toISOString().split('T')[0],
+        truckNo: '',
+        fromPlace: '',
+        toPlace: '',
+        weight: 0,
+        freight: 0,
+        status: 'Booked',
+        consignor: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+        consignee: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+        billingTo: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+        charges: { hamail: 0, surCharge: 0, stCharge: 0, collectionCharge: 0, ddCharge: 0, otherCharge: 0, riskCharge: 0 },
+        items: [{ description: 'Goods Consignment', pcs: 1, weight: 0 }],
+        rate: 0,
+        rateOn: 'Fixed',
+        remark: '',
+        lrType: 'Original',
+        invoiceNo: '',
+        invoiceAmount: 0,
+        invoiceDate: null,
+        poNo: '',
+        poDate: null,
+        ewayBillNo: '',
+        ewayBillDate: null,
+        ewayExDate: null,
+        addressOfDelivery: '',
+        chargedWeight: 0,
+        gstPaidBy: 'Consignor',
+        actualWeightMT: 0,
+    });
+
+    // 4. Truck Modals
+    const [showAddTruckModal, setShowAddTruckModal] = useState(false);
+    const [editingTruck, setEditingTruck] = useState<SavedTruck | null>(null);
+    const [newTruckData, setNewTruckData] = useState<Partial<SavedTruck>>({
+        truckNo: '',
+        ownerName: '',
+        contactNumber: '',
+        make: 'Tata Motors',
+        model: '',
+        truckType: 'Open Body',
+        capacity: '20 Ton',
+        fuelType: 'Diesel',
+        mileage: 4.5,
+        driverName: '',
+        driverContact: '',
+        fastagBalance: 0,
+        status: 'Active',
+    });
+
+    // 5. Party Modals
+    const [showAddPartyModal, setShowAddPartyModal] = useState(false);
+    const [editingParty, setEditingParty] = useState<SavedParty | null>(null);
+    const [newPartyData, setNewPartyData] = useState<Partial<SavedParty>>({
+        name: '',
+        type: 'Both',
+        contact: '',
+        city: '',
+        address: '',
+        gst: '',
+        pan: '',
+    });
+
+    // 6. Voucher Modals
+    const [showAddVoucherModal, setShowAddVoucherModal] = useState(false);
+    const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+    const [newVoucherData, setNewVoucherData] = useState<Partial<Voucher>>({
+        voucher_no: `VCH-${Date.now().toString().slice(-5)}`,
+        date: new Date().toISOString().split('T')[0],
+        party_name: '',
+        amount: 0,
+        payment_mode: 'Cash',
+        description: '',
+    });
+
+    // 7. Ledger Statement state
     const [partyList, setPartyList] = useState<string[]>([]);
     const [selectedPartyLedger, setSelectedPartyLedger] = useState<string>('');
     const [ledgerFromDate, setLedgerFromDate] = useState<string>('');
     const [ledgerToDate, setLedgerToDate] = useState<string>('');
-    const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
-    const [savedParties, setSavedParties] = useState<SavedParty[]>([]);
     const [ledgerStatements, setLedgerStatements] = useState<LedgerStatement[]>([]);
-    const [ledgerSubTab, setLedgerSubTab] = useState<'view' | 'saved'>('view');
+    const [ledgerSubTab, setLedgerSubTab] = useState<'view' | 'saved' | 'entries'>('view');
 
-    const fetchOperators = async () => {
-        setIsLoadingUsers(true);
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data, error } = await supabase
-                    .from('app_users')
-                    .select('*')
-                    .eq('admin_id', user.id);
-                if (error && error.code !== 'PGRST116') throw error;
-                if (data) setOperators(data);
-            }
-        } catch (error) {
-            console.error("Error fetching operators:", error);
-        } finally {
-            setIsLoadingUsers(false);
-        }
-    };
+    // 8. Raw Ledger entry modal
+    const [showAddLedgerEntryModal, setShowAddLedgerEntryModal] = useState(false);
+    const [editingLedgerEntry, setEditingLedgerEntry] = useState<LedgerEntry | null>(null);
+    const [newLedgerEntryData, setNewLedgerEntryData] = useState<Partial<LedgerEntry>>({
+        date: new Date().toISOString().split('T')[0],
+        party_name: '',
+        description: '',
+        credit: 0,
+        debit: 0,
+        payment_mode: 'Bank Transfer',
+        category: 'Freight / Invoice',
+    });
 
+    // Live clock
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(timer);
     }, []);
 
-    const fetchOverviewData = async () => {
-        try {
-            const [lrs, parties, trucks] = await Promise.all([
-                getLorryReceipts(),
-                getSavedParties(),
-                getSavedTrucks()
-            ]);
-            setActiveLRCount(lrs.length);
-            const revenue = lrs.reduce((acc: number, lr: LorryReceipt) => acc + (lr.invoiceAmount || lr.freight || 0), 0);
-            setTotalRevenue(revenue);
-            
-            const totalUsers = parties.length + trucks.length + operators.length;
-            setTotalUsersCount(totalUsers);
-        } catch (error) {
-            console.error("Error fetching overview stats:", error);
+    // Sync companyDetails prop
+    useEffect(() => {
+        if (propCompanyDetails) {
+            setCompanyDetails(propCompanyDetails);
+            setAdminPasskeyInput(propCompanyDetails.adminPasskey || '');
+            setManagerPasskeyInput(propCompanyDetails.managerPasskey || '');
+            setRbacEnabled(propCompanyDetails.rbacEnabled || false);
         }
-    };
+    }, [propCompanyDetails]);
 
-    const fetchLedgerData = async () => {
+    // Master Fetch Data
+    const fetchAllMasterData = async () => {
+        setIsRefreshing(true);
         try {
-            const [data, lrs, vouchers, parties, company] = await Promise.all([
-                getLedgerEntries(),
-                getLorryReceipts(),
-                getVouchers(),
-                getSavedParties(),
-                getCompanyDetails()
+            const { data: { user } } = await supabase.auth.getUser();
+            setCurrentUser(user);
+
+            const [lrs, parties, trucks, vouchers, ledger, company, statements] = await Promise.all([
+                getLorryReceipts().catch(() => []),
+                getSavedParties().catch(() => []),
+                getSavedTrucks().catch(() => []),
+                getVouchers().catch(() => []),
+                getLedgerEntries().catch(() => []),
+                getCompanyDetails().catch(() => null),
+                getLedgerStatements().catch(() => []),
             ]);
-            setLedgerEntries(data);
+
             setAllLRs(lrs);
+            setAllParties(parties);
+            setAllTrucks(trucks);
             setAllVouchers(vouchers);
-            setSavedParties(parties);
-            setCompanyDetails(company);
+            setAllLedgerEntries(ledger);
+            if (company) {
+                setCompanyDetails(company);
+                setAdminPasskeyInput(company.adminPasskey || '');
+                setManagerPasskeyInput(company.managerPasskey || '');
+                setRbacEnabled(company.rbacEnabled || false);
+            }
+            setLedgerStatements(statements);
 
-            // Build unique party name list from LRs + vouchers + saved parties
-            const namesFromLRs = lrs.flatMap(lr => [lr.consignor?.name, lr.consignee?.name, lr.billingTo?.name].filter(Boolean) as string[]);
-            const namesFromVouchers = vouchers.map(v => v.party_name).filter(Boolean) as string[];
-            const namesFromParties = parties.map(p => p.name).filter(Boolean) as string[];
-            const uniqueNames = Array.from(new Set([...namesFromParties, ...namesFromLRs, ...namesFromVouchers])).sort();
-            setPartyList(uniqueNames);
-        } catch (error) {
-            console.error("Error fetching ledger:", error);
-        }
-    };
+            // Fetch operators from app_users
+            if (user) {
+                const { data: opsData } = await supabase
+                    .from('app_users')
+                    .select('*')
+                    .eq('admin_id', user.id);
+                if (opsData) setOperators(opsData);
+            }
 
-    const loadLedgerStatements = async () => {
-        try {
-            const data = await getLedgerStatements();
-            setLedgerStatements(data);
-        } catch (err) {
-            console.error("Error loading statements:", err);
+            // Build unique party list
+            const lrNames = lrs.flatMap((l) => [l.consignor?.name, l.consignee?.name, l.billingTo?.name].filter(Boolean) as string[]);
+            const vchNames = vouchers.map((v) => v.party_name).filter(Boolean) as string[];
+            const pNames = parties.map((p) => p.name).filter(Boolean) as string[];
+            const unique = Array.from(new Set([...pNames, ...lrNames, ...vchNames])).sort();
+            setPartyList(unique);
+            if (!selectedPartyLedger && unique.length > 0) {
+                setSelectedPartyLedger(unique[0]);
+            }
+        } catch (error: any) {
+            console.error('Error fetching master data in admin panel:', error);
+            toast.error('Could not refresh some master data: ' + (error?.message || 'Error'));
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
     useEffect(() => {
-        if (activeTab === 'overview') {
-            fetchOverviewData();
-            fetchOperators(); // To get correct operator count
-        } else if (activeTab === 'ledger') {
-            fetchLedgerData();
-            loadLedgerStatements();
-        } else if (activeTab === 'users') {
-            fetchOperators();
-        }
-    }, [activeTab]);
-
-    useEffect(() => {
-        const subscription = subscribeToLedgerEntries((payload) => {
-            fetchLedgerData();
-        });
-        return () => {
-            subscription.unsubscribe();
-        };
+        fetchAllMasterData();
     }, []);
 
-    const handleCreateOperator = async (e: React.FormEvent) => {
+    // Subscribe to ledger entries
+    useEffect(() => {
+        const sub = subscribeToLedgerEntries(() => {
+            getLedgerEntries().then(setAllLedgerEntries).catch(console.error);
+        });
+        return () => sub.unsubscribe();
+    }, []);
+
+    // Summary calculations
+    const stats = useMemo(() => {
+        const totalRevenue = allLRs.reduce((sum, lr) => sum + (lr.freight || lr.invoiceAmount || 0), 0);
+        const totalExpenses = allVouchers.reduce((sum, v) => sum + (Number(v.amount) || 0), 0);
+        const netProfit = totalRevenue - totalExpenses;
+        const totalAccounts = 1 + operators.length; // Admin + operators
+        return {
+            totalRevenue,
+            totalExpenses,
+            netProfit,
+            totalAccounts,
+            totalLRs: allLRs.length,
+            totalTrucks: allTrucks.length,
+            totalParties: allParties.length,
+            totalVouchers: allVouchers.length,
+        };
+    }, [allLRs, allVouchers, allTrucks, allParties, operators]);
+
+    // Global Power Search matches
+    const searchResults = useMemo(() => {
+        const q = globalSearch.trim().toLowerCase();
+        if (!q) return null;
+
+        const matchedLRs = allLRs.filter(
+            (l) =>
+                l.lrNo?.toLowerCase().includes(q) ||
+                l.truckNo?.toLowerCase().includes(q) ||
+                l.consignor?.name?.toLowerCase().includes(q) ||
+                l.consignee?.name?.toLowerCase().includes(q) ||
+                l.invoiceNo?.toLowerCase().includes(q) ||
+                l.fromPlace?.toLowerCase().includes(q) ||
+                l.toPlace?.toLowerCase().includes(q)
+        ).slice(0, 5);
+
+        const matchedTrucks = allTrucks.filter(
+            (t) =>
+                t.truckNo?.toLowerCase().includes(q) ||
+                t.driverName?.toLowerCase().includes(q) ||
+                t.make?.toLowerCase().includes(q) ||
+                t.model?.toLowerCase().includes(q)
+        ).slice(0, 5);
+
+        const matchedParties = allParties.filter(
+            (p) =>
+                p.name?.toLowerCase().includes(q) ||
+                p.city?.toLowerCase().includes(q) ||
+                p.gst?.toLowerCase().includes(q) ||
+                p.contact?.toLowerCase().includes(q)
+        ).slice(0, 5);
+
+        const matchedVouchers = allVouchers.filter(
+            (v) =>
+                v.voucher_no?.toLowerCase().includes(q) ||
+                v.party_name?.toLowerCase().includes(q) ||
+                v.description?.toLowerCase().includes(q)
+        ).slice(0, 5);
+
+        const matchedUsers = operators.filter(
+            (u) =>
+                u.email?.toLowerCase().includes(q) ||
+                u.role?.toLowerCase().includes(q)
+        );
+
+        return { matchedLRs, matchedTrucks, matchedParties, matchedVouchers, matchedUsers };
+    }, [globalSearch, allLRs, allTrucks, allParties, allVouchers, operators]);
+
+    // Accounts list & mapping for multi-tenant / multi-account management
+    const userAccounts = useMemo(() => {
+        const list: { id: string; email: string; role: string; label: string }[] = [];
+        if (currentUser) {
+            list.push({
+                id: currentUser.id,
+                email: currentUser.email || 'admin@ssk.com',
+                role: currentUser.email === 'admin@ssk.com' ? 'Super Admin' : 'Admin',
+                label: `${currentUser.email || 'admin@ssk.com'} (Super Admin)`,
+            });
+        }
+        operators.forEach((op) => {
+            list.push({
+                id: op.operator_id,
+                email: op.email,
+                role: op.role || 'Operator',
+                label: `${op.email} (${op.role || 'Operator'})`,
+            });
+        });
+        const existingIds = new Set(list.map((u) => u.id));
+        allLRs.forEach((lr) => {
+            if (lr.user_id && !existingIds.has(lr.user_id)) {
+                existingIds.add(lr.user_id);
+                list.push({
+                    id: lr.user_id,
+                    email: `User (${lr.user_id.slice(0, 8)})`,
+                    role: 'User',
+                    label: `User ${lr.user_id.slice(0, 8)}`,
+                });
+            }
+        });
+        return list;
+    }, [currentUser, operators, allLRs]);
+
+    const getUserEmailById = (uid?: string) => {
+        if (!uid) return 'admin@ssk.com';
+        const match = userAccounts.find((u) => u.id === uid);
+        return match ? match.email : uid.slice(0, 8);
+    };
+
+    // Filtered LRs
+    const filteredLRs = useMemo(() => {
+        return allLRs.filter((lr) => {
+            if (selectedAccountFilter !== 'ALL' && lr.user_id !== selectedAccountFilter) return false;
+            if (lrFilterStatus !== 'ALL' && lr.status !== lrFilterStatus) return false;
+            if (lrSearchQuery.trim()) {
+                const q = lrSearchQuery.toLowerCase();
+                const match =
+                    lr.lrNo?.toLowerCase().includes(q) ||
+                    lr.truckNo?.toLowerCase().includes(q) ||
+                    lr.consignor?.name?.toLowerCase().includes(q) ||
+                    lr.consignee?.name?.toLowerCase().includes(q) ||
+                    lr.invoiceNo?.toLowerCase().includes(q) ||
+                    lr.fromPlace?.toLowerCase().includes(q) ||
+                    lr.toPlace?.toLowerCase().includes(q);
+                if (!match) return false;
+            }
+            return true;
+        });
+    }, [allLRs, lrFilterStatus, lrSearchQuery, selectedAccountFilter]);
+
+    // Filtered Trucks
+    const filteredTrucks = useMemo(() => {
+        return allTrucks.filter((t) => {
+            if (selectedAccountFilter !== 'ALL' && t.user_id !== selectedAccountFilter) return false;
+            if (!truckSearchQuery.trim()) return true;
+            const q = truckSearchQuery.toLowerCase();
+            return (
+                t.truckNo?.toLowerCase().includes(q) ||
+                t.driverName?.toLowerCase().includes(q) ||
+                t.make?.toLowerCase().includes(q) ||
+                t.model?.toLowerCase().includes(q) ||
+                t.truckType?.toLowerCase().includes(q)
+            );
+        });
+    }, [allTrucks, truckSearchQuery, selectedAccountFilter]);
+
+    // Filtered Parties
+    const filteredParties = useMemo(() => {
+        return allParties.filter((p) => {
+            if (selectedAccountFilter !== 'ALL' && p.user_id !== selectedAccountFilter) return false;
+            if (!partySearchQuery.trim()) return true;
+            const q = partySearchQuery.toLowerCase();
+            return (
+                p.name?.toLowerCase().includes(q) ||
+                p.city?.toLowerCase().includes(q) ||
+                p.gst?.toLowerCase().includes(q) ||
+                p.contact?.toLowerCase().includes(q)
+            );
+        });
+    }, [allParties, partySearchQuery, selectedAccountFilter]);
+
+    // Filtered Vouchers
+    const filteredVouchers = useMemo(() => {
+        return allVouchers.filter((v) => {
+            if (selectedAccountFilter !== 'ALL' && v.user_id !== selectedAccountFilter) return false;
+            if (!voucherSearchQuery.trim()) return true;
+            const q = voucherSearchQuery.toLowerCase();
+            return (
+                v.voucher_no?.toLowerCase().includes(q) ||
+                v.party_name?.toLowerCase().includes(q) ||
+                v.description?.toLowerCase().includes(q) ||
+                v.payment_mode?.toLowerCase().includes(q)
+            );
+        });
+    }, [allVouchers, voucherSearchQuery, selectedAccountFilter]);
+
+    // ==========================================
+    // CRUD Handlers for Accounts & Users
+    // ==========================================
+    const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (operators.length >= 2) {
-            toast.error("You can only create up to 2 operators.");
+        if (!newUserEmail || !newUserPassword) {
+            toast.error('Email and password required');
             return;
         }
-        
         setIsCreatingUser(true);
-        const toastId = toast.loading('Creating operator...');
+        const toastId = toast.loading('Creating account...');
         try {
-            await createOperator(operatorEmail, operatorPassword);
-            toast.success("Operator created successfully!", { id: toastId });
+            await createOperator(newUserEmail, newUserPassword, newUserRole);
+            toast.success(`Account created with role: ${newUserRole}!`, { id: toastId });
             setShowAddUserModal(false);
-            setOperatorEmail('');
-            setOperatorPassword('');
-            fetchOperators();
+            setNewUserEmail('');
+            setNewUserPassword('');
+            fetchAllMasterData();
         } catch (error: any) {
-            toast.error(error.message || "Failed to create operator.", { id: toastId });
+            toast.error(error?.message || 'Failed to create user', { id: toastId });
         } finally {
             setIsCreatingUser(false);
         }
@@ -466,1049 +572,3072 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({ onClose, currentRole, onSig
     const handleUpdateOperator = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingOperator) return;
-
         setIsUpdatingOperator(true);
-        const toastId = toast.loading('Updating operator...');
+        const toastId = toast.loading('Updating user credentials...');
         try {
             await updateOperatorAuth(editingOperator.operator_id, editEmail, editPassword);
-            toast.success("Operator updated successfully!", { id: toastId });
+            if (editRole !== editingOperator.role) {
+                await updateOperatorRole(editingOperator.operator_id, editRole);
+            }
+            toast.success('Account updated successfully!', { id: toastId });
             setEditingOperator(null);
-            setEditEmail('');
-            setEditPassword('');
-            fetchOperators();
+            fetchAllMasterData();
         } catch (error: any) {
-            toast.error(error.message || "Failed to update operator.", { id: toastId });
+            toast.error(error?.message || 'Failed to update account', { id: toastId });
         } finally {
             setIsUpdatingOperator(false);
         }
     };
 
-    // Mock data
-    const recentActivities: ActivityItem[] = [
-        { id: '1', user: 'Rajesh Kumar', action: 'Created new LR #LR-2024-001', timestamp: '2 minutes ago', type: 'success' },
-        { id: '2', user: 'Priya Sharma', action: 'Updated truck details MH-12-AB-1234', timestamp: '15 minutes ago', type: 'info' },
-        { id: '3', user: 'System', action: 'Database backup completed', timestamp: '1 hour ago', type: 'success' },
-        { id: '4', user: 'Amit Patel', action: 'Failed login attempt detected', timestamp: '2 hours ago', type: 'warning' },
-        { id: '5', user: 'Sneha Reddy', action: 'Generated monthly invoice report', timestamp: '3 hours ago', type: 'info' },
-    ];
+    const handleDeleteUser = async (op: any) => {
+        if (!confirm(`Are you sure you want to permanently delete account ${op.email}?`)) return;
+        const toastId = toast.loading('Deleting account...');
+        try {
+            await deleteOperator(op.operator_id);
+            toast.success('Account deleted successfully!', { id: toastId });
+            fetchAllMasterData();
+        } catch (error: any) {
+            toast.error(error?.message || 'Failed to delete account', { id: toastId });
+        }
+    };
+
+    const handleSavePasskeys = async () => {
+        const toastId = toast.loading('Saving Passkeys & RBAC configuration...');
+        try {
+            const updated: CompanyDetails = {
+                ...companyDetails,
+                adminPasskey: adminPasskeyInput.trim(),
+                managerPasskey: managerPasskeyInput.trim(),
+                rbacEnabled: rbacEnabled,
+            };
+            if (onUpdateDetails) {
+                await onUpdateDetails(updated);
+            } else {
+                await saveCompanyDetails(updated);
+            }
+            setCompanyDetails(updated);
+            toast.success('Security & Passkey settings updated!', { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to update passkeys: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // CRUD Handlers for Lorry Receipts (LRs)
+    // ==========================================
+    const handleQuickStatusChange = async (lrNo: string, newStatus: LRStatus) => {
+        const toastId = toast.loading(`Updating LR #${lrNo} status to ${newStatus}...`);
+        try {
+            await updateLorryReceiptStatus(lrNo, newStatus);
+            setAllLRs((prev) =>
+                prev.map((lr) =>
+                    lr.lrNo === lrNo ? { ...lr, status: newStatus, status_updated_at: new Date().toISOString() } : lr
+                )
+            );
+            toast.success(`LR #${lrNo} is now ${newStatus}!`, { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to update status: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleDeleteLRRecord = async (lrNo: string) => {
+        if (!confirm(`Are you sure you want to delete LR #${lrNo}? This cannot be undone.`)) return;
+        const toastId = toast.loading(`Deleting LR #${lrNo}...`);
+        try {
+            await deleteLorryReceipt(lrNo);
+            setAllLRs((prev) => prev.filter((lr) => lr.lrNo !== lrNo));
+            toast.success(`LR #${lrNo} permanently deleted.`, { id: toastId });
+            if (viewingLR?.lrNo === lrNo) setViewingLR(null);
+            if (editingLR?.lrNo === lrNo) setEditingLR(null);
+        } catch (error: any) {
+            toast.error('Failed to delete LR: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleSaveEditedLR = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLR) return;
+        const toastId = toast.loading(`Saving changes to LR #${editingLR.lrNo}...`);
+        try {
+            await saveLorryReceipt(editingLR);
+            setAllLRs((prev) => prev.map((lr) => (lr.lrNo === editingLR.lrNo ? editingLR : lr)));
+            toast.success(`LR #${editingLR.lrNo} updated successfully!`, { id: toastId });
+            setEditingLR(null);
+        } catch (error: any) {
+            toast.error('Failed to save LR: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleCreateNewLR = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newLRData.lrNo || !newLRData.truckNo) {
+            toast.error('LR Number and Truck Number are required!');
+            return;
+        }
+        const toastId = toast.loading(`Creating LR #${newLRData.lrNo}...`);
+        try {
+            const lrToSave = newLRData as LorryReceipt;
+            await saveLorryReceipt(lrToSave);
+            setAllLRs((prev) => [lrToSave, ...prev]);
+            toast.success(`LR #${lrToSave.lrNo} created successfully!`, { id: toastId });
+            setShowCreateLRModal(false);
+            setNewLRData({
+                lrNo: '',
+                date: new Date().toISOString().split('T')[0],
+                truckNo: '',
+                fromPlace: '',
+                toPlace: '',
+                weight: 0,
+                freight: 0,
+                status: 'Booked',
+                consignor: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+                consignee: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+                billingTo: { name: '', address: '', city: '', contact: '', pan: '', gst: '' },
+                charges: { hamail: 0, surCharge: 0, stCharge: 0, collectionCharge: 0, ddCharge: 0, otherCharge: 0, riskCharge: 0 },
+                items: [{ description: 'Goods Consignment', pcs: 1, weight: 0 }],
+                rate: 0,
+                rateOn: 'Fixed',
+                remark: '',
+                lrType: 'Original',
+            });
+        } catch (error: any) {
+            toast.error('Failed to create LR: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // CRUD Handlers for Trucks / Garage
+    // ==========================================
+    const handleSaveNewTruck = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newTruckData.truckNo) {
+            toast.error('Truck Number is required');
+            return;
+        }
+        const toastId = toast.loading('Adding truck to garage...');
+        try {
+            await saveSavedTruck(newTruckData as SavedTruck);
+            const freshTrucks = await getSavedTrucks();
+            setAllTrucks(freshTrucks);
+            toast.success(`Truck ${newTruckData.truckNo} saved to Garage!`, { id: toastId });
+            setShowAddTruckModal(false);
+            setNewTruckData({
+                truckNo: '',
+                ownerName: '',
+                contactNumber: '',
+                make: 'Tata Motors',
+                model: '',
+                truckType: 'Open Body',
+                capacity: '20 Ton',
+                fuelType: 'Diesel',
+                mileage: 4.5,
+                driverName: '',
+                driverContact: '',
+                fastagBalance: 0,
+                status: 'Active',
+            });
+        } catch (error: any) {
+            toast.error('Failed to save truck: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleUpdateTruck = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTruck) return;
+        const toastId = toast.loading(`Updating Truck ${editingTruck.truckNo}...`);
+        try {
+            await saveSavedTruck(editingTruck);
+            const fresh = await getSavedTrucks();
+            setAllTrucks(fresh);
+            toast.success(`Truck ${editingTruck.truckNo} updated!`, { id: toastId });
+            setEditingTruck(null);
+        } catch (error: any) {
+            toast.error('Failed to update truck: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleDeleteTruckRecord = async (t: SavedTruck) => {
+        if (!confirm(`Are you sure you want to delete truck ${t.truckNo}?`)) return;
+        const toastId = toast.loading(`Deleting truck ${t.truckNo}...`);
+        try {
+            await deleteSavedTruck(t.id || '', t.truckNo);
+            setAllTrucks((prev) => prev.filter((x) => x.id !== t.id && x.truckNo !== t.truckNo));
+            toast.success(`Truck ${t.truckNo} deleted.`, { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to delete truck: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // CRUD Handlers for Parties
+    // ==========================================
+    const handleSaveNewParty = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newPartyData.name) {
+            toast.error('Party name is required');
+            return;
+        }
+        const toastId = toast.loading('Saving new party...');
+        try {
+            await saveSavedParty(newPartyData as SavedParty);
+            const fresh = await getSavedParties();
+            setAllParties(fresh);
+            toast.success(`Party ${newPartyData.name} saved!`, { id: toastId });
+            setShowAddPartyModal(false);
+            setNewPartyData({ name: '', type: 'Both', contact: '', city: '', address: '', gst: '', pan: '' });
+        } catch (error: any) {
+            toast.error('Failed to save party: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleUpdateParty = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingParty) return;
+        const toastId = toast.loading(`Updating ${editingParty.name}...`);
+        try {
+            await saveSavedParty(editingParty);
+            const fresh = await getSavedParties();
+            setAllParties(fresh);
+            toast.success(`Party ${editingParty.name} updated!`, { id: toastId });
+            setEditingParty(null);
+        } catch (error: any) {
+            toast.error('Failed to update party: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleDeletePartyRecord = async (party: SavedParty) => {
+        if (!confirm(`Are you sure you want to delete party ${party.name}?`)) return;
+        const toastId = toast.loading(`Deleting ${party.name}...`);
+        try {
+            await deleteSavedParty(party.id || '');
+            setAllParties((prev) => prev.filter((p) => p.id !== party.id));
+            toast.success(`Party ${party.name} deleted.`, { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to delete party: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // CRUD Handlers for Vouchers & Expenses
+    // ==========================================
+    const handleSaveNewVoucher = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newVoucherData.voucher_no || !newVoucherData.amount) {
+            toast.error('Voucher No and Amount are required');
+            return;
+        }
+        const toastId = toast.loading('Recording voucher...');
+        try {
+            await saveVoucher(newVoucherData as Voucher);
+            const fresh = await getVouchers();
+            setAllVouchers(fresh);
+            toast.success(`Voucher #${newVoucherData.voucher_no} recorded!`, { id: toastId });
+            setShowAddVoucherModal(false);
+            setNewVoucherData({
+                voucher_no: `VCH-${Date.now().toString().slice(-5)}`,
+                date: new Date().toISOString().split('T')[0],
+                party_name: '',
+                amount: 0,
+                payment_mode: 'Cash',
+                description: '',
+            });
+        } catch (error: any) {
+            toast.error('Failed to record voucher: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleUpdateVoucher = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingVoucher || !editingVoucher.id) return;
+        const toastId = toast.loading(`Updating voucher #${editingVoucher.voucher_no}...`);
+        try {
+            await updateVoucher(editingVoucher.id, editingVoucher);
+            const fresh = await getVouchers();
+            setAllVouchers(fresh);
+            toast.success(`Voucher #${editingVoucher.voucher_no} updated!`, { id: toastId });
+            setEditingVoucher(null);
+        } catch (error: any) {
+            toast.error('Failed to update voucher: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleDeleteVoucherRecord = async (voucher: Voucher) => {
+        if (!confirm(`Are you sure you want to delete voucher #${voucher.voucher_no}?`)) return;
+        const toastId = toast.loading(`Deleting voucher #${voucher.voucher_no}...`);
+        try {
+            await deleteVoucher(voucher.id || '');
+            setAllVouchers((prev) => prev.filter((v) => v.id !== voucher.id));
+            toast.success(`Voucher #${voucher.voucher_no} deleted.`, { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to delete voucher: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // CRUD Handlers for Raw Ledger Entries
+    // ==========================================
+    const handleSaveNewLedgerEntry = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const toastId = toast.loading('Adding ledger entry...');
+        try {
+            await addLedgerEntry(newLedgerEntryData);
+            const fresh = await getLedgerEntries();
+            setAllLedgerEntries(fresh);
+            toast.success('Ledger transaction added!', { id: toastId });
+            setShowAddLedgerEntryModal(false);
+            setNewLedgerEntryData({
+                date: new Date().toISOString().split('T')[0],
+                party_name: '',
+                description: '',
+                credit: 0,
+                debit: 0,
+                payment_mode: 'Bank Transfer',
+                category: 'Freight / Invoice',
+            });
+        } catch (error: any) {
+            toast.error('Failed to add entry: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleUpdateLedgerEntry = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingLedgerEntry || !editingLedgerEntry.id) return;
+        const toastId = toast.loading('Updating ledger transaction...');
+        try {
+            await updateLedgerEntry(editingLedgerEntry.id, editingLedgerEntry);
+            const fresh = await getLedgerEntries();
+            setAllLedgerEntries(fresh);
+            toast.success('Ledger transaction updated!', { id: toastId });
+            setEditingLedgerEntry(null);
+        } catch (error: any) {
+            toast.error('Failed to update entry: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleDeleteLedgerEntryRecord = async (id?: string) => {
+        if (!id) return;
+        if (!confirm('Are you sure you want to delete this ledger transaction?')) return;
+        const toastId = toast.loading('Deleting transaction...');
+        try {
+            await deleteLedgerEntry(id);
+            setAllLedgerEntries((prev) => prev.filter((e) => e.id !== id));
+            toast.success('Transaction deleted.', { id: toastId });
+        } catch (error: any) {
+            toast.error('Failed to delete entry: ' + (error?.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ==========================================
+    // Full System Database Backup & Export
+    // ==========================================
+    const handleExportFullDatabaseJSON = () => {
+        const fullBackup = {
+            exportTimestamp: new Date().toISOString(),
+            app: 'SSK Bilty Book / LR Manager',
+            companyDetails,
+            stats,
+            accounts: operators.map((o) => ({ id: o.operator_id, email: o.email, role: o.role, created_at: o.created_at })),
+            lorryReceipts: allLRs,
+            trucks: allTrucks,
+            parties: allParties,
+            vouchers: allVouchers,
+            ledgerEntries: allLedgerEntries,
+        };
+
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(fullBackup, null, 2))}`;
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute('href', jsonString);
+        downloadAnchor.setAttribute('download', `FULL_SYSTEM_BACKUP_${new Date().toISOString().slice(0, 10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        toast.success('Complete Database JSON exported successfully!');
+    };
+
+    const handleClearLocalStorageCache = () => {
+        try {
+            localStorage.removeItem('bilty_cached_lrs');
+            localStorage.removeItem('bilty_cached_parties');
+            localStorage.removeItem('bilty_cached_trucks');
+            localStorage.removeItem('bilty_lr_draft_new');
+            toast.success('Local cache cleared! Re-syncing from cloud...');
+            fetchAllMasterData();
+        } catch (e: any) {
+            toast.error('Failed to clear cache: ' + e?.message);
+        }
+    };
+
+    // PDF Statement Export for Ledger
+    const handleExportLedgerPDF = () => {
+        import('jspdf').then(({ default: jsPDF }) => {
+            import('jspdf-autotable').then(({ default: autoTable }) => {
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.getWidth();
+
+                // 1. Company Header
+                doc.setFontSize(20);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(41, 128, 185);
+                doc.text((companyDetails.name || 'SSK CARGO SERVICES').toUpperCase(), pageWidth / 2, 18, { align: 'center' });
+
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(70, 70, 70);
+                doc.text(companyDetails.address || '', pageWidth / 2, 24, { align: 'center', maxWidth: pageWidth - 30 });
+
+                const contacts = (companyDetails.contact || []).join(' | ');
+                const headerLine = [contacts ? `Mob: ${contacts}` : '', companyDetails.email ? `Email: ${companyDetails.email}` : '', companyDetails.gstn ? `GST: ${companyDetails.gstn}` : ''].filter(Boolean).join('  •  ');
+                doc.text(headerLine, pageWidth / 2, 30, { align: 'center' });
+
+                doc.setDrawColor(41, 128, 185);
+                doc.setLineWidth(0.5);
+                doc.line(14, 34, pageWidth - 14, 34);
+
+                // 2. Party & Statement Title
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(20, 20, 20);
+                doc.text('STATEMENT OF ACCOUNT', 14, 42);
+
+                doc.setFontSize(10);
+                doc.text(`Party: ${selectedPartyLedger || 'All Parties'}`, 14, 48);
+
+                const partyObj = allParties.find((p) => p.name === selectedPartyLedger);
+                let curY = 53;
+                if (partyObj) {
+                    doc.setFont('helvetica', 'normal');
+                    if (partyObj.city) doc.text(`City: ${partyObj.city}`, 14, curY);
+                    if (partyObj.gst) doc.text(`GSTN: ${partyObj.gst}`, pageWidth / 2, curY);
+                    curY += 6;
+                }
+
+                // 3. Ledger Rows Computation
+                type RowItem = { date: string; desc: string; type: string; ref: string; cr: number; dr: number; bal: number };
+                const rows: RowItem[] = [];
+
+                // Filter LRs for this party
+                allLRs
+                    .filter((lr) => {
+                        if (selectedPartyLedger && selectedPartyLedger !== 'ALL') {
+                            const isP = lr.consignor?.name === selectedPartyLedger || lr.consignee?.name === selectedPartyLedger || lr.billingTo?.name === selectedPartyLedger;
+                            if (!isP) return false;
+                        }
+                        if (ledgerFromDate && new Date(lr.date) < new Date(ledgerFromDate)) return false;
+                        if (ledgerToDate && new Date(lr.date) > new Date(ledgerToDate)) return false;
+                        return true;
+                    })
+                    .forEach((lr) => {
+                        rows.push({
+                            date: lr.date,
+                            desc: `Freight Bill: ${lr.fromPlace} -> ${lr.toPlace} (${lr.truckNo})`,
+                            type: 'Invoice (Credit)',
+                            ref: lr.lrNo,
+                            cr: Number(lr.freight || lr.invoiceAmount) || 0,
+                            dr: 0,
+                            bal: 0,
+                        });
+                    });
+
+                // Filter Vouchers
+                allVouchers
+                    .filter((v) => {
+                        if (selectedPartyLedger && selectedPartyLedger !== 'ALL' && v.party_name !== selectedPartyLedger) return false;
+                        if (ledgerFromDate && new Date(v.date) < new Date(ledgerFromDate)) return false;
+                        if (ledgerToDate && new Date(v.date) > new Date(ledgerToDate)) return false;
+                        return true;
+                    })
+                    .forEach((v) => {
+                        rows.push({
+                            date: v.date,
+                            desc: v.description || 'Voucher Payment / Expense',
+                            type: 'Voucher (Debit)',
+                            ref: v.voucher_no,
+                            cr: 0,
+                            dr: Number(v.amount) || 0,
+                            bal: 0,
+                        });
+                    });
+
+                // Sort by date
+                rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+                let runBal = 0;
+                rows.forEach((r) => {
+                    runBal += r.cr - r.dr;
+                    r.bal = runBal;
+                });
+
+                const totalCr = rows.reduce((s, r) => s + r.cr, 0);
+                const totalDr = rows.reduce((s, r) => s + r.dr, 0);
+                const netBal = totalCr - totalDr;
+
+                // Summary Box
+                doc.setDrawColor(210, 210, 210);
+                doc.setFillColor(248, 250, 252);
+                doc.roundedRect(14, curY, pageWidth - 28, 14, 2, 2, 'FD');
+
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(100, 116, 139);
+                doc.text('TOTAL BILLED (CR)', 20, curY + 5);
+                doc.text('TOTAL PAID (DR)', pageWidth / 2, curY + 5, { align: 'center' });
+                doc.text('OUTSTANDING BALANCE', pageWidth - 20, curY + 5, { align: 'right' });
+
+                doc.setFontSize(10);
+                doc.setTextColor(16, 185, 129); // emerald
+                doc.text(`Rs. ${totalCr.toLocaleString('en-IN')}`, 20, curY + 11);
+
+                doc.setTextColor(239, 68, 68); // rose
+                doc.text(`Rs. ${totalDr.toLocaleString('en-IN')}`, pageWidth / 2, curY + 11, { align: 'center' });
+
+                doc.setTextColor(netBal >= 0 ? 37 : 239, netBal >= 0 ? 99 : 68, netBal >= 0 ? 235 : 68);
+                doc.text(`Rs. ${Math.abs(netBal).toLocaleString('en-IN')} ${netBal >= 0 ? '(Receivable)' : '(Payable)'}`, pageWidth - 20, curY + 11, { align: 'right' });
+
+                // Table
+                const tableData = rows.map((r) => [
+                    r.date,
+                    r.type,
+                    r.ref,
+                    r.desc,
+                    r.cr ? `Rs. ${r.cr.toLocaleString('en-IN')}` : '-',
+                    r.dr ? `Rs. ${r.dr.toLocaleString('en-IN')}` : '-',
+                    `Rs. ${r.bal.toLocaleString('en-IN')}`,
+                ]);
+
+                autoTable(doc, {
+                    head: [['Date', 'Type', 'Ref No', 'Particulars', 'Credit (Cr)', 'Debit (Dr)', 'Balance']],
+                    body: tableData,
+                    startY: curY + 18,
+                    theme: 'grid',
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: {
+                        4: { halign: 'right' },
+                        5: { halign: 'right' },
+                        6: { halign: 'right', fontStyle: 'bold' },
+                    },
+                });
+
+                const fileName = `Ledger_${(selectedPartyLedger || 'All').replace(/[^a-z0-9]/gi, '_')}.pdf`;
+                doc.save(fileName);
+                toast.success('Ledger Statement PDF downloaded!');
+
+                // Save to cloud storage
+                const pdfBlob = doc.output('blob');
+                const filePath = `statements/statement_${Date.now()}.pdf`;
+                saveLedgerStatement(
+                    {
+                        admin_id: (currentUser?.id as any) || 'admin',
+                        party_name: selectedPartyLedger || 'All Parties',
+                        from_date: ledgerFromDate || '2024-01-01',
+                        to_date: ledgerToDate || new Date().toISOString().split('T')[0],
+                        file_path: filePath,
+                    },
+                    pdfBlob
+                )
+                    .then(() => {
+                        getLedgerStatements().then(setLedgerStatements).catch(console.error);
+                    })
+                    .catch((err) => console.error('Cloud save statement error:', err));
+            });
+        });
+    };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-4 md:p-8 overflow-hidden relative">
-            {/* Animated background elements */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
-                <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-                <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+            {/* Top Super Bar */}
+            <div className="bg-slate-900/90 backdrop-blur-xl border-b border-white/10 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-40 shadow-2xl">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-400 via-rose-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-2 ring-white/20 animate-pulse">
+                        <BoltIcon className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-base sm:text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-white to-indigo-300 uppercase">
+                                Super Admin Powerhouse
+                            </h1>
+                            <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-rose-500 text-white uppercase tracking-widest shadow-xs">
+                                Root Control
+                            </span>
+                            {(currentUser?.email === 'admin@ssk.com' || propIsSuperAdmin) && (
+                                <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-amber-500 text-slate-950 uppercase tracking-wider font-mono shadow-xs">
+                                    👑 admin@ssk.com
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-xs text-slate-400 font-mono">
+                            {companyDetails.name || 'Logistics Fleet'} • {currentUser?.email || 'admin@ssk.com'} •{' '}
+                            {currentTime.toLocaleTimeString()}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Center / Account Scope Filter */}
+                <div className="flex items-center gap-2 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-indigo-500/30 shadow-inner">
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                        <span>👁️ Filter User:</span>
+                    </span>
+                    <select
+                        value={selectedAccountFilter}
+                        onChange={(e) => setSelectedAccountFilter(e.target.value)}
+                        className="bg-transparent text-xs font-semibold text-slate-100 focus:outline-none cursor-pointer max-w-[210px] truncate"
+                        title="Filter entire powerhouse by specific user account"
+                    >
+                        <option value="ALL" className="bg-slate-900 text-amber-400 font-bold">
+                            👑 ALL USERS & ACCOUNTS ({userAccounts.length})
+                        </option>
+                        {userAccounts.map((acc) => (
+                            <option key={acc.id} value={acc.id} className="bg-slate-900 text-slate-200">
+                                {acc.email} {acc.role ? `[${acc.role}]` : ''}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Right Global Actions */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    {onSwitchToAppMode && (
+                        <button
+                            onClick={onSwitchToAppMode}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-md shadow-emerald-600/30 cursor-pointer"
+                            title="Open standard Fleet & Logistics App interface while retaining root access"
+                        >
+                            <TruckIcon className="w-4 h-4 text-white" />
+                            <span>Fleet App View</span>
+                        </button>
+                    )}
+
+                    <button
+                        onClick={handleExportFullDatabaseJSON}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-400/30 text-indigo-200 text-xs font-bold transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer"
+                        title="Download entire database as JSON backup"
+                    >
+                        <DownloadIcon className="w-4 h-4 text-indigo-400" />
+                        <span>Export All Data</span>
+                    </button>
+
+                    <button
+                        onClick={fetchAllMasterData}
+                        disabled={isRefreshing}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold transition-all active:scale-95 text-slate-200 cursor-pointer ${
+                            isRefreshing ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                        title="Refresh all data directly from Supabase Cloud"
+                    >
+                        <RefreshIcon className={`w-4 h-4 text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span>{isRefreshing ? 'Syncing...' : 'Sync Cloud'}</span>
+                    </button>
+
+                    {onClose && (
+                        <button
+                            onClick={onClose}
+                            className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 rounded-xl text-white text-xs font-black shadow-lg shadow-rose-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                        >
+                            Exit Powerhouse
+                        </button>
+                    )}
+                </div>
             </div>
 
-            {/* Main Container */}
-            <div className="relative z-10 max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl shadow-blue-500/50 transform hover:scale-110 transition-transform duration-300">
-                            <ShieldCheckIcon className="w-10 h-10 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 animate-gradient">
-                                {currentRole} Control Center
-                            </h1>
-                            <p className="text-gray-400 mt-1 flex items-center gap-2">
-                                <ClockIcon className="w-4 h-4" />
-                                {currentTime.toLocaleString('en-IN', {
-                                    weekday: 'long',
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    second: '2-digit'
-                                })}
-                            </p>
-                        </div>
-                    </div>
+            {/* Navigation Tabs Bar */}
+            <div className="bg-slate-900/60 border-b border-white/10 px-4 sm:px-8 py-2 overflow-x-auto custom-scrollbar flex items-center gap-2">
+                {[
+                    { id: 'overview', label: 'Command Hub', icon: <DashboardIcon className="w-4 h-4" /> },
+                    { id: 'users', label: `Accounts & Roles (${1 + operators.length})`, icon: <UsersIcon className="w-4 h-4" />, badge: operators.length },
+                    { id: 'lrs', label: `Lorry Receipts (${allLRs.length})`, icon: <DocumentTextIcon className="w-4 h-4" /> },
+                    { id: 'trucks', label: `Fleet Garage (${allTrucks.length})`, icon: <TruckIcon className="w-4 h-4" /> },
+                    { id: 'parties', label: `Parties & Clients (${allParties.length})`, icon: <UserGroupIcon className="w-4 h-4" /> },
+                    { id: 'vouchers', label: `Vouchers & Cash (${allVouchers.length})`, icon: <CurrencyRupeeIcon className="w-4 h-4" /> },
+                    { id: 'ledger', label: 'Ledger & Statements', icon: <ChartBarIcon className="w-4 h-4" /> },
+                    { id: 'system', label: 'Master Config & System', icon: <CogIcon className="w-4 h-4" /> },
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as AdminTab)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                            activeTab === tab.id
+                                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/40 scale-105'
+                                : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                        }`}
+                    >
+                        {tab.icon}
+                        <span>{tab.label}</span>
+                    </button>
+                ))}
+            </div>
 
-                    <div className="flex items-center gap-3">
-                        {onSignOut && (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (onClose) onClose();
-                                    onSignOut();
-                                }}
-                                className="px-5 py-3 bg-red-500/20 backdrop-blur-xl border border-red-500/40 rounded-xl text-red-300 font-bold hover:bg-red-500/30 hover:text-white transition-all duration-300 hover:scale-105 shadow-xl cursor-pointer flex items-center gap-2"
-                                title="Sign out of your account"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                                </svg>
-                                <span>Sign Out</span>
-                            </button>
-                        )}
-                        {onClose && (
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-6 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl text-white font-semibold
-                                         hover:bg-white/20 transition-all duration-300 hover:scale-105 shadow-xl cursor-pointer"
-                            >
-                                Close Panel
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Tab Navigation */}
-                <div className="mb-8 flex gap-2 p-2 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 overflow-x-auto">
-                    {[
-                        { id: 'overview', label: 'Overview', icon: <DashboardIcon className="w-5 h-5" /> },
-                        { id: 'ledger', label: 'Ledger', icon: <DocumentTextIcon className="w-5 h-5" /> },
-                        { id: 'users', label: 'Users', icon: <UsersIcon className="w-5 h-5" /> },
-                        { id: 'system', label: 'System', icon: <ServerIcon className="w-5 h-5" /> },
-                        { id: 'analytics', label: 'Analytics', icon: <ChartBarIcon className="w-5 h-5" /> },
-                    ].map((tab) => (
+            {/* Main Content Viewport */}
+            <div className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto space-y-6">
+                {/* Global Search Bar */}
+                <div className="relative">
+                    <SearchIcon className="w-5 h-5 absolute left-4 top-3.5 text-slate-400" />
+                    <input
+                        type="text"
+                        value={globalSearch}
+                        onChange={(e) => setGlobalSearch(e.target.value)}
+                        placeholder="Power Search across EVERYTHING (LR No, Truck No, Party Name, Voucher ID, Account Email)..."
+                        className="w-full pl-12 pr-10 py-3 bg-slate-900/80 border border-white/10 rounded-2xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 shadow-xl"
+                    />
+                    {globalSearch && (
                         <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 whitespace-nowrap
-                                     ${activeTab === tab.id
-                                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-xl shadow-blue-500/50 scale-105'
-                                    : 'text-gray-300 hover:bg-white/10 hover:text-white'}`}
+                            onClick={() => setGlobalSearch('')}
+                            className="absolute right-3.5 top-3.5 text-slate-400 hover:text-white"
                         >
-                            {tab.icon}
-                            {tab.label}
+                            <CloseIcon className="w-5 h-5" />
                         </button>
-                    ))}
+                    )}
                 </div>
 
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
-                    <div className="space-y-8 animate-fadeIn">
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <StatCard3D
-                                title="Total Users"
-                                value={totalUsersCount}
-                                icon={<UsersIcon />}
-                                trend="up"
-                                trendValue="+2%"
-                                color="blue"
-                                delay={0}
-                            />
-                            <StatCard3D
-                                title="Active LRs"
-                                value={activeLRCount}
-                                icon={<DocumentTextIcon />}
-                                trend="up"
-                                trendValue="+5%"
-                                color="green"
-                                delay={100}
-                            />
-                            <StatCard3D
-                                title="Total Revenue"
-                                value={`₹${(totalRevenue / 100000).toFixed(2)}L`}
-                                icon={<CurrencyRupeeIcon />}
-                                trend="up"
-                                trendValue="+8%"
-                                color="purple"
-                                delay={200}
-                            />
-                            <StatCard3D
-                                title="System Health"
-                                value="100%"
-                                icon={<ActivityIcon />}
-                                trend="neutral"
-                                trendValue="Stable"
-                                color="teal"
-                                delay={300}
-                            />
+                {/* Global Search Results Popup / Drawer */}
+                {searchResults && (
+                    <div className="p-5 rounded-2xl bg-slate-900 border border-indigo-500/40 shadow-2xl space-y-4 animate-fadeIn">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                            <span className="text-xs font-black uppercase text-indigo-400 tracking-wider">
+                                Global Power Search Matches for "{globalSearch}"
+                            </span>
+                            <button
+                                onClick={() => setGlobalSearch('')}
+                                className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+                            >
+                                Clear Results
+                            </button>
                         </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                            {/* Matched LRs */}
+                            {searchResults.matchedLRs.length > 0 && (
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="font-bold text-amber-300 mb-2 flex items-center gap-1.5">
+                                        <DocumentTextIcon className="w-4 h-4" /> Matched LRs ({searchResults.matchedLRs.length})
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {searchResults.matchedLRs.map((lr) => (
+                                            <div
+                                                key={lr.lrNo}
+                                                onClick={() => {
+                                                    setActiveTab('lrs');
+                                                    setViewingLR(lr);
+                                                    setGlobalSearch('');
+                                                }}
+                                                className="p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 flex justify-between"
+                                            >
+                                                <span className="font-bold text-white">#{lr.lrNo}</span>
+                                                <span className="text-slate-400">{lr.truckNo}</span>
+                                                <span className="text-emerald-400 font-mono">₹{lr.freight}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-                        {/* Quick Actions */}
-                        <div>
-                            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                                <BoltIcon className="w-7 h-7 text-yellow-400" />
-                                Quick Actions
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <ActionCard
-                                    title="User Management"
-                                    description="Add, edit, or remove user accounts and manage permissions"
-                                    icon={<UserGroupIcon />}
-                                    onClick={() => setActiveTab('users')}
-                                    color="blue"
-                                />
-                                <ActionCard
-                                    title="System Settings"
-                                    description="Configure application settings and preferences"
-                                    icon={<CogIcon />}
-                                    onClick={() => setActiveTab('system')}
-                                    color="purple"
-                                />
-                                <ActionCard
-                                    title="Database Backup"
-                                    description="Create and manage database backups"
-                                    icon={<DatabaseIcon />}
-                                    onClick={() => alert('Database backup initiated')}
-                                    color="green"
-                                />
-                                <ActionCard
-                                    title="Security Audit"
-                                    description="Review security logs and access controls"
-                                    icon={<ShieldCheckIcon />}
-                                    onClick={() => alert('Opening security audit')}
-                                    color="red"
-                                    badge="New"
-                                />
-                                <ActionCard
-                                    title="Analytics Dashboard"
-                                    description="View detailed analytics and reports"
-                                    icon={<ChartBarIcon />}
-                                    onClick={() => setActiveTab('analytics')}
-                                    color="indigo"
-                                />
-                                <ActionCard
-                                    title="Notifications"
-                                    description="Manage system notifications and alerts"
-                                    icon={<BellIcon />}
-                                    onClick={() => alert('Opening notifications')}
-                                    color="orange"
-                                    badge="5"
-                                />
+                            {/* Matched Trucks */}
+                            {searchResults.matchedTrucks.length > 0 && (
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="font-bold text-blue-300 mb-2 flex items-center gap-1.5">
+                                        <TruckIcon className="w-4 h-4" /> Matched Trucks ({searchResults.matchedTrucks.length})
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {searchResults.matchedTrucks.map((t) => (
+                                            <div
+                                                key={t.truckNo}
+                                                onClick={() => {
+                                                    setActiveTab('trucks');
+                                                    setEditingTruck(t);
+                                                    setGlobalSearch('');
+                                                }}
+                                                className="p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 flex justify-between"
+                                            >
+                                                <span className="font-bold text-white">{t.truckNo}</span>
+                                                <span className="text-slate-400">{t.make}</span>
+                                                <span className="text-indigo-300">{t.driverName || 'No Driver'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Matched Parties */}
+                            {searchResults.matchedParties.length > 0 && (
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="font-bold text-emerald-300 mb-2 flex items-center gap-1.5">
+                                        <UserGroupIcon className="w-4 h-4" /> Matched Parties ({searchResults.matchedParties.length})
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {searchResults.matchedParties.map((p) => (
+                                            <div
+                                                key={p.name}
+                                                onClick={() => {
+                                                    setActiveTab('parties');
+                                                    setEditingParty(p);
+                                                    setGlobalSearch('');
+                                                }}
+                                                className="p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 flex justify-between"
+                                            >
+                                                <span className="font-bold text-white">{p.name}</span>
+                                                <span className="text-slate-400">{p.city || p.gst || ''}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Matched Vouchers */}
+                            {searchResults.matchedVouchers.length > 0 && (
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="font-bold text-rose-300 mb-2 flex items-center gap-1.5">
+                                        <CurrencyRupeeIcon className="w-4 h-4" /> Matched Vouchers ({searchResults.matchedVouchers.length})
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {searchResults.matchedVouchers.map((v) => (
+                                            <div
+                                                key={v.voucher_no}
+                                                onClick={() => {
+                                                    setActiveTab('vouchers');
+                                                    setEditingVoucher(v);
+                                                    setGlobalSearch('');
+                                                }}
+                                                className="p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 flex justify-between"
+                                            >
+                                                <span className="font-bold text-white">#{v.voucher_no}</span>
+                                                <span className="text-slate-400">{v.party_name}</span>
+                                                <span className="text-rose-400 font-mono">₹{v.amount}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Matched Accounts */}
+                            {searchResults.matchedUsers.length > 0 && (
+                                <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                                    <div className="font-bold text-purple-300 mb-2 flex items-center gap-1.5">
+                                        <UsersIcon className="w-4 h-4" /> Matched Accounts ({searchResults.matchedUsers.length})
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {searchResults.matchedUsers.map((u) => (
+                                            <div
+                                                key={u.operator_id}
+                                                onClick={() => {
+                                                    setActiveTab('users');
+                                                    setEditingOperator(u);
+                                                    setEditEmail(u.email);
+                                                    setEditRole(u.role || 'Operator');
+                                                    setGlobalSearch('');
+                                                }}
+                                                className="p-2 bg-slate-800 rounded-lg cursor-pointer hover:bg-slate-700 flex justify-between"
+                                            >
+                                                <span className="font-bold text-white">{u.email}</span>
+                                                <span className="text-purple-400 uppercase font-black">{u.role}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 1: OVERVIEW & COMMAND HUB */}
+                {/* ============================================================== */}
+                {activeTab === 'overview' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        {/* KPI Metric Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-900/40 via-slate-900 to-indigo-950/60 border border-blue-500/20 shadow-xl">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-xs font-bold text-blue-300 uppercase tracking-wider">Total Revenue</p>
+                                        <h3 className="text-2xl font-black text-white mt-1 font-mono">
+                                            ₹{(stats.totalRevenue / 100000).toFixed(2)}L
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 mt-1">From {stats.totalLRs} Lorry Receipts</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-blue-500/20 text-blue-400">
+                                        <TrendingUpIcon className="w-6 h-6" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-gradient-to-br from-rose-900/40 via-slate-900 to-rose-950/60 border border-rose-500/20 shadow-xl">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-xs font-bold text-rose-300 uppercase tracking-wider">Total Expenses</p>
+                                        <h3 className="text-2xl font-black text-white mt-1 font-mono">
+                                            ₹{(stats.totalExpenses / 100000).toFixed(2)}L
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 mt-1">Across {stats.totalVouchers} Vouchers</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-rose-500/20 text-rose-400">
+                                        <CurrencyRupeeIcon className="w-6 h-6" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-900/40 via-slate-900 to-emerald-950/60 border border-emerald-500/20 shadow-xl">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Net Margin</p>
+                                        <h3 className="text-2xl font-black text-emerald-400 mt-1 font-mono">
+                                            ₹{(stats.netProfit / 100000).toFixed(2)}L
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 mt-1">Operating Cashflow</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-emerald-500/20 text-emerald-400">
+                                        <ActivityIcon className="w-6 h-6" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-gradient-to-br from-purple-900/40 via-slate-900 to-purple-950/60 border border-purple-500/20 shadow-xl">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-xs font-bold text-purple-300 uppercase tracking-wider">System Accounts</p>
+                                        <h3 className="text-2xl font-black text-white mt-1 font-mono">
+                                            {stats.totalAccounts}
+                                        </h3>
+                                        <p className="text-[11px] text-slate-400 mt-1">1 Admin + {operators.length} Operators</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-purple-500/20 text-purple-400">
+                                        <UsersIcon className="w-6 h-6" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Recent Activity */}
+                        {/* Quick Creation Dock */}
                         <div>
-                            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
-                                <ActivityIcon className="w-7 h-7 text-green-400" />
-                                Recent Activity
+                            <h2 className="text-sm font-black text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <BoltIcon className="w-5 h-5 text-amber-400" /> Powerhouse Quick Launch Dock
                             </h2>
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl">
-                                <div className="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
-                                    {recentActivities.map((activity) => (
-                                        <ActivityFeedItem key={activity.id} activity={activity} />
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('users');
+                                        setShowAddUserModal(true);
+                                    }}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-purple-500/30 hover:border-purple-500 hover:bg-purple-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <UsersIcon className="w-5 h-5 text-purple-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">+ Add Account</p>
+                                    <p className="text-[10px] text-slate-400">Create operator</p>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('lrs');
+                                        setShowCreateLRModal(true);
+                                    }}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-blue-500/30 hover:border-blue-500 hover:bg-blue-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <DocumentTextIcon className="w-5 h-5 text-blue-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">+ Create LR</p>
+                                    <p className="text-[10px] text-slate-400">Issue Bilty</p>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('trucks');
+                                        setShowAddTruckModal(true);
+                                    }}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-emerald-500/30 hover:border-emerald-500 hover:bg-emerald-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <TruckIcon className="w-5 h-5 text-emerald-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">+ Add Truck</p>
+                                    <p className="text-[10px] text-slate-400">Register in garage</p>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('parties');
+                                        setShowAddPartyModal(true);
+                                    }}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/30 hover:border-amber-500 hover:bg-amber-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <UserGroupIcon className="w-5 h-5 text-amber-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">+ Add Party</p>
+                                    <p className="text-[10px] text-slate-400">Client / Consignor</p>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setActiveTab('vouchers');
+                                        setShowAddVoucherModal(true);
+                                    }}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-rose-500/30 hover:border-rose-500 hover:bg-rose-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <CurrencyRupeeIcon className="w-5 h-5 text-rose-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">+ Add Voucher</p>
+                                    <p className="text-[10px] text-slate-400">Record cash/expense</p>
+                                </button>
+
+                                <button
+                                    onClick={handleExportFullDatabaseJSON}
+                                    className="p-4 rounded-xl bg-slate-900/80 border border-cyan-500/30 hover:border-cyan-500 hover:bg-cyan-950/40 transition-all text-left group cursor-pointer"
+                                >
+                                    <DownloadIcon className="w-5 h-5 text-cyan-400 mb-2 group-hover:scale-110 transition-transform" />
+                                    <p className="font-bold text-xs text-white">Full Backup</p>
+                                    <p className="text-[10px] text-slate-400">Export JSON file</p>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Pending Approvals (if any) */}
+                        {managerRequests.length > 0 && (
+                            <div className="p-5 rounded-2xl bg-amber-950/40 border border-amber-500/30 shadow-xl">
+                                <h3 className="font-black text-amber-400 text-sm uppercase flex items-center gap-2 mb-3">
+                                    <BellIcon className="w-5 h-5" /> Pending Access Requests ({managerRequests.length})
+                                </h3>
+                                <div className="space-y-2">
+                                    {managerRequests.map((req) => (
+                                        <div key={req.id} className="p-3 bg-slate-900/80 rounded-xl flex items-center justify-between">
+                                            <div>
+                                                <p className="font-bold text-white">{req.user_email || 'User'}</p>
+                                                <p className="text-xs text-slate-400">Requested Role: <span className="text-amber-400 font-bold">{req.requested_role}</span></p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                {onApproveManagerRequest && (
+                                                    <button
+                                                        onClick={() => onApproveManagerRequest(req)}
+                                                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold"
+                                                    >
+                                                        Approve
+                                                    </button>
+                                                )}
+                                                {onRejectManagerRequest && (
+                                                    <button
+                                                        onClick={() => onRejectManagerRequest(req.id)}
+                                                        className="px-3 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold"
+                                                    >
+                                                        Reject
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
+                        )}
+
+                        {/* System Diagnostics & Cloud Status */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl">
+                                <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+                                    <ServerIcon className="w-5 h-5 text-blue-400" /> Database & Cloud Status
+                                </h3>
+                                <div className="space-y-2.5 text-xs text-slate-300">
+                                    <div className="flex justify-between py-1 border-b border-white/5">
+                                        <span className="text-slate-400">Connected Supabase Project</span>
+                                        <span className="font-mono text-emerald-400 font-bold">LIVE & SECURED</span>
+                                    </div>
+                                    <div className="flex justify-between py-1 border-b border-white/5">
+                                        <span className="text-slate-400">Lorry Receipts in DB</span>
+                                        <span className="font-mono text-white font-bold">{allLRs.length} records</span>
+                                    </div>
+                                    <div className="flex justify-between py-1 border-b border-white/5">
+                                        <span className="text-slate-400">Parties in DB</span>
+                                        <span className="font-mono text-white font-bold">{allParties.length} records</span>
+                                    </div>
+                                    <div className="flex justify-between py-1 border-b border-white/5">
+                                        <span className="text-slate-400">Trucks in DB</span>
+                                        <span className="font-mono text-white font-bold">{allTrucks.length} records</span>
+                                    </div>
+                                    <div className="flex justify-between py-1">
+                                        <span className="text-slate-400">Vouchers in DB</span>
+                                        <span className="font-mono text-white font-bold">{allVouchers.length} records</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl flex flex-col justify-between">
+                                <div>
+                                    <h3 className="font-bold text-white text-sm mb-3 flex items-center gap-2">
+                                        <DatabaseIcon className="w-5 h-5 text-purple-400" /> Cache & Recovery Tools
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                                        Offline cache ensures snappy UI loading. If any record shows outdated values, flush the local cache to re-pull all fresh entities from Supabase.
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleClearLocalStorageCache}
+                                        className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold text-slate-200 transition-all cursor-pointer"
+                                    >
+                                        Flush Local Cache
+                                    </button>
+                                    <button
+                                        onClick={handleExportFullDatabaseJSON}
+                                        className="flex-1 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer"
+                                    >
+                                        Download JSON
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
 
-                {/* Users Tab */}
+                {/* ============================================================== */}
+                {/* TAB 2: ACCOUNTS & USER ROLES POWERHOUSE */}
+                {/* ============================================================== */}
                 {activeTab === 'users' && (
                     <div className="space-y-6 animate-fadeIn">
-                        <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
-                            <h2 className="text-2xl font-bold text-white mb-6">Operator Management</h2>
-                            <p className="text-gray-300 mb-6">Create up to 2 Operators who can manage LRs and Trucks/Parties on your behalf.</p>
-
-                            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-                                {/* Operator List */}
-                                <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                        <UsersIcon className="w-6 h-6 text-blue-400" />
-                                        Active Operators ({operators.length}/2)
+                        {/* Master Passkeys & RBAC Security Card */}
+                        <div className="p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 shadow-2xl space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                                <div>
+                                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                                        <ShieldCheckIcon className="w-6 h-6 text-indigo-400" />
+                                        Master Passkeys & Role Access Control (RBAC)
                                     </h3>
-                                    
-                                    {isLoadingUsers ? (
-                                        <div className="text-center py-8 text-gray-400">Loading...</div>
-                                    ) : operators.length === 0 ? (
-                                        <div className="text-center py-8 text-gray-400">
-                                            No operators added yet.
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-4">
-                                            {operators.map((op, idx) => (
-                                                <div key={op.operator_id || idx} className="p-4 bg-white/10 rounded-xl flex items-center justify-between">
-                                                    <div>
-                                                        <p className="font-semibold text-white">{op.email}</p>
-                                                        <p className="text-xs text-blue-300 capitalize">{op.role}</p>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingOperator(op);
-                                                            setEditEmail(op.email);
-                                                            setEditPassword('');
-                                                        }}
-                                                        className="p-2 bg-blue-500/20 text-blue-400 hover:bg-blue-500/40 rounded-lg transition-colors"
-                                                        title="Edit Operator"
-                                                    >
-                                                        <PencilIcon className="w-5 h-5" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <p className="text-xs text-slate-400">
+                                        Configure passkeys required to enter Admin or Manager modes.
+                                    </p>
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer bg-slate-800/80 px-3 py-1.5 rounded-xl border border-white/10">
+                                    <input
+                                        type="checkbox"
+                                        checked={rbacEnabled}
+                                        onChange={(e) => setRbacEnabled(e.target.checked)}
+                                        className="rounded text-indigo-600 focus:ring-0"
+                                    />
+                                    <span className="text-xs font-bold text-white">Enable RBAC Passkeys</span>
+                                </label>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        Super Admin Passkey
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showAdminPasskey ? 'text' : 'password'}
+                                            value={adminPasskeyInput}
+                                            onChange={(e) => setAdminPasskeyInput(e.target.value)}
+                                            placeholder="Enter Admin passkey (e.g. 1234)"
+                                            className="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAdminPasskey(!showAdminPasskey)}
+                                            className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white"
+                                        >
+                                            {showAdminPasskey ? 'Hide' : 'Show'}
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Add Operator Form */}
-                                {currentRole === 'Admin' && (
-                                    <div className="bg-white/5 rounded-2xl p-6 border border-white/10">
-                                    <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                        <PlusIcon className="w-6 h-6 text-green-400" />
-                                        Create New Operator
-                                    </h3>
-
-                                    {operators.length >= 2 ? (
-                                        <div className="p-4 bg-yellow-500/20 border border-yellow-500/30 rounded-xl text-yellow-200">
-                                            You have reached the limit of 2 operators.
-                                        </div>
-                                    ) : (
-                                        <form onSubmit={handleCreateOperator} className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-1">Operator Email</label>
-                                                <input 
-                                                    type="email" 
-                                                    value={operatorEmail}
-                                                    onChange={(e) => setOperatorEmail(e.target.value)}
-                                                    required
-                                                    className="w-full px-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
-                                                    placeholder="operator@company.com"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-300 mb-1">Operator Password</label>
-                                                <input 
-                                                    type="password" 
-                                                    value={operatorPassword}
-                                                    onChange={(e) => setOperatorPassword(e.target.value)}
-                                                    required
-                                                    minLength={6}
-                                                    className="w-full px-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
-                                                    placeholder="Enter a secure password"
-                                                />
-                                            </div>
-                                            <button 
-                                                type="submit"
-                                                disabled={isCreatingUser}
-                                                className="w-full py-3 mt-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl font-bold text-white shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 disabled:opacity-50"
-                                            >
-                                                {isCreatingUser ? 'Creating...' : 'Create Operator'}
-                                            </button>
-                                        </form>
-                                    )}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-300 mb-1">
+                                        Manager Passkey
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type={showManagerPasskey ? 'text' : 'password'}
+                                            value={managerPasskeyInput}
+                                            onChange={(e) => setManagerPasskeyInput(e.target.value)}
+                                            placeholder="Enter Manager passkey"
+                                            className="w-full px-4 py-2.5 bg-slate-950 border border-white/10 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-indigo-500"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowManagerPasskey(!showManagerPasskey)}
+                                            className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white"
+                                        >
+                                            {showManagerPasskey ? 'Hide' : 'Show'}
+                                        </button>
+                                    </div>
                                 </div>
-                                )}
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    onClick={handleSavePasskeys}
+                                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                    Save Security & Passkeys
+                                </button>
                             </div>
                         </div>
 
-                        {/* Edit Operator Modal */}
-                        {editingOperator && (
-                            <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                                <div className="bg-slate-800 text-white rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/10 animate-fadeInUp">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                                            <PencilIcon className="w-6 h-6 text-blue-400" />
-                                            Edit Operator
-                                        </h3>
-                                        <button onClick={() => setEditingOperator(null)} className="p-1 hover:bg-white/10 rounded-full transition-colors text-gray-400">
-                                            <CloseIcon className="w-6 h-6" />
-                                        </button>
-                                    </div>
-                                    <form onSubmit={handleUpdateOperator} className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-1">Update Email</label>
-                                            <input 
-                                                type="email" 
-                                                value={editEmail}
-                                                onChange={(e) => setEditEmail(e.target.value)}
-                                                required
-                                                className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
-                                                placeholder="operator@company.com"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-300 mb-1">New Password</label>
-                                            <input 
-                                                type="password" 
-                                                value={editPassword}
-                                                onChange={(e) => setEditPassword(e.target.value)}
-                                                required
-                                                minLength={6}
-                                                className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500"
-                                                placeholder="Enter new password"
-                                            />
-                                        </div>
-                                        <div className="pt-4 flex gap-3">
-                                            <button 
-                                                type="button"
-                                                onClick={() => setEditingOperator(null)}
-                                                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-white transition-all duration-300"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button 
-                                                type="submit"
-                                                disabled={isUpdatingOperator}
-                                                className="flex-1 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl font-bold text-white shadow-lg hover:shadow-indigo-500/30 transition-all duration-300 disabled:opacity-50"
-                                            >
-                                                {isUpdatingOperator ? 'Updating...' : 'Save Changes'}
-                                            </button>
-                                        </div>
-                                    </form>
+                        {/* Primary Admin Account Info */}
+                        <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl flex items-center justify-between flex-wrap gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-lg">
+                                    A
                                 </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-white text-sm">{currentUser?.email || 'Super Admin'}</h4>
+                                        <span className="px-2 py-0.5 text-[10px] font-black rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/30 uppercase">
+                                            Super Admin (Owner)
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 font-mono mt-0.5">UID: {currentUser?.id || 'Root'}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAddUserModal(true)}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            >
+                                <PlusIcon className="w-4 h-4" />
+                                <span>Create New Account</span>
+                            </button>
+                        </div>
+
+                        {/* Operators and Sub-accounts Table */}
+                        <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                                    <UsersIcon className="w-5 h-5 text-indigo-400" />
+                                    Active Sub-Accounts ({operators.length})
+                                </h3>
+                                <span className="text-xs text-slate-400">
+                                    Operators have shared access to manage LRs & Master Data
+                                </span>
+                            </div>
+
+                            {operators.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400 text-sm">
+                                    No sub-accounts or operators created yet. Click "+ Create New Account" to add team members.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                            <tr>
+                                                <th className="px-6 py-3.5">Account Email</th>
+                                                <th className="px-6 py-3.5">Assigned Role</th>
+                                                <th className="px-6 py-3.5">Created Date</th>
+                                                <th className="px-6 py-3.5 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {operators.map((op) => (
+                                                <tr key={op.operator_id} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-6 py-4 font-bold text-white">{op.email}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span
+                                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                                                op.role === 'Admin'
+                                                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                                                    : op.role === 'Manager'
+                                                                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                                                                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                                            }`}
+                                                        >
+                                                            {op.role || 'Operator'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-400 font-mono">
+                                                        {op.created_at ? new Date(op.created_at).toLocaleDateString() : 'N/A'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedAccountFilter(op.operator_id);
+                                                                setActiveTab('lrs');
+                                                                toast.success(`Filtered view to account: ${op.email}`);
+                                                            }}
+                                                            className="px-2.5 py-1 bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 rounded-lg font-bold transition-colors cursor-pointer"
+                                                            title="Inspect all data created by this user"
+                                                        >
+                                                            Inspect Data
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingOperator(op);
+                                                                setEditEmail(op.email);
+                                                                setEditRole(op.role || 'Operator');
+                                                                setEditPassword('');
+                                                            }}
+                                                            className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg font-bold transition-colors cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteUser(op)}
+                                                            className="px-2.5 py-1 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg font-bold transition-colors cursor-pointer"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 3: LORRY RECEIPTS (LR / BILTY) POWERHOUSE */}
+                {/* ============================================================== */}
+                {activeTab === 'lrs' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        {/* Filter Bar & Create Button */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10 shadow-xl">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {['ALL', 'Booked', 'In Transit', 'Out for Delivery', 'Delivered', 'Cancelled'].map((st) => (
+                                    <button
+                                        key={st}
+                                        onClick={() => setLrFilterStatus(st)}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                            lrFilterStatus === st
+                                                ? 'bg-blue-600 text-white shadow-md'
+                                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                    >
+                                        {st}
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    value={lrSearchQuery}
+                                    onChange={(e) => setLrSearchQuery(e.target.value)}
+                                    placeholder="Search LR, truck, party..."
+                                    className="px-3 py-1.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                                />
+                                <button
+                                    onClick={() => setShowCreateLRModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>+ Create LR</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* LRs Master Table */}
+                        <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-4 py-3.5">LR No</th>
+                                            <th className="px-4 py-3.5">Date</th>
+                                            <th className="px-4 py-3.5">Truck No</th>
+                                            <th className="px-4 py-3.5">Route</th>
+                                            <th className="px-4 py-3.5">Consignor & Consignee</th>
+                                            <th className="px-4 py-3.5">Freight</th>
+                                            <th className="px-4 py-3.5">Status</th>
+                                            <th className="px-4 py-3.5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredLRs.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                                                    No Lorry Receipts found matching current criteria.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredLRs.map((lr) => (
+                                                <tr key={lr.lrNo} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-4 py-3 font-mono font-bold text-white">
+                                                        <div>#{lr.lrNo}</div>
+                                                        {selectedAccountFilter === 'ALL' && (
+                                                            <div className="text-[10px] text-indigo-400 font-sans font-medium flex items-center gap-1 mt-0.5">
+                                                                <span>👤</span> <span className="truncate max-w-[120px]">{getUserEmailById(lr.user_id)}</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-400 whitespace-nowrap">{lr.date}</td>
+                                                    <td className="px-4 py-3 font-bold text-amber-300 font-mono whitespace-nowrap">
+                                                        {lr.truckNo}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-300">
+                                                        {lr.fromPlace} <span className="text-slate-500">→</span> {lr.toPlace}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-bold text-white truncate max-w-[180px]">
+                                                            {lr.consignor?.name || 'Consignor'}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                                                            {lr.consignee?.name || 'Consignee'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-mono font-bold text-emerald-400">
+                                                        ₹{lr.freight?.toLocaleString('en-IN') || 0}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            value={lr.status}
+                                                            onChange={(e) => handleQuickStatusChange(lr.lrNo, e.target.value as LRStatus)}
+                                                            className="bg-slate-950 border border-white/20 rounded-lg px-2 py-1 text-[11px] font-bold text-white focus:outline-none cursor-pointer"
+                                                        >
+                                                            <option value="Booked">Booked</option>
+                                                            <option value="In Transit">In Transit</option>
+                                                            <option value="Out for Delivery">Out for Delivery</option>
+                                                            <option value="Delivered">Delivered</option>
+                                                            <option value="Cancelled">Cancelled</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right space-x-1.5 whitespace-nowrap">
+                                                        <button
+                                                            onClick={() => setViewingLR(lr)}
+                                                            className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="View Details"
+                                                        >
+                                                            <EyeIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingLR({ ...lr })}
+                                                            className="p-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Edit LR"
+                                                        >
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteLRRecord(lr.lrNo)}
+                                                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Delete LR"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 4: FLEET & GARAGE POWERHOUSE */}
+                {/* ============================================================== */}
+                {activeTab === 'trucks' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10 shadow-xl">
+                            <div>
+                                <h3 className="font-bold text-white text-sm">Registered Fleet Vehicles ({allTrucks.length})</h3>
+                                <p className="text-xs text-slate-400">Manage specifications, compliance, and drivers</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    value={truckSearchQuery}
+                                    onChange={(e) => setTruckSearchQuery(e.target.value)}
+                                    placeholder="Search truck no, driver..."
+                                    className="px-3 py-1.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                                />
+                                <button
+                                    onClick={() => setShowAddTruckModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>+ Register Truck</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-4 py-3.5">Truck No</th>
+                                            <th className="px-4 py-3.5">Make & Model</th>
+                                            <th className="px-4 py-3.5">Type & Capacity</th>
+                                            <th className="px-4 py-3.5">Driver & Contact</th>
+                                            <th className="px-4 py-3.5">FASTag Balance</th>
+                                            <th className="px-4 py-3.5">Status</th>
+                                            <th className="px-4 py-3.5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredTrucks.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                                                    No trucks registered in Garage.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredTrucks.map((truck) => (
+                                                <tr key={truck.truckNo} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-4 py-3 font-mono font-black text-amber-300 text-sm">
+                                                        <div>{truck.truckNo}</div>
+                                                        {selectedAccountFilter === 'ALL' && (
+                                                            <div className="text-[10px] text-indigo-400 font-sans font-medium flex items-center gap-1 mt-0.5">
+                                                                <span>👤</span> <span className="truncate max-w-[120px]">{getUserEmailById(truck.user_id)}</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-white">
+                                                        {truck.make || 'Tata'} {truck.model || ''}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-300">
+                                                        {truck.truckType || 'Open Body'} • {truck.capacity || 'N/A'}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-bold text-white">{truck.driverName || 'No Driver'}</div>
+                                                        <div className="text-[11px] text-slate-400">{truck.driverContact || ''}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-mono text-emerald-400 font-bold">
+                                                        ₹{truck.fastagBalance?.toLocaleString('en-IN') || 0}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                                            {truck.status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => setEditingTruck({ ...truck })}
+                                                            className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Edit Truck"
+                                                        >
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteTruckRecord(truck)}
+                                                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Delete Truck"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 5: PARTIES & CLIENTS POWERHOUSE */}
+                {/* ============================================================== */}
+                {activeTab === 'parties' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10 shadow-xl">
+                            <div>
+                                <h3 className="font-bold text-white text-sm">Master Parties Directory ({allParties.length})</h3>
+                                <p className="text-xs text-slate-400">Consignors, Consignees & Transporters</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    value={partySearchQuery}
+                                    onChange={(e) => setPartySearchQuery(e.target.value)}
+                                    placeholder="Search party, city, GST..."
+                                    className="px-3 py-1.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                                />
+                                <button
+                                    onClick={() => setShowAddPartyModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 text-white text-xs font-bold rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>+ Add Party</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-4 py-3.5">Party Name</th>
+                                            <th className="px-4 py-3.5">Type</th>
+                                            <th className="px-4 py-3.5">City & Address</th>
+                                            <th className="px-4 py-3.5">GSTN & PAN</th>
+                                            <th className="px-4 py-3.5">Contact Phone</th>
+                                            <th className="px-4 py-3.5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredParties.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                                    No parties found.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredParties.map((p) => (
+                                                <tr key={p.id || p.name} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-4 py-3 font-bold text-white">
+                                                        <div>{p.name}</div>
+                                                        {selectedAccountFilter === 'ALL' && (
+                                                            <div className="text-[10px] text-indigo-400 font-sans font-medium flex items-center gap-1 mt-0.5">
+                                                                <span>👤</span> <span className="truncate max-w-[120px]">{getUserEmailById(p.user_id)}</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                                            {p.type || 'Both'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-300">
+                                                        <div>{p.city || '-'}</div>
+                                                        <div className="text-[11px] text-slate-400 truncate max-w-[200px]">{p.address}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-mono text-slate-300">
+                                                        <div>{p.gst || '-'}</div>
+                                                        <div className="text-[11px] text-slate-400">{p.pan || ''}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 font-mono text-slate-300">{p.contact || '-'}</td>
+                                                    <td className="px-4 py-3 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => setEditingParty({ ...p })}
+                                                            className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Edit Party"
+                                                        >
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeletePartyRecord(p)}
+                                                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Delete Party"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 6: VOUCHERS & EXPENSES POWERHOUSE */}
+                {/* ============================================================== */}
+                {activeTab === 'vouchers' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-2xl border border-white/10 shadow-xl">
+                            <div>
+                                <h3 className="font-bold text-white text-sm">Vouchers & Cash Book ({allVouchers.length})</h3>
+                                <p className="text-xs text-slate-400">Total Recorded: ₹{stats.totalExpenses.toLocaleString('en-IN')}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    value={voucherSearchQuery}
+                                    onChange={(e) => setVoucherSearchQuery(e.target.value)}
+                                    placeholder="Search voucher, party..."
+                                    className="px-3 py-1.5 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-rose-500"
+                                />
+                                <button
+                                    onClick={() => setShowAddVoucherModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-rose-600 to-pink-600 text-white text-xs font-bold rounded-xl shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                >
+                                    <PlusIcon className="w-4 h-4" />
+                                    <span>+ Add Voucher</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                    <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                            <th className="px-4 py-3.5">Voucher No</th>
+                                            <th className="px-4 py-3.5">Date</th>
+                                            <th className="px-4 py-3.5">Party / Beneficiary</th>
+                                            <th className="px-4 py-3.5">Amount</th>
+                                            <th className="px-4 py-3.5">Mode</th>
+                                            <th className="px-4 py-3.5">Description</th>
+                                            <th className="px-4 py-3.5 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {filteredVouchers.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                                                    No vouchers recorded.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredVouchers.map((v) => (
+                                                <tr key={v.id || v.voucher_no} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-4 py-3 font-mono font-bold text-rose-300">
+                                                        <div>#{v.voucher_no}</div>
+                                                        {selectedAccountFilter === 'ALL' && (
+                                                            <div className="text-[10px] text-indigo-400 font-sans font-medium flex items-center gap-1 mt-0.5">
+                                                                <span>👤</span> <span className="truncate max-w-[120px]">{getUserEmailById(v.user_id)}</span>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-400">{v.date}</td>
+                                                    <td className="px-4 py-3 font-bold text-white">{v.party_name || 'N/A'}</td>
+                                                    <td className="px-4 py-3 font-mono font-black text-rose-400">
+                                                        ₹{Number(v.amount)?.toLocaleString('en-IN') || 0}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-slate-300">{v.payment_mode || 'Cash'}</td>
+                                                    <td className="px-4 py-3 text-slate-400 truncate max-w-[200px]">
+                                                        {v.description}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right space-x-2">
+                                                        <button
+                                                            onClick={() => setEditingVoucher({ ...v })}
+                                                            className="p-1.5 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Edit Voucher"
+                                                        >
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteVoucherRecord(v)}
+                                                            className="p-1.5 bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 rounded-lg transition-colors cursor-pointer"
+                                                            title="Delete Voucher"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ============================================================== */}
+                {/* TAB 7: LEDGER & STATEMENTS */}
+                {/* ============================================================== */}
+                {activeTab === 'ledger' && (
+                    <div className="space-y-6 animate-fadeIn">
+                        {/* Sub-tabs */}
+                        <div className="flex gap-2 p-1 bg-slate-900 border border-white/10 rounded-xl w-fit">
+                            <button
+                                onClick={() => setLedgerSubTab('view')}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    ledgerSubTab === 'view' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                Party Statement & PDF
+                            </button>
+                            <button
+                                onClick={() => setLedgerSubTab('entries')}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    ledgerSubTab === 'entries' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                Raw Ledger Entries ({allLedgerEntries.length})
+                            </button>
+                            <button
+                                onClick={() => setLedgerSubTab('saved')}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    ledgerSubTab === 'saved' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                                Saved Statements ({ledgerStatements.length})
+                            </button>
+                        </div>
+
+                        {ledgerSubTab === 'view' && (
+                            <div className="p-6 rounded-2xl bg-slate-900/80 border border-white/10 shadow-xl space-y-4">
+                                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                                    <DocumentTextIcon className="w-5 h-5 text-blue-400" /> Generate Official Ledger Statement
+                                </h3>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">Select Party</label>
+                                        <select
+                                            value={selectedPartyLedger}
+                                            onChange={(e) => setSelectedPartyLedger(e.target.value)}
+                                            className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                                        >
+                                            <option value="ALL">All Parties Consolidated</option>
+                                            {partyList.map((p) => (
+                                                <option key={p} value={p}>
+                                                    {p}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">From Date</label>
+                                        <input
+                                            type="date"
+                                            value={ledgerFromDate}
+                                            onChange={(e) => setLedgerFromDate(e.target.value)}
+                                            className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-400 mb-1">To Date</label>
+                                        <input
+                                            type="date"
+                                            value={ledgerToDate}
+                                            onChange={(e) => setLedgerToDate(e.target.value)}
+                                            className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 flex justify-end">
+                                    <button
+                                        onClick={handleExportLedgerPDF}
+                                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                    >
+                                        <DownloadIcon className="w-4 h-4" />
+                                        <span>Download & Save PDF Statement</span>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {ledgerSubTab === 'entries' && (
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center bg-slate-900/80 p-4 rounded-2xl border border-white/10">
+                                    <span className="text-xs font-bold text-white">Manual & System Ledger Journal</span>
+                                    <button
+                                        onClick={() => setShowAddLedgerEntryModal(true)}
+                                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl cursor-pointer"
+                                    >
+                                        + Add Transaction
+                                    </button>
+                                </div>
+
+                                <div className="bg-slate-900/80 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+                                    <table className="w-full text-left text-xs">
+                                        <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
+                                            <tr>
+                                                <th className="px-4 py-3.5">Date</th>
+                                                <th className="px-4 py-3.5">Party</th>
+                                                <th className="px-4 py-3.5">Description</th>
+                                                <th className="px-4 py-3.5">Credit</th>
+                                                <th className="px-4 py-3.5">Debit</th>
+                                                <th className="px-4 py-3.5">Mode</th>
+                                                <th className="px-4 py-3.5 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {allLedgerEntries.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
+                                                        No ledger entries recorded.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                allLedgerEntries.map((e) => (
+                                                    <tr key={e.id} className="hover:bg-white/5">
+                                                        <td className="px-4 py-3 text-slate-400">{e.date}</td>
+                                                        <td className="px-4 py-3 font-bold text-white">{e.party_name || '-'}</td>
+                                                        <td className="px-4 py-3 text-slate-300">{e.description}</td>
+                                                        <td className="px-4 py-3 text-emerald-400 font-mono font-bold">
+                                                            {e.credit ? `₹${e.credit}` : '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-rose-400 font-mono font-bold">
+                                                            {e.debit ? `₹${e.debit}` : '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-400">{e.payment_mode || '-'}</td>
+                                                        <td className="px-4 py-3 text-right space-x-2">
+                                                            <button
+                                                                onClick={() => setEditingLedgerEntry(e)}
+                                                                className="p-1.5 bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/40"
+                                                            >
+                                                                <PencilIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteLedgerEntryRecord(e.id)}
+                                                                className="p-1.5 bg-rose-500/20 text-rose-300 rounded hover:bg-rose-500/40"
+                                                            >
+                                                                <TrashIcon className="w-3.5 h-3.5" />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {ledgerSubTab === 'saved' && (
+                            <div className="bg-slate-900/80 border border-white/10 rounded-2xl p-4 shadow-xl">
+                                <h3 className="text-sm font-bold text-white mb-3">Saved Statements in Cloud</h3>
+                                {ledgerStatements.length === 0 ? (
+                                    <p className="text-xs text-slate-400 py-6 text-center">No statements saved yet.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {ledgerStatements.map((stmt) => (
+                                            <div key={stmt.id} className="p-3 bg-slate-950 rounded-xl flex items-center justify-between text-xs">
+                                                <div>
+                                                    <p className="font-bold text-white">{stmt.party_name}</p>
+                                                    <p className="text-slate-400">
+                                                        Period: {stmt.from_date} to {stmt.to_date}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!confirm('Delete saved statement?')) return;
+                                                        await deleteLedgerStatement(stmt.id, stmt.file_path);
+                                                        setLedgerStatements((prev) => prev.filter((s) => s.id !== stmt.id));
+                                                        toast.success('Deleted statement.');
+                                                    }}
+                                                    className="p-2 bg-rose-500/20 text-rose-300 rounded-lg hover:bg-rose-500/40"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
                 )}
 
-                {/* System Tab */}
+                {/* ============================================================== */}
+                {/* TAB 8: MASTER SETTINGS & COMPANY PROFILE */}
+                {/* ============================================================== */}
                 {activeTab === 'system' && (
                     <div className="space-y-6 animate-fadeIn">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
-                                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                    <ServerIcon className="w-6 h-6 text-blue-400" />
-                                    Server Status
-                                </h3>
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-300">CPU Usage</span>
-                                        <span className="text-green-400 font-bold">24%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2">
-                                        <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-2 rounded-full" style={{ width: '24%' }}></div>
-                                    </div>
+                        <div className="p-6 rounded-2xl bg-slate-900/80 border border-white/10 shadow-2xl space-y-4">
+                            <h3 className="font-bold text-white text-base flex items-center gap-2">
+                                <CogIcon className="w-5 h-5 text-indigo-400" /> Company Master Profile & Billing Information
+                            </h3>
 
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-300">Memory Usage</span>
-                                        <span className="text-yellow-400 font-bold">67%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2">
-                                        <div className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full" style={{ width: '67%' }}></div>
-                                    </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Company / Transporter Name</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.name || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, name: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
 
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-gray-300">Disk Usage</span>
-                                        <span className="text-blue-400 font-bold">45%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2">
-                                        <div className="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full" style={{ width: '45%' }}></div>
-                                    </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Tagline</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.tagline || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, tagline: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="block text-slate-300 font-bold mb-1">Head Office Address</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.address || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, address: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">GSTN</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.gstn || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, gstn: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">PAN Number</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.pan || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, pan: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Email Address</label>
+                                    <input
+                                        type="email"
+                                        value={companyDetails.email || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, email: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Website URL</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.web || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, web: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Jurisdiction City</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.jurisdictionCity || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, jurisdictionCity: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">SAC / HSN Code</label>
+                                    <input
+                                        type="text"
+                                        value={companyDetails.sacCode || ''}
+                                        onChange={(e) => setCompanyDetails({ ...companyDetails, sacCode: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none focus:border-indigo-500"
+                                    />
                                 </div>
                             </div>
 
-                            <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
-                                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                    <DatabaseIcon className="w-6 h-6 text-purple-400" />
-                                    Database Info
-                                </h3>
-                                <div className="space-y-4 text-gray-300">
-                                    <div className="flex justify-between">
-                                        <span>Total Records</span>
-                                        <span className="font-bold text-white">45,892</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Last Backup</span>
-                                        <span className="font-bold text-green-400">2 hours ago</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Database Size</span>
-                                        <span className="font-bold text-white">2.4 GB</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Connection Pool</span>
-                                        <span className="font-bold text-blue-400">Active (12/20)</span>
-                                    </div>
+                            {/* Bank Details */}
+                            <div className="pt-4 border-t border-white/10">
+                                <h4 className="font-bold text-white text-xs mb-3">Bank Account Information</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                                    <input
+                                        type="text"
+                                        placeholder="Bank Name"
+                                        value={companyDetails.bankDetails?.name || ''}
+                                        onChange={(e) =>
+                                            setCompanyDetails({
+                                                ...companyDetails,
+                                                bankDetails: { ...companyDetails.bankDetails, name: e.target.value },
+                                            })
+                                        }
+                                        className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Branch"
+                                        value={companyDetails.bankDetails?.branch || ''}
+                                        onChange={(e) =>
+                                            setCompanyDetails({
+                                                ...companyDetails,
+                                                bankDetails: { ...companyDetails.bankDetails, branch: e.target.value },
+                                            })
+                                        }
+                                        className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Account Number"
+                                        value={companyDetails.bankDetails?.accountNo || ''}
+                                        onChange={(e) =>
+                                            setCompanyDetails({
+                                                ...companyDetails,
+                                                bankDetails: { ...companyDetails.bankDetails, accountNo: e.target.value },
+                                            })
+                                        }
+                                        className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none font-mono"
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="IFSC Code"
+                                        value={companyDetails.bankDetails?.ifscCode || ''}
+                                        onChange={(e) =>
+                                            setCompanyDetails({
+                                                ...companyDetails,
+                                                bankDetails: { ...companyDetails.bankDetails, ifscCode: e.target.value },
+                                            })
+                                        }
+                                        className="px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none font-mono"
+                                    />
                                 </div>
+                            </div>
+
+                            <div className="pt-4 flex justify-end">
+                                <button
+                                    onClick={async () => {
+                                        const toastId = toast.loading('Saving company details...');
+                                        try {
+                                            if (onUpdateDetails) {
+                                                await onUpdateDetails(companyDetails);
+                                            } else {
+                                                await saveCompanyDetails(companyDetails);
+                                            }
+                                            toast.success('Company profile updated successfully!', { id: toastId });
+                                        } catch (e: any) {
+                                            toast.error('Failed to save profile: ' + e?.message, { id: toastId });
+                                        }
+                                    }}
+                                    className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                >
+                                    Save Company Details
+                                </button>
                             </div>
                         </div>
                     </div>
                 )}
-
-                {/* Analytics Tab */}
-                {activeTab === 'analytics' && (
-                    <div className="space-y-6 animate-fadeIn">
-                        <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-8 shadow-2xl">
-                            <h2 className="text-2xl font-bold text-white mb-6">Analytics Dashboard</h2>
-                            <div className="text-center py-12 text-gray-400">
-                                <ChartBarIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                                <p>Advanced analytics and charts will be displayed here</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Ledger Tab */}
-                {activeTab === 'ledger' && (() => {
-                    // --- Party Ledger Logic ---
-                    type LedgerRow = {
-                        date: string;
-                        description: string;
-                        type: 'Invoice (Credit)' | 'Voucher (Debit)';
-                        ref_no: string;
-                        payment_mode?: string;
-                        credit: number;
-                        debit: number;
-                    };
-
-                    const partyRows: LedgerRow[] = [];
-
-                    if (selectedPartyLedger) {
-                        // Group LRs by invoiceNo for the selected party (or ALL)
-                        const partyInvoices: { [key: string]: { date: string, amountExclTax: number, invoiceNo: string, partyName: string } } = {};
-
-                        allLRs
-                            .filter(lr => lr.isInvoiceGenerated && lr.invoiceNo)
-                            .filter(lr => {
-                                // Party filter
-                                if (selectedPartyLedger !== 'ALL') {
-                                    const billedToName = lr.billingTo?.name || lr.consignor?.name;
-                                    if (billedToName !== selectedPartyLedger) return false;
-                                }
-                                
-                                // Date range filter
-                                const lrDate = new Date(lr.invoiceDate || lr.date).getTime();
-                                if (ledgerFromDate && lrDate < new Date(ledgerFromDate).getTime()) return false;
-                                if (ledgerToDate && lrDate > new Date(ledgerToDate).getTime()) return false;
-                                
-                                return true;
-                            })
-                            .forEach(lr => {
-                                const invNo = lr.invoiceNo as string;
-                                const billedToName = lr.billingTo?.name || lr.consignor?.name || 'Unknown Party';
-                                const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum, charge) => sum + (Number(charge) || 0), 0);
-                                const rawAmount = (Number(lr.freight) || 0) + totalCharges;
-
-                                if (!partyInvoices[invNo]) {
-                                    partyInvoices[invNo] = {
-                                        date: lr.invoiceDate || lr.date,
-                                        amountExclTax: 0,
-                                        invoiceNo: invNo,
-                                        partyName: billedToName
-                                    };
-                                }
-                                partyInvoices[invNo].amountExclTax += rawAmount;
-                            });
-
-                        // Create a single ledger credit row for each aggregated Invoice
-                        Object.values(partyInvoices).forEach(inv => {
-                            // Total amount include tax 18%
-                            const amountWithTax = Math.round(inv.amountExclTax * 1.18);
-                            
-                            partyRows.push({
-                                date: inv.date,
-                                description: selectedPartyLedger === 'ALL' ? `Bill Generated (${inv.partyName})` : `Bill Generated`,
-                                type: 'Invoice (Credit)',
-                                ref_no: inv.invoiceNo,
-                                credit: amountWithTax,
-                                debit: 0,
-                            });
-                        });
-
-                        // Vouchers → Debit rows
-                        allVouchers
-                            .filter(v => {
-                                // Party filter
-                                if (selectedPartyLedger !== 'ALL' && v.party_name !== selectedPartyLedger) return false;
-                                
-                                // Date range filter
-                                const vDate = new Date(v.date).getTime();
-                                if (ledgerFromDate && vDate < new Date(ledgerFromDate).getTime()) return false;
-                                if (ledgerToDate && vDate > new Date(ledgerToDate).getTime()) return false;
-                                
-                                return true;
-                            })
-                            .forEach(v => {
-                                partyRows.push({
-                                    date: v.date,
-                                    description: selectedPartyLedger === 'ALL' ? `${v.description} (${v.party_name})` : v.description,
-                                    type: 'Voucher (Debit)',
-                                    ref_no: v.voucher_no,
-                                    payment_mode: v.payment_mode,
-                                    credit: 0,
-                                    debit: Number(v.amount) || 0,
-                                });
-                            });
-                    }
-
-                    // Sort by date ascending
-                    partyRows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-                    // Running balance
-                    let runningBal = 0;
-                    const rowsWithBalance = partyRows.map(row => {
-                        runningBal += row.credit - row.debit;
-                        return { ...row, runningBalance: runningBal };
-                    });
-
-                    const totalCredit = partyRows.reduce((s, r) => s + r.credit, 0);
-                    const totalDebit = partyRows.reduce((s, r) => s + r.debit, 0);
-                    const totalBalance = totalCredit - totalDebit;
-
-                    const handleExportPDF = () => {
-                        import('jspdf').then(({ default: jsPDF }) => {
-                            import('jspdf-autotable').then(({ default: autoTable }) => {
-                                const doc = new jsPDF('p', 'mm', 'a4');
-                                const pageWidth = doc.internal.pageSize.getWidth();
-                                
-                                // --- 1. Company Header ---
-                                if (companyDetails) {
-                                    doc.setFontSize(22);
-                                    doc.setFont('helvetica', 'bold');
-                                    doc.setTextColor(41, 128, 185); // Blue
-                                    doc.text(companyDetails.name.toUpperCase(), pageWidth / 2, 20, { align: 'center' });
-                                    
-                                    doc.setFontSize(10);
-                                    doc.setFont('helvetica', 'normal');
-                                    doc.setTextColor(60, 60, 60);
-                                    doc.text(companyDetails.address || '', pageWidth / 2, 26, { align: 'center', maxWidth: pageWidth - 40 });
-                                    
-                                    const detailsLine = [
-                                        companyDetails.mobile ? `Mob: ${companyDetails.mobile}` : '',
-                                        companyDetails.email ? `Email: ${companyDetails.email}` : ''
-                                    ].filter(Boolean).join('  |  ');
-                                    
-                                    doc.text(detailsLine, pageWidth / 2, 31, { align: 'center' });
-                                    
-                                    if (companyDetails.gstNo) {
-                                        doc.setFont('helvetica', 'bold');
-                                        doc.setTextColor(41, 128, 185); // Blue
-                                        doc.text(`GST NO: ${companyDetails.gstNo}`, pageWidth / 2, 36, { align: 'center' });
-                                        doc.setFont('helvetica', 'normal');
-                                        doc.setTextColor(60, 60, 60);
-                                    }
-                                    
-                                    doc.setDrawColor(41, 128, 185);
-                                    doc.setLineWidth(0.5);
-                                    doc.line(14, 40, pageWidth - 14, 40);
-                                }
-
-                                // --- 2. Party & Statement Details ---
-                                doc.setFontSize(16);
-                                doc.setFont('helvetica', 'bold');
-                                doc.setTextColor(0, 0, 0);
-                                doc.text("STATEMENT", 14, 48);
-                                
-                                doc.setFontSize(10);
-                                doc.text(`Party: ${selectedPartyLedger}`, 14, 55);
-                                
-                                const partyObj = savedParties.find(p => p.name === selectedPartyLedger);
-                                let currentY = 60;
-                                if (partyObj) {
-                                    doc.setFont('helvetica', 'normal');
-                                    if (partyObj.address) {
-                                        const addressText = `Address: ${partyObj.address}`;
-                                        const splitAddress = doc.splitTextToSize(addressText, pageWidth / 2 + 20);
-                                        doc.text(splitAddress, 14, currentY);
-                                        currentY += (splitAddress.length * 5) + 2;
-                                    }
-                                    if (partyObj.gst) {
-                                        doc.setFont('helvetica', 'bold');
-                                        doc.text(`GST: ${partyObj.gst}`, 14, currentY);
-                                        doc.setFont('helvetica', 'normal');
-                                        currentY += 8;
-                                    }
-                                }
-
-                                doc.setFont('helvetica', 'bold');
-                                doc.text("Statement Period:", pageWidth - 14, 55, { align: 'right' });
-                                doc.setFont('helvetica', 'normal');
-                                const dateRange = `${ledgerFromDate || 'Start'} to ${ledgerToDate || 'End'}`;
-                                doc.text(dateRange, pageWidth - 14, 60, { align: 'right' });
-
-                                // --- 3. Summary Box ---
-                                doc.setDrawColor(200);
-                                doc.setFillColor(245, 245, 245);
-                                // Ensure summary box doesn't overlap with party details if address is long
-                                const summaryBoxY = Math.max(70, currentY);
-                                doc.roundedRect(14, summaryBoxY, pageWidth - 28, 15, 2, 2, 'FD');
-                                
-                                doc.setFontSize(9);
-                                doc.setFont('helvetica', 'bold');
-                                doc.text("Total Credit", 25, summaryBoxY + 6);
-                                doc.text("Total Debit", pageWidth / 2, summaryBoxY + 6, { align: 'center' });
-                                doc.text("Net Balance", pageWidth - 25, summaryBoxY + 6, { align: 'right' });
-                                
-                                doc.setFontSize(11);
-                                doc.setTextColor(39, 174, 96); // Green
-                                doc.text(`Rs. ${totalCredit.toLocaleString('en-IN')}`, 25, summaryBoxY + 12);
-                                doc.setTextColor(192, 57, 43); // Red
-                                doc.text(`Rs. ${totalDebit.toLocaleString('en-IN')}`, pageWidth / 2, summaryBoxY + 12, { align: 'center' });
-                                doc.setTextColor(totalBalance >= 0 ? 41 : 192, totalBalance >= 0 ? 128 : 57, totalBalance >= 0 ? 185 : 43);
-                                doc.text(`Rs. ${Math.abs(totalBalance).toLocaleString('en-IN')} ${totalBalance >= 0 ? '(Cr)' : '(Dr)'}`, pageWidth - 25, summaryBoxY + 12, { align: 'right' });
-
-                                // --- 4. Ledger Table ---
-                                const tableStartY = summaryBoxY + 20;
-                                const tableColumn = ["Date", "Type", "Ref No.", "Description", "Credit", "Debit", "Balance"];
-                                const tableRows = rowsWithBalance.map(row => [
-                                    new Date(row.date).toLocaleDateString('en-GB'),
-                                    row.type,
-                                    row.ref_no,
-                                    row.description,
-                                    row.credit ? row.credit.toLocaleString('en-IN') : '-',
-                                    row.debit ? row.debit.toLocaleString('en-IN') : '-',
-                                    row.runningBalance.toLocaleString('en-IN')
-                                ]);
-
-                                autoTable(doc, {
-                                    head: [tableColumn],
-                                    body: tableRows,
-                                    startY: tableStartY,
-                                    theme: 'grid',
-                                    styles: { fontSize: 8, cellPadding: 2, font: 'helvetica' },
-                                    headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: 'bold' },
-                                    alternateRowStyles: { fillColor: [248, 249, 250] },
-                                    columnStyles: {
-                                        4: { halign: 'right' },
-                                        5: { halign: 'right' },
-                                        6: { halign: 'right', fontStyle: 'bold' }
-                                    }
-                                });
-
-                                doc.save(`Ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}.pdf`);
-                                toast.success('PDF Downloaded successfully!');
-
-                                // --- 5. Save to database & Storage ---
-                                const pdfBlob = doc.output('blob');
-                                const fileName = `ledger_${selectedPartyLedger.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`;
-                                const filePath = `statements/${fileName}`;
-
-                                saveLedgerStatement({
-                                    admin_id: (supabase.auth.getUser() as any).id, // Will be replaced by service
-                                    party_name: selectedPartyLedger,
-                                    from_date: ledgerFromDate || '2000-01-01',
-                                    to_date: ledgerToDate || new Date().toISOString().split('T')[0],
-                                    file_path: filePath
-                                }, pdfBlob).then(() => {
-                                    loadLedgerStatements();
-                                }).catch(err => {
-                                    console.error("Error saving statement:", err);
-                                });
-                            });
-                        });
-                    };
-
-                    const handleDeleteStatement = async (statement: LedgerStatement) => {
-                        if (!confirm("Are you sure you want to delete this saved statement?")) return;
-                        try {
-                            await deleteLedgerStatement(statement.id, statement.file_path);
-                            toast.success("Statement deleted!");
-                            loadLedgerStatements();
-                        } catch (err) {
-                            toast.error("Error deleting statement");
-                        }
-                    };
-
-                    return (
-                        <div className="space-y-6 animate-fadeIn">
-                            {/* Ledger Navigation Sub-tabs */}
-                            <div className="flex gap-2 p-1 bg-white/5 rounded-2xl border border-white/10 w-fit">
-                                <button 
-                                    onClick={() => setLedgerSubTab('view')}
-                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${ledgerSubTab === 'view' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                >
-                                    View Ledger
-                                </button>
-                                <button 
-                                    onClick={() => setLedgerSubTab('saved')}
-                                    className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${ledgerSubTab === 'saved' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                                >
-                                    Saved Statements ({ledgerStatements.length})
-                                </button>
-                            </div>
-
-                            {ledgerSubTab === 'view' ? (
-                                <>
-                                    {/* Party Selector & Filters */}
-                                    <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
-                                <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                                    <UserIcon className="w-6 h-6 text-blue-400" />
-                                    Ledger Filters
-                                </h2>
-                                <div className="flex flex-col lg:flex-row gap-4 items-end">
-                                    <div className="flex-1 w-full">
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">Select Party</label>
-                                        <select
-                                            value={selectedPartyLedger}
-                                            onChange={e => setSelectedPartyLedger(e.target.value)}
-                                            className="w-full bg-white/10 border border-white/20 text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium transition-all hover:bg-white/15"
-                                        >
-                                            <option value="" className="text-gray-900">— Select Party to View Ledger —</option>
-                                            <option value="ALL" className="text-gray-900 font-bold bg-blue-100">ALL PARTIES (COMBINED LEDGER)</option>
-                                            {partyList.map(p => (
-                                                <option key={p} value={p} className="text-gray-900">{p}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    
-                                    <div className="w-full lg:w-48">
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">From Date</label>
-                                        <div className="relative">
-                                            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                                            <input 
-                                                type="date"
-                                                value={ledgerFromDate}
-                                                onChange={e => setLedgerFromDate(e.target.value)}
-                                                className="w-full bg-white/10 border border-white/20 text-white rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all hover:bg-white/15"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full lg:w-48">
-                                        <label className="block text-xs font-semibold text-gray-400 uppercase mb-2 ml-1">To Date</label>
-                                        <div className="relative">
-                                            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 pointer-events-none" />
-                                            <input 
-                                                type="date"
-                                                value={ledgerToDate}
-                                                onChange={e => setLedgerToDate(e.target.value)}
-                                                className="w-full bg-white/10 border border-white/20 text-white rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none text-sm transition-all hover:bg-white/15"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-2 w-full lg:w-auto">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedPartyLedger('');
-                                                setLedgerFromDate('');
-                                                setLedgerToDate('');
-                                            }}
-                                            className="flex-1 lg:flex-none px-6 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-400 hover:bg-white/10 hover:text-white transition text-sm font-bold"
-                                        >Reset</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Summary Cards */}
-                            {selectedPartyLedger && (
-                                <>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-xl rounded-2xl border border-green-500/30 p-6">
-                                            <h3 className="text-green-400 font-semibold mb-1 text-sm uppercase tracking-wider">Total Credit (Invoices)</h3>
-                                            <p className="text-3xl font-black text-white">₹{totalCredit.toLocaleString('en-IN')}</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-red-500/20 to-rose-600/20 backdrop-blur-xl rounded-2xl border border-red-500/30 p-6">
-                                            <h3 className="text-red-400 font-semibold mb-1 text-sm uppercase tracking-wider">Total Debit (Vouchers)</h3>
-                                            <p className="text-3xl font-black text-white">₹{totalDebit.toLocaleString('en-IN')}</p>
-                                        </div>
-                                        <div className={`bg-gradient-to-br ${totalBalance >= 0 ? 'from-blue-500/20 to-indigo-600/20 border-blue-500/30' : 'from-orange-500/20 to-red-600/20 border-orange-500/30'} backdrop-blur-xl rounded-2xl border p-6`}>
-                                            <h3 className={`${totalBalance >= 0 ? 'text-blue-400' : 'text-orange-400'} font-semibold mb-1 text-sm uppercase tracking-wider`}>Net Balance (Credit − Debit)</h3>
-                                            <p className={`text-3xl font-black ${totalBalance >= 0 ? 'text-white' : 'text-orange-300'}`}>
-                                                {totalBalance < 0 ? '− ' : ''}₹{Math.abs(totalBalance).toLocaleString('en-IN')}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Ledger Table */}
-                                    <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
-                                        <div className="flex justify-between items-center mb-5">
-                                            <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <DocumentTextIcon className="w-6 h-6 text-blue-400" />
-                                                    Ledger for: <span className="text-blue-300">{selectedPartyLedger}</span>
-                                                </div>
-                                                {(ledgerFromDate || ledgerToDate) && (
-                                                    <span className="text-xs font-normal text-gray-400 bg-white/5 px-2 py-1 rounded-lg border border-white/10">
-                                                        Period: {ledgerFromDate || '...'} to {ledgerToDate || '...'}
-                                                    </span>
-                                                )}
-                                            </h2>
-                                            <button 
-                                                onClick={handleExportPDF}
-                                                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 rounded-xl text-white font-bold transition-all shadow-lg hover:shadow-blue-500/50"
-                                            >
-                                                <DownloadIcon className="w-4 h-4" /> Export PDF
-                                            </button>
-                                        </div>
-                                        <div className="overflow-x-auto custom-scrollbar">
-                                            <table className="w-full text-left text-sm text-gray-300">
-                                                <thead className="text-xs text-gray-400 uppercase bg-white/5">
-                                                    <tr>
-                                                        <th className="px-4 py-3 rounded-tl-xl font-semibold">Date</th>
-                                                        <th className="px-4 py-3 font-semibold">Type</th>
-                                                        <th className="px-4 py-3 font-semibold">Ref No.</th>
-                                                        <th className="px-4 py-3 font-semibold">Description</th>
-                                                        <th className="px-4 py-3 font-semibold">Mode</th>
-                                                        <th className="px-4 py-3 font-semibold text-right text-green-400">Credit (₹)</th>
-                                                        <th className="px-4 py-3 font-semibold text-right text-red-400">Debit (₹)</th>
-                                                        <th className="px-4 py-3 font-semibold text-right rounded-tr-xl">Balance (₹)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-white/10">
-                                                    {rowsWithBalance.length === 0 ? (
-                                                        <tr>
-                                                            <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
-                                                                No transactions found for <strong className="text-white">{selectedPartyLedger}</strong>.
-                                                            </td>
-                                                        </tr>
-                                                    ) : (
-                                                        rowsWithBalance.map((row, idx) => (
-                                                            <tr key={idx} className={`hover:bg-white/5 transition ${row.type === 'Invoice (Credit)' ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
-                                                                <td className="px-4 py-3 whitespace-nowrap text-gray-300">{new Date(row.date).toLocaleDateString('en-GB')}</td>
-                                                                <td className="px-4 py-3">
-                                                                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                                                                        row.type === 'Invoice (Credit)'
-                                                                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                                                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                                                    }`}>{row.type}</span>
-                                                                </td>
-                                                                <td className="px-4 py-3 font-mono text-xs text-blue-300">{row.ref_no}</td>
-                                                                <td className="px-4 py-3 text-white font-medium max-w-[200px] truncate" title={row.description}>{row.description}</td>
-                                                                <td className="px-4 py-3 text-gray-400 text-xs">{row.payment_mode || '—'}</td>
-                                                                <td className="px-4 py-3 text-right font-bold text-green-400">{row.credit ? `₹${row.credit.toLocaleString('en-IN')}` : '—'}</td>
-                                                                <td className="px-4 py-3 text-right font-bold text-red-400">{row.debit ? `₹${row.debit.toLocaleString('en-IN')}` : '—'}</td>
-                                                                <td className={`px-4 py-3 text-right font-black text-lg ${ row.runningBalance >= 0 ? 'text-white' : 'text-orange-300'}`}>
-                                                                    {row.runningBalance < 0 ? '−' : ''}₹{Math.abs(row.runningBalance).toLocaleString('en-IN')}
-                                                                </td>
-                                                            </tr>
-                                                        ))
-                                                    )}
-                                                </tbody>
-                                                <tfoot className="bg-white/5 font-bold text-white border-t-2 border-white/20">
-                                                    <tr>
-                                                        <td colSpan={5} className="px-4 py-4 text-right text-gray-300 uppercase tracking-wider text-xs">TOTAL</td>
-                                                        <td className="px-4 py-4 text-right text-green-400 text-lg">₹{totalCredit.toLocaleString('en-IN')}</td>
-                                                        <td className="px-4 py-4 text-right text-red-400 text-lg">₹{totalDebit.toLocaleString('en-IN')}</td>
-                                                        <td className={`px-4 py-4 text-right text-xl font-black ${totalBalance >= 0 ? 'text-blue-300' : 'text-orange-300'}`}>
-                                                            {totalBalance < 0 ? '−' : ''}₹{Math.abs(totalBalance).toLocaleString('en-IN')}
-                                                        </td>
-                                                    </tr>
-                                                </tfoot>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-
-                            {!selectedPartyLedger && (
-                                <div className="text-center py-20 text-gray-400">
-                                    <UserIcon className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                                    <p className="text-xl font-semibold">Select a party above to view their ledger</p>
-                                    <p className="text-sm mt-2 opacity-70">All invoices and vouchers linked to that party will appear here</p>
-                                </div>
-                            )}
-                                </>
-                            ) : (
-                                <div className="bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20 p-6 shadow-2xl overflow-hidden">
-                                    <div className="flex justify-between items-center mb-5">
-                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                            <CloudIcon className="w-6 h-6 text-blue-400" />
-                                            Saved Statements History
-                                        </h2>
-                                        <button 
-                                            onClick={loadLedgerStatements}
-                                            className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition"
-                                            title="Refresh List"
-                                        >
-                                            <RefreshIcon className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                    <div className="overflow-x-auto custom-scrollbar">
-                                        <table className="w-full text-left text-sm text-gray-300">
-                                            <thead className="text-xs text-gray-400 uppercase bg-white/5">
-                                                <tr>
-                                                    <th className="px-4 py-3 rounded-tl-xl font-semibold">Date Saved</th>
-                                                    <th className="px-4 py-3 font-semibold">Party Name</th>
-                                                    <th className="px-4 py-3 font-semibold">Period</th>
-                                                    <th className="px-4 py-3 font-semibold text-center rounded-tr-xl">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-white/10">
-                                                {ledgerStatements.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={4} className="px-4 py-10 text-center text-gray-400">
-                                                            No saved statements found. Export a ledger to save it here.
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    ledgerStatements.map((stmt) => (
-                                                        <tr key={stmt.id} className="hover:bg-white/5 transition">
-                                                            <td className="px-4 py-3 whitespace-nowrap text-gray-300">
-                                                                {new Date(stmt.created_at).toLocaleString('en-GB')}
-                                                            </td>
-                                                            <td className="px-4 py-3 font-bold text-white">{stmt.party_name}</td>
-                                                            <td className="px-4 py-3 text-xs text-gray-400">
-                                                                {new Date(stmt.from_date).toLocaleDateString('en-GB')} to {new Date(stmt.to_date).toLocaleDateString('en-GB')}
-                                                            </td>
-                                                            <td className="px-4 py-3 text-center">
-                                                                <div className="flex items-center justify-center gap-3">
-                                                                    <a 
-                                                                        href={stmt.file_url} 
-                                                                        target="_blank" 
-                                                                        rel="noopener noreferrer"
-                                                                        className="p-2 hover:bg-blue-500/20 rounded-lg text-blue-400 hover:text-blue-300 transition"
-                                                                        title="Download/View PDF"
-                                                                    >
-                                                                        <DownloadIcon className="w-5 h-5" />
-                                                                    </a>
-                                                                    <button 
-                                                                        onClick={() => handleDeleteStatement(stmt)}
-                                                                        className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition"
-                                                                        title="Delete Statement"
-                                                                    >
-                                                                        <TrashIcon className="w-5 h-5" />
-                                                                    </button>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })()}
             </div>
 
-            {/* Custom Scrollbar Styles */}
-            <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
+            {/* ============================================================== */}
+            {/* MODALS */}
+            {/* ============================================================== */}
 
-                @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
+            {/* Modal 1: Create User / Operator */}
+            {showAddUserModal && (
+                <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fadeIn">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <UsersIcon className="w-5 h-5 text-indigo-400" /> Create System Account
+                            </h3>
+                            <button onClick={() => setShowAddUserModal(false)} className="text-slate-400 hover:text-white">
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateUser} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Email Address</label>
+                                <input
+                                    type="email"
+                                    required
+                                    value={newUserEmail}
+                                    onChange={(e) => setNewUserEmail(e.target.value)}
+                                    placeholder="operator@company.com"
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Temporary Password</label>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={6}
+                                    value={newUserPassword}
+                                    onChange={(e) => setNewUserPassword(e.target.value)}
+                                    placeholder="Minimum 6 characters"
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Assigned Role</label>
+                                <select
+                                    value={newUserRole}
+                                    onChange={(e) => setNewUserRole(e.target.value as any)}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                >
+                                    <option value="Operator">Operator (Standard LR & Master Data Entry)</option>
+                                    <option value="Manager">Manager (Supervisory role)</option>
+                                    <option value="Admin">Admin (Full administrative control)</option>
+                                </select>
+                            </div>
+                            <div className="pt-2 flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddUserModal(false)}
+                                    className="flex-1 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold hover:bg-slate-700"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isCreatingUser}
+                                    className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold disabled:opacity-50"
+                                >
+                                    {isCreatingUser ? 'Creating...' : 'Create Account'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                @keyframes gradient {
-                    0%, 100% { background-position: 0% 50%; }
-                    50% { background-position: 100% 50%; }
-                }
+            {/* Modal 2: Edit User / Operator */}
+            {editingOperator && (
+                <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fadeIn">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <PencilIcon className="w-5 h-5 text-blue-400" /> Edit Account
+                            </h3>
+                            <button onClick={() => setEditingOperator(null)} className="text-slate-400 hover:text-white">
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleUpdateOperator} className="space-y-4 text-xs">
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    required
+                                    value={editEmail}
+                                    onChange={(e) => setEditEmail(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">New Password (leave empty to keep current)</label>
+                                <input
+                                    type="password"
+                                    value={editPassword}
+                                    onChange={(e) => setEditPassword(e.target.value)}
+                                    placeholder="Enter new password"
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Role</label>
+                                <select
+                                    value={editRole}
+                                    onChange={(e) => setEditRole(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                >
+                                    <option value="Operator">Operator</option>
+                                    <option value="Manager">Manager</option>
+                                    <option value="Admin">Admin</option>
+                                </select>
+                            </div>
+                            <div className="pt-2 flex gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingOperator(null)}
+                                    className="flex-1 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isUpdatingOperator}
+                                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold disabled:opacity-50"
+                                >
+                                    {isUpdatingOperator ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .animate-fadeIn {
-                    animation: fadeIn 0.5s ease-in-out;
-                }
+            {/* Modal 3: View Full LR Details */}
+            {viewingLR && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base">
+                                Lorry Receipt #{viewingLR.lrNo}
+                            </h3>
+                            <button onClick={() => setViewingLR(null)} className="text-slate-400 hover:text-white">
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">Date</span>
+                                <span className="font-bold text-white">{viewingLR.date}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">Truck No</span>
+                                <span className="font-bold text-amber-300 font-mono">{viewingLR.truckNo}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">Status</span>
+                                <span className="font-bold text-emerald-400">{viewingLR.status}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">From Place</span>
+                                <span className="font-bold text-white">{viewingLR.fromPlace}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">To Place</span>
+                                <span className="font-bold text-white">{viewingLR.toPlace}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl">
+                                <span className="text-slate-400 block">Freight</span>
+                                <span className="font-mono font-bold text-emerald-400">₹{viewingLR.freight}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl col-span-2 sm:col-span-3">
+                                <span className="text-slate-400 block">Consignor</span>
+                                <span className="font-bold text-white">{viewingLR.consignor?.name}</span>
+                                <span className="text-slate-400 block text-[11px]">{viewingLR.consignor?.address}</span>
+                            </div>
+                            <div className="p-3 bg-slate-950 rounded-xl col-span-2 sm:col-span-3">
+                                <span className="text-slate-400 block">Consignee</span>
+                                <span className="font-bold text-white">{viewingLR.consignee?.name}</span>
+                                <span className="text-slate-400 block text-[11px]">{viewingLR.consignee?.address}</span>
+                            </div>
+                        </div>
+                        <div className="pt-2 flex justify-end gap-2">
+                            <button
+                                onClick={() => {
+                                    setEditingLR({ ...viewingLR });
+                                    setViewingLR(null);
+                                }}
+                                className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold"
+                            >
+                                Edit this LR
+                            </button>
+                            <button
+                                onClick={() => setViewingLR(null)}
+                                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-bold"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
-                .animate-fadeInUp {
-                    animation: fadeInUp 0.6s ease-out forwards;
-                }
+            {/* Modal 4: Edit LR Record */}
+            {editingLR && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base">Edit LR #{editingLR.lrNo}</h3>
+                            <button onClick={() => setEditingLR(null)} className="text-slate-400 hover:text-white">
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveEditedLR} className="space-y-4 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={editingLR.date}
+                                        onChange={(e) => setEditingLR({ ...editingLR, date: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Truck No</label>
+                                    <input
+                                        type="text"
+                                        value={editingLR.truckNo}
+                                        onChange={(e) => setEditingLR({ ...editingLR, truckNo: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Status</label>
+                                    <select
+                                        value={editingLR.status}
+                                        onChange={(e) => setEditingLR({ ...editingLR, status: e.target.value as LRStatus })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    >
+                                        <option value="Booked">Booked</option>
+                                        <option value="In Transit">In Transit</option>
+                                        <option value="Out for Delivery">Out for Delivery</option>
+                                        <option value="Delivered">Delivered</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">From Place</label>
+                                    <input
+                                        type="text"
+                                        value={editingLR.fromPlace}
+                                        onChange={(e) => setEditingLR({ ...editingLR, fromPlace: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">To Place</label>
+                                    <input
+                                        type="text"
+                                        value={editingLR.toPlace}
+                                        onChange={(e) => setEditingLR({ ...editingLR, toPlace: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Freight Amount</label>
+                                    <input
+                                        type="number"
+                                        value={editingLR.freight}
+                                        onChange={(e) => setEditingLR({ ...editingLR, freight: Number(e.target.value) })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <label className="block text-slate-300 font-bold mb-1">Consignor Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingLR.consignor?.name || ''}
+                                        onChange={(e) =>
+                                            setEditingLR({
+                                                ...editingLR,
+                                                consignor: { ...editingLR.consignor, name: e.target.value },
+                                            })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <label className="block text-slate-300 font-bold mb-1">Consignee Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingLR.consignee?.name || ''}
+                                        onChange={(e) =>
+                                            setEditingLR({
+                                                ...editingLR,
+                                                consignee: { ...editingLR.consignee, name: e.target.value },
+                                            })
+                                        }
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingLR(null)}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold"
+                                >
+                                    Save Changes
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .animate-gradient {
-                    background-size: 200% 200%;
-                    animation: gradient 3s ease infinite;
-                }
+            {/* Modal 5: Create New LR */}
+            {showCreateLRModal && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base">+ Create New Lorry Receipt (Bilty)</h3>
+                            <button onClick={() => setShowCreateLRModal(false)} className="text-slate-400 hover:text-white">
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateNewLR} className="space-y-4 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">LR Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newLRData.lrNo || ''}
+                                        onChange={(e) => setNewLRData({ ...newLRData, lrNo: e.target.value })}
+                                        placeholder="e.g. 1001"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={newLRData.date}
+                                        onChange={(e) => setNewLRData({ ...newLRData, date: e.target.value })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Truck Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={newLRData.truckNo || ''}
+                                        onChange={(e) => setNewLRData({ ...newLRData, truckNo: e.target.value.toUpperCase() })}
+                                        placeholder="MH12AB1234"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">From Place</label>
+                                    <input
+                                        type="text"
+                                        value={newLRData.fromPlace || ''}
+                                        onChange={(e) => setNewLRData({ ...newLRData, fromPlace: e.target.value })}
+                                        placeholder="Origin"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">To Place</label>
+                                    <input
+                                        type="text"
+                                        value={newLRData.toPlace || ''}
+                                        onChange={(e) => setNewLRData({ ...newLRData, toPlace: e.target.value })}
+                                        placeholder="Destination"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Freight (₹)</label>
+                                    <input
+                                        type="number"
+                                        value={newLRData.freight || 0}
+                                        onChange={(e) => setNewLRData({ ...newLRData, freight: Number(e.target.value) })}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <label className="block text-slate-300 font-bold mb-1">Consignor Name</label>
+                                    <input
+                                        type="text"
+                                        value={newLRData.consignor?.name || ''}
+                                        onChange={(e) =>
+                                            setNewLRData({
+                                                ...newLRData,
+                                                consignor: { ...newLRData.consignor!, name: e.target.value },
+                                            })
+                                        }
+                                        placeholder="Sender party name"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div className="sm:col-span-3">
+                                    <label className="block text-slate-300 font-bold mb-1">Consignee Name</label>
+                                    <input
+                                        type="text"
+                                        value={newLRData.consignee?.name || ''}
+                                        onChange={(e) =>
+                                            setNewLRData({
+                                                ...newLRData,
+                                                consignee: { ...newLRData.consignee!, name: e.target.value },
+                                            })
+                                        }
+                                        placeholder="Receiver party name"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCreateLRModal(false)}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold"
+                                >
+                                    Create LR
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 8px;
-                }
+            {/* Modal 6: Add / Edit Truck */}
+            {(showAddTruckModal || editingTruck) && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <TruckIcon className="w-5 h-5 text-emerald-400" />
+                                {editingTruck ? `Edit Truck ${editingTruck.truckNo}` : 'Register New Truck'}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddTruckModal(false);
+                                    setEditingTruck(null);
+                                }}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form
+                            onSubmit={editingTruck ? handleUpdateTruck : handleSaveNewTruck}
+                            className="space-y-4 text-xs"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Truck Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editingTruck ? editingTruck.truckNo : newTruckData.truckNo || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.toUpperCase();
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, truckNo: val });
+                                            else setNewTruckData({ ...newTruckData, truckNo: val });
+                                        }}
+                                        placeholder="MH12AB1234"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Make / Brand</label>
+                                    <input
+                                        type="text"
+                                        value={editingTruck ? editingTruck.make || '' : newTruckData.make || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, make: val });
+                                            else setNewTruckData({ ...newTruckData, make: val });
+                                        }}
+                                        placeholder="Tata Motors, Ashok Leyland"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Truck Type</label>
+                                    <input
+                                        type="text"
+                                        value={editingTruck ? editingTruck.truckType || '' : newTruckData.truckType || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, truckType: val });
+                                            else setNewTruckData({ ...newTruckData, truckType: val });
+                                        }}
+                                        placeholder="Open Body, Container, Trailer"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Capacity</label>
+                                    <input
+                                        type="text"
+                                        value={editingTruck ? editingTruck.capacity || '' : newTruckData.capacity || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, capacity: val });
+                                            else setNewTruckData({ ...newTruckData, capacity: val });
+                                        }}
+                                        placeholder="20 Ton, 40 Ton"
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Driver Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingTruck ? editingTruck.driverName || '' : newTruckData.driverName || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, driverName: val });
+                                            else setNewTruckData({ ...newTruckData, driverName: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Driver Contact</label>
+                                    <input
+                                        type="text"
+                                        value={editingTruck ? editingTruck.driverContact || '' : newTruckData.driverContact || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingTruck) setEditingTruck({ ...editingTruck, driverContact: val });
+                                            else setNewTruckData({ ...newTruckData, driverContact: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAddTruckModal(false);
+                                        setEditingTruck(null);
+                                    }}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold"
+                                >
+                                    {editingTruck ? 'Save Changes' : 'Register Truck'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: rgba(255, 255, 255, 0.1);
-                    border-radius: 10px;
-                }
+            {/* Modal 7: Add / Edit Party */}
+            {(showAddPartyModal || editingParty) && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <UserGroupIcon className="w-5 h-5 text-amber-400" />
+                                {editingParty ? `Edit Party: ${editingParty.name}` : 'Add Master Party'}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddPartyModal(false);
+                                    setEditingParty(null);
+                                }}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form
+                            onSubmit={editingParty ? handleUpdateParty : handleSaveNewParty}
+                            className="space-y-4 text-xs"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="sm:col-span-2">
+                                    <label className="block text-slate-300 font-bold mb-1">Party Name *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editingParty ? editingParty.name : newPartyData.name || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingParty) setEditingParty({ ...editingParty, name: val });
+                                            else setNewPartyData({ ...newPartyData, name: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Type</label>
+                                    <select
+                                        value={editingParty ? editingParty.type : newPartyData.type || 'Both'}
+                                        onChange={(e) => {
+                                            const val = e.target.value as any;
+                                            if (editingParty) setEditingParty({ ...editingParty, type: val });
+                                            else setNewPartyData({ ...newPartyData, type: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    >
+                                        <option value="Consignor">Consignor</option>
+                                        <option value="Consignee">Consignee</option>
+                                        <option value="Both">Both (Consignor & Consignee)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">City</label>
+                                    <input
+                                        type="text"
+                                        value={editingParty ? editingParty.city || '' : newPartyData.city || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingParty) setEditingParty({ ...editingParty, city: val });
+                                            else setNewPartyData({ ...newPartyData, city: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">GSTN</label>
+                                    <input
+                                        type="text"
+                                        value={editingParty ? editingParty.gst || '' : newPartyData.gst || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value.toUpperCase();
+                                            if (editingParty) setEditingParty({ ...editingParty, gst: val });
+                                            else setNewPartyData({ ...newPartyData, gst: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none font-mono"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Contact Phone</label>
+                                    <input
+                                        type="text"
+                                        value={editingParty ? editingParty.contact || '' : newPartyData.contact || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingParty) setEditingParty({ ...editingParty, contact: val });
+                                            else setNewPartyData({ ...newPartyData, contact: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="block text-slate-300 font-bold mb-1">Address</label>
+                                    <input
+                                        type="text"
+                                        value={editingParty ? editingParty.address || '' : newPartyData.address || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingParty) setEditingParty({ ...editingParty, address: val });
+                                            else setNewPartyData({ ...newPartyData, address: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAddPartyModal(false);
+                                        setEditingParty(null);
+                                    }}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold"
+                                >
+                                    {editingParty ? 'Save Changes' : 'Add Party'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: rgba(255, 255, 255, 0.3);
-                    border-radius: 10px;
-                }
+            {/* Modal 8: Add / Edit Voucher */}
+            {(showAddVoucherModal || editingVoucher) && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base flex items-center gap-2">
+                                <CurrencyRupeeIcon className="w-5 h-5 text-rose-400" />
+                                {editingVoucher ? `Edit Voucher #${editingVoucher.voucher_no}` : 'Record New Voucher'}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddVoucherModal(false);
+                                    setEditingVoucher(null);
+                                }}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form
+                            onSubmit={editingVoucher ? handleUpdateVoucher : handleSaveNewVoucher}
+                            className="space-y-4 text-xs"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Voucher Number *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editingVoucher ? editingVoucher.voucher_no : newVoucherData.voucher_no || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, voucher_no: val });
+                                            else setNewVoucherData({ ...newVoucherData, voucher_no: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Date</label>
+                                    <input
+                                        type="date"
+                                        value={editingVoucher ? editingVoucher.date : newVoucherData.date}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, date: val });
+                                            else setNewVoucherData({ ...newVoucherData, date: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Party / Payee Name</label>
+                                    <input
+                                        type="text"
+                                        value={editingVoucher ? editingVoucher.party_name || '' : newVoucherData.party_name || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, party_name: val });
+                                            else setNewVoucherData({ ...newVoucherData, party_name: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Amount (₹) *</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        value={editingVoucher ? editingVoucher.amount : newVoucherData.amount || 0}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, amount: val });
+                                            else setNewVoucherData({ ...newVoucherData, amount: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Payment Mode</label>
+                                    <select
+                                        value={editingVoucher ? editingVoucher.payment_mode : newVoucherData.payment_mode || 'Cash'}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, payment_mode: val });
+                                            else setNewVoucherData({ ...newVoucherData, payment_mode: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    >
+                                        <option value="Cash">Cash</option>
+                                        <option value="Bank Transfer">Bank Transfer</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="UPI">UPI / GPay / PhonePe</option>
+                                        <option value="NEFT">NEFT / RTGS</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Description / Remarks</label>
+                                    <input
+                                        type="text"
+                                        value={editingVoucher ? editingVoucher.description || '' : newVoucherData.description || ''}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (editingVoucher) setEditingVoucher({ ...editingVoucher, description: val });
+                                            else setNewVoucherData({ ...newVoucherData, description: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAddVoucherModal(false);
+                                        setEditingVoucher(null);
+                                    }}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold"
+                                >
+                                    {editingVoucher ? 'Save Changes' : 'Record Voucher'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: rgba(255, 255, 255, 0.5);
-                }
-            `}</style>
+            {/* Modal 9: Add / Edit Raw Ledger Entry */}
+            {(showAddLedgerEntryModal || editingLedgerEntry) && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fadeIn space-y-4">
+                        <div className="flex justify-between items-center border-b border-white/10 pb-3">
+                            <h3 className="font-black text-white text-base">
+                                {editingLedgerEntry ? 'Edit Ledger Entry' : 'Add Ledger Entry'}
+                            </h3>
+                            <button
+                                onClick={() => {
+                                    setShowAddLedgerEntryModal(false);
+                                    setEditingLedgerEntry(null);
+                                }}
+                                className="text-slate-400 hover:text-white"
+                            >
+                                <CloseIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <form
+                            onSubmit={editingLedgerEntry ? handleUpdateLedgerEntry : handleSaveNewLedgerEntry}
+                            className="space-y-4 text-xs"
+                        >
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Date</label>
+                                <input
+                                    type="date"
+                                    value={editingLedgerEntry ? editingLedgerEntry.date : newLedgerEntryData.date}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (editingLedgerEntry) setEditingLedgerEntry({ ...editingLedgerEntry, date: val });
+                                        else setNewLedgerEntryData({ ...newLedgerEntryData, date: val });
+                                    }}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Party Name</label>
+                                <input
+                                    type="text"
+                                    value={editingLedgerEntry ? editingLedgerEntry.party_name || '' : newLedgerEntryData.party_name || ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (editingLedgerEntry) setEditingLedgerEntry({ ...editingLedgerEntry, party_name: val });
+                                        else setNewLedgerEntryData({ ...newLedgerEntryData, party_name: val });
+                                    }}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Credit (Cr)</label>
+                                    <input
+                                        type="number"
+                                        value={editingLedgerEntry ? editingLedgerEntry.credit : newLedgerEntryData.credit || 0}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            if (editingLedgerEntry) setEditingLedgerEntry({ ...editingLedgerEntry, credit: val });
+                                            else setNewLedgerEntryData({ ...newLedgerEntryData, credit: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-slate-300 font-bold mb-1">Debit (Dr)</label>
+                                    <input
+                                        type="number"
+                                        value={editingLedgerEntry ? editingLedgerEntry.debit : newLedgerEntryData.debit || 0}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value);
+                                            if (editingLedgerEntry) setEditingLedgerEntry({ ...editingLedgerEntry, debit: val });
+                                            else setNewLedgerEntryData({ ...newLedgerEntryData, debit: val });
+                                        }}
+                                        className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white font-mono focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-slate-300 font-bold mb-1">Description</label>
+                                <input
+                                    type="text"
+                                    value={editingLedgerEntry ? editingLedgerEntry.description : newLedgerEntryData.description || ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (editingLedgerEntry) setEditingLedgerEntry({ ...editingLedgerEntry, description: val });
+                                        else setNewLedgerEntryData({ ...newLedgerEntryData, description: val });
+                                    }}
+                                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 rounded-xl text-white focus:outline-none"
+                                />
+                            </div>
+                            <div className="pt-2 flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowAddLedgerEntryModal(false);
+                                        setEditingLedgerEntry(null);
+                                    }}
+                                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold"
+                                >
+                                    {editingLedgerEntry ? 'Save Changes' : 'Add Entry'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

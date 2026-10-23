@@ -146,6 +146,10 @@ const App: React.FC = () => {
     const [managerRequests, setManagerRequests] = useState<any[]>([]);
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [superAdminViewMode, setSuperAdminViewMode] = useState<'admin_panel' | 'user_app'>('admin_panel');
+
+    const isSuperAdmin = session?.user?.email === 'admin@ssk.com';
+
 
     const handleError = (error: unknown, fallbackMessage: string) => {
         console.error(fallbackMessage, error);
@@ -278,7 +282,12 @@ const App: React.FC = () => {
                         // ✅ FIX 1b: Unblock loading immediately, role check in background
                         setIsLoading(false);
 
-                        if (session.user?.email !== 'gps@ssk.com') {
+                        if (session.user?.email === 'admin@ssk.com') {
+                            sessionStorage.setItem('currentRole', 'Admin');
+                            sessionStorage.setItem('roleSelected', 'true');
+                            sessionStorage.setItem('isSuperAdmin', 'true');
+                            setCurrentRole('Admin');
+                        } else if (session.user?.email !== 'gps@ssk.com') {
                             checkOperatorRole().then(roleInfo => {
                                 if (roleInfo && !roleInfo.isAdmin) {
                                     sessionStorage.setItem('currentRole', 'Operator');
@@ -395,9 +404,9 @@ const App: React.FC = () => {
         }
     }, [currentView, session]);
 
-    // Show role selection after login if RBAC is enabled
+    // Show role selection after login if RBAC is enabled (Bypassed for Super Admin admin@ssk.com)
     useEffect(() => {
-        if (session && companyDetails.rbacEnabled && !showRoleSelection && currentRole === 'Admin') {
+        if (session && companyDetails.rbacEnabled && !showRoleSelection && currentRole === 'Admin' && session.user?.email !== 'admin@ssk.com') {
             // Check if we need to show role selection (only on fresh login)
             const hasSelectedRole = sessionStorage.getItem('roleSelected');
             if (!hasSelectedRole) {
@@ -988,12 +997,59 @@ const App: React.FC = () => {
         );
     }
 
+    // 👑 SUPER ADMIN POWERHOUSE MODE (admin@ssk.com)
+    if (isSuperAdmin && superAdminViewMode === 'admin_panel') {
+        return (
+            <div className="bg-slate-950 min-h-screen font-sans">
+                <Toaster position="top-center" />
+                <Suspense fallback={
+                    <div className="flex items-center justify-center min-h-screen bg-slate-950">
+                        <RunningTruckLoader 
+                            statusMessage="Launching Super Admin Powerhouse..."
+                            subMessage="Root Access Activated for admin@ssk.com..."
+                            fullScreen={true}
+                        />
+                    </div>
+                }>
+                    <AdminPanel3D
+                        isOpen={true}
+                        isSuperAdmin={true}
+                        onClose={() => setSuperAdminViewMode('user_app')}
+                        onSwitchToAppMode={() => setSuperAdminViewMode('user_app')}
+                        companyDetails={companyDetails}
+                        onUpdateDetails={handleUpdateDetails}
+                        onUploadAsset={handleUploadAsset}
+                        currentRole="Admin"
+                        managerRequests={managerRequests}
+                        onApproveManagerRequest={handleApproveManagerRequest}
+                        onRejectManagerRequest={handleRejectManagerRequest}
+                        onSignOut={handleSignOut}
+                    />
+                </Suspense>
+            </div>
+        );
+    }
+
     const isHomeScreen = currentView === 'dashboard' && dashboardSection === null;
 
     if (isHomeScreen) {
         return (
             <div className="bg-[#0b1329] min-h-screen font-sans">
                 <Toaster position="top-center" />
+                {isSuperAdmin && (
+                    <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-700 text-white px-3 sm:px-6 py-2 flex items-center justify-between text-xs font-black shadow-lg sticky top-0 z-50">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                            <span>👑 SUPER ADMIN ACTIVE (admin@ssk.com) • Full Root Access Across All Users & Accounts</span>
+                        </div>
+                        <button
+                            onClick={() => setSuperAdminViewMode('admin_panel')}
+                            className="px-3 py-1 bg-white text-slate-950 rounded-lg hover:bg-amber-100 transition-all font-bold shadow-md cursor-pointer text-xs"
+                        >
+                            ⚡ Open Admin Powerhouse
+                        </button>
+                    </div>
+                )}
                 <Suspense fallback={
                     <div className="flex items-center justify-center min-h-screen bg-slate-950">
                         <RunningTruckLoader 
@@ -1009,7 +1065,9 @@ const App: React.FC = () => {
                     {isAdminPanelOpen && (
                         <AdminPanel3D
                             isOpen={isAdminPanelOpen}
+                            isSuperAdmin={isSuperAdmin}
                             onClose={() => setIsAdminPanelOpen(false)}
+                            onSwitchToAppMode={() => setSuperAdminViewMode('user_app')}
                             companyDetails={companyDetails}
                             onUpdateDetails={handleUpdateDetails}
                             onUploadAsset={handleUploadAsset}
@@ -1040,6 +1098,20 @@ const App: React.FC = () => {
     return (
         <div className="bg-slate-50 min-h-screen font-sans">
             <Toaster position="top-center" />
+            {isSuperAdmin && (
+                <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-700 text-white px-3 sm:px-6 py-2 flex items-center justify-between text-xs font-black shadow-lg sticky top-0 z-50">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>👑 SUPER ADMIN ACTIVE (admin@ssk.com) • Full Root Access Across All Users & Accounts</span>
+                    </div>
+                    <button
+                        onClick={() => setSuperAdminViewMode('admin_panel')}
+                        className="px-3 py-1 bg-white text-slate-950 rounded-lg hover:bg-amber-100 transition-all font-bold shadow-md cursor-pointer text-xs"
+                    >
+                        ⚡ Open Admin Powerhouse
+                    </button>
+                </div>
+            )}
             <Header
                 companyDetails={companyDetails}
                 onUpdateDetails={handleUpdateDetails}
@@ -1150,7 +1222,18 @@ const App: React.FC = () => {
             {isAdminPanelOpen && (
                 <Suspense fallback={null}>
                     <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
-                        <AdminPanel3D onClose={() => setIsAdminPanelOpen(false)} currentRole={currentRole} />
+                        <AdminPanel3D
+                            isOpen={isAdminPanelOpen}
+                            onClose={() => setIsAdminPanelOpen(false)}
+                            companyDetails={companyDetails}
+                            onUpdateDetails={handleUpdateDetails}
+                            onUploadAsset={handleUploadAsset}
+                            currentRole={currentRole}
+                            managerRequests={managerRequests}
+                            onApproveManagerRequest={handleApproveManagerRequest}
+                            onRejectManagerRequest={handleRejectManagerRequest}
+                            onSignOut={handleSignOut}
+                        />
                     </div>
                 </Suspense>
             )}

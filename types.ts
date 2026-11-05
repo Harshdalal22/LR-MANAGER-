@@ -281,7 +281,9 @@ export interface PaymentReceipt {
     date: string;
     receipt_no: string;
     party_name: string;
-    amount: number;
+    amount: number;         // Net Received Amount (e.g. ₹5,000)
+    tds_amount?: number;    // TDS Amount Deducted (e.g. ₹1,000)
+    total_amount?: number;  // Total Gross Settlement = Amount + TDS (e.g. ₹6,000)
     payment_mode: 'Cash' | 'Bank Transfer' | 'Cheque' | 'UPI' | 'NEFT' | 'RTGS';
     invoice_nos?: string[];
     notes?: string;

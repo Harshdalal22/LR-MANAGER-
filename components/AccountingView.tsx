@@ -382,14 +382,18 @@ const LedgerTab = ({
 
         // D. Payments Received for this party
         payments.filter(p => p.party_name === selectedParty).forEach(p => {
+            const netAmt = Number(p.amount) || 0;
+            const tdsAmt = Number(p.tds_amount) || 0;
+            const grossTot = Number(p.total_amount) || (netAmt + tdsAmt);
+
             txs.push({
                 id: `pay-${p.id}`,
                 date: p.date,
-                particulars: `Payment Received (${p.payment_mode || 'Bank'}) ${p.notes ? '• ' + p.notes : ''}`,
+                particulars: `Payment Received (${p.payment_mode || 'Bank'})${tdsAmt > 0 ? ` [Net: ₹${netAmt.toLocaleString('en-IN')} + TDS: ₹${tdsAmt.toLocaleString('en-IN')}]` : ''}${p.notes ? ' • ' + p.notes : ''}`,
                 voucherNo: p.receipt_no || '--',
-                type: 'Payment',
+                type: tdsAmt > 0 ? 'Payment + TDS' : 'Payment',
                 debit: 0,
-                credit: Number(p.amount) || 0,
+                credit: grossTot,
                 source: 'Payment',
                 payment_mode: p.payment_mode
             });
@@ -1549,144 +1553,442 @@ const PaymentsTab = ({ payments, lorryReceipts, onRefresh }: {
     onRefresh: () => void;
 }) => {
     const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState<Partial<PaymentReceipt>>({
-        date: today(), receipt_no: `RCP-${Date.now().toString().slice(-6)}`, party_name: '', amount: 0,
-        payment_mode: 'Cash', invoice_nos: [], notes: ''
-    });
+    const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+
+    const initialFormState = {
+        date: today(),
+        receipt_no: `RCP-${Date.now().toString().slice(-6)}`,
+        party_name: '',
+        amount: 0,
+        tds_amount: 0,
+        total_amount: 0,
+        payment_mode: 'Bank Transfer' as any,
+        invoice_nos: [] as string[],
+        notes: ''
+    };
+
+    const [form, setForm] = useState<Partial<PaymentReceipt>>(initialFormState);
     const [saving, setSaving] = useState(false);
 
     const parties = useMemo(() => {
         const set = new Set<string>();
-        lorryReceipts.forEach(lr => { if (lr.billingTo?.name) set.add(lr.billingTo.name); if (lr.consignor?.name) set.add(lr.consignor.name); });
-        payments.forEach(p => set.add(p.party_name));
-        return Array.from(set).sort();
+        lorryReceipts.forEach(lr => { 
+            if (lr.billingTo?.name) set.add(lr.billingTo.name); 
+            if (lr.consignor?.name) set.add(lr.consignor.name); 
+            if (lr.consignee?.name) set.add(lr.consignee.name);
+        });
+        payments.forEach(p => { if (p.party_name) set.add(p.party_name); });
+        return Array.from(set).filter(Boolean).sort();
     }, [lorryReceipts, payments]);
 
     const invoiceOptions = useMemo(() => {
         if (!form.party_name) return [];
-        return lorryReceipts.filter(lr => lr.isInvoiceGenerated && lr.invoiceNo && (lr.billingTo?.name === form.party_name || lr.consignor?.name === form.party_name)).map(lr => lr.invoiceNo!).filter((v, i, a) => a.indexOf(v) === i);
+        return lorryReceipts
+            .filter(lr => lr.isInvoiceGenerated && (lr.freightBillNo || lr.invoiceNo || lr.charges?.freightBillNo) && 
+                (lr.billingTo?.name === form.party_name || lr.consignor?.name === form.party_name || lr.consignee?.name === form.party_name)
+            )
+            .map(lr => (lr.freightBillNo || lr.invoiceNo || lr.charges?.freightBillNo || '').trim())
+            .filter((v, i, a) => v && a.indexOf(v) === i);
     }, [form.party_name, lorryReceipts]);
 
+    // Live calculation: Net Amount + TDS = Total Gross Amount
+    const calculatedTotal = useMemo(() => {
+        const amt = Number(form.amount) || 0;
+        const tds = Number(form.tds_amount) || 0;
+        return amt + tds;
+    }, [form.amount, form.tds_amount]);
+
+    const handleOpenCreate = () => {
+        setEditingPaymentId(null);
+        setForm({
+            ...initialFormState,
+            receipt_no: `RCP-${Date.now().toString().slice(-6)}`
+        });
+        setShowForm(true);
+    };
+
+    const handleOpenEdit = (p: PaymentReceipt) => {
+        const netAmt = Number(p.amount) || 0;
+        const tdsAmt = Number(p.tds_amount) || 0;
+        const totAmt = Number(p.total_amount) || (netAmt + tdsAmt);
+
+        setEditingPaymentId(p.id || null);
+        setForm({
+            ...p,
+            amount: netAmt,
+            tds_amount: tdsAmt,
+            total_amount: totAmt
+        });
+        setShowForm(true);
+    };
+
     const handleSave = async () => {
-        if (!form.party_name || !form.amount) return toast.error('Party name and amount are required');
+        if (!form.party_name?.trim()) return toast.error('Party name is required');
+        const netAmt = Number(form.amount);
+        const tdsAmt = Number(form.tds_amount) || 0;
+        if (!netAmt && !tdsAmt) return toast.error('Please enter payment amount or TDS');
+
+        const totAmt = netAmt + tdsAmt;
         setSaving(true);
+        const toastId = toast.loading(editingPaymentId ? 'Updating payment receipt...' : 'Saving payment receipt...');
         try {
-            await savePaymentReceipt(form as PaymentReceipt);
-            toast.success('Payment receipt saved');
+            const payload: PaymentReceipt = {
+                ...(form as any),
+                id: editingPaymentId || undefined,
+                amount: netAmt,
+                tds_amount: tdsAmt,
+                total_amount: totAmt
+            };
+
+            await savePaymentReceipt(payload);
+            toast.success(editingPaymentId ? 'Payment receipt updated! ✅' : 'Payment receipt saved! ✅', { id: toastId });
             setShowForm(false);
-            setForm({ date: today(), receipt_no: `RCP-${Date.now().toString().slice(-6)}`, party_name: '', amount: 0, payment_mode: 'Cash', invoice_nos: [], notes: '' });
+            setEditingPaymentId(null);
+            setForm(initialFormState);
             onRefresh();
-        } catch (e: any) { toast.error(e.message); }
-        finally { setSaving(false); }
+        } catch (e: any) { 
+            console.error('Error saving payment receipt:', e);
+            toast.error(e.message || 'Failed to save receipt', { id: toastId }); 
+        } finally { 
+            setSaving(false); 
+        }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Delete this payment receipt?')) return;
-        try { await deletePaymentReceipt(id); toast.success('Deleted'); onRefresh(); } catch (e: any) { toast.error(e.message); }
+    const handleDelete = async (id: string, rcpNo?: string) => {
+        if (!confirm(`Are you sure you want to delete payment receipt "${rcpNo || id}"?`)) return;
+        const toastId = toast.loading('Deleting payment receipt...');
+        try { 
+            await deletePaymentReceipt(id); 
+            toast.success('Payment receipt deleted! 🗑️', { id: toastId }); 
+            onRefresh(); 
+        } catch (e: any) { 
+            toast.error(e.message || 'Failed to delete', { id: toastId }); 
+        }
     };
 
-    const totalReceived = payments.reduce((s, p) => s + p.amount, 0);
+    const totalNetReceived = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const totalTdsDeducted = payments.reduce((s, p) => s + (Number(p.tds_amount) || 0), 0);
+    const totalGrossSettled = payments.reduce((s, p) => s + (Number(p.total_amount) || ((Number(p.amount) || 0) + (Number(p.tds_amount) || 0))), 0);
 
     return (
-        <div className="space-y-5">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-4 text-sm">
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3">
-                        <div className="text-xs text-gray-500 font-bold">TOTAL RECEIVED</div>
-                        <div className="text-xl font-black text-green-600">{fmt(totalReceived)}</div>
+        <div className="space-y-5 animate-fadeIn">
+            {/* KPI Summary Cards */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-3">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">NET RECEIVED</div>
+                        <div className="text-xl font-black text-emerald-700 mt-0.5">{fmt(totalNetReceived)}</div>
                     </div>
-                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3">
-                        <div className="text-xs text-gray-500 font-bold">PAYMENTS</div>
-                        <div className="text-xl font-black text-blue-600">{payments.length}</div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-3">
+                        <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">TDS DEDUCTED</div>
+                        <div className="text-xl font-black text-amber-600 mt-0.5">{fmt(totalTdsDeducted)}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-3">
+                        <div className="text-[10px] text-blue-800 font-bold uppercase tracking-wider">TOTAL SETTLED (GROSS)</div>
+                        <div className="text-xl font-black text-blue-900 mt-0.5">{fmt(totalGrossSettled)}</div>
+                    </div>
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs px-4 py-3">
+                        <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">TOTAL RECEIPTS</div>
+                        <div className="text-xl font-black text-slate-800 mt-0.5">{payments.length}</div>
                     </div>
                 </div>
-                <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-green-600 text-white rounded-xl font-bold shadow hover:bg-green-700 transition">
-                    + Record Payment
+
+                <button 
+                    onClick={handleOpenCreate} 
+                    className="flex items-center gap-1.5 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                >
+                    <span className="text-lg leading-none">+</span>
+                    <span>Record Payment</span>
                 </button>
             </div>
 
-            {/* Form */}
+            {/* Payment Entry / Edit Form */}
             {showForm && (
-                <div className="bg-green-50 border border-green-200 rounded-2xl p-5">
-                    <h3 className="font-bold text-green-800 mb-4">Record Payment Receipt</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="bg-emerald-50/60 border-2 border-emerald-300 rounded-2xl p-5 shadow-sm animate-fadeIn">
+                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-emerald-200">
+                        <h3 className="font-black text-emerald-900 text-base flex items-center gap-2">
+                            <span>{editingPaymentId ? '✏️' : '💵'}</span>
+                            <span>{editingPaymentId ? `Edit Payment Receipt (${form.receipt_no})` : 'Record New Payment Receipt'}</span>
+                        </h3>
+                        <button
+                            onClick={() => { setShowForm(false); setEditingPaymentId(null); }}
+                            className="text-slate-400 hover:text-slate-700 font-bold text-sm"
+                        >
+                            ✕ Cancel
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                        {/* Date */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Date *</label>
-                            <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <label className="block text-xs font-bold text-slate-700 mb-1">Payment Date *</label>
+                            <input 
+                                type="date" 
+                                value={form.date} 
+                                onChange={e => setForm(f => ({ ...f, date: e.target.value }))} 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-600 shadow-xs" 
+                            />
                         </div>
+
+                        {/* Receipt No */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Receipt No *</label>
-                            <input value={form.receipt_no} onChange={e => setForm(f => ({ ...f, receipt_no: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <label className="block text-xs font-bold text-slate-700 mb-1">Receipt / Ref No *</label>
+                            <input 
+                                value={form.receipt_no} 
+                                onChange={e => setForm(f => ({ ...f, receipt_no: e.target.value }))} 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-emerald-600 shadow-xs" 
+                            />
                         </div>
+
+                        {/* Payment Mode */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Payment Mode *</label>
-                            <select value={form.payment_mode} onChange={e => setForm(f => ({ ...f, payment_mode: e.target.value as any }))} className="w-full border rounded-lg px-3 py-2 text-sm">
-                                {['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
+                            <label className="block text-xs font-bold text-slate-700 mb-1">Payment Mode *</label>
+                            <select 
+                                value={form.payment_mode} 
+                                onChange={e => setForm(f => ({ ...f, payment_mode: e.target.value as any }))} 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-600 shadow-xs"
+                            >
+                                {['Bank Transfer', 'NEFT', 'RTGS', 'UPI', 'Cheque', 'Cash'].map(m => (
+                                    <option key={m} value={m}>{m}</option>
+                                ))}
                             </select>
                         </div>
+
+                        {/* Party Name */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Party Name *</label>
-                            <input value={form.party_name} onChange={e => setForm(f => ({ ...f, party_name: e.target.value }))} list="pay-party"
-                                placeholder="Party name" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                            <datalist id="pay-party">{parties.map(p => <option key={p} value={p} />)}</datalist>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">Party / Company Name *</label>
+                            <input 
+                                value={form.party_name} 
+                                onChange={e => setForm(f => ({ ...f, party_name: e.target.value }))} 
+                                list="pay-party-list"
+                                placeholder="Choose or type party" 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-600 shadow-xs" 
+                            />
+                            <datalist id="pay-party-list">{parties.map(p => <option key={p} value={p} />)}</datalist>
                         </div>
+
+                        {/* Net Received Amount */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Amount (₹) *</label>
-                            <input type="number" value={form.amount || ''} onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))}
-                                placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                Net Received Amount (₹) *
+                            </label>
+                            <input 
+                                type="number" 
+                                min="0"
+                                step="any"
+                                value={form.amount || ''} 
+                                onChange={e => setForm(f => ({ ...f, amount: +e.target.value }))}
+                                placeholder="e.g. 5000" 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-800 focus:outline-none focus:border-emerald-600 shadow-xs" 
+                            />
                         </div>
+
+                        {/* TDS Amount (User requested option) */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Link Invoice(s)</label>
-                            <select multiple value={form.invoice_nos || []} onChange={e => setForm(f => ({ ...f, invoice_nos: Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value) }))}
-                                className="w-full border rounded-lg px-3 py-2 text-sm h-20">
-                                {invoiceOptions.map(inv => <option key={inv} value={inv}>{inv}</option>)}
+                            <label className="block text-xs font-bold text-amber-800 mb-1 flex items-center justify-between">
+                                <span>TDS Deducted (₹)</span>
+                                <span className="text-[10px] text-amber-600 font-semibold">(Tax Deducted at Source)</span>
+                            </label>
+                            <input 
+                                type="number" 
+                                min="0"
+                                step="any"
+                                value={form.tds_amount || ''} 
+                                onChange={e => setForm(f => ({ ...f, tds_amount: +e.target.value }))}
+                                placeholder="e.g. 1000" 
+                                className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-xs font-mono font-bold text-amber-700 focus:outline-none focus:border-amber-600 shadow-xs" 
+                            />
+                        </div>
+
+                        {/* Live Total Amount Box: e.g. 5000 + 1000 = 6000 */}
+                        <div className="col-span-1 sm:col-span-2 md:col-span-3 bg-white border-2 border-emerald-400 rounded-xl p-3 flex flex-wrap justify-between items-center shadow-xs">
+                            <div>
+                                <span className="text-xs font-black text-emerald-900 uppercase tracking-wider block">
+                                    TOTAL GROSS SETTLEMENT AMOUNT:
+                                </span>
+                                <span className="text-xs text-slate-500 font-medium mt-0.5 block">
+                                    Amount Received (₹{Number(form.amount || 0).toLocaleString('en-IN')}) + TDS Deducted (₹{Number(form.tds_amount || 0).toLocaleString('en-IN')})
+                                </span>
+                            </div>
+                            <div className="text-2xl font-black text-emerald-700 font-mono">
+                                ₹ {calculatedTotal.toLocaleString('en-IN')}
+                            </div>
+                        </div>
+
+                        {/* Linked Invoices */}
+                        <div className="col-span-1 sm:col-span-2">
+                            <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                                <span>Link Invoices (Optional)</span>
+                                <span className="text-[10px] text-slate-400">Hold Ctrl / Cmd to select multiple</span>
+                            </label>
+                            <select 
+                                multiple 
+                                value={form.invoice_nos || []} 
+                                onChange={e => setForm(f => ({ ...f, invoice_nos: Array.from(e.target.selectedOptions, (o: HTMLOptionElement) => o.value) }))}
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-medium h-20 shadow-xs"
+                            >
+                                {invoiceOptions.map(inv => (
+                                    <option key={inv} value={inv}>{inv}</option>
+                                ))}
                             </select>
                         </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Notes</label>
-                            <input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                                placeholder="Optional notes" className="w-full border rounded-lg px-3 py-2 text-sm" />
+
+                        {/* Notes */}
+                        <div className="col-span-1">
+                            <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Remarks</label>
+                            <textarea 
+                                rows={3}
+                                value={form.notes || ''} 
+                                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                                placeholder="Bank UTR, Cheque No, TDS details, etc." 
+                                className="w-full border border-slate-300 bg-white rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-emerald-600 shadow-xs" 
+                            />
                         </div>
                     </div>
-                    <div className="flex gap-3 mt-4">
-                        <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-green-600 text-white rounded-xl text-sm font-bold shadow hover:bg-green-700 disabled:opacity-60">
-                            {saving ? 'Saving...' : 'Save Receipt'}
+
+                    <div className="flex gap-2.5 justify-end mt-4 pt-3 border-t border-emerald-200">
+                        <button 
+                            type="button" 
+                            onClick={() => { setShowForm(false); setEditingPaymentId(null); }} 
+                            className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+                        >
+                            Cancel
                         </button>
-                        <button onClick={() => setShowForm(false)} className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+                        <button 
+                            type="button" 
+                            onClick={handleSave} 
+                            disabled={saving} 
+                            className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+                        >
+                            {saving ? 'Saving...' : editingPaymentId ? 'Update Payment Receipt' : 'Save Payment Receipt'}
+                        </button>
                     </div>
                 </div>
             )}
 
-            {/* Table */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {/* Payments Table */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-xs text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50">
-                                {['Date', 'Receipt No', 'Party', 'Amount', 'Mode', 'Linked Invoices', 'Notes', ''].map(h => (
-                                    <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
-                                ))}
+                            <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700 w-28">Receipt No</th>
+                                <th className="px-4 py-3 border-r border-slate-700">Party Name</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Net Amount (₹)</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28 text-amber-300">TDS (₹)</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-32 text-emerald-300">Total (₹)</th>
+                                <th className="px-3 py-3 border-r border-slate-700 w-24">Mode</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700">Linked Invoices</th>
+                                <th className="px-3.5 py-3 border-r border-slate-700">Notes</th>
+                                <th className="px-3 py-3 text-center w-24">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-slate-200">
                             {payments.length === 0 ? (
-                                <tr><td colSpan={8} className="text-center py-12 text-gray-400">No payments recorded yet</td></tr>
-                            ) : payments.map(p => (
-                                <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-4 py-3 font-medium text-gray-600">{p.date}</td>
-                                    <td className="px-4 py-3 font-bold text-green-700">{p.receipt_no}</td>
-                                    <td className="px-4 py-3 text-gray-800 font-semibold">{p.party_name}</td>
-                                    <td className="px-4 py-3 font-black text-green-600">{fmt(p.amount)}</td>
-                                    <td className="px-4 py-3"><Badge color="bg-blue-100 text-blue-700">{p.payment_mode}</Badge></td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs">{(p.invoice_nos || []).join(', ') || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-500">{p.notes || '—'}</td>
-                                    <td className="px-4 py-3">
-                                        <button onClick={() => handleDelete(p.id!)} className="text-red-400 hover:text-red-600 text-xs font-bold">Delete</button>
+                                <tr>
+                                    <td colSpan={10} className="text-center py-14 text-slate-400">
+                                        <div className="text-3xl mb-2">💵</div>
+                                        <div className="font-bold text-sm">No payment receipts recorded yet.</div>
+                                        <div className="text-xs mt-1">Click <strong>+ Record Payment</strong> above to add customer payments with TDS and gross settlement.</div>
                                     </td>
                                 </tr>
-                            ))}
+                            ) : payments.map(p => {
+                                const netAmt = Number(p.amount) || 0;
+                                const tdsAmt = Number(p.tds_amount) || 0;
+                                const totAmt = Number(p.total_amount) || (netAmt + tdsAmt);
+
+                                return (
+                                    <tr key={p.id} className="hover:bg-blue-50/40 transition-colors">
+                                        {/* Date */}
+                                        <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap border-r border-slate-200">
+                                            {p.date}
+                                        </td>
+
+                                        {/* Receipt No */}
+                                        <td className="px-3.5 py-2.5 font-mono font-bold text-blue-900 whitespace-nowrap border-r border-slate-200">
+                                            {p.receipt_no}
+                                        </td>
+
+                                        {/* Party */}
+                                        <td className="px-4 py-2.5 text-slate-900 font-bold border-r border-slate-200">
+                                            {p.party_name}
+                                        </td>
+
+                                        {/* Net Amount */}
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-slate-800 border-r border-slate-200">
+                                            ₹ {netAmt.toLocaleString('en-IN')}
+                                        </td>
+
+                                        {/* TDS */}
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-amber-700 border-r border-slate-200">
+                                            {tdsAmt > 0 ? `₹ ${tdsAmt.toLocaleString('en-IN')}` : '--'}
+                                        </td>
+
+                                        {/* Total Amount = Net + TDS */}
+                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-emerald-700 border-r border-slate-200 whitespace-nowrap">
+                                            ₹ {totAmt.toLocaleString('en-IN')}
+                                        </td>
+
+                                        {/* Mode */}
+                                        <td className="px-3 py-2.5 border-r border-slate-200 whitespace-nowrap">
+                                            <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                                                {p.payment_mode}
+                                            </span>
+                                        </td>
+
+                                        {/* Linked Invoices */}
+                                        <td className="px-3.5 py-2.5 text-slate-600 text-[11px] font-mono border-r border-slate-200">
+                                            {(p.invoice_nos || []).join(', ') || '--'}
+                                        </td>
+
+                                        {/* Notes */}
+                                        <td className="px-3.5 py-2.5 text-slate-500 text-[11px] border-r border-slate-200">
+                                            {p.notes || '--'}
+                                        </td>
+
+                                        {/* Actions: Edit & Delete */}
+                                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button 
+                                                    onClick={() => handleOpenEdit(p)} 
+                                                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                                                    title="Edit this payment receipt"
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDelete(p.id!, p.receipt_no)} 
+                                                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-lg transition-colors cursor-pointer"
+                                                    title="Delete this payment receipt"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
+
+                        {/* Footer Total Bar */}
+                        <tfoot>
+                            <tr className="bg-slate-100 border-t-2 border-slate-800 font-black text-slate-900 text-xs">
+                                <td colSpan={3} className="px-4 py-3 text-right uppercase tracking-wider">
+                                    TOTAL PAYMENTS RECEIVED:
+                                </td>
+                                <td className="px-3.5 py-3 text-right font-mono text-slate-900 font-black">
+                                    ₹ {totalNetReceived.toLocaleString('en-IN')}
+                                </td>
+                                <td className="px-3.5 py-3 text-right font-mono text-amber-700 font-black">
+                                    ₹ {totalTdsDeducted.toLocaleString('en-IN')}
+                                </td>
+                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-black">
+                                    ₹ {totalGrossSettled.toLocaleString('en-IN')}
+                                </td>
+                                <td colSpan={4}></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>

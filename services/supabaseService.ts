@@ -1354,21 +1354,56 @@ export const getPaymentReceipts = async (): Promise<PaymentReceipt[]> => {
         15000
     );
     if (error && error.code !== 'PGRST116') throw error;
-    return (data || []).map((r: any) => ({
-        ...r,
-        invoice_nos: r.invoice_nos || []
-    }));
+    return (data || []).map((r: any) => {
+        let tds = Number(r.tds_amount) || 0;
+        let tot = Number(r.total_amount) || 0;
+        if (!tds && r.notes && r.notes.includes('[TDS:')) {
+            const match = r.notes.match(/\[TDS:\s*₹?([0-9.]+)/i);
+            if (match && match[1]) tds = Number(match[1]) || 0;
+        }
+        if (!tot) {
+            tot = (Number(r.amount) || 0) + tds;
+        }
+        return {
+            ...r,
+            tds_amount: tds,
+            total_amount: tot,
+            invoice_nos: r.invoice_nos || []
+        };
+    });
 };
 
 export const savePaymentReceipt = async (receipt: PaymentReceipt): Promise<PaymentReceipt> => {
     const finalUserId = await getEffectiveUserId();
     const payload = { ...receipt, user_id: finalUserId };
-    const { data, error } = await withTimeout(
-        supabase.from('payment_receipts').upsert(payload).select().single(),
-        15000
-    );
-    if (error) throw error;
-    return data;
+    try {
+        const { data, error } = await withTimeout(
+            supabase.from('payment_receipts').upsert(payload).select().single(),
+            15000
+        );
+        if (error) throw error;
+        return data;
+    } catch (err: any) {
+        // Graceful fallback if columns tds_amount or total_amount do not exist in the database yet
+        if (err?.message && (err.message.includes('tds_amount') || err.message.includes('total_amount'))) {
+            const safeNotes = [
+                receipt.notes || '',
+                receipt.tds_amount ? `[TDS: ₹${receipt.tds_amount} | Total: ₹${receipt.total_amount || (receipt.amount + (receipt.tds_amount || 0))}]` : ''
+            ].filter(Boolean).join(' ');
+
+            const fallbackPayload = { ...payload, notes: safeNotes };
+            delete (fallbackPayload as any).tds_amount;
+            delete (fallbackPayload as any).total_amount;
+
+            const { data, error } = await withTimeout(
+                supabase.from('payment_receipts').upsert(fallbackPayload).select().single(),
+                15000
+            );
+            if (error) throw error;
+            return { ...data, tds_amount: receipt.tds_amount, total_amount: receipt.total_amount };
+        }
+        throw err;
+    }
 };
 
 export const deletePaymentReceipt = async (id: string) => {

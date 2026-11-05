@@ -651,7 +651,6 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                     companyDetails={companyDetails}
                     onSaveInvoiceDetails={onUpdateInvoiceDetails ? async (lrNos, invNo, invDate, rowDetails, note) => {
                         await onUpdateInvoiceDetails(lrNos, invNo, invDate, rowDetails, note);
-                        setSelectedInvoice(null);
                     } : undefined}
                 />
             )}

@@ -1,10 +1,11 @@
 import React, { useRef, forwardRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { LorryReceipt, CompanyDetails, PartyDetails, InvoiceRowItem } from '../types';
-import { DownloadIcon, XIcon, SaveIcon } from './icons';
+import { DownloadIcon, XIcon, SaveIcon, PrintIcon } from './icons';
 import { toWords } from '../utils/numberToWords';
 import { getNextSequence } from '../utils/sequenceUtils';
 import { toast } from 'react-hot-toast';
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
 interface InvoiceModalProps {
@@ -485,6 +486,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     onSaveInvoiceDetails 
 }) => {
     const previewRef = useRef<HTMLDivElement>(null);
+    const printRoot = document.getElementById('print-root');
     const [billNo, setBillNo] = useState('');
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
     const [taxType, setTaxType] = useState<'intra' | 'inter'>('intra');
@@ -770,18 +772,46 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) 
         : { name: 'N/A', address: 'N/A', gst: 'N/A' };
 
+    const handlePrint = () => {
+        let styleEl = document.getElementById('dynamic-print-style') as HTMLStyleElement;
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-print-style';
+            document.head.appendChild(styleEl);
+        }
+        styleEl.innerHTML = `
+            @media print {
+                @page {
+                    size: A4 portrait;
+                    margin: 4mm 4mm;
+                }
+                #print-root {
+                    width: 100%;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                }
+                .printable-area {
+                    width: 100% !important;
+                    max-width: 760px !important;
+                    box-shadow: none !important;
+                }
+            }
+        `;
+        window.print();
+    };
+
     const handleDownloadPDF = async () => {
-        const element = previewRef.current;
+        const element = previewRef.current || (document.querySelector('.printable-area') as HTMLElement);
         if (!element) {
             toast.error('Invoice preview not found');
             return;
         }
 
         setIsExporting(true);
-        const toastId = toast.loading('Generating Invoice PDF...');
+        const toastId = toast.loading('Generating Perfect Single-Page PDF...');
 
         try {
-            // Wait for render to update with isExporting=true (hides input borders/placeholders)
             await new Promise(resolve => setTimeout(resolve, 300));
 
             const canvas = await html2canvas(element, {
@@ -805,88 +835,48 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 compress: true
             });
 
-            const pageW = pdf.internal.pageSize.getWidth();
-            const pageH = pdf.internal.pageSize.getHeight();
-            const margin = 4;
-            const usableW = pageW - margin * 2;
-            const maxH = pageH - margin * 2;
+            const pdfW = pdf.internal.pageSize.getWidth();
+            const pdfH = pdf.internal.pageSize.getHeight();
+            const margin = 3.5;
+            const maxW = pdfW - (margin * 2);
+            const maxH = pdfH - (margin * 2);
 
             const imgRatio = canvas.width / canvas.height;
-            const renderH = usableW / imgRatio;
+            let renderW = maxW;
+            let renderH = renderW / imgRatio;
 
-            if (renderH <= maxH) {
-                // Fits on a single A4 page
-                const imgData = canvas.toDataURL('image/jpeg', 0.98);
-                pdf.addImage(imgData, 'JPEG', margin, margin, usableW, renderH, undefined, 'FAST');
-            } else {
-                // Multi-page slicing if table has many rows
-                const slicePixelH = (maxH / usableW) * canvas.width;
-                let srcY = 0;
-                let pageIndex = 0;
-
-                while (srcY < canvas.height) {
-                    const currentSliceH = Math.min(slicePixelH, canvas.height - srcY);
-                    const sliceCanvas = document.createElement('canvas');
-                    sliceCanvas.width = canvas.width;
-                    sliceCanvas.height = Math.round(currentSliceH);
-                    const ctx = sliceCanvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(
-                            canvas,
-                            0,
-                            Math.round(srcY),
-                            canvas.width,
-                            sliceCanvas.height,
-                            0,
-                            0,
-                            canvas.width,
-                            sliceCanvas.height
-                        );
-                    }
-
-                    if (pageIndex > 0) {
-                        pdf.addPage('a4', 'portrait');
-                    }
-
-                    const sliceRenderH = (sliceCanvas.height / canvas.width) * usableW;
-                    pdf.addImage(
-                        sliceCanvas.toDataURL('image/jpeg', 0.98),
-                        'JPEG',
-                        margin,
-                        margin,
-                        usableW,
-                        sliceRenderH,
-                        undefined,
-                        'FAST'
-                    );
-
-                    srcY += slicePixelH;
-                    pageIndex++;
-                }
+            if (renderH > maxH) {
+                renderH = maxH;
+                renderW = renderH * imgRatio;
             }
 
-            // Dual download trigger: Blob URL anchor click + pdf.save for mobile/desktop support
-            const pdfBlob = pdf.output('blob');
-            const blobUrl = URL.createObjectURL(pdfBlob);
-            const downloadLink = document.createElement('a');
-            downloadLink.href = blobUrl;
-            downloadLink.download = filename;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+            const posX = margin + (maxW - renderW) / 2;
+            const posY = margin + (maxH - renderH) / 2;
 
+            const imgData = canvas.toDataURL('image/jpeg', 0.98);
+            pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH, undefined, 'FAST');
+
+            // 1. Native jsPDF save
+            pdf.save(filename);
+
+            // 2. Fallback direct Blob anchor trigger
             try {
-                pdf.save(filename);
-            } catch (e) {
-                // link.click already triggered
-            }
+                const pdfBlob = pdf.output('blob');
+                const blobUrl = URL.createObjectURL(pdfBlob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = blobUrl;
+                downloadLink.download = filename;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 8000);
+            } catch (e) {}
 
-            toast.success(`Invoice ${filename} downloaded!`, { id: toastId });
-        } catch (err) {
+            toast.success(`Invoice PDF downloaded! ✅`, { id: toastId });
+        } catch (err: any) {
             console.error('Invoice PDF error:', err);
             toast.error('Direct PDF error. Opening Print dialog...', { id: toastId });
-            window.print();
+            handlePrint();
         } finally {
             setIsExporting(false);
         }
@@ -912,15 +902,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const handleSaveAndDownload = async () => {
         if (onSaveInvoiceDetails) {
             setIsSaving(true);
-            const toastId = toast.loading('Saving & preparing download...');
             try {
                 const lrNos = invoiceRows.map(r => r.lrNo);
                 persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
                 await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
                 setSaveStatus('saved');
-                toast.success('Invoice saved!', { id: toastId });
             } catch (error) {
-                toast.error('Failed to save invoice', { id: toastId });
+                console.warn('Background save note:', error);
             } finally {
                 setIsSaving(false);
             }
@@ -1009,26 +997,37 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-2">
+                        <button 
+                            type="button"
+                            onClick={handlePrint}
+                            className="flex items-center bg-slate-800 text-white px-3 py-1.5 rounded-md hover:bg-slate-900 text-xs font-semibold shadow-sm transition-colors"
+                            title="Print or Save as Vector PDF"
+                        >
+                            <PrintIcon className="w-4 h-4 mr-1"/>
+                            Print
+                        </button>
+                        <button 
+                            type="button"
+                            onClick={handleDownloadPDF} 
+                            disabled={isExporting}
+                            className="flex items-center bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 text-xs font-semibold shadow-sm transition-colors disabled:bg-gray-400"
+                            title="Download 1-Page PDF"
+                        >
+                            <DownloadIcon className="w-4 h-4 mr-1"/>
+                            {isExporting ? 'Generating...' : 'Download PDF'}
+                        </button>
                         {onSaveInvoiceDetails && (
                             <button 
+                                type="button"
                                 onClick={handleSaveOnly} 
                                 disabled={isSaving}
-                                className="flex items-center bg-gray-800 text-white px-3 py-1.5 rounded-md hover:bg-black text-xs font-semibold shadow-sm disabled:bg-gray-400 transition-colors"
+                                className="flex items-center bg-emerald-600 text-white px-3 py-1.5 rounded-md hover:bg-emerald-700 text-xs font-semibold shadow-sm disabled:bg-gray-400 transition-colors"
                                 title="Save changes to database"
                             >
                                 <SaveIcon className="w-4 h-4 mr-1"/>
                                 {isSaving ? 'Saving...' : 'Save'}
                             </button>
                         )}
-                        <button 
-                            onClick={handleSaveAndDownload} 
-                            disabled={isSaving || isExporting}
-                            className="flex items-center bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-xs font-semibold shadow-sm transition-colors disabled:bg-gray-400"
-                            title="Save all changes and download PDF"
-                        >
-                            <DownloadIcon className="w-4 h-4 mr-1"/>
-                            {isExporting ? 'Generating...' : 'Download PDF'}
-                        </button>
                         <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-200">
                             <XIcon className="w-5 h-5"/>
                         </button>
@@ -1064,6 +1063,29 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     />
                 </div>
             </div>
+
+            {/* Print Portal for Direct Browser & Mobile Vector PDF Print */}
+            {printRoot && createPortal(
+                <div className="print-copies-container">
+                    <InvoiceContent
+                        invoiceRows={invoiceRows}
+                        onRowChange={() => {}}
+                        billedTo={billedTo}
+                        companyDetails={companyDetails}
+                        billNo={billNo}
+                        billDate={billDate}
+                        taxType={taxType}
+                        showGst={showGst}
+                        showFromColumn={showFromColumn}
+                        note={note}
+                        onNoteChange={() => {}}
+                        tableNote={tableNote}
+                        onTableNoteChange={() => {}}
+                        isExporting={true}
+                    />
+                </div>,
+                printRoot
+            )}
         </div>
     );
 };

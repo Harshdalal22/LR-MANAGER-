@@ -37,6 +37,8 @@ interface InvoiceContentProps {
     onNoteChange: (val: string) => void;
     tableNote: string;
     onTableNoteChange: (val: string) => void;
+    noteExtraPoint: number;
+    onNoteExtraPointChange: (val: number) => void;
     isExporting: boolean;
 }
 
@@ -54,6 +56,13 @@ const formatDateDDMMYYYY = (dateStr: string) => {
     }
 };
 
+// Extracts only the main/head-office address (removes B.Office / Branch Office if present in settings)
+const getSingleHeadOfficeAddress = (addr: string) => {
+    if (!addr) return '';
+    const parts = addr.split(/(?:,?\s*B\.?\s*Office|\r?\n|,\s*Branch\s*Office|;\s*)/i);
+    return parts[0].replace(/,\s*$/, '').trim();
+};
+
 const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
     invoiceRows,
     onRowChange,
@@ -68,13 +77,16 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
     onNoteChange,
     tableNote,
     onTableNoteChange,
+    noteExtraPoint,
+    onNoteExtraPointChange,
     isExporting
 }, ref) => {
-    // Calculations
+    // Calculations (including Extra Point entered next to Note row)
     const totalFreight = invoiceRows.reduce((sum, r) => sum + (Number(r.freight) || 0), 0);
-    const totalExtraPoint = invoiceRows.reduce((sum, r) => sum + (Number(r.extraPoint) || 0), 0);
+    const rowsExtraPoint = invoiceRows.reduce((sum, r) => sum + (Number(r.extraPoint) || 0), 0);
+    const totalExtraPoint = rowsExtraPoint + (Number(noteExtraPoint) || 0);
     const totalDetention = invoiceRows.reduce((sum, r) => sum + (Number(r.detention) || 0), 0);
-    const totalAmount = invoiceRows.reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+    const totalAmount = totalFreight + totalExtraPoint + totalDetention;
 
     // GST amounts — only applied when showGst is true
     const totalCgst = (showGst && taxType === 'intra') ? totalAmount * 0.09 : 0;
@@ -118,14 +130,18 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                     )}
                 </div>
                 <div className="flex-1 text-center text-black min-w-0 px-2 space-y-0.5">
-                    <h1 className="text-xl sm:text-[22px] font-black text-red-600 tracking-normal uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                    {/* Generous padding and line-height so company name is never sliced in canvas/PDF */}
+                    <h1 
+                        className="text-[19px] sm:text-[21px] font-black text-red-600 tracking-normal uppercase whitespace-nowrap inline-block px-1 py-1"
+                        style={{ lineHeight: '1.3', overflow: 'visible' }}
+                    >
                         {companyDetails.name || 'SSK CARGO SERVICES PRIVATE LIMITED'}
                     </h1>
-                    {/* Single Company Address from Settings */}
+                    {/* Single Head Office Address only */}
                     {companyDetails.address && (
                         <p className="text-[10.5px] mt-0.5 text-gray-800 font-medium leading-tight">
                             <span className="font-bold text-gray-900">Address: </span>
-                            {companyDetails.address.replace(/\r?\n+/g, ', ').trim()}
+                            {getSingleHeadOfficeAddress(companyDetails.address)}
                         </p>
                     )}
                     {/* Contact & Email (just like LR) */}
@@ -342,9 +358,26 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                                 )}
                             </div>
                         </td>
+                        {/* Editable Extra Point input next to Note */}
+                        <td className="border border-gray-600 p-0 text-right bg-amber-50/20">
+                            {isExporting ? (
+                                <span className="px-1 font-bold text-[11px]">{noteExtraPoint > 0 ? Number(noteExtraPoint).toFixed(2) : ''}</span>
+                            ) : (
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    value={noteExtraPoint || ''}
+                                    onChange={(e) => onNoteExtraPointChange(parseFloat(e.target.value) || 0)}
+                                    placeholder="0.00"
+                                    title="Click to edit Extra Point for this note line"
+                                    className="w-full text-right bg-transparent border-0 border-b border-dashed border-gray-300 focus:border-blue-500 focus:bg-amber-50 outline-none text-[11px] py-0.5 px-1 font-bold"
+                                />
+                            )}
+                        </td>
                         <td className="border border-gray-600 p-0.5"></td>
-                        <td className="border border-gray-600 p-0.5"></td>
-                        <td className="border border-gray-600 p-0.5 bg-amber-50/30"></td>
+                        <td className="border border-gray-600 p-0.5 text-right font-bold bg-amber-50/30 text-[11px]">
+                            {noteExtraPoint > 0 ? Number(noteExtraPoint).toFixed(2) : ''}
+                        </td>
                     </tr>
 
                     {/* Table TOTAL Row */}
@@ -500,6 +533,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const [note, setNote] = useState<string>('');
     // Table-level note (above TOTAL row, in merged From/To/Freight cells)
     const [tableNote, setTableNote] = useState<string>('');
+    // Table-level extra point (next to Note in Extra Point column)
+    const [noteExtraPoint, setNoteExtraPoint] = useState<number>(0);
 
     // State for individual LR rows
     const [invoiceRows, setInvoiceRows] = useState<InvoiceRowItem[]>([]);
@@ -518,6 +553,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         sFrom: boolean, 
         currentNote: string, 
         currentTableNote: string,
+        currentNoteExtraPoint: number,
         rows: InvoiceRowItem[]
     ) => {
         if (!bNo) return;
@@ -530,6 +566,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 showFromColumn: true,
                 note: currentNote,
                 tableNote: currentTableNote,
+                noteExtraPoint: currentNoteExtraPoint,
                 rows: rows.reduce((acc, r) => {
                     acc[r.lrNo] = {
                         gatePassNo: r.gatePassNo,
@@ -646,8 +683,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         }
         setNote(resolvedNote);
 
-        // Resolve Table Note
+        // Resolve Table Note & Table Extra Point
         setTableNote(savedCustom?.tableNote || '');
+        setNoteExtraPoint(Number(savedCustom?.noteExtraPoint) || 0);
 
         // Resolve Date
         if (savedCustom?.billDate) {
@@ -724,48 +762,53 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         });
 
         setInvoiceRows(updated);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, updated);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, noteExtraPoint, updated);
         triggerDebouncedAutoSave(updated, note, billNo, billDate);
     };
 
     const handleNoteChange = (newNote: string) => {
         setNote(newNote);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, newNote, tableNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, newNote, tableNote, noteExtraPoint, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, newNote, billNo, billDate);
     };
 
     const handleTableNoteChange = (newTableNote: string) => {
         setTableNote(newTableNote);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, newTableNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, newTableNote, noteExtraPoint, invoiceRows);
+    };
+
+    const handleNoteExtraPointChange = (newVal: number) => {
+        setNoteExtraPoint(newVal);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, newVal, invoiceRows);
     };
 
     const handleBillNoChange = (newNo: string) => {
         setBillNo(newNo);
-        persistToLocalStorage(newNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
+        persistToLocalStorage(newNo, billDate, taxType, showGst, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, note, newNo, billDate);
     };
 
     const handleBillDateChange = (newDate: string) => {
         setBillDate(newDate);
-        persistToLocalStorage(billNo, newDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
+        persistToLocalStorage(billNo, newDate, taxType, showGst, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, note, billNo, newDate);
     };
 
     const handleTaxTypeChange = (newType: 'intra' | 'inter') => {
         setTaxType(newType);
-        persistToLocalStorage(billNo, billDate, newType, showGst, showFromColumn, note, tableNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, newType, showGst, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
     };
 
     const handleGstToggle = () => {
         const next = !showGst;
         setShowGst(next);
-        persistToLocalStorage(billNo, billDate, taxType, next, showFromColumn, note, tableNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, next, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
     };
 
     const handleFromColumnToggle = () => {
         const next = !showFromColumn;
         setShowFromColumn(next);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, next, note, tableNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, next, note, tableNote, noteExtraPoint, invoiceRows);
     };
 
     const billedTo: Partial<PartyDetails> = lorryReceipts.length > 0 
@@ -888,7 +931,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         const toastId = toast.loading('Saving invoice changes...');
         try {
             const lrNos = invoiceRows.map(r => r.lrNo);
-            persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
+            persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
             await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
             setSaveStatus('saved');
             toast.success(`Invoice ${billNo} saved successfully!`, { id: toastId });
@@ -904,7 +947,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             setIsSaving(true);
             try {
                 const lrNos = invoiceRows.map(r => r.lrNo);
-                persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
+                persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, noteExtraPoint, invoiceRows);
                 await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
                 setSaveStatus('saved');
             } catch (error) {
@@ -1059,6 +1102,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         onNoteChange={handleNoteChange}
                         tableNote={tableNote}
                         onTableNoteChange={handleTableNoteChange}
+                        noteExtraPoint={noteExtraPoint}
+                        onNoteExtraPointChange={handleNoteExtraPointChange}
                         isExporting={isExporting}
                     />
                 </div>
@@ -1081,6 +1126,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         onNoteChange={() => {}}
                         tableNote={tableNote}
                         onTableNoteChange={() => {}}
+                        noteExtraPoint={noteExtraPoint}
+                        onNoteExtraPointChange={() => {}}
                         isExporting={true}
                     />
                 </div>,

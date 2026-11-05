@@ -899,38 +899,10 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
 }) => {
     const previewRef = useRef<HTMLDivElement>(null);
     const printRoot = document.getElementById('print-root');
-    const [viewMode, setViewMode] = useState<'modern-gst' | 'classic' | 'compare'>(lr.templateStyle || initialTemplateStyle || 'modern-gst');
     const [copyType, setCopyType] = useState<string>(lr.copyType || 'CONSIGNOR COPY');
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
     const [showAmounts, setShowAmounts] = useState(true);
-
-    // Advanced Print & PDF State
-    const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
-    const [paperSize, setPaperSize] = useState<'a4' | 'a5' | 'letter' | 'legal'>('a4');
-    const [singlePageFit, setSinglePageFit] = useState<boolean>(true);
-    const [multiCopyMode, setMultiCopyMode] = useState<'single' | '3-copies' | '4-copies'>('single');
     const [isExporting, setIsExporting] = useState<boolean>(false);
-
-    // GST Liability State (Defaults to 18% GST)
-    const [gstLiability, setGstLiability] = useState<'FCM_18' | 'RCM' | 'FCM_12'>(() => {
-        const p = (lr.gstPaidBy || '').toLowerCase();
-        if (p.includes('5') || p.includes('rcm')) return 'RCM';
-        if (p.includes('12')) return 'FCM_12';
-        return 'FCM_18';
-    });
-
-    const effectiveTemplate = viewMode === 'compare' ? 'modern-gst' : viewMode;
-
-    // Copies list for multi-copy printing
-    const getPrintCopies = () => {
-        if (multiCopyMode === '3-copies') {
-            return ['CONSIGNOR COPY', 'CONSIGNEE COPY', 'DRIVER COPY'];
-        }
-        if (multiCopyMode === '4-copies') {
-            return ['CONSIGNOR COPY', 'CONSIGNEE COPY', 'TRANSPORTER COPY', 'DRIVER COPY'];
-        }
-        return [copyType];
-    };
 
     // Text Summary Generator for Instant Sharing
     const generateBiltyText = () => {
@@ -1005,9 +977,9 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
 
         const pdf = new jsPDF({
-            orientation: printOrientation,
+            orientation: 'portrait',
             unit: 'mm',
-            format: paperSize.toLowerCase(),
+            format: 'a4',
             compress: true
         });
 
@@ -1015,66 +987,34 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         const pdfH = pdf.internal.pageSize.getHeight();
 
         // Optimized printable margin (3.5mm for full-page portrait coverage)
-        const margin = paperSize === 'a5' ? 3.0 : 3.5;
+        const margin = 3.5;
         const maxW = pdfW - (margin * 2);
         const maxH = pdfH - (margin * 2);
 
-        // Check for multi-copy mode in printRoot
-        const printCopiesEl = printRoot?.querySelectorAll<HTMLElement>('.print-page-wrapper .printable-area');
-        const isMulti = multiCopyMode !== 'single' && printCopiesEl && printCopiesEl.length > 1;
+        const canvas = await html2canvas(targetEl, {
+            scale: 2.5,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0
+        });
 
-        if (isMulti) {
-            for (let i = 0; i < printCopiesEl.length; i++) {
-                if (i > 0) {
-                    pdf.addPage(paperSize.toLowerCase(), printOrientation);
-                }
-                const cCanvas = await html2canvas(printCopiesEl[i], {
-                    scale: 2.5,
-                    useCORS: true,
-                    allowTaint: false,
-                    logging: false,
-                    backgroundColor: '#ffffff',
-                    scrollX: 0,
-                    scrollY: 0
-                });
-                const cRatio = cCanvas.width / cCanvas.height;
-                let cW = maxW;
-                let cH = cW / cRatio;
-                if (singlePageFit && cH > maxH) {
-                    cH = maxH;
-                    cW = cH * cRatio;
-                }
-                const cX = margin + (maxW - cW) / 2;
-                const cY = margin + (maxH - cH) / 2;
-                const cImg = cCanvas.toDataURL('image/jpeg', 0.98);
-                pdf.addImage(cImg, 'JPEG', cX, cY, cW, cH, undefined, 'FAST');
-            }
-        } else {
-            const canvas = await html2canvas(targetEl, {
-                scale: 2.5,
-                useCORS: true,
-                allowTaint: false,
-                logging: false,
-                backgroundColor: '#ffffff',
-                scrollX: 0,
-                scrollY: 0
-            });
+        const imgRatio = canvas.width / canvas.height;
+        let renderW = maxW;
+        let renderH = renderW / imgRatio;
 
-            const imgRatio = canvas.width / canvas.height;
-            let renderW = maxW;
-            let renderH = renderW / imgRatio;
-
-            if (singlePageFit && renderH > maxH) {
-                renderH = maxH;
-                renderW = renderH * imgRatio;
-            }
-
-            const posX = margin + (maxW - renderW) / 2;
-            const posY = margin + (maxH - renderH) / 2;
-
-            const imgData = canvas.toDataURL('image/jpeg', 0.98);
-            pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH, undefined, 'FAST');
+        if (renderH > maxH) {
+            renderH = maxH;
+            renderW = renderH * imgRatio;
         }
+
+        const posX = margin + (maxW - renderW) / 2;
+        const posY = margin + (maxH - renderH) / 2;
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        pdf.addImage(imgData, 'JPEG', posX, posY, renderW, renderH, undefined, 'FAST');
 
         return { pdf, filename };
     };
@@ -1103,7 +1043,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         }
     };
 
-    // Dynamic Print Trigger — A4 full-page fit, no overflow, no blank space
+    // Dynamic Print Trigger — Full-page A4 print matching PDF exactly (No shrinking, 100% full page)
     const handlePrint = () => {
         let styleEl = document.getElementById('dynamic-print-style') as HTMLStyleElement;
         if (!styleEl) {
@@ -1111,52 +1051,64 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             styleEl.id = 'dynamic-print-style';
             document.head.appendChild(styleEl);
         }
-        // Always use 3mm margin for maximum print area coverage
         styleEl.innerHTML = `
             @media print {
-                /* Hide everything except the print root */
-                body > *:not(#print-root) { display: none !important; }
-                body { margin: 0 !important; padding: 0 !important; background: white !important; }
-
                 @page {
-                    size: ${paperSize.toUpperCase()} ${printOrientation};
-                    margin: 3mm;
+                    size: A4 portrait;
+                    margin: 4mm;
                 }
-
+                html, body {
+                    width: 100% !important;
+                    height: auto !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    background: #ffffff !important;
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                body * {
+                    visibility: hidden;
+                }
+                #print-root, #print-root * {
+                    visibility: visible;
+                }
                 #print-root {
-                    display: block !important;
+                    position: absolute !important;
+                    left: 0 !important;
+                    top: 0 !important;
                     width: 100% !important;
                     margin: 0 !important;
                     padding: 0 !important;
-                }
-
-                .print-page-wrapper {
                     display: block !important;
+                }
+                .print-copies-container {
                     width: 100% !important;
+                }
+                .print-page-wrapper {
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: block !important;
                     page-break-after: always;
                     break-after: page;
                 }
-
+                .print-page-wrapper:last-child {
+                    page-break-after: auto;
+                    break-after: auto;
+                }
                 .printable-area {
-                    /* Scale to fill the whole A4 page */
                     width: 100% !important;
                     max-width: 100% !important;
-                    min-width: 0 !important;
-                    margin: 0 auto !important;
-                    padding: 2mm !important;
+                    min-width: 100% !important;
                     box-sizing: border-box !important;
+                    margin: 0 auto !important;
+                    padding: 3mm 4mm !important;
+                    border: 2px solid #0f172a !important;
+                    box-shadow: none !important;
+                    transform: none !important;
+                    zoom: 1 !important;
                     page-break-inside: avoid !important;
-                    transform-origin: top left;
-                    /* Scale down wide bilty to fit A4 */
-                    ${printOrientation === 'portrait'
-                        ? 'transform: scale(0.72) !important; transform-origin: top center !important;'
-                        : 'transform: scale(0.90) !important; transform-origin: top center !important;'
-                    }
-                }
-
-                .page-break {
-                    page-break-after: always !important;
-                    break-after: page !important;
+                    break-inside: avoid !important;
                 }
             }
         `;
@@ -1264,29 +1216,25 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             {/* Render copies for printing */}
             {printRoot && createPortal(
                 <div className="print-copies-container">
-                    {getPrintCopies().map((cType, index) => (
-                        <div key={index} className={`print-page-wrapper ${index > 0 ? 'page-break mt-6' : ''}`}>
-                            <LRContent
-                                lr={lr}
-                                companyDetails={companyDetails}
-                                showCompanyDetails={showCompanyDetails}
-                                showAmounts={showAmounts}
-                                templateStyle={effectiveTemplate}
-                                copyType={cType}
-                                orientation={printOrientation}
-                                paperSize={paperSize}
-                                singlePageFit={singlePageFit}
-                                gstLiability={gstLiability}
-                            />
-                        </div>
-                    ))}
+                    <div className="print-page-wrapper">
+                        <ModernGSTBiltyContent
+                            lr={lr}
+                            companyDetails={companyDetails}
+                            showCompanyDetails={showCompanyDetails}
+                            showAmounts={showAmounts}
+                            copyType={copyType}
+                            orientation="portrait"
+                            paperSize="a4"
+                            singlePageFit={true}
+                        />
+                    </div>
                 </div>,
                 printRoot
             )}
 
             {/* Modal Dialog */}
             <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-7xl my-4 overflow-hidden border border-slate-200 flex flex-col">
-                {/* Modal Toolbar 1: Primary Controls */}
+                {/* Modal Toolbar: Clean Header & Primary Actions */}
                 <div className="p-3 sm:p-4 bg-white border-b border-slate-200 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-20 shadow-sm">
                     <div className="flex items-center gap-3">
                         <div className="bg-blue-600 text-white p-2 rounded-xl shadow-md">
@@ -1294,48 +1242,22 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         </div>
                         <div>
                             <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
-                                Bilty / LR Preview & Print Suite
-                                <span className="text-xs bg-blue-100 text-blue-800 font-mono px-2 py-0.5 rounded-full font-bold">
+                                Bilty / LR Preview
+                                <span className="text-xs bg-blue-100 text-blue-800 font-mono px-2.5 py-0.5 rounded-full font-bold">
                                     {lr.lrNo || 'Draft'}
                                 </span>
                             </h2>
-                            <p className="text-xs text-slate-500 font-medium">Configure single-page layout, orientation, ratios & export</p>
+                            <p className="text-xs text-slate-500 font-medium">Standard A4 Full-Page Electronic Consignment Note</p>
                         </div>
                     </div>
 
-                    {/* Template & Action Buttons */}
+                    {/* Action Buttons */}
                     <div className="flex items-center flex-wrap gap-2">
-                        {/* Design Template Switcher */}
-                        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
-                            <button
-                                type="button"
-                                onClick={() => setViewMode('modern-gst')}
-                                className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${viewMode === 'modern-gst' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
-                            >
-                                <span>✨ Modern GST</span>
-                                <span className="text-[10px] bg-amber-400 text-amber-950 px-1 py-0.2 rounded font-extrabold">BEST ⭐</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setViewMode('classic')}
-                                className={`px-3 py-1.5 rounded-lg transition-all ${viewMode === 'classic' ? 'bg-blue-600 text-white shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
-                            >
-                                📋 Classic
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setViewMode('compare')}
-                                className={`px-3 py-1.5 rounded-lg transition-all ${viewMode === 'compare' ? 'bg-purple-600 text-white shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'}`}
-                            >
-                                🔀 Compare
-                            </button>
-                        </div>
-
                         {/* Copy Type Selector */}
                         <select
                             value={copyType}
                             onChange={(e) => setCopyType(e.target.value)}
-                            className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-xl px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
+                            className="bg-white border border-slate-300 text-slate-800 text-xs font-bold rounded-xl px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm cursor-pointer"
                         >
                             <option value="CONSIGNOR COPY">Consignor Copy</option>
                             <option value="CONSIGNEE COPY">Consignee Copy</option>
@@ -1343,8 +1265,8 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             <option value="DRIVER COPY">Driver Copy</option>
                         </select>
 
-                        {/* Toggles */}
-                        <label className="flex items-center space-x-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer shadow-sm">
+                        {/* Amounts Toggle */}
+                        <label className="flex items-center space-x-1.5 bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer shadow-sm">
                             <input
                                 type="checkbox"
                                 checked={showAmounts}
@@ -1357,44 +1279,44 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         {/* Save Button */}
                         {!isReadOnly && onSave && (
                             <button
-                                onClick={() => onSave({ ...lr, templateStyle: effectiveTemplate, copyType })}
-                                className="flex items-center bg-emerald-600 text-white px-3 py-1.5 rounded-xl hover:bg-emerald-700 font-bold text-xs shadow-md transition-colors"
+                                onClick={() => onSave({ ...lr, templateStyle: 'modern-gst', copyType })}
+                                className="flex items-center bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 font-bold text-xs shadow-md transition-colors"
                             >
                                 <SaveIcon className="w-4 h-4 mr-1" />
                                 Save LR
                             </button>
                         )}
 
-                        {/* Print Button */}
+                        {/* Print Button (Full A4 Page) */}
                         <button
                             onClick={handlePrint}
-                            className="flex items-center bg-slate-800 text-white px-3.5 py-1.5 rounded-xl hover:bg-slate-900 font-bold text-xs shadow-md transition-all active:scale-95"
-                            title="Print Document"
+                            className="flex items-center bg-slate-900 text-white px-4 py-2 rounded-xl hover:bg-black font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
+                            title="Print LR on Full A4 Page"
                         >
-                            <PrintIcon className="w-4 h-4 mr-1.5" />
-                            Print
+                            <PrintIcon className="w-4 h-4" />
+                            <span>Print (Full A4 Page)</span>
                         </button>
 
                         {/* PDF Download Button */}
                         <button
                             onClick={handleDownloadPDF}
                             disabled={isExporting}
-                            className="flex items-center bg-blue-600 text-white px-3.5 py-1.5 rounded-xl hover:bg-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
+                            className="flex items-center bg-blue-600 text-white px-3.5 py-2 rounded-xl hover:bg-blue-700 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 gap-1.5"
                             title="Download 1-Page PDF"
                         >
-                            <DownloadIcon className="w-4 h-4 mr-1.5" />
-                            PDF (1-Page)
+                            <DownloadIcon className="w-4 h-4" />
+                            <span>Download PDF</span>
                         </button>
 
-                        {/* Direct 1-Click WhatsApp Button (tries PDF attachment first) */}
+                        {/* Direct 1-Click WhatsApp Button */}
                         <button
                             type="button"
                             onClick={async () => {
                                 const targetPhone = consigneeContact || consignorContact || driverContact || '';
                                 await handleDirectWhatsApp(targetPhone);
                             }}
-                            className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
-                            title="WhatsApp: tries PDF attachment then text fallback"
+                            className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
+                            title="Share via WhatsApp"
                         >
                             <WhatsAppIcon className="w-4 h-4" />
                             <span>WhatsApp</span>
@@ -1410,7 +1332,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                     onClose();
                                 }
                             }}
-                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                            className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors ml-1"
                             title="Close preview"
                         >
                             <XIcon className="w-5 h-5" />
@@ -1418,181 +1340,21 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                     </div>
                 </div>
 
-                {/* Modal Toolbar 2: Advanced Print, Layout & Orientation Settings Bar */}
-                <div className="bg-slate-900 text-white px-4 py-2.5 flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 text-xs">
-                    {/* Left: Orientation & Ratio & GST Controls */}
-                    <div className="flex items-center flex-wrap gap-3">
-                        {/* Orientation Toggle */}
-                        <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
-                            <span className="text-[10px] font-bold text-slate-400 px-1 uppercase">Orientation:</span>
-                            <button
-                                type="button"
-                                onClick={() => setPrintOrientation('portrait')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${printOrientation === 'portrait' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
-                            >
-                                <span>📄</span>
-                                <span>Portrait</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setPrintOrientation('landscape')}
-                                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${printOrientation === 'landscape' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'}`}
-                            >
-                                <span>📜</span>
-                                <span>Landscape</span>
-                            </button>
-                        </div>
-
-                        {/* Paper Ratio / Size Selector */}
-                        <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">Ratio/Size:</span>
-                            <select
-                                value={paperSize}
-                                onChange={(e) => setPaperSize(e.target.value as any)}
-                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
-                            >
-                                <option value="a4" className="bg-slate-900 text-white">A4 (Standard 210×297mm)</option>
-                                <option value="a5" className="bg-slate-900 text-white">A5 (Half Page 148×210mm)</option>
-                                <option value="letter" className="bg-slate-900 text-white">Letter (8.5×11 in)</option>
-                                <option value="legal" className="bg-slate-900 text-white">Legal (8.5×14 in)</option>
-                            </select>
-                        </div>
-
-                        {/* Single-Page Fit Guarantee Toggle */}
-                        <label className="flex items-center space-x-1.5 bg-emerald-950/80 px-2.5 py-1 rounded-xl border border-emerald-500/40 text-xs font-bold text-emerald-300 cursor-pointer shadow-sm hover:bg-emerald-900/80 transition-colors">
-                            <input
-                                type="checkbox"
-                                checked={singlePageFit}
-                                onChange={(e) => setSinglePageFit(e.target.checked)}
-                                className="h-3.5 w-3.5 text-emerald-500 rounded border-slate-600 focus:ring-emerald-400"
-                            />
-                            <span>⚡ 100% Single-Page Fit Lock</span>
-                        </label>
-
-                        {/* Multi-Copy Mode */}
-                        <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-xl border border-slate-700">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">Batch Print:</span>
-                            <select
-                                value={multiCopyMode}
-                                onChange={(e) => setMultiCopyMode(e.target.value as any)}
-                                className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer"
-                            >
-                                <option value="single" className="bg-slate-900 text-white">1 Copy (Current View)</option>
-                                <option value="3-copies" className="bg-slate-900 text-white">3 Copies (Consignor + Consignee + Driver)</option>
-                                <option value="4-copies" className="bg-slate-900 text-white">4 Copies (All 4 Copies)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Right: Quick Image & Share Actions */}
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={handleDownloadImage}
-                            disabled={isExporting}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-1 transition-all"
-                            title="Export as High-Res PNG Image"
-                        >
-                            <span>🖼️</span>
-                            <span>PNG Image</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleCopySummary}
-                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-lg font-bold text-xs border border-slate-700 flex items-center gap-1 transition-all"
-                            title="Copy text summary for WhatsApp/SMS"
-                        >
-                            <span>📋</span>
-                            <span>Copy Summary</span>
-                        </button>
-                    </div>
-                </div>
-
                 {/* Preview Sheet Area */}
                 <div className="p-3 sm:p-6 overflow-x-auto flex justify-center bg-slate-200/70 min-h-[650px]">
-                    {viewMode === 'compare' ? (
-                        /* Side-by-Side Comparison Mode */
-                        <div className="flex flex-col lg:flex-row gap-6 items-start justify-center w-full max-w-7xl">
-                            {/* Layout 1: Modern GST (Recommended) */}
-                            <div className="flex-1 bg-white shadow-2xl rounded-xl p-3 border-2 border-blue-500 relative flex flex-col items-center">
-                                <div className="w-full flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="bg-blue-600 text-white text-xs font-black px-2.5 py-1 rounded-lg">✨ Option 1: Modern GST BiltyBook</span>
-                                        <span className="bg-green-100 text-green-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">⭐ RECOMMENDED</span>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                             setViewMode('modern-gst');
-                                            toast.success('Selected Modern GST BiltyBook layout!');
-                                        }}
-                                        className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-lg hover:bg-blue-700 shadow-sm"
-                                    >
-                                        Use This Design ✓
-                                    </button>
-                                </div>
-                                <div className="w-full overflow-x-auto">
-                                    <ModernGSTBiltyContent
-                                        ref={previewRef}
-                                        lr={lr}
-                                        companyDetails={companyDetails}
-                                        showCompanyDetails={showCompanyDetails}
-                                        showAmounts={showAmounts}
-                                        copyType={copyType}
-                                        orientation={printOrientation}
-                                        paperSize={paperSize}
-                                        singlePageFit={singlePageFit}
-                                        gstLiability={gstLiability}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Layout 2: Classic Standard */}
-                            <div className="flex-1 bg-white shadow-2xl rounded-xl p-3 border border-slate-300 relative flex flex-col items-center">
-                                <div className="w-full flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="bg-slate-700 text-white text-xs font-black px-2.5 py-1 rounded-lg">📋 Option 2: Classic Standard</span>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setViewMode('classic');
-                                            toast.success('Selected Classic Standard layout!');
-                                        }}
-                                        className="bg-slate-700 text-white text-xs font-bold px-3 py-1 rounded-lg hover:bg-slate-800 shadow-sm"
-                                    >
-                                        Use This Design ✓
-                                    </button>
-                                </div>
-                                <div className="w-full overflow-x-auto">
-                                    <ClassicLRContent
-                                        lr={lr}
-                                        companyDetails={companyDetails}
-                                        showCompanyDetails={showCompanyDetails}
-                                        showAmounts={showAmounts}
-                                        orientation={printOrientation}
-                                        paperSize={paperSize}
-                                        singlePageFit={singlePageFit}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        /* Single Selected Layout Mode */
-                        <div className="bg-white shadow-2xl rounded-sm p-1 my-auto">
-                            <LRContent
-                                ref={previewRef}
-                                lr={lr}
-                                companyDetails={companyDetails}
-                                showCompanyDetails={showCompanyDetails}
-                                showAmounts={showAmounts}
-                                templateStyle={effectiveTemplate}
-                                copyType={copyType}
-                                orientation={printOrientation}
-                                paperSize={paperSize}
-                                singlePageFit={singlePageFit}
-                                gstLiability={gstLiability}
-                            />
-                        </div>
-                    )}
+                    <div className="bg-white shadow-2xl rounded-xs p-1 my-auto">
+                        <ModernGSTBiltyContent
+                            ref={previewRef}
+                            lr={lr}
+                            companyDetails={companyDetails}
+                            showCompanyDetails={showCompanyDetails}
+                            showAmounts={showAmounts}
+                            copyType={copyType}
+                            orientation="portrait"
+                            paperSize="a4"
+                            singlePageFit={true}
+                        />
+                    </div>
                 </div>
             </div>
 

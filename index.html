@@ -101,18 +101,41 @@
           position: absolute;
           left: 0;
           top: 0;
-          width: 100%;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          display: block !important;
+        }
+        .print-copies-container {
+          width: 100% !important;
+        }
+        .print-page-wrapper {
+          width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          display: block !important;
+          page-break-after: always;
+          break-after: page;
+        }
+        .print-page-wrapper:last-child {
+          page-break-after: auto;
+          break-after: auto;
         }
         .printable-area {
           box-shadow: none !important;
-          margin-bottom: 0 !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          min-width: 100% !important;
+          margin: 0 auto !important;
+          padding: 3mm 4mm !important;
+          box-sizing: border-box !important;
+          transform: none !important;
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
         }
         @page {
           size: A4 portrait;
-          margin: 6mm 4mm;
+          margin: 4mm;
         }
         .page-break {
           page-break-after: always;

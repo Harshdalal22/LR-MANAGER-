@@ -116,13 +116,39 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                         </div>
                     )}
                 </div>
-                <div className="flex-1 text-center text-black min-w-0 px-2">
+                <div className="flex-1 text-center text-black min-w-0 px-2 space-y-0.5">
                     <h1 className="text-xl sm:text-[22px] font-black text-red-600 tracking-normal uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                         {companyDetails.name || 'SSK CARGO SERVICES PRIVATE LIMITED'}
                     </h1>
+                    {/* Single Company Address from Settings */}
                     {companyDetails.address && (
-                        <p className="text-[11px] mt-1 text-gray-800 font-medium whitespace-pre-line leading-tight">
-                            {companyDetails.address}
+                        <p className="text-[10.5px] mt-0.5 text-gray-800 font-medium leading-tight">
+                            <span className="font-bold text-gray-900">Address: </span>
+                            {companyDetails.address.replace(/\r?\n+/g, ', ').trim()}
+                        </p>
+                    )}
+                    {/* Contact & Email (just like LR) */}
+                    {((companyDetails.contact && companyDetails.contact.length > 0) || companyDetails.email) && (
+                        <p className="text-[10px] text-gray-700 leading-tight">
+                            {companyDetails.contact && companyDetails.contact.length > 0 && (
+                                <><span className="font-bold text-gray-900">Phone: </span><span>{companyDetails.contact.join(', ')}</span></>
+                            )}
+                            {companyDetails.contact && companyDetails.contact.length > 0 && companyDetails.email && ' • '}
+                            {companyDetails.email && (
+                                <><span className="font-bold text-gray-900">Email: </span><span>{companyDetails.email}</span></>
+                            )}
+                        </p>
+                    )}
+                    {/* GSTIN & PAN (just like LR) */}
+                    {(companyDetails.gstn || companyDetails.pan) && (
+                        <p className="text-[10px] text-gray-800 font-semibold leading-tight">
+                            {companyDetails.gstn && (
+                                <><span className="font-bold text-gray-900">GSTIN: </span><span className="font-mono">{companyDetails.gstn}</span></>
+                            )}
+                            {companyDetails.gstn && companyDetails.pan && ' • '}
+                            {companyDetails.pan && (
+                                <><span className="font-bold text-gray-900">PAN: </span><span className="font-mono">{companyDetails.pan}</span></>
+                            )}
                         </p>
                     )}
                 </div>
@@ -135,11 +161,13 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
             <div className="flex justify-between items-start mt-2 pb-1 text-black">
                 <div className="w-3/5 text-xs">
                     <p className="font-bold text-[13px] tracking-wide text-gray-900">
-                        M/S {billedTo.name || 'AVENUE SUPERMARTS LTD'}
+                        M/S {billedTo.name || ''}
                     </p>
-                    <p className="text-gray-800 font-medium text-[11px] leading-tight mt-0.5 whitespace-pre-line">
-                        {billedTo.address || 'VILLAGE - KULANA, NH 352 JHAJJAR - 124108'}
-                    </p>
+                    {billedTo.address && (
+                        <p className="text-gray-800 font-medium text-[11px] leading-tight mt-0.5">
+                            {billedTo.address.replace(/\r?\n+/g, ', ').trim()}
+                        </p>
+                    )}
                     {showGst && billedTo.gst && (
                         <p className="font-bold text-[11px] text-black mt-1">
                             GST NO: <span className="font-mono">{billedTo.gst}</span>
@@ -743,56 +771,122 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         : { name: 'N/A', address: 'N/A', gst: 'N/A' };
 
     const handleDownloadPDF = async () => {
-        setIsExporting(true);
-        await new Promise(r => setTimeout(r, 250)); // let render update with isExporting=true
         const element = previewRef.current;
         if (!element) {
-            setIsExporting(false);
+            toast.error('Invoice preview not found');
             return;
         }
+
+        setIsExporting(true);
+        const toastId = toast.loading('Generating Invoice PDF...');
+
         try {
-            // Try html2pdf (CDN) first if available
-            if (typeof (window as any).html2pdf !== 'undefined') {
-                const opt = {
-                    margin: 4,
-                    filename: `Invoice-${billNo}-${billedTo.name?.split(' ')[0] || 'Bill'}.pdf`,
-                    image: { type: 'jpeg', quality: 1.0 },
-                    html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-                };
-                await (window as any).html2pdf().from(element).set(opt).save();
+            // Wait for render to update with isExporting=true (hides input borders/placeholders)
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            const canvas = await html2canvas(element, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0
+            });
+
+            const cleanBillNo = (billNo || 'BILL').replace(/[/\\?%*:|"<>]/g, '_');
+            const cleanParty = (billedTo.name || 'Party').split(' ')[0].replace(/[/\\?%*:|"<>]/g, '_');
+            const filename = `Invoice-${cleanBillNo}-${cleanParty}.pdf`;
+
+            const pdf = new jsPDF({
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait',
+                compress: true
+            });
+
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const margin = 4;
+            const usableW = pageW - margin * 2;
+            const maxH = pageH - margin * 2;
+
+            const imgRatio = canvas.width / canvas.height;
+            const renderH = usableW / imgRatio;
+
+            if (renderH <= maxH) {
+                // Fits on a single A4 page
+                const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                pdf.addImage(imgData, 'JPEG', margin, margin, usableW, renderH, undefined, 'FAST');
             } else {
-                // Fallback: bundled jsPDF + html2canvas (always available)
-                const canvas = await html2canvas(element, { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 });
-                const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-                const pageW = pdf.internal.pageSize.getWidth();
-                const pageH = pdf.internal.pageSize.getHeight();
-                const margin = 4;
-                const usableW = pageW - margin * 2;
-                const imgH = (canvas.height * usableW) / canvas.width;
-                let yPos = margin;
-                let remaining = imgH;
+                // Multi-page slicing if table has many rows
+                const slicePixelH = (maxH / usableW) * canvas.width;
                 let srcY = 0;
-                while (remaining > 0) {
-                    const sliceH = Math.min(remaining, pageH - margin * 2);
+                let pageIndex = 0;
+
+                while (srcY < canvas.height) {
+                    const currentSliceH = Math.min(slicePixelH, canvas.height - srcY);
                     const sliceCanvas = document.createElement('canvas');
                     sliceCanvas.width = canvas.width;
-                    sliceCanvas.height = Math.round((sliceH / usableW) * canvas.width);
+                    sliceCanvas.height = Math.round(currentSliceH);
                     const ctx = sliceCanvas.getContext('2d');
                     if (ctx) {
-                        ctx.drawImage(canvas, 0, Math.round(srcY), canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+                        ctx.drawImage(
+                            canvas,
+                            0,
+                            Math.round(srcY),
+                            canvas.width,
+                            sliceCanvas.height,
+                            0,
+                            0,
+                            canvas.width,
+                            sliceCanvas.height
+                        );
                     }
-                    if (srcY > 0) { pdf.addPage(); yPos = margin; }
-                    pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 1.0), 'JPEG', margin, yPos, usableW, sliceH);
-                    srcY += sliceCanvas.height;
-                    remaining -= sliceH;
+
+                    if (pageIndex > 0) {
+                        pdf.addPage('a4', 'portrait');
+                    }
+
+                    const sliceRenderH = (sliceCanvas.height / canvas.width) * usableW;
+                    pdf.addImage(
+                        sliceCanvas.toDataURL('image/jpeg', 0.98),
+                        'JPEG',
+                        margin,
+                        margin,
+                        usableW,
+                        sliceRenderH,
+                        undefined,
+                        'FAST'
+                    );
+
+                    srcY += slicePixelH;
+                    pageIndex++;
                 }
-                pdf.save(`Invoice-${billNo}-${billedTo.name?.split(' ')[0] || 'Bill'}.pdf`);
             }
-            toast.success('PDF downloaded!');
+
+            // Dual download trigger: Blob URL anchor click + pdf.save for mobile/desktop support
+            const pdfBlob = pdf.output('blob');
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            const downloadLink = document.createElement('a');
+            downloadLink.href = blobUrl;
+            downloadLink.download = filename;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+
+            try {
+                pdf.save(filename);
+            } catch (e) {
+                // link.click already triggered
+            }
+
+            toast.success(`Invoice ${filename} downloaded!`, { id: toastId });
         } catch (err) {
-            console.error('PDF generation error:', err);
-            toast.error('PDF download failed. Try again.');
+            console.error('Invoice PDF error:', err);
+            toast.error('Direct PDF error. Opening Print dialog...', { id: toastId });
+            window.print();
         } finally {
             setIsExporting(false);
         }
@@ -801,14 +895,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const handleSaveOnly = async () => {
         if (!onSaveInvoiceDetails) return;
         setIsSaving(true);
+        const toastId = toast.loading('Saving invoice changes...');
         try {
             const lrNos = invoiceRows.map(r => r.lrNo);
             persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
             await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
             setSaveStatus('saved');
-            toast.success(`Invoice ${billNo} saved successfully!`);
+            toast.success(`Invoice ${billNo} saved successfully!`, { id: toastId });
         } catch (error) {
-            toast.error('Failed to save invoice');
+            toast.error('Failed to save invoice', { id: toastId });
         } finally {
             setIsSaving(false);
         }
@@ -817,21 +912,20 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const handleSaveAndDownload = async () => {
         if (onSaveInvoiceDetails) {
             setIsSaving(true);
+            const toastId = toast.loading('Saving & preparing download...');
             try {
                 const lrNos = invoiceRows.map(r => r.lrNo);
                 persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
                 await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
                 setSaveStatus('saved');
-                toast.success('Invoice saved & downloading PDF!');
-                handleDownloadPDF();
+                toast.success('Invoice saved!', { id: toastId });
             } catch (error) {
-                toast.error('Failed to save invoice');
+                toast.error('Failed to save invoice', { id: toastId });
             } finally {
                 setIsSaving(false);
             }
-        } else {
-            handleDownloadPDF();
         }
+        await handleDownloadPDF();
     };
 
     return (

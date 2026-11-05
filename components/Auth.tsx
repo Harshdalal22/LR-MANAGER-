@@ -373,16 +373,6 @@ const Auth: React.FC = () => {
                     {/* ===================================================================== */}
                     <div className="col-span-1 md:col-span-6 lg:col-span-6 flex flex-col justify-center min-h-screen md:min-h-full w-full bg-gradient-to-b from-[#1e40af] via-[#2563eb] to-[#ea580c] md:bg-none md:bg-white p-4 sm:p-6 lg:p-10 relative">
 
-                        {/* Mobile Status Bar Simulation (for authentic mobile look on mobile app) */}
-                        <div className="md:hidden flex justify-between items-center text-white/90 text-xs font-semibold px-2 mb-3">
-                            <span>9:41</span>
-                            <div className="flex items-center gap-1.5">
-                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 19.58 10.56 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
-                                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4z"/></svg>
-                                <svg className="w-5 h-3 fill-current" viewBox="0 0 24 14"><rect x="1" y="1" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/><rect x="3" y="3" width="12" height="8" rx="1"/><rect x="21" y="4" width="2" height="6" rx="1"/></svg>
-                            </div>
-                        </div>
-
                         {/* Mobile Header Branding (Shown only on Mobile screen `< md`) */}
                         <div className="md:hidden flex flex-col items-center text-center mb-3">
                             <div className="flex items-center justify-center gap-2 mb-1">

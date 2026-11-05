@@ -186,24 +186,57 @@ const OverviewTab = ({ lorryReceipts, vouchers, payments, ledgerEntries }: {
 };
 
 // ─── LEDGER TAB ───────────────────────────────────────────────────────────────
-const LedgerTab = ({ lorryReceipts, ledgerEntries, payments, onRefresh }: {
+const LedgerTab = ({ 
+    lorryReceipts, 
+    ledgerEntries, 
+    payments, 
+    companyDetails, 
+    savedParties = [], 
+    onRefresh 
+}: {
     lorryReceipts: LorryReceipt[];
     ledgerEntries: LedgerEntry[];
     payments: PaymentReceipt[];
+    companyDetails: CompanyDetails;
+    savedParties?: SavedParty[];
     onRefresh: () => void;
 }) => {
     const [selectedParty, setSelectedParty] = useState<string>('');
-    const [showForm, setShowForm] = useState(false);
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
-    const [form, setForm] = useState<Partial<LedgerEntry>>({
-        date: today(), description: '', debit: 0, credit: 0, payment_mode: 'Cash', party_name: '', entry_type: 'manual'
-    });
-    const [saving, setSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [includeUninvoiced, setIncludeUninvoiced] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
-    // Build party list from LRs + ledger entries
+    // Modal state for adding a new manual line
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addForm, setAddForm] = useState({
+        date: today(),
+        particulars: '',
+        voucher_no: '',
+        amount: '',
+        type: 'debit' as 'debit' | 'credit',
+        payment_mode: 'Bank Transfer'
+    });
+
+    // Modal state for editing any ledger row
+    const [editingRow, setEditingRow] = useState<{
+        dbId?: string;
+        isInvoice?: boolean;
+        voucherNo?: string;
+        date: string;
+        particulars: string;
+        debit: number;
+        credit: number;
+        payment_mode?: string;
+    } | null>(null);
+
+    const [isSaving, setIsSaving] = useState(false);
+
+    // 1. Build comprehensive party list (from saved parties + invoiced LRs + LRs + ledger entries + payments)
     const parties = useMemo(() => {
         const set = new Set<string>();
+        savedParties.forEach(p => { if (p.name) set.add(p.name); });
         lorryReceipts.forEach(lr => {
             if (lr.billingTo?.name) set.add(lr.billingTo.name);
             if (lr.consignor?.name) set.add(lr.consignor.name);
@@ -211,235 +244,1173 @@ const LedgerTab = ({ lorryReceipts, ledgerEntries, payments, onRefresh }: {
         });
         ledgerEntries.forEach(e => { if (e.party_name) set.add(e.party_name); });
         payments.forEach(p => { if (p.party_name) set.add(p.party_name); });
-        return Array.from(set).sort();
-    }, [lorryReceipts, ledgerEntries, payments]);
+        return Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    }, [savedParties, lorryReceipts, ledgerEntries, payments]);
 
-    // Build transactions for selected party
-    const transactions = useMemo(() => {
+    // Party Details (for Header & PDF info box)
+    const partyDetails = useMemo(() => {
+        if (!selectedParty) return null;
+        const matched = savedParties.find(p => p.name.trim().toLowerCase() === selectedParty.trim().toLowerCase());
+        if (matched) return matched;
+        const sampleLR = lorryReceipts.find(lr => 
+            lr.billingTo?.name === selectedParty || lr.consignor?.name === selectedParty || lr.consignee?.name === selectedParty
+        );
+        if (sampleLR) {
+            if (sampleLR.billingTo?.name === selectedParty) return sampleLR.billingTo;
+            if (sampleLR.consignor?.name === selectedParty) return sampleLR.consignor;
+            if (sampleLR.consignee?.name === selectedParty) return sampleLR.consignee;
+        }
+        return { name: selectedParty, address: '', city: '', gst: '', contact: '' };
+    }, [selectedParty, savedParties, lorryReceipts]);
+
+    // 2. Build transactions strictly per user requirement:
+    // "when party select to uska invoice uthana chaie complete bss invoice uthana chaie company ka jo b invoice bna h or uska total ammount included gst usme dekhan chaie"
+    const rawTransactions = useMemo(() => {
         if (!selectedParty) return [];
 
-        const txs: { date: string; description: string; debit: number; credit: number; source: string; ref?: string }[] = [];
+        type TxItem = {
+            id: string;
+            dbId?: string;
+            date: string;
+            particulars: string;
+            gstInfo?: string;
+            voucherNo: string;
+            type: string;
+            debit: number;
+            credit: number;
+            source: 'Invoice' | 'Payment' | 'Manual' | 'LR';
+            isInvoice?: boolean;
+            isManual?: boolean;
+            payment_mode?: string;
+            lrs?: LorryReceipt[];
+        };
 
-        // From LRs (freight = debit = receivable)
-        lorryReceipts.filter(lr =>
-            lr.billingTo?.name === selectedParty || lr.consignor?.name === selectedParty || lr.consignee?.name === selectedParty
-        ).forEach(lr => {
+        const txs: TxItem[] = [];
+        const processedInvoiceNos = new Set<string>();
+
+        // A. Group all Invoiced LRs for this company
+        const partyLRs = lorryReceipts.filter(lr =>
+            lr.billingTo?.name === selectedParty || 
+            lr.consignor?.name === selectedParty || 
+            lr.consignee?.name === selectedParty
+        );
+
+        const invoicedGroups: { [invNo: string]: LorryReceipt[] } = {};
+        const uninvoicedLRs: LorryReceipt[] = [];
+
+        partyLRs.forEach(lr => {
+            const billNo = (lr.freightBillNo || lr.invoiceNo || lr.charges?.freightBillNo || '').trim();
+            if (lr.isInvoiceGenerated && billNo) {
+                if (!invoicedGroups[billNo]) invoicedGroups[billNo] = [];
+                invoicedGroups[billNo].push(lr);
+            } else {
+                uninvoicedLRs.push(lr);
+            }
+        });
+
+        // B. Generate 1 clean Debit row per Invoice with Total Amount Included GST
+        Object.entries(invoicedGroups).forEach(([billNo, lrs]) => {
+            processedInvoiceNos.add(billNo);
+            const firstLR = lrs[0];
+            const invDate = firstLR.freightBillDate || firstLR.invoiceDate || firstLR.charges?.freightBillDate || firstLR.date;
+
+            // Subtotal = Freight + All LR Charges (hamali, extraPoint, detention, toll, statistical, etc.)
+            const subtotal = lrs.reduce((sum, lr) => {
+                const fr = Number(lr.freight) || 0;
+                const ep = Number(lr.charges?.extraPoint || 0);
+                const dt = Number(lr.charges?.detention || 0);
+                const hm = Number(lr.charges?.hamail || 0);
+                const dd = Number(lr.charges?.ddCharge || 0);
+                const st = Number(lr.charges?.stCharge || 0);
+                const tl = Number(lr.charges?.tollTax || lr.charges?.otherCharge || 0);
+                return sum + fr + ep + dt + hm + dd + st + tl;
+            }, 0);
+
+            // GST on Invoice
+            const explicitGst = lrs.reduce((sum, lr) => sum + (Number(lr.charges?.gstAmount) || 0), 0);
+            const isExempt = lrs.some(lr => 
+                lr.gstLiability === 'EXEMPTED' || 
+                (lr.gstPaidBy || '').toLowerCase().includes('exempt')
+            );
+            const gstRate = isExempt ? 0 : 0.18; // standard 18% GST on transport freight invoice
+            const calculatedGst = explicitGst > 0 ? explicitGst : Math.round(subtotal * gstRate);
+            const totalWithGst = Math.round(subtotal + calculatedGst);
+
+            // Check if user has an override/saved edit for this invoice in ledger_entries
+            const manualOverride = ledgerEntries.find(e => 
+                e.party_name === selectedParty && 
+                e.voucher_no === billNo && 
+                e.entry_type === 'invoice'
+            );
+
+            const lrListStr = lrs.map(l => l.lrNo).filter(Boolean).join(', ');
+
             txs.push({
-                date: lr.date,
-                description: `LR# ${lr.lrNo} — ${lr.fromPlace} to ${lr.toPlace}`,
-                debit: lr.freight || 0,
-                credit: 0,
-                source: lr.isInvoiceGenerated ? `Invoice: ${lr.invoiceNo}` : 'Not Invoiced',
-                ref: lr.lrNo
+                id: manualOverride ? `db-${manualOverride.id}` : `inv-${billNo}`,
+                dbId: manualOverride?.id,
+                date: manualOverride?.date || invDate,
+                particulars: manualOverride?.description || `Freight Invoice #${billNo} (${lrs.length} LR${lrs.length > 1 ? 's' : ''}: ${lrListStr})`,
+                gstInfo: calculatedGst > 0 
+                    ? `(Subtotal ₹${subtotal.toLocaleString('en-IN')} + 18% GST ₹${calculatedGst.toLocaleString('en-IN')})` 
+                    : undefined,
+                voucherNo: billNo,
+                type: 'Freight Invoice',
+                debit: manualOverride ? Number(manualOverride.debit || 0) : totalWithGst,
+                credit: manualOverride ? Number(manualOverride.credit || 0) : 0,
+                source: 'Invoice',
+                isInvoice: true,
+                lrs: lrs
             });
         });
 
-        // From payments
+        // C. Optional: Uninvoiced LRs (Only shown if user explicitly enables the toggle)
+        if (includeUninvoiced) {
+            uninvoicedLRs.forEach(lr => {
+                txs.push({
+                    id: `lr-${lr.lrNo}`,
+                    date: lr.date,
+                    particulars: `LR# ${lr.lrNo} — ${lr.fromPlace} to ${lr.toPlace} (${lr.truckNo || 'Vehicle'}) [Pending Invoice]`,
+                    voucherNo: lr.lrNo,
+                    type: 'LR Pending Invoice',
+                    debit: Number(lr.freight) || 0,
+                    credit: 0,
+                    source: 'LR',
+                    isInvoice: false
+                });
+            });
+        }
+
+        // D. Payments Received for this party
         payments.filter(p => p.party_name === selectedParty).forEach(p => {
-            txs.push({ date: p.date, description: `Payment — ${p.payment_mode} — ${p.receipt_no}`, debit: 0, credit: p.amount, source: 'Payment Receipt', ref: p.receipt_no });
+            txs.push({
+                id: `pay-${p.id}`,
+                date: p.date,
+                particulars: `Payment Received (${p.payment_mode || 'Bank'}) ${p.notes ? '• ' + p.notes : ''}`,
+                voucherNo: p.receipt_no || '--',
+                type: 'Payment',
+                debit: 0,
+                credit: Number(p.amount) || 0,
+                source: 'Payment',
+                payment_mode: p.payment_mode
+            });
         });
 
-        // From manual ledger entries
+        // E. Manual Ledger Entries (Excluding already-linked invoice overrides)
         ledgerEntries.filter(e => e.party_name === selectedParty).forEach(e => {
-            txs.push({ date: e.date, description: e.description, debit: e.debit, credit: e.credit, source: e.entry_type || 'Manual', ref: e.voucher_no });
+            if (e.entry_type === 'invoice' && e.voucher_no && processedInvoiceNos.has(e.voucher_no)) {
+                // already applied as override above
+                return;
+            }
+            txs.push({
+                id: `manual-${e.id}`,
+                dbId: e.id,
+                date: e.date,
+                particulars: e.description,
+                voucherNo: e.voucher_no || '--',
+                type: e.entry_type === 'manual' ? 'Manual Entry' : (e.entry_type || 'Adjustment'),
+                debit: Number(e.debit) || 0,
+                credit: Number(e.credit) || 0,
+                source: 'Manual',
+                isManual: true,
+                payment_mode: e.payment_mode
+            });
         });
 
-        // Sort by date
-        txs.sort((a, b) => a.date.localeCompare(b.date));
+        // Sort chronologically by date ascending
+        txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        // Apply date filter
-        return txs.filter(tx => {
+        return txs;
+    }, [selectedParty, lorryReceipts, payments, ledgerEntries, includeUninvoiced]);
+
+    // Apply date range & search filter
+    const filteredTransactions = useMemo(() => {
+        return rawTransactions.filter(tx => {
             if (fromDate && tx.date < fromDate) return false;
             if (toDate && tx.date > toDate) return false;
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                const matchDesc = (tx.particulars || '').toLowerCase().includes(q);
+                const matchRef = (tx.voucherNo || '').toLowerCase().includes(q);
+                const matchType = (tx.type || '').toLowerCase().includes(q);
+                if (!matchDesc && !matchRef && !matchType) return false;
+            }
             return true;
         });
-    }, [selectedParty, lorryReceipts, payments, ledgerEntries, fromDate, toDate]);
+    }, [rawTransactions, fromDate, toDate, searchQuery]);
 
+    // Running Balance Calculation
     const balance = useMemo(() => {
         let running = 0;
-        return transactions.map(tx => {
-            running += tx.debit - tx.credit;
+        return filteredTransactions.map(tx => {
+            running += (tx.debit - tx.credit);
             return { ...tx, balance: running };
         });
-    }, [transactions]);
+    }, [filteredTransactions]);
 
-    const totalDebit = transactions.reduce((s, t) => s + t.debit, 0);
-    const totalCredit = transactions.reduce((s, t) => s + t.credit, 0);
+    const totalDebit = useMemo(() => balance.reduce((s, t) => s + t.debit, 0), [balance]);
+    const totalCredit = useMemo(() => balance.reduce((s, t) => s + t.credit, 0), [balance]);
     const closingBalance = totalDebit - totalCredit;
 
-    const handleSave = async () => {
-        if (!form.description || (!form.debit && !form.credit)) return toast.error('Fill in description and amount');
-        setSaving(true);
+    // ── Save New Manual Line ──
+    const handleAddEntry = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const amt = Number(addForm.amount);
+        if (!addForm.particulars.trim()) return toast.error('Please enter description/particulars');
+        if (!amt || amt <= 0) return toast.error('Please enter a valid amount');
+        if (!selectedParty) return toast.error('Please select a party first');
+
+        setIsSaving(true);
+        const toastId = toast.loading('Adding ledger entry...');
         try {
-            await addLedgerEntry(form);
-            toast.success('Entry added');
-            setShowForm(false);
-            setForm({ date: today(), description: '', debit: 0, credit: 0, payment_mode: 'Cash', party_name: selectedParty, entry_type: 'manual' });
+            await addLedgerEntry({
+                party_name: selectedParty,
+                date: addForm.date,
+                description: addForm.particulars.trim(),
+                voucher_no: addForm.voucher_no.trim() || undefined,
+                debit: addForm.type === 'debit' ? amt : 0,
+                credit: addForm.type === 'credit' ? amt : 0,
+                payment_mode: addForm.payment_mode,
+                entry_type: 'manual'
+            });
+
+            toast.success('Line added to ledger successfully! ✅', { id: toastId });
+            setShowAddModal(false);
+            setAddForm({
+                date: today(),
+                particulars: '',
+                voucher_no: '',
+                amount: '',
+                type: 'debit',
+                payment_mode: 'Bank Transfer'
+            });
             onRefresh();
-        } catch (e: any) { toast.error(e.message); }
-        finally { setSaving(false); }
+        } catch (err: any) {
+            console.error('Error adding ledger entry:', err);
+            toast.error('Failed to add entry: ' + (err.message || 'Error'), { id: toastId });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
+    // ── Save Edited Line ──
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingRow) return;
+        if (!editingRow.particulars.trim()) return toast.error('Please enter description');
+
+        setIsSaving(true);
+        const toastId = toast.loading('Updating ledger entry...');
+        try {
+            if (editingRow.dbId) {
+                // Update existing database entry
+                await updateLedgerEntry(editingRow.dbId, {
+                    date: editingRow.date,
+                    description: editingRow.particulars.trim(),
+                    voucher_no: editingRow.voucherNo?.trim() || undefined,
+                    debit: Number(editingRow.debit) || 0,
+                    credit: Number(editingRow.credit) || 0,
+                    payment_mode: editingRow.payment_mode
+                });
+            } else if (editingRow.isInvoice) {
+                // Create an invoice override entry in ledger_entries to persist custom amount/date
+                await addLedgerEntry({
+                    party_name: selectedParty,
+                    voucher_no: editingRow.voucherNo,
+                    entry_type: 'invoice',
+                    date: editingRow.date,
+                    description: editingRow.particulars.trim(),
+                    debit: Number(editingRow.debit) || 0,
+                    credit: Number(editingRow.credit) || 0,
+                    payment_mode: editingRow.payment_mode || 'Invoice'
+                });
+            }
+
+            toast.success('Ledger line updated successfully! ✅', { id: toastId });
+            setEditingRow(null);
+            onRefresh();
+        } catch (err: any) {
+            console.error('Error updating ledger entry:', err);
+            toast.error('Failed to update entry: ' + (err.message || 'Error'), { id: toastId });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ── Delete Manual Line ──
+    const handleDeleteRow = async (entry: any) => {
+        if (!entry.dbId) return;
+        if (!window.confirm(`Are you sure you want to delete this entry: "${entry.particulars}"?`)) return;
+
+        const toastId = toast.loading('Deleting entry...');
+        try {
+            await deleteLedgerEntry(entry.dbId);
+            toast.success('Entry deleted from ledger! 🗑️', { id: toastId });
+            onRefresh();
+        } catch (err: any) {
+            console.error('Delete error:', err);
+            toast.error('Failed to delete entry: ' + (err.message || 'Error'), { id: toastId });
+        }
+    };
+
+    // ── High Quality PDF Generator with ZERO Word Overlapping ──
+    const handleDownloadPDF = async () => {
+        if (!selectedParty) return;
+        setIsExporting(true);
+        const toastId = toast.loading('Generating Perfect Ledger PDF (No word overlapping)...');
+
+        try {
+            const { default: jsPDF } = await import('jspdf');
+            const { default: autoTable } = await import('jspdf-autotable');
+
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 14;
+            let curY = margin;
+
+            // 1. Company Header
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor(15, 23, 42); // slate-900
+            doc.text((companyDetails.name || 'SSK CARGO SERVICES PVT LTD').toUpperCase(), margin, curY);
+            curY += 6;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8.5);
+            doc.setTextColor(71, 85, 105); // slate-600
+            if (companyDetails.address) {
+                const splitAddress = doc.splitTextToSize(companyDetails.address, pageWidth - (margin * 2));
+                doc.text(splitAddress, margin, curY);
+                curY += (splitAddress.length * 4);
+            }
+
+            const metaLine = [
+                companyDetails.gstn ? `GSTIN: ${companyDetails.gstn}` : '',
+                companyDetails.pan ? `PAN: ${companyDetails.pan}` : '',
+                (companyDetails.contact || []).length > 0 ? `Phone: ${companyDetails.contact.join(', ')}` : '',
+                companyDetails.email ? `Email: ${companyDetails.email}` : ''
+            ].filter(Boolean).join('  •  ');
+
+            if (metaLine) {
+                doc.text(metaLine, margin, curY);
+                curY += 4.5;
+            }
+
+            // Divider Line
+            doc.setDrawColor(203, 213, 225);
+            doc.setLineWidth(0.4);
+            doc.line(margin, curY, pageWidth - margin, curY);
+            curY += 5;
+
+            // 2. Title & Party Details Box
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(30, 58, 138); // blue-900
+            doc.text('STATEMENT OF ACCOUNT / PARTY LEDGER', margin, curY);
+            curY += 5;
+
+            const partyAddr = partyDetails?.address || partyDetails?.city || '';
+            const partyGst = partyDetails?.gst || '';
+
+            // Two-Column Party Box
+            const cardY = curY;
+            const cardHeight = 22;
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 1.5, 1.5, 'FD');
+
+            // Left side
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(15, 23, 42);
+            doc.text(`Party: ${selectedParty}`, margin + 4, cardY + 5.5);
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.5);
+            doc.setTextColor(71, 85, 105);
+            if (partyAddr) {
+                doc.text(partyAddr, margin + 4, cardY + 10, { maxWidth: 95 });
+            }
+            if (partyGst) {
+                doc.text(`GSTIN: ${partyGst}`, margin + 4, cardY + 15);
+            }
+
+            // Right side
+            const rightX = pageWidth - margin - 4;
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text(`Period: ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}`, rightX, cardY + 5.5, { align: 'right' });
+            doc.text(`Generated On: ${today()}`, rightX, cardY + 10, { align: 'right' });
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(9);
+            doc.setTextColor(closingBalance > 0 ? 220 : 22, closingBalance > 0 ? 38 : 101, closingBalance > 0 ? 38 : 52);
+            doc.text(`Closing Balance: Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR (To Pay)' : 'CR (Advance)'}`, rightX, cardY + 16.5, { align: 'right' });
+
+            curY = cardY + cardHeight + 5;
+
+            // 3. Table Rows with strict autoTable column bounds (No word overlaying!)
+            const tableData = balance.map(t => [
+                t.date,
+                t.voucherNo || '--',
+                t.particulars + (t.gstInfo ? `\n${t.gstInfo}` : ''),
+                t.type,
+                t.debit > 0 ? `Rs. ${t.debit.toLocaleString('en-IN')}` : '--',
+                t.credit > 0 ? `Rs. ${t.credit.toLocaleString('en-IN')}` : '--',
+                `Rs. ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}`
+            ]);
+
+            autoTable(doc, {
+                startY: curY,
+                head: [['Date', 'Ref / Inv No', 'Particulars / Description', 'Type', 'Debit (Dr)', 'Credit (Cr)', 'Balance']],
+                body: tableData,
+                theme: 'grid',
+                styles: {
+                    fontSize: 7.5,
+                    cellPadding: 2,
+                    textColor: [30, 41, 59],
+                    lineColor: [226, 232, 240],
+                    lineWidth: 0.15,
+                    overflow: 'linebreak'
+                },
+                headStyles: {
+                    fillColor: [15, 23, 42],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    fontSize: 8
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 250, 252]
+                },
+                columnStyles: {
+                    0: { cellWidth: 20 },
+                    1: { cellWidth: 22, fontStyle: 'bold' },
+                    2: { cellWidth: 'auto', minCellWidth: 50 },
+                    3: { cellWidth: 22 },
+                    4: { cellWidth: 24, halign: 'right', textColor: [220, 38, 38] },
+                    5: { cellWidth: 24, halign: 'right', textColor: [22, 101, 52] },
+                    6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+                },
+                foot: [[
+                    'TOTAL', '', 'Total Invoiced / Received', '',
+                    `Rs. ${totalDebit.toLocaleString('en-IN')}`,
+                    `Rs. ${totalCredit.toLocaleString('en-IN')}`,
+                    `Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}`
+                ]],
+                footStyles: {
+                    fillColor: [241, 245, 249],
+                    textColor: [15, 23, 42],
+                    fontStyle: 'bold',
+                    fontSize: 8
+                },
+                didDrawPage: (data) => {
+                    const pageNo = doc.internal.getNumberOfPages();
+                    doc.setFontSize(7);
+                    doc.setTextColor(148, 163, 184);
+                    doc.text(
+                        `Page ${pageNo} • System Generated Statement • ${companyDetails.name || 'BiltyBook'}`,
+                        pageWidth / 2,
+                        pageHeight - 6,
+                        { align: 'center' }
+                    );
+                }
+            });
+
+            const cleanParty = selectedParty.replace(/[^a-zA-Z0-9]/g, '_');
+            doc.save(`Ledger_${cleanParty}_${today()}.pdf`);
+            toast.success('Ledger Statement PDF downloaded! ✅', { id: toastId });
+        } catch (err: any) {
+            console.error('PDF generation error:', err);
+            toast.error('Failed to generate PDF: ' + (err.message || 'Error'), { id: toastId });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // ── Direct Browser Print ──
     const handlePrint = () => {
         const win = window.open('', '_blank');
         if (!win) return;
         win.document.write(`
-            <html><head><title>Ledger - ${selectedParty}</title>
-            <style>body{font-family:Arial,sans-serif;font-size:12px;padding:20px;}
-            table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ddd;padding:6px;text-align:left;}
-            th{background:#f5f5f5;font-weight:bold;}.dr{color:#e53e3e;}.cr{color:#38a169;}</style></head>
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Ledger - ${selectedParty}</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; padding: 20px; color: #0f172a; margin: 0; }
+                    .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
+                    .company-name { font-size: 18px; font-weight: 900; text-transform: uppercase; }
+                    .company-info { font-size: 9px; color: #475569; margin-top: 2px; }
+                    .statement-title { font-size: 14px; font-weight: 800; color: #1e3a8a; margin: 10px 0 6px 0; }
+                    .meta-box { border: 1px solid #cbd5e1; background: #f8fafc; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+                    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+                    th { background: #0f172a; color: #ffffff; font-size: 9px; text-transform: uppercase; font-weight: 800; }
+                    .dr { color: #dc2626; font-weight: 700; text-align: right; }
+                    .cr { color: #16a34a; font-weight: 700; text-align: right; }
+                    .bal { font-weight: 800; text-align: right; }
+                    .footer-row th { background: #f1f5f9; color: #0f172a; font-size: 10px; font-weight: 900; }
+                    .subtext { font-size: 8px; color: #64748b; margin-top: 2px; }
+                </style>
+            </head>
             <body>
-            <h2>Ledger Statement - ${selectedParty}</h2>
-            <p>Period: ${fromDate || 'All'} to ${toDate || 'All'}</p>
-            <table><thead><tr><th>Date</th><th>Description</th><th>Debit (₹)</th><th>Credit (₹)</th><th>Balance (₹)</th></tr></thead>
-            <tbody>${balance.map(t => `<tr>
-                <td>${t.date}</td><td>${t.description}</td>
-                <td class="dr">${t.debit > 0 ? fmtNum(t.debit) : ''}</td>
-                <td class="cr">${t.credit > 0 ? fmtNum(t.credit) : ''}</td>
-                <td>${fmtNum(t.balance)}</td></tr>`).join('')}
-            </tbody><tfoot><tr><th colspan="2">Total</th><th class="dr">${fmtNum(totalDebit)}</th><th class="cr">${fmtNum(totalCredit)}</th><th>${fmtNum(closingBalance)}</th></tr></tfoot>
-            </table></body></html>`);
+                <div class="header">
+                    <div class="company-name">${companyDetails.name || 'TRANSPORT COMPANY'}</div>
+                    <div class="company-info">${companyDetails.address || ''} • GSTIN: ${companyDetails.gstn || '--'} • Phone: ${(companyDetails.contact || []).join(', ')}</div>
+                </div>
+                <div class="statement-title">PARTY LEDGER STATEMENT</div>
+                <div class="meta-box">
+                    <div>
+                        <strong>Account of:</strong> ${selectedParty}<br/>
+                        ${partyDetails?.address ? `Address: ${partyDetails.address}<br/>` : ''}
+                        ${partyDetails?.gst ? `GSTIN: ${partyDetails.gst}` : ''}
+                    </div>
+                    <div style="text-align: right;">
+                        <strong>Period:</strong> ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}<br/>
+                        <strong>Generated:</strong> ${today()}<br/>
+                        <strong style="color: ${closingBalance > 0 ? '#dc2626' : '#16a34a'};">Closing Balance: ₹ ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR' : 'CR'}</strong>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 12%;">Date</th>
+                            <th style="width: 14%;">Ref / Inv No</th>
+                            <th style="width: 40%;">Particulars</th>
+                            <th style="width: 12%; text-align: right;">Debit (₹)</th>
+                            <th style="width: 12%; text-align: right;">Credit (₹)</th>
+                            <th style="width: 14%; text-align: right;">Balance (₹)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${balance.map(t => `
+                            <tr>
+                                <td>${t.date}</td>
+                                <td><strong>${t.voucherNo || '--'}</strong></td>
+                                <td>${t.particulars}${t.gstInfo ? `<div class="subtext">${t.gstInfo}</div>` : ''}</td>
+                                <td class="dr">${t.debit > 0 ? t.debit.toLocaleString('en-IN') : '--'}</td>
+                                <td class="cr">${t.credit > 0 ? t.credit.toLocaleString('en-IN') : '--'}</td>
+                                <td class="bal">₹ ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr class="footer-row">
+                            <th colspan="3">Total</th>
+                            <th class="dr">₹ ${totalDebit.toLocaleString('en-IN')}</th>
+                            <th class="cr">₹ ${totalCredit.toLocaleString('en-IN')}</th>
+                            <th class="bal">₹ ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </body>
+            </html>
+        `);
         win.document.close();
+        win.focus();
         win.print();
     };
 
+    // ── Direct WhatsApp Sharing ──
+    const handleShareWhatsApp = () => {
+        if (!selectedParty) return;
+        const partyPhone = (partyDetails as any)?.contact || (partyDetails as any)?.phone || '';
+        const cleanPhone = partyPhone.replace(/[^0-9]/g, '');
+        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+
+        const summaryText = `📊 *ACCOUNT STATEMENT / LEDGER*
+🏢 Client: *${selectedParty}*
+💼 Transporter: *${companyDetails.name || 'Speedway Logistics'}*
+📅 Period: *${fromDate || 'Beginning'} to ${toDate || 'Till Date'}*
+━━━━━━━━━━━━━━━━━━━━
+💰 Total Billed / Debit: *₹ ${totalDebit.toLocaleString('en-IN')}* (Incl. GST)
+💵 Total Received / Credit: *₹ ${totalCredit.toLocaleString('en-IN')}*
+⚖️ *Net Balance: ₹ ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR (To Pay)' : 'CR (Advance)'}*
+━━━━━━━━━━━━━━━━━━━━
+${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
+
+        const url = phoneWithCountry
+            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodeURIComponent(summaryText)}`
+            : `https://api.whatsapp.com/send?text=${encodeURIComponent(summaryText)}`;
+
+        window.open(url, '_blank');
+        toast.success('Opening WhatsApp Share...');
+    };
+
     return (
-        <div className="space-y-5">
-            {/* Party Selector */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="space-y-5 animate-fadeIn">
+            {/* Top Filter & Action Toolbar */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-5">
                 <div className="flex flex-wrap gap-3 items-end">
-                    <div className="flex-1 min-w-48">
-                        <label className="block text-xs font-bold text-gray-500 mb-1">SELECT PARTY</label>
-                        <select value={selectedParty} onChange={e => setSelectedParty(e.target.value)}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-gray-50">
-                            <option value="">— Choose a Party —</option>
-                            {parties.map(p => <option key={p} value={p}>{p}</option>)}
+                    {/* Party Selector */}
+                    <div className="flex-1 min-w-[240px]">
+                        <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                            <span>🏢</span> SELECT PARTY (COMPANY / CUSTOMER)
+                        </label>
+                        <select
+                            value={selectedParty}
+                            onChange={(e) => setSelectedParty(e.target.value)}
+                            className="w-full border-2 border-slate-300 focus:border-blue-600 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 focus:outline-none bg-slate-50/50 shadow-inner"
+                        >
+                            <option value="">— Select a Company / Party —</option>
+                            {parties.map((p) => (
+                                <option key={p} value={p}>
+                                    {p}
+                                </option>
+                            ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">FROM DATE</label>
-                        <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-gray-50" />
+
+                    {/* From Date */}
+                    <div className="w-36">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            FROM DATE
+                        </label>
+                        <input
+                            type="date"
+                            value={fromDate}
+                            onChange={(e) => setFromDate(e.target.value)}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
+                        />
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">TO DATE</label>
-                        <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-blue-500 bg-gray-50" />
+
+                    {/* To Date */}
+                    <div className="w-36">
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            TO DATE
+                        </label>
+                        <input
+                            type="date"
+                            value={toDate}
+                            onChange={(e) => setToDate(e.target.value)}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
+                        />
                     </div>
+
+                    {/* Uninvoiced LRs Toggle */}
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl shadow-xs">
+                        <input
+                            type="checkbox"
+                            id="uninvoiced-toggle"
+                            checked={includeUninvoiced}
+                            onChange={(e) => setIncludeUninvoiced(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <label htmlFor="uninvoiced-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                            Include Uninvoiced LRs
+                        </label>
+                    </div>
+
+                    {/* Action Buttons */}
                     {selectedParty && (
-                        <>
-                            <button onClick={() => setShowForm(true)} className="px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow hover:bg-blue-700 transition">+ Add Entry</button>
-                            <button onClick={handlePrint} className="px-4 py-2.5 bg-gray-800 text-white rounded-xl text-sm font-bold shadow hover:bg-gray-900 transition">🖨️ Print</button>
-                        </>
+                        <div className="flex items-center flex-wrap gap-2 ml-auto">
+                            <button
+                                onClick={() => setShowAddModal(true)}
+                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                title="Add manual line to this ledger"
+                            >
+                                <span className="text-base leading-none">+</span>
+                                <span>Add Line</span>
+                            </button>
+
+                            <button
+                                onClick={handleDownloadPDF}
+                                disabled={isExporting}
+                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                title="Download PDF with clean formatting (no words overlapping)"
+                            >
+                                <span>📄</span>
+                                <span>Download PDF</span>
+                            </button>
+
+                            <button
+                                onClick={handlePrint}
+                                className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-black text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                title="Print Statement"
+                            >
+                                <span>🖨️</span>
+                                <span>Print</span>
+                            </button>
+
+                            <button
+                                onClick={handleShareWhatsApp}
+                                className="flex items-center gap-1.5 px-3 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                title="Share summary via WhatsApp"
+                            >
+                                <span>💬</span>
+                                <span>WhatsApp</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {/* Add Entry Form */}
-            {showForm && (
-                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                    <h3 className="font-bold text-blue-800 mb-4">Add Manual Ledger Entry</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Date</label>
-                            <input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
-                                className="w-full border rounded-lg px-3 py-2 text-sm" />
+            {/* Main Ledger Display */}
+            {selectedParty ? (
+                <div className="space-y-4">
+                    {/* KPI Cards: Total Invoiced (Debit) • Total Received (Credit) • Closing Balance */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        TOTAL BILLED / DEBITS (INCL. GST)
+                                    </div>
+                                    <div className="text-2xl font-black text-blue-900 mt-1">
+                                        ₹ {totalDebit.toLocaleString('en-IN')}
+                                    </div>
+                                </div>
+                                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl text-xl">
+                                    📑
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                Complete Invoices generated for company
+                            </div>
                         </div>
-                        <div className="col-span-2 md:col-span-1">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Party Name</label>
-                            <input value={form.party_name || ''} onChange={e => setForm(f => ({ ...f, party_name: e.target.value }))}
-                                list="party-list" placeholder="Party name"
-                                className="w-full border rounded-lg px-3 py-2 text-sm" />
-                            <datalist id="party-list">{parties.map(p => <option key={p} value={p} />)}</datalist>
+
+                        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        TOTAL PAYMENTS RECEIVED (CREDITS)
+                                    </div>
+                                    <div className="text-2xl font-black text-emerald-700 mt-1">
+                                        ₹ {totalCredit.toLocaleString('en-IN')}
+                                    </div>
+                                </div>
+                                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xl">
+                                    💵
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                Cash, Bank Transfers & Manual Receipts
+                            </div>
                         </div>
-                        <div className="col-span-2">
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Description</label>
-                            <input value={form.description || ''} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                                placeholder="Description" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Debit (₹)</label>
-                            <input type="number" value={form.debit || ''} onChange={e => setForm(f => ({ ...f, debit: +e.target.value }))}
-                                placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Credit (₹)</label>
-                            <input type="number" value={form.credit || ''} onChange={e => setForm(f => ({ ...f, credit: +e.target.value }))}
-                                placeholder="0" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-600 mb-1">Payment Mode</label>
-                            <select value={form.payment_mode} onChange={e => setForm(f => ({ ...f, payment_mode: e.target.value }))}
-                                className="w-full border rounded-lg px-3 py-2 text-sm">
-                                {['Cash', 'Bank Transfer', 'Cheque', 'UPI', 'NEFT', 'RTGS'].map(m => <option key={m}>{m}</option>)}
-                            </select>
+
+                        <div className={`bg-white rounded-2xl border p-4 shadow-xs ${closingBalance > 0 ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                        OUTSTANDING NET BALANCE
+                                    </div>
+                                    <div className={`text-2xl font-black mt-1 ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                        ₹ {Math.abs(closingBalance).toLocaleString('en-IN')}
+                                        <span className="text-xs font-bold ml-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-300">
+                                            {closingBalance > 0 ? 'DR (To Pay)' : closingBalance < 0 ? 'CR (Advance)' : 'CLEARED'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className={`p-2.5 rounded-xl text-xl ${closingBalance > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                    ⚖️
+                                </div>
+                            </div>
+                            <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                {closingBalance > 0 ? 'Receivable from client' : 'Advance balance from client'}
+                            </div>
                         </div>
                     </div>
-                    <div className="flex gap-3 mt-4">
-                        <button onClick={handleSave} disabled={saving}
-                            className="px-5 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold shadow hover:bg-blue-700 disabled:opacity-60">
-                            {saving ? 'Saving...' : 'Save Entry'}
-                        </button>
-                        <button onClick={() => setShowForm(false)} className="px-5 py-2 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+
+                    {/* Elegant On-Screen Ledger Sheet */}
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
+                        {/* Statement Header Card */}
+                        <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap justify-between items-center gap-4">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                                        {selectedParty}
+                                    </h3>
+                                    <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                                        Party Ledger
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                    {partyDetails?.address || 'No registered address'} {partyDetails?.city ? `• ${partyDetails.city}` : ''}
+                                    {partyDetails?.gst ? ` • GSTIN: ${partyDetails.gst}` : ''}
+                                </p>
+                            </div>
+
+                            {/* Search Filter input */}
+                            <div className="w-full sm:w-64">
+                                <input
+                                    type="text"
+                                    placeholder="Search by Inv No, LR, desc..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 shadow-inner"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Statement Table */}
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                        <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
+                                        <th className="px-3.5 py-3 border-r border-slate-700 w-28">Ref / Inv No</th>
+                                        <th className="px-4 py-3 border-r border-slate-700">Particulars / Description</th>
+                                        <th className="px-3 py-3 border-r border-slate-700 w-28">Type</th>
+                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Debit (₹)</th>
+                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Credit (₹)</th>
+                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-32">Balance (₹)</th>
+                                        <th className="px-3 py-3 text-center w-20">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200">
+                                    {balance.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} className="text-center py-12 text-slate-400">
+                                                <div className="text-3xl mb-2">📭</div>
+                                                <div className="font-bold text-sm">No transactions found for this party.</div>
+                                                <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter an opening balance or payment.</div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        balance.map((tx, idx) => (
+                                            <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                                                {/* Date */}
+                                                <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap align-top border-r border-slate-200">
+                                                    {tx.date}
+                                                </td>
+
+                                                {/* Ref / Inv No */}
+                                                <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap align-top border-r border-slate-200">
+                                                    {tx.voucherNo || '--'}
+                                                </td>
+
+                                                {/* Particulars */}
+                                                <td className="px-4 py-2.5 text-slate-800 align-top border-r border-slate-200">
+                                                    <div className="font-bold leading-snug">
+                                                        {tx.particulars}
+                                                    </div>
+                                                    {tx.gstInfo && (
+                                                        <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+                                                            {tx.gstInfo}
+                                                        </div>
+                                                    )}
+                                                </td>
+
+                                                {/* Type */}
+                                                <td className="px-3 py-2.5 align-top border-r border-slate-200 whitespace-nowrap">
+                                                    <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                                        tx.source === 'Invoice'
+                                                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                            : tx.source === 'Payment'
+                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                            : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                                    }`}>
+                                                        {tx.type}
+                                                    </span>
+                                                </td>
+
+                                                {/* Debit (Dr) */}
+                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-red-600 align-top border-r border-slate-200">
+                                                    {tx.debit > 0 ? `₹ ${tx.debit.toLocaleString('en-IN')}` : '--'}
+                                                </td>
+
+                                                {/* Credit (Cr) */}
+                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-emerald-700 align-top border-r border-slate-200">
+                                                    {tx.credit > 0 ? `₹ ${tx.credit.toLocaleString('en-IN')}` : '--'}
+                                                </td>
+
+                                                {/* Running Balance */}
+                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
+                                                    ₹ {Math.abs(tx.balance).toLocaleString('en-IN')}
+                                                    <span className={`text-[9.5px] font-bold ml-1 ${tx.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                        {tx.balance >= 0 ? 'DR' : 'CR'}
+                                                    </span>
+                                                </td>
+
+                                                {/* Actions */}
+                                                <td className="px-3 py-2.5 text-center align-top whitespace-nowrap">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        <button
+                                                            onClick={() => setEditingRow({
+                                                                dbId: tx.dbId,
+                                                                isInvoice: tx.isInvoice,
+                                                                voucherNo: tx.voucherNo,
+                                                                date: tx.date,
+                                                                particulars: tx.particulars,
+                                                                debit: tx.debit,
+                                                                credit: tx.credit,
+                                                                payment_mode: tx.payment_mode
+                                                            })}
+                                                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-md transition-colors"
+                                                            title="Edit this line"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        {tx.isManual && tx.dbId && (
+                                                            <button
+                                                                onClick={() => handleDeleteRow(tx)}
+                                                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors"
+                                                                title="Delete this manual line"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+
+                                {/* Footer Total Bar */}
+                                <tfoot>
+                                    <tr className="bg-slate-100 border-t-2 border-slate-800 font-black text-slate-900 text-xs">
+                                        <td colSpan={4} className="px-4 py-3 text-right uppercase tracking-wider">
+                                            TOTAL STATEMENTS SUMMARY:
+                                        </td>
+                                        <td className="px-3.5 py-3 text-right font-mono text-red-600 font-black">
+                                            ₹ {totalDebit.toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-black">
+                                            ₹ {totalCredit.toLocaleString('en-IN')}
+                                        </td>
+                                        <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900">
+                                            ₹ {Math.abs(closingBalance).toLocaleString('en-IN')} {closingBalance >= 0 ? 'DR' : 'CR'}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                /* Empty state when no party is chosen */
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center text-slate-400">
+                    <div className="text-5xl mb-4">📒</div>
+                    <div className="font-black text-slate-800 text-lg">Select a Party to view Company Ledger</div>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                        Choose any company or customer from the dropdown above. Their complete generated invoices with total amount including GST, payments, and running balance will load instantly.
+                    </p>
+                </div>
+            )}
+
+            {/* ══ MODAL: ADD MANUAL LINE TO LEDGER ══ */}
+            {showAddModal && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+                        <div className="p-4 bg-[#0b192c] text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-base flex items-center gap-2">
+                                    <span>➕</span> Add Line to Ledger
+                                </h3>
+                                <p className="text-xs text-slate-300">Party: <strong>{selectedParty}</strong></p>
+                            </div>
+                            <button
+                                onClick={() => setShowAddModal(false)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleAddEntry} className="p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={addForm.date}
+                                        onChange={(e) => setAddForm({ ...addForm, date: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Ref / Voucher No</label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. NEFT-1049, CN-01"
+                                        value={addForm.voucher_no}
+                                        onChange={(e) => setAddForm({ ...addForm, voucher_no: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Particulars / Description *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder="e.g. Payment received via Bank, Freight Adjustment, Opening Balance"
+                                    value={addForm.particulars}
+                                    onChange={(e) => setAddForm({ ...addForm, particulars: e.target.value })}
+                                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Entry Type *</label>
+                                    <select
+                                        value={addForm.type}
+                                        onChange={(e) => setAddForm({ ...addForm, type: e.target.value as 'debit' | 'credit' })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600 bg-white"
+                                    >
+                                        <option value="debit">🔴 Debit (Charge / Invoice / Receivable)</option>
+                                        <option value="credit">🟢 Credit (Payment / Advance / Receipt)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Amount (₹) *</label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        step="any"
+                                        placeholder="₹ 0.00"
+                                        value={addForm.amount}
+                                        onChange={(e) => setAddForm({ ...addForm, amount: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold focus:outline-none focus:border-blue-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Payment Mode / Category</label>
+                                <select
+                                    value={addForm.payment_mode}
+                                    onChange={(e) => setAddForm({ ...addForm, payment_mode: e.target.value })}
+                                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 bg-white"
+                                >
+                                    {['Bank Transfer', 'Cash', 'Cheque', 'UPI', 'NEFT', 'RTGS', 'Adjustment', 'TDS Deduction'].map((m) => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddModal(false)}
+                                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSaving}
+                                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md disabled:opacity-50"
+                                >
+                                    {isSaving ? 'Adding...' : 'Save Line'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}
 
-            {/* Ledger Table */}
-            {selectedParty ? (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    {/* Header */}
-                    <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center">
-                        <div>
-                            <h3 className="font-black text-gray-800 text-lg">{selectedParty}</h3>
-                            <div className={`text-sm font-bold mt-0.5 ${closingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                Closing Balance: {fmt(Math.abs(closingBalance))} {closingBalance > 0 ? 'DR' : 'CR'}
+            {/* ══ MODAL: EDIT LEDGER ROW ══ */}
+            {editingRow && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+                        <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+                            <div>
+                                <h3 className="font-bold text-base flex items-center gap-2">
+                                    <span>✏️</span> Edit Ledger Line
+                                </h3>
+                                <p className="text-xs text-slate-300">
+                                    Ref: <strong>{editingRow.voucherNo || 'Manual'}</strong> • Party: {selectedParty}
+                                </p>
                             </div>
+                            <button
+                                onClick={() => setEditingRow(null)}
+                                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                            >
+                                ✕
+                            </button>
                         </div>
-                        <div className="grid grid-cols-3 gap-4 text-right">
-                            <div><div className="text-xs text-gray-400">Total Debit</div><div className="font-bold text-red-600">{fmt(totalDebit)}</div></div>
-                            <div><div className="text-xs text-gray-400">Total Credit</div><div className="font-bold text-green-600">{fmt(totalCredit)}</div></div>
-                            <div><div className="text-xs text-gray-400">Balance</div><div className={`font-bold ${closingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>{fmt(Math.abs(closingBalance))}</div></div>
-                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Date *</label>
+                                    <input
+                                        type="date"
+                                        required
+                                        value={editingRow.date}
+                                        onChange={(e) => setEditingRow({ ...editingRow, date: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Ref / Invoice No</label>
+                                    <input
+                                        type="text"
+                                        value={editingRow.voucherNo || ''}
+                                        onChange={(e) => setEditingRow({ ...editingRow, voucherNo: e.target.value })}
+                                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-700 mb-1">Particulars / Description *</label>
+                                <textarea
+                                    required
+                                    rows={2}
+                                    value={editingRow.particulars}
+                                    onChange={(e) => setEditingRow({ ...editingRow, particulars: e.target.value })}
+                                    className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-600"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-bold text-red-700 mb-1">Debit Amount (₹)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={editingRow.debit}
+                                        onChange={(e) => setEditingRow({ ...editingRow, debit: Number(e.target.value) || 0 })}
+                                        className="w-full border border-red-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-red-700 focus:outline-none focus:border-red-600"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-emerald-700 mb-1">Credit Amount (₹)</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={editingRow.credit}
+                                        onChange={(e) => setEditingRow({ ...editingRow, credit: Number(e.target.value) || 0 })}
+                                        className="w-full border border-emerald-200 rounded-xl px-3 py-2 text-xs font-mono font-bold text-emerald-700 focus:outline-none focus:border-emerald-600"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingRow(null)}
+                                    className="px-4 py-2 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl hover:bg-slate-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSaving}
+                                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md disabled:opacity-50"
+                                >
+                                    {isSaving ? 'Saving...' : 'Save Changes'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-gray-50">
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Description</th>
-                                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Source</th>
-                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Debit</th>
-                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Credit</th>
-                                    <th className="px-4 py-3 text-right text-xs font-bold text-gray-500 uppercase">Balance</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {balance.length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center py-10 text-gray-400">No transactions found for this party</td></tr>
-                                ) : balance.map((tx, i) => (
-                                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap font-medium">{tx.date}</td>
-                                        <td className="px-4 py-3 text-gray-700">{tx.description}</td>
-                                        <td className="px-4 py-3">
-                                            <Badge color={tx.source.includes('Invoice') ? 'bg-blue-100 text-blue-700' : tx.source.includes('Payment') ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}>
-                                                {tx.source}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-bold text-red-600">{tx.debit > 0 ? fmt(tx.debit) : '—'}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-green-600">{tx.credit > 0 ? fmt(tx.credit) : '—'}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-gray-800">{fmt(Math.abs(tx.balance))} <span className={`text-xs ${tx.balance > 0 ? 'text-red-500' : 'text-green-500'}`}>{tx.balance > 0 ? 'DR' : 'CR'}</span></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            ) : (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-16 text-center text-gray-400">
-                    <div className="text-5xl mb-4">📒</div>
-                    <div className="font-bold text-lg">Select a Party to view Ledger</div>
-                    <div className="text-sm mt-1">Party list is auto-populated from your LR records</div>
                 </div>
             )}
         </div>
@@ -3489,7 +4460,16 @@ const AccountingView: React.FC<AccountingViewProps> = ({
                         {activeTab === 'overview' && <OverviewTab lorryReceipts={lorryReceipts} vouchers={vouchers} payments={payments} ledgerEntries={ledgerEntries} />}
                         {activeTab === 'truck-pnl' && <TruckPnlTab lorryReceipts={lorryReceipts} vouchers={vouchers} savedTrucks={savedTrucks} onOpenGarage={onOpenGarage} />}
                         {activeTab === 'gst' && <GSTCenterTab lorryReceipts={lorryReceipts} companyDetails={companyDetails} />}
-                        {activeTab === 'ledger' && <LedgerTab lorryReceipts={lorryReceipts} ledgerEntries={ledgerEntries} payments={payments} onRefresh={loadData} />}
+                        {activeTab === 'ledger' && (
+                            <LedgerTab 
+                                lorryReceipts={lorryReceipts} 
+                                ledgerEntries={ledgerEntries} 
+                                payments={payments} 
+                                companyDetails={companyDetails}
+                                savedParties={savedParties}
+                                onRefresh={loadData} 
+                            />
+                        )}
                         {activeTab === 'invoices' && <InvoicesTab lorryReceipts={lorryReceipts} payments={payments} />}
                         {activeTab === 'payments' && <PaymentsTab payments={payments} lorryReceipts={lorryReceipts} onRefresh={loadData} />}
                         {activeTab === 'expenses' && <ExpensesTab vouchers={vouchers} lorryReceipts={lorryReceipts} savedTrucks={savedTrucks} onRefresh={loadData} />}

@@ -1093,41 +1093,55 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                 const doc = new jsPDF('p', 'mm', 'a4');
                 const pageWidth = doc.internal.pageSize.getWidth();
 
-                // 1. Company Header
-                doc.setFontSize(20);
+                let curY = 16;
+
+                // 1. Company Header (Dynamic cursor tracking to prevent overlapping)
+                doc.setFontSize(18);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(41, 128, 185);
-                doc.text((companyDetails.name || 'SSK CARGO SERVICES').toUpperCase(), pageWidth / 2, 18, { align: 'center' });
+                doc.text((companyDetails.name || 'SSK CARGO SERVICES').toUpperCase(), pageWidth / 2, curY, { align: 'center' });
+                curY += 6;
 
-                doc.setFontSize(9);
+                doc.setFontSize(8.5);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(70, 70, 70);
-                doc.text(companyDetails.address || '', pageWidth / 2, 24, { align: 'center', maxWidth: pageWidth - 30 });
+                if (companyDetails.address) {
+                    const splitAddr = doc.splitTextToSize(companyDetails.address, pageWidth - 30);
+                    doc.text(splitAddr, pageWidth / 2, curY, { align: 'center' });
+                    curY += (splitAddr.length * 4);
+                }
 
                 const contacts = (companyDetails.contact || []).join(' | ');
                 const headerLine = [contacts ? `Mob: ${contacts}` : '', companyDetails.email ? `Email: ${companyDetails.email}` : '', companyDetails.gstn ? `GST: ${companyDetails.gstn}` : ''].filter(Boolean).join('  •  ');
-                doc.text(headerLine, pageWidth / 2, 30, { align: 'center' });
+                if (headerLine) {
+                    doc.text(headerLine, pageWidth / 2, curY, { align: 'center' });
+                    curY += 4.5;
+                }
 
                 doc.setDrawColor(41, 128, 185);
                 doc.setLineWidth(0.5);
-                doc.line(14, 34, pageWidth - 14, 34);
+                doc.line(14, curY, pageWidth - 14, curY);
+                curY += 6;
 
                 // 2. Party & Statement Title
-                doc.setFontSize(14);
+                doc.setFontSize(13);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(20, 20, 20);
-                doc.text('STATEMENT OF ACCOUNT', 14, 42);
+                doc.text('STATEMENT OF ACCOUNT', 14, curY);
+                curY += 6;
 
-                doc.setFontSize(10);
-                doc.text(`Party: ${selectedPartyLedger || 'All Parties'}`, 14, 48);
+                doc.setFontSize(9.5);
+                doc.text(`Party: ${selectedPartyLedger || 'All Parties'}`, 14, curY);
+                curY += 5;
 
                 const partyObj = allParties.find((p) => p.name === selectedPartyLedger);
-                let curY = 53;
                 if (partyObj) {
                     doc.setFont('helvetica', 'normal');
                     if (partyObj.city) doc.text(`City: ${partyObj.city}`, 14, curY);
                     if (partyObj.gst) doc.text(`GSTN: ${partyObj.gst}`, pageWidth / 2, curY);
                     curY += 6;
+                } else {
+                    curY += 2;
                 }
 
                 // 3. Ledger Rows Computation
@@ -1228,13 +1242,17 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                     body: tableData,
                     startY: curY + 18,
                     theme: 'grid',
-                    styles: { fontSize: 8, cellPadding: 2 },
+                    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
                     headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
                     alternateRowStyles: { fillColor: [248, 250, 252] },
                     columnStyles: {
-                        4: { halign: 'right' },
-                        5: { halign: 'right' },
-                        6: { halign: 'right', fontStyle: 'bold' },
+                        0: { cellWidth: 22 },
+                        1: { cellWidth: 24 },
+                        2: { cellWidth: 24 },
+                        3: { cellWidth: 'auto', minCellWidth: 45 },
+                        4: { cellWidth: 24, halign: 'right' },
+                        5: { cellWidth: 24, halign: 'right' },
+                        6: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
                     },
                 });
 

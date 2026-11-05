@@ -28,26 +28,43 @@ const SpiralBookIcon: React.FC<{ className?: string }> = ({ className = "w-7 h-7
     </svg>
 );
 
-const TruckIllustration: React.FC<{ className?: string }> = ({ className = "w-64 sm:w-72" }) => (
+const TruckIllustration: React.FC<{ className?: string }> = ({ className = "w-52 sm:w-60" }) => (
     <div className={`relative flex flex-col items-center justify-center select-none ${className}`}>
-        <img 
-            src="/truck_illustration.png" 
-            alt="BiltyBook Logistics" 
-            className="w-full h-auto max-h-52 object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.35)] transition-transform duration-300 hover:scale-105" 
-        />
+        {/* Exact Truck Image */}
+        <div className="relative z-10 w-full flex justify-center">
+            <img 
+                src="/truck_illustration.png" 
+                alt="BiltyBook Truck" 
+                className="w-full h-auto max-h-44 sm:max-h-48 object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] transition-transform duration-300 hover:scale-105" 
+            />
+        </div>
+
+        {/* Soft Ground Shadow & Highway Road Line (Exact as mockup) */}
+        <div className="w-48 sm:w-56 -mt-2.5 flex flex-col items-center pointer-events-none">
+            <div className="w-40 sm:w-48 h-2 bg-slate-950/20 rounded-full blur-[2px]" />
+            <div className="w-full border-b-2 border-dashed border-white/40 mt-0.5" />
+        </div>
     </div>
 );
 
-// Desktop banner illustration with background mountains and night sky
+// Desktop banner illustration with road line and shadow
 const DesktopHeroGraphic: React.FC = () => (
     <div className="relative w-full max-w-md mx-auto my-6 flex flex-col items-center">
         {/* Soft radial glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-        <img 
-            src="/truck_illustration.png" 
-            alt="BiltyBook Logistics" 
-            className="relative z-10 w-full max-w-sm max-h-64 object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:scale-105" 
-        />
+        
+        <div className="relative z-10 w-full flex flex-col items-center">
+            <img 
+                src="/truck_illustration.png" 
+                alt="BiltyBook Logistics Truck" 
+                className="w-full max-w-xs max-h-56 object-contain drop-shadow-[0_25px_40px_rgba(0,0,0,0.6)] transition-transform duration-300 hover:scale-105" 
+            />
+            {/* Road & Shadow */}
+            <div className="w-64 -mt-3 flex flex-col items-center pointer-events-none">
+                <div className="w-56 h-3 bg-black/40 rounded-full blur-sm" />
+                <div className="w-full border-b-2 border-dashed border-amber-400/50 mt-1" />
+            </div>
+        </div>
     </div>
 );
 

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LorryReceipt, CompanyDetails, SavedParty, LedgerEntry, Voucher, PaymentReceipt, SavedTruck } from '../types';
+import { LorryReceipt, CompanyDetails, SavedParty, LedgerEntry, Voucher, PaymentReceipt, SavedTruck, LedgerStatement } from '../types';
 import { IndianNumberPlate } from './TruckGarage';
 import {
     getLedgerEntries, addLedgerEntry, updateLedgerEntry, deleteLedgerEntry,
     getVouchers, addVoucher, updateVoucher, deleteVoucher,
-    getPaymentReceipts, savePaymentReceipt, deletePaymentReceipt
+    getPaymentReceipts, savePaymentReceipt, deletePaymentReceipt,
+    saveLedgerStatement, getLedgerStatements, deleteLedgerStatement
 } from '../services/supabaseService';
 import {
     fetchDailyFuelPrices, findDieselPrice, findFuelPrice, getAvailableFuelLocations,
@@ -207,6 +208,29 @@ const LedgerTab = ({
     const [searchQuery, setSearchQuery] = useState('');
     const [includeUninvoiced, setIncludeUninvoiced] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+
+    // Ledger sub-view toggle: 'current' (Statement Builder) vs 'saved' (Saved Statements Register)
+    const [activeLedgerView, setActiveLedgerView] = useState<'current' | 'saved'>('current');
+    const [savedStatements, setSavedStatements] = useState<LedgerStatement[]>([]);
+    const [isSavingStatement, setIsSavingStatement] = useState(false);
+    const [loadingSaved, setLoadingSaved] = useState(false);
+    const [savedSearchQuery, setSavedSearchQuery] = useState('');
+
+    const loadSavedStatements = async () => {
+        setLoadingSaved(true);
+        try {
+            const list = await getLedgerStatements();
+            setSavedStatements(list || []);
+        } catch (err) {
+            console.error("Failed to load saved ledger statements:", err);
+        } finally {
+            setLoadingSaved(false);
+        }
+    };
+
+    useEffect(() => {
+        loadSavedStatements();
+    }, []);
 
     // Modal state for adding a new manual line
     const [showAddModal, setShowAddModal] = useState(false);
@@ -455,6 +479,18 @@ const LedgerTab = ({
     const totalCredit = useMemo(() => balance.reduce((s, t) => s + t.credit, 0), [balance]);
     const closingBalance = totalDebit - totalCredit;
 
+    // Filter saved ledger statements by search keyword
+    const filteredSavedStatements = useMemo(() => {
+        if (!savedSearchQuery) return savedStatements;
+        const q = savedSearchQuery.toLowerCase();
+        return savedStatements.filter(s =>
+            (s.party_name || '').toLowerCase().includes(q) ||
+            (s.statement_date || '').toLowerCase().includes(q) ||
+            (s.from_date || '').toLowerCase().includes(q) ||
+            (s.to_date || '').toLowerCase().includes(q)
+        );
+    }, [savedStatements, savedSearchQuery]);
+
     // ── Save New Manual Line ──
     const handleAddEntry = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -557,184 +593,269 @@ const LedgerTab = ({
     };
 
     // ── High Quality PDF Generator with ZERO Word Overlapping ──
+    const generateLedgerDoc = async () => {
+        if (!selectedParty) throw new Error('Please select a party first');
+
+        const { default: jsPDF } = await import('jspdf');
+        const { default: autoTable } = await import('jspdf-autotable');
+
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+        });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 14;
+        let curY = margin;
+
+        // 1. Company Header
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(15, 23, 42); // slate-900
+        doc.text((companyDetails.name || 'SSK CARGO SERVICES PVT LTD').toUpperCase(), margin, curY);
+        curY += 6;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105); // slate-600
+        if (companyDetails.address) {
+            const splitAddress = doc.splitTextToSize(companyDetails.address, pageWidth - (margin * 2));
+            doc.text(splitAddress, margin, curY);
+            curY += (splitAddress.length * 4);
+        }
+
+        const metaLine = [
+            companyDetails.gstn ? `GSTIN: ${companyDetails.gstn}` : '',
+            companyDetails.pan ? `PAN: ${companyDetails.pan}` : '',
+            (companyDetails.contact || []).length > 0 ? `Phone: ${companyDetails.contact.join(', ')}` : '',
+            companyDetails.email ? `Email: ${companyDetails.email}` : ''
+        ].filter(Boolean).join('  •  ');
+
+        if (metaLine) {
+            doc.text(metaLine, margin, curY);
+            curY += 4.5;
+        }
+
+        // Divider Line
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.4);
+        doc.line(margin, curY, pageWidth - margin, curY);
+        curY += 5;
+
+        // 2. Title & Party Details Box
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(30, 58, 138); // blue-900
+        doc.text('STATEMENT OF ACCOUNT / PARTY LEDGER', margin, curY);
+        curY += 5;
+
+        const partyAddr = partyDetails?.address || partyDetails?.city || '';
+        const partyGst = partyDetails?.gst || '';
+
+        // Two-Column Party Box
+        const cardY = curY;
+        const cardHeight = 22;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 1.5, 1.5, 'FD');
+
+        // Left side
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(`Party: ${selectedParty}`, margin + 4, cardY + 5.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        if (partyAddr) {
+            doc.text(partyAddr, margin + 4, cardY + 10, { maxWidth: 95 });
+        }
+        if (partyGst) {
+            doc.text(`GSTIN: ${partyGst}`, margin + 4, cardY + 15);
+        }
+
+        // Right side
+        const rightX = pageWidth - margin - 4;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Period: ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}`, rightX, cardY + 5.5, { align: 'right' });
+        doc.text(`Generated On: ${today()}`, rightX, cardY + 10, { align: 'right' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(closingBalance > 0 ? 220 : 22, closingBalance > 0 ? 38 : 101, closingBalance > 0 ? 38 : 52);
+        doc.text(`Closing Balance: Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR (To Pay)' : 'CR (Advance)'}`, rightX, cardY + 16.5, { align: 'right' });
+
+        curY = cardY + cardHeight + 5;
+
+        // 3. Table Rows with strict autoTable column bounds (No word overlaying!)
+        const tableData = balance.map(t => [
+            t.date,
+            t.voucherNo || '--',
+            t.particulars + (t.gstInfo ? `\n${t.gstInfo}` : ''),
+            t.type,
+            t.debit > 0 ? `Rs. ${t.debit.toLocaleString('en-IN')}` : '--',
+            t.credit > 0 ? `Rs. ${t.credit.toLocaleString('en-IN')}` : '--',
+            `Rs. ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}`
+        ]);
+
+        autoTable(doc, {
+            startY: curY,
+            head: [['Date', 'Ref / Inv No', 'Particulars / Description', 'Type', 'Debit (Dr)', 'Credit (Cr)', 'Balance']],
+            body: tableData,
+            theme: 'grid',
+            styles: {
+                fontSize: 7.5,
+                cellPadding: 2,
+                textColor: [30, 41, 59],
+                lineColor: [226, 232, 240],
+                lineWidth: 0.15,
+                overflow: 'linebreak'
+            },
+            headStyles: {
+                fillColor: [15, 23, 42],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                fontSize: 8
+            },
+            alternateRowStyles: {
+                fillColor: [248, 250, 252]
+            },
+            columnStyles: {
+                0: { cellWidth: 20 },
+                1: { cellWidth: 22, fontStyle: 'bold' },
+                2: { cellWidth: 'auto', minCellWidth: 50 },
+                3: { cellWidth: 22 },
+                4: { cellWidth: 24, halign: 'right', textColor: [220, 38, 38] },
+                5: { cellWidth: 24, halign: 'right', textColor: [22, 101, 52] },
+                6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+            },
+            foot: [[
+                'TOTAL', '', 'Total Invoiced / Received', '',
+                `Rs. ${totalDebit.toLocaleString('en-IN')}`,
+                `Rs. ${totalCredit.toLocaleString('en-IN')}`,
+                `Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}`
+            ]],
+            footStyles: {
+                fillColor: [241, 245, 249],
+                textColor: [15, 23, 42],
+                fontStyle: 'bold',
+                fontSize: 8
+            },
+            didDrawPage: (data) => {
+                const pageNo = doc.internal.getNumberOfPages();
+                doc.setFontSize(7);
+                doc.setTextColor(148, 163, 184);
+                doc.text(
+                    `Page ${pageNo} • System Generated Statement • ${companyDetails.name || 'BiltyBook'}`,
+                    pageWidth / 2,
+                    pageHeight - 6,
+                    { align: 'center' }
+                );
+            }
+        });
+
+        const cleanParty = selectedParty.replace(/[^a-zA-Z0-9]/g, '_');
+        const filename = `Ledger_${cleanParty}_${today()}.pdf`;
+        return { doc, filename };
+    };
+
     const handleDownloadPDF = async () => {
         if (!selectedParty) return;
         setIsExporting(true);
         const toastId = toast.loading('Generating Perfect Ledger PDF (No word overlapping)...');
 
         try {
-            const { default: jsPDF } = await import('jspdf');
-            const { default: autoTable } = await import('jspdf-autotable');
-
-            const doc = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4',
-                compress: true
-            });
-
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 14;
-            let curY = margin;
-
-            // 1. Company Header
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(16);
-            doc.setTextColor(15, 23, 42); // slate-900
-            doc.text((companyDetails.name || 'SSK CARGO SERVICES PVT LTD').toUpperCase(), margin, curY);
-            curY += 6;
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8.5);
-            doc.setTextColor(71, 85, 105); // slate-600
-            if (companyDetails.address) {
-                const splitAddress = doc.splitTextToSize(companyDetails.address, pageWidth - (margin * 2));
-                doc.text(splitAddress, margin, curY);
-                curY += (splitAddress.length * 4);
-            }
-
-            const metaLine = [
-                companyDetails.gstn ? `GSTIN: ${companyDetails.gstn}` : '',
-                companyDetails.pan ? `PAN: ${companyDetails.pan}` : '',
-                (companyDetails.contact || []).length > 0 ? `Phone: ${companyDetails.contact.join(', ')}` : '',
-                companyDetails.email ? `Email: ${companyDetails.email}` : ''
-            ].filter(Boolean).join('  •  ');
-
-            if (metaLine) {
-                doc.text(metaLine, margin, curY);
-                curY += 4.5;
-            }
-
-            // Divider Line
-            doc.setDrawColor(203, 213, 225);
-            doc.setLineWidth(0.4);
-            doc.line(margin, curY, pageWidth - margin, curY);
-            curY += 5;
-
-            // 2. Title & Party Details Box
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(12);
-            doc.setTextColor(30, 58, 138); // blue-900
-            doc.text('STATEMENT OF ACCOUNT / PARTY LEDGER', margin, curY);
-            curY += 5;
-
-            const partyAddr = partyDetails?.address || partyDetails?.city || '';
-            const partyGst = partyDetails?.gst || '';
-
-            // Two-Column Party Box
-            const cardY = curY;
-            const cardHeight = 22;
-            doc.setFillColor(248, 250, 252);
-            doc.setDrawColor(226, 232, 240);
-            doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 1.5, 1.5, 'FD');
-
-            // Left side
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(15, 23, 42);
-            doc.text(`Party: ${selectedParty}`, margin + 4, cardY + 5.5);
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7.5);
-            doc.setTextColor(71, 85, 105);
-            if (partyAddr) {
-                doc.text(partyAddr, margin + 4, cardY + 10, { maxWidth: 95 });
-            }
-            if (partyGst) {
-                doc.text(`GSTIN: ${partyGst}`, margin + 4, cardY + 15);
-            }
-
-            // Right side
-            const rightX = pageWidth - margin - 4;
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(100, 116, 139);
-            doc.text(`Period: ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}`, rightX, cardY + 5.5, { align: 'right' });
-            doc.text(`Generated On: ${today()}`, rightX, cardY + 10, { align: 'right' });
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(9);
-            doc.setTextColor(closingBalance > 0 ? 220 : 22, closingBalance > 0 ? 38 : 101, closingBalance > 0 ? 38 : 52);
-            doc.text(`Closing Balance: Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR (To Pay)' : 'CR (Advance)'}`, rightX, cardY + 16.5, { align: 'right' });
-
-            curY = cardY + cardHeight + 5;
-
-            // 3. Table Rows with strict autoTable column bounds (No word overlaying!)
-            const tableData = balance.map(t => [
-                t.date,
-                t.voucherNo || '--',
-                t.particulars + (t.gstInfo ? `\n${t.gstInfo}` : ''),
-                t.type,
-                t.debit > 0 ? `Rs. ${t.debit.toLocaleString('en-IN')}` : '--',
-                t.credit > 0 ? `Rs. ${t.credit.toLocaleString('en-IN')}` : '--',
-                `Rs. ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}`
-            ]);
-
-            autoTable(doc, {
-                startY: curY,
-                head: [['Date', 'Ref / Inv No', 'Particulars / Description', 'Type', 'Debit (Dr)', 'Credit (Cr)', 'Balance']],
-                body: tableData,
-                theme: 'grid',
-                styles: {
-                    fontSize: 7.5,
-                    cellPadding: 2,
-                    textColor: [30, 41, 59],
-                    lineColor: [226, 232, 240],
-                    lineWidth: 0.15,
-                    overflow: 'linebreak'
-                },
-                headStyles: {
-                    fillColor: [15, 23, 42],
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                    fontSize: 8
-                },
-                alternateRowStyles: {
-                    fillColor: [248, 250, 252]
-                },
-                columnStyles: {
-                    0: { cellWidth: 20 },
-                    1: { cellWidth: 22, fontStyle: 'bold' },
-                    2: { cellWidth: 'auto', minCellWidth: 50 },
-                    3: { cellWidth: 22 },
-                    4: { cellWidth: 24, halign: 'right', textColor: [220, 38, 38] },
-                    5: { cellWidth: 24, halign: 'right', textColor: [22, 101, 52] },
-                    6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
-                },
-                foot: [[
-                    'TOTAL', '', 'Total Invoiced / Received', '',
-                    `Rs. ${totalDebit.toLocaleString('en-IN')}`,
-                    `Rs. ${totalCredit.toLocaleString('en-IN')}`,
-                    `Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}`
-                ]],
-                footStyles: {
-                    fillColor: [241, 245, 249],
-                    textColor: [15, 23, 42],
-                    fontStyle: 'bold',
-                    fontSize: 8
-                },
-                didDrawPage: (data) => {
-                    const pageNo = doc.internal.getNumberOfPages();
-                    doc.setFontSize(7);
-                    doc.setTextColor(148, 163, 184);
-                    doc.text(
-                        `Page ${pageNo} • System Generated Statement • ${companyDetails.name || 'BiltyBook'}`,
-                        pageWidth / 2,
-                        pageHeight - 6,
-                        { align: 'center' }
-                    );
-                }
-            });
-
-            const cleanParty = selectedParty.replace(/[^a-zA-Z0-9]/g, '_');
-            doc.save(`Ledger_${cleanParty}_${today()}.pdf`);
+            const { doc, filename } = await generateLedgerDoc();
+            doc.save(filename);
             toast.success('Ledger Statement PDF downloaded! ✅', { id: toastId });
         } catch (err: any) {
             console.error('PDF generation error:', err);
             toast.error('Failed to generate PDF: ' + (err.message || 'Error'), { id: toastId });
         } finally {
             setIsExporting(false);
+        }
+    };
+
+    // ── Save Ledger Statement (लेजर सेव करें) ──
+    const handleSaveLedgerStatement = async () => {
+        if (!selectedParty) {
+            return toast.error('Please select a party first to save ledger');
+        }
+        if (balance.length === 0) {
+            return toast.error('No ledger entries to save for this party');
+        }
+
+        setIsSavingStatement(true);
+        const toastId = toast.loading('Saving Ledger Statement & snapshot...');
+        try {
+            const { doc } = await generateLedgerDoc();
+            const pdfBlob = doc.output('blob');
+
+            await saveLedgerStatement({
+                party_name: selectedParty,
+                statement_date: today(),
+                from_date: fromDate || undefined,
+                to_date: toDate || undefined,
+                total_debit: totalDebit,
+                total_credit: totalCredit,
+                closing_balance: closingBalance,
+                entries_count: balance.length
+            }, pdfBlob);
+
+            await loadSavedStatements();
+            toast.success(`Ledger for ${selectedParty} saved successfully! 💾✅`, { id: toastId });
+        } catch (err: any) {
+            console.error('Save ledger statement error:', err);
+            toast.error('Failed to save ledger: ' + (err.message || 'Error'), { id: toastId });
+        } finally {
+            setIsSavingStatement(false);
+        }
+    };
+
+    const handleDeleteSavedStatement = async (st: LedgerStatement) => {
+        if (!window.confirm(`Delete saved ledger statement for "${st.party_name}" from ${st.statement_date}?`)) return;
+        const toastId = toast.loading('Deleting saved ledger...');
+        try {
+            await deleteLedgerStatement(st.id);
+            await loadSavedStatements();
+            toast.success('Saved ledger deleted! 🗑️', { id: toastId });
+        } catch (err: any) {
+            toast.error('Delete error: ' + (err.message || 'Error'), { id: toastId });
+        }
+    };
+
+    const handleOpenSavedStatement = (st: LedgerStatement) => {
+        setSelectedParty(st.party_name);
+        if (st.from_date) setFromDate(st.from_date);
+        else setFromDate('');
+        if (st.to_date) setToDate(st.to_date);
+        else setToDate('');
+        setActiveLedgerView('current');
+        toast.success(`Opened ledger for ${st.party_name} 📊`);
+    };
+
+    const handleDownloadSavedPdf = async (st: LedgerStatement) => {
+        if (st.pdf_url) {
+            const a = document.createElement('a');
+            a.href = st.pdf_url;
+            a.download = `Ledger_${st.party_name.replace(/[^a-zA-Z0-9]/g, '_')}_${st.statement_date}.pdf`;
+            a.target = '_blank';
+            a.click();
+        } else {
+            // Switch to it and download
+            setSelectedParty(st.party_name);
+            if (st.from_date) setFromDate(st.from_date);
+            if (st.to_date) setToDate(st.to_date);
+            setActiveLedgerView('current');
+            setTimeout(() => {
+                handleDownloadPDF();
+            }, 300);
         }
     };
 
@@ -850,355 +971,550 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
     return (
         <div className="space-y-5 animate-fadeIn">
-            {/* Top Filter & Action Toolbar */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-5">
-                <div className="flex flex-wrap gap-3 items-end">
-                    {/* Party Selector */}
-                    <div className="flex-1 min-w-[240px]">
-                        <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                            <span>🏢</span> SELECT PARTY (COMPANY / CUSTOMER)
-                        </label>
-                        <select
-                            value={selectedParty}
-                            onChange={(e) => setSelectedParty(e.target.value)}
-                            className="w-full border-2 border-slate-300 focus:border-blue-600 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 focus:outline-none bg-slate-50/50 shadow-inner"
-                        >
-                            <option value="">— Select a Company / Party —</option>
-                            {parties.map((p) => (
-                                <option key={p} value={p}>
-                                    {p}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* From Date */}
-                    <div className="w-36">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            FROM DATE
-                        </label>
-                        <input
-                            type="date"
-                            value={fromDate}
-                            onChange={(e) => setFromDate(e.target.value)}
-                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
-                        />
-                    </div>
-
-                    {/* To Date */}
-                    <div className="w-36">
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            TO DATE
-                        </label>
-                        <input
-                            type="date"
-                            value={toDate}
-                            onChange={(e) => setToDate(e.target.value)}
-                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
-                        />
-                    </div>
-
-                    {/* Uninvoiced LRs Toggle */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl shadow-xs">
-                        <input
-                            type="checkbox"
-                            id="uninvoiced-toggle"
-                            checked={includeUninvoiced}
-                            onChange={(e) => setIncludeUninvoiced(e.target.checked)}
-                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <label htmlFor="uninvoiced-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
-                            Include Uninvoiced LRs
-                        </label>
-                    </div>
-
-                    {/* Action Buttons */}
-                    {selectedParty && (
-                        <div className="flex items-center flex-wrap gap-2 ml-auto">
-                            <button
-                                onClick={() => setShowAddModal(true)}
-                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
-                                title="Add manual line to this ledger"
-                            >
-                                <span className="text-base leading-none">+</span>
-                                <span>Add Line</span>
-                            </button>
-
-                            <button
-                                onClick={handleDownloadPDF}
-                                disabled={isExporting}
-                                className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
-                                title="Download PDF with clean formatting (no words overlapping)"
-                            >
-                                <span>📄</span>
-                                <span>Download PDF</span>
-                            </button>
-
-                            <button
-                                onClick={handlePrint}
-                                className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-black text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
-                                title="Print Statement"
-                            >
-                                <span>🖨️</span>
-                                <span>Print</span>
-                            </button>
-
-                            <button
-                                onClick={handleShareWhatsApp}
-                                className="flex items-center gap-1.5 px-3 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
-                                title="Share summary via WhatsApp"
-                            >
-                                <span>💬</span>
-                                <span>WhatsApp</span>
-                            </button>
-                        </div>
-                    )}
+            {/* ── Sub-tab Switcher: Active Statement vs Saved Ledgers ── */}
+            <div className="flex items-center justify-between flex-wrap gap-3 pb-1 border-b border-slate-200">
+                <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                    <button
+                        type="button"
+                        onClick={() => setActiveLedgerView('current')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            activeLedgerView === 'current'
+                                ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80 scale-[1.02]'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>📊</span>
+                        <span>Active Statement (सक्रिय लेजर)</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setActiveLedgerView('saved');
+                            loadSavedStatements();
+                        }}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                            activeLedgerView === 'saved'
+                                ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80 scale-[1.02]'
+                                : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                    >
+                        <span>📁</span>
+                        <span>Saved Ledgers (सेव किए गए लेजर)</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            activeLedgerView === 'saved' ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                            {savedStatements.length}
+                        </span>
+                    </button>
                 </div>
+
+                {activeLedgerView === 'saved' && (
+                    <button
+                        type="button"
+                        onClick={loadSavedStatements}
+                        disabled={loadingSaved}
+                        className="px-3.5 py-2 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-700 shadow-xs flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    >
+                        <span className={loadingSaved ? 'animate-spin' : ''}>🔄</span>
+                        <span>Refresh List</span>
+                    </button>
+                )}
             </div>
 
-            {/* Main Ledger Display */}
-            {selectedParty ? (
-                <div className="space-y-4">
-                    {/* KPI Cards: Total Invoiced (Debit) • Total Received (Credit) • Closing Balance */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        TOTAL BILLED / DEBITS (INCL. GST)
-                                    </div>
-                                    <div className="text-2xl font-black text-blue-900 mt-1">
-                                        ₹ {totalDebit.toLocaleString('en-IN')}
-                                    </div>
-                                </div>
-                                <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl text-xl">
-                                    📑
-                                </div>
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                Complete Invoices generated for company
-                            </div>
+            {activeLedgerView === 'saved' ? (
+                /* ── SAVED LEDGERS REGISTER VIEW ── */
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    {/* Header + Search bar */}
+                    <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <h3 className="text-base font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
+                                <span>📁</span> Saved Party Statements ({filteredSavedStatements.length})
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                Archive of saved company statements. Open in builder or download PDF anytime.
+                            </p>
                         </div>
-
-                        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        TOTAL PAYMENTS RECEIVED (CREDITS)
-                                    </div>
-                                    <div className="text-2xl font-black text-emerald-700 mt-1">
-                                        ₹ {totalCredit.toLocaleString('en-IN')}
-                                    </div>
-                                </div>
-                                <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xl">
-                                    💵
-                                </div>
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                Cash, Bank Transfers & Manual Receipts
-                            </div>
-                        </div>
-
-                        <div className={`bg-white rounded-2xl border p-4 shadow-xs ${closingBalance > 0 ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                        OUTSTANDING NET BALANCE
-                                    </div>
-                                    <div className={`text-2xl font-black mt-1 ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                                        ₹ {Math.abs(closingBalance).toLocaleString('en-IN')}
-                                        <span className="text-xs font-bold ml-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-300">
-                                            {closingBalance > 0 ? 'DR (To Pay)' : closingBalance < 0 ? 'CR (Advance)' : 'CLEARED'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className={`p-2.5 rounded-xl text-xl ${closingBalance > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    ⚖️
-                                </div>
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                {closingBalance > 0 ? 'Receivable from client' : 'Advance balance from client'}
-                            </div>
+                        <div className="w-full sm:w-72">
+                            <input
+                                type="text"
+                                placeholder="Search by party, date, period..."
+                                value={savedSearchQuery}
+                                onChange={(e) => setSavedSearchQuery(e.target.value)}
+                                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-medium focus:outline-none focus:border-blue-600 shadow-inner"
+                            />
                         </div>
                     </div>
 
-                    {/* Elegant On-Screen Ledger Sheet */}
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
-                        {/* Statement Header Card */}
-                        <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap justify-between items-center gap-4">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                                        {selectedParty}
-                                    </h3>
-                                    <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
-                                        Party Ledger
-                                    </span>
-                                </div>
-                                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                    {partyDetails?.address || 'No registered address'} {partyDetails?.city ? `• ${partyDetails.city}` : ''}
-                                    {partyDetails?.gst ? ` • GSTIN: ${partyDetails.gst}` : ''}
-                                </p>
-                            </div>
-
-                            {/* Search Filter input */}
-                            <div className="w-full sm:w-64">
-                                <input
-                                    type="text"
-                                    placeholder="Search by Inv No, LR, desc..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 shadow-inner"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Statement Table */}
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-xs text-left border-collapse">
-                                <thead>
-                                    <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
-                                        <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
-                                        <th className="px-3.5 py-3 border-r border-slate-700 w-28">Ref / Inv No</th>
-                                        <th className="px-4 py-3 border-r border-slate-700">Particulars / Description</th>
-                                        <th className="px-3 py-3 border-r border-slate-700 w-28">Type</th>
-                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Debit (₹)</th>
-                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Credit (₹)</th>
-                                        <th className="px-3.5 py-3 border-r border-slate-700 text-right w-32">Balance (₹)</th>
-                                        <th className="px-3 py-3 text-center w-20">Actions</th>
+                    {/* Table of Saved Statements */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left border-collapse">
+                            <thead>
+                                <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                    <th className="px-4 py-3 border-r border-slate-700">Saved Date</th>
+                                    <th className="px-4 py-3 border-r border-slate-700">Company / Party</th>
+                                    <th className="px-3.5 py-3 border-r border-slate-700">Statement Period</th>
+                                    <th className="px-3 py-3 border-r border-slate-700 text-center">Entries</th>
+                                    <th className="px-3.5 py-3 border-r border-slate-700 text-right">Total Debit (₹)</th>
+                                    <th className="px-3.5 py-3 border-r border-slate-700 text-right">Total Credit (₹)</th>
+                                    <th className="px-3.5 py-3 border-r border-slate-700 text-right">Net Balance (₹)</th>
+                                    <th className="px-4 py-3 text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                                {loadingSaved ? (
+                                    <tr>
+                                        <td colSpan={8} className="text-center py-12 text-slate-400">
+                                            <div className="animate-spin text-2xl mb-2">⏳</div>
+                                            <div className="font-bold text-xs">Loading saved ledgers...</div>
+                                        </td>
                                     </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200">
-                                    {balance.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="text-center py-12 text-slate-400">
-                                                <div className="text-3xl mb-2">📭</div>
-                                                <div className="font-bold text-sm">No transactions found for this party.</div>
-                                                <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter an opening balance or payment.</div>
+                                ) : filteredSavedStatements.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} className="text-center py-16 text-slate-400">
+                                            <div className="text-4xl mb-3">📭</div>
+                                            <div className="font-black text-slate-700 text-sm">No Saved Ledgers Found</div>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                                                Switch to "Active Statement", select any party, and click the <strong>"💾 Save Ledger"</strong> button to save statements here permanently.
+                                            </p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    filteredSavedStatements.map((st) => (
+                                        <tr key={st.id} className="hover:bg-blue-50/40 transition-colors">
+                                            <td className="px-4 py-3 font-mono font-bold text-slate-600 whitespace-nowrap align-middle border-r border-slate-200">
+                                                {st.statement_date || '--'}
+                                            </td>
+                                            <td className="px-4 py-3 font-black text-slate-900 align-middle border-r border-slate-200">
+                                                {st.party_name}
+                                            </td>
+                                            <td className="px-3.5 py-3 text-slate-600 whitespace-nowrap align-middle border-r border-slate-200">
+                                                {st.from_date || 'Start'} ➔ {st.to_date || 'Till Date'}
+                                            </td>
+                                            <td className="px-3 py-3 text-center font-bold text-slate-700 align-middle border-r border-slate-200">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-300 text-[10px]">
+                                                    {st.entries_count || '--'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3.5 py-3 text-right font-mono font-bold text-red-600 align-middle border-r border-slate-200 whitespace-nowrap">
+                                                ₹ {Number(st.total_debit || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="px-3.5 py-3 text-right font-mono font-bold text-emerald-700 align-middle border-r border-slate-200 whitespace-nowrap">
+                                                ₹ {Number(st.total_credit || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900 align-middle border-r border-slate-200 whitespace-nowrap">
+                                                ₹ {Math.abs(Number(st.closing_balance || 0)).toLocaleString('en-IN')}
+                                                <span className={`ml-1 text-[9px] font-bold ${Number(st.closing_balance || 0) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                    {Number(st.closing_balance || 0) >= 0 ? 'DR' : 'CR'}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center align-middle whitespace-nowrap">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenSavedStatement(st)}
+                                                        className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all border border-blue-200 flex items-center gap-1 cursor-pointer"
+                                                        title="Open in statement builder"
+                                                    >
+                                                        <span>👁️</span>
+                                                        <span>Open</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDownloadSavedPdf(st)}
+                                                        className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-all border border-emerald-200 flex items-center gap-1 cursor-pointer"
+                                                        title="Download statement PDF"
+                                                    >
+                                                        <span>📥</span>
+                                                        <span>PDF</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteSavedStatement(st)}
+                                                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all border border-red-100 cursor-pointer"
+                                                        title="Delete saved statement"
+                                                    >
+                                                        <span>🗑️</span>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
-                                    ) : (
-                                        balance.map((tx, idx) => (
-                                            <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
-                                                {/* Date */}
-                                                <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap align-top border-r border-slate-200">
-                                                    {tx.date}
-                                                </td>
-
-                                                {/* Ref / Inv No */}
-                                                <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap align-top border-r border-slate-200">
-                                                    {tx.voucherNo || '--'}
-                                                </td>
-
-                                                {/* Particulars */}
-                                                <td className="px-4 py-2.5 text-slate-800 align-top border-r border-slate-200">
-                                                    <div className="font-bold leading-snug">
-                                                        {tx.particulars}
-                                                    </div>
-                                                    {tx.gstInfo && (
-                                                        <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                                                            {tx.gstInfo}
-                                                        </div>
-                                                    )}
-                                                </td>
-
-                                                {/* Type */}
-                                                <td className="px-3 py-2.5 align-top border-r border-slate-200 whitespace-nowrap">
-                                                    <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                                        tx.source === 'Invoice'
-                                                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                            : tx.source === 'Payment'
-                                                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                                            : 'bg-purple-100 text-purple-800 border border-purple-200'
-                                                    }`}>
-                                                        {tx.type}
-                                                    </span>
-                                                </td>
-
-                                                {/* Debit (Dr) */}
-                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-red-600 align-top border-r border-slate-200">
-                                                    {tx.debit > 0 ? `₹ ${tx.debit.toLocaleString('en-IN')}` : '--'}
-                                                </td>
-
-                                                {/* Credit (Cr) */}
-                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-emerald-700 align-top border-r border-slate-200">
-                                                    {tx.credit > 0 ? `₹ ${tx.credit.toLocaleString('en-IN')}` : '--'}
-                                                </td>
-
-                                                {/* Running Balance */}
-                                                <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
-                                                    ₹ {Math.abs(tx.balance).toLocaleString('en-IN')}
-                                                    <span className={`text-[9.5px] font-bold ml-1 ${tx.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                                        {tx.balance >= 0 ? 'DR' : 'CR'}
-                                                    </span>
-                                                </td>
-
-                                                {/* Actions */}
-                                                <td className="px-3 py-2.5 text-center align-top whitespace-nowrap">
-                                                    <div className="flex items-center justify-center gap-1.5">
-                                                        <button
-                                                            onClick={() => setEditingRow({
-                                                                dbId: tx.dbId,
-                                                                isInvoice: tx.isInvoice,
-                                                                voucherNo: tx.voucherNo,
-                                                                date: tx.date,
-                                                                particulars: tx.particulars,
-                                                                debit: tx.debit,
-                                                                credit: tx.credit,
-                                                                payment_mode: tx.payment_mode
-                                                            })}
-                                                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-md transition-colors"
-                                                            title="Edit this line"
-                                                        >
-                                                            ✏️
-                                                        </button>
-                                                        {tx.isManual && tx.dbId && (
-                                                            <button
-                                                                onClick={() => handleDeleteRow(tx)}
-                                                                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors"
-                                                                title="Delete this manual line"
-                                                            >
-                                                                🗑️
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-
-                                {/* Footer Total Bar */}
-                                <tfoot>
-                                    <tr className="bg-slate-100 border-t-2 border-slate-800 font-black text-slate-900 text-xs">
-                                        <td colSpan={4} className="px-4 py-3 text-right uppercase tracking-wider">
-                                            TOTAL STATEMENTS SUMMARY:
-                                        </td>
-                                        <td className="px-3.5 py-3 text-right font-mono text-red-600 font-black">
-                                            ₹ {totalDebit.toLocaleString('en-IN')}
-                                        </td>
-                                        <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-black">
-                                            ₹ {totalCredit.toLocaleString('en-IN')}
-                                        </td>
-                                        <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900">
-                                            ₹ {Math.abs(closingBalance).toLocaleString('en-IN')} {closingBalance >= 0 ? 'DR' : 'CR'}
-                                        </td>
-                                        <td></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             ) : (
-                /* Empty state when no party is chosen */
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center text-slate-400">
-                    <div className="text-5xl mb-4">📒</div>
-                    <div className="font-black text-slate-800 text-lg">Select a Party to view Company Ledger</div>
-                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                        Choose any company or customer from the dropdown above. Their complete generated invoices with total amount including GST, payments, and running balance will load instantly.
-                    </p>
-                </div>
+                /* ── ACTIVE STATEMENT BUILDER & PREVIEW ── */
+                <>
+                    {/* Top Filter & Action Toolbar */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-5">
+                        <div className="flex flex-wrap gap-3 items-end">
+                            {/* Party Selector */}
+                            <div className="flex-1 min-w-[240px]">
+                                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                    <span>🏢</span> SELECT PARTY (COMPANY / CUSTOMER)
+                                </label>
+                                <select
+                                    value={selectedParty}
+                                    onChange={(e) => setSelectedParty(e.target.value)}
+                                    className="w-full border-2 border-slate-300 focus:border-blue-600 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-800 focus:outline-none bg-slate-50/50 shadow-inner"
+                                >
+                                    <option value="">— Select a Company / Party —</option>
+                                    {parties.map((p) => (
+                                        <option key={p} value={p}>
+                                            {p}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* From Date */}
+                            <div className="w-36">
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                    FROM DATE
+                                </label>
+                                <input
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={(e) => setFromDate(e.target.value)}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
+                                />
+                            </div>
+
+                            {/* To Date */}
+                            <div className="w-36">
+                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                    TO DATE
+                                </label>
+                                <input
+                                    type="date"
+                                    value={toDate}
+                                    onChange={(e) => setToDate(e.target.value)}
+                                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-blue-500 bg-slate-50"
+                                />
+                            </div>
+
+                            {/* Uninvoiced LRs Toggle */}
+                            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-2.5 rounded-xl shadow-xs">
+                                <input
+                                    type="checkbox"
+                                    id="uninvoiced-toggle"
+                                    checked={includeUninvoiced}
+                                    onChange={(e) => setIncludeUninvoiced(e.target.checked)}
+                                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <label htmlFor="uninvoiced-toggle" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                                    Include Uninvoiced LRs
+                                </label>
+                            </div>
+
+                            {/* Action Buttons */}
+                            {selectedParty && (
+                                <div className="flex items-center flex-wrap gap-2 ml-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddModal(true)}
+                                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                        title="Add manual line to this ledger"
+                                    >
+                                        <span className="text-base leading-none">+</span>
+                                        <span>Add Line</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveLedgerStatement}
+                                        disabled={isSavingStatement || isExporting}
+                                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                        title="Save this ledger statement (लेजर सेव करें)"
+                                    >
+                                        <span>{isSavingStatement ? '⏳' : '💾'}</span>
+                                        <span>{isSavingStatement ? 'Saving...' : 'Save Ledger'}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadPDF}
+                                        disabled={isExporting}
+                                        className="flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                                        title="Download PDF with clean formatting (no words overlapping)"
+                                    >
+                                        <span>📄</span>
+                                        <span>Download PDF</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handlePrint}
+                                        className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-black text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                        title="Print Statement"
+                                    >
+                                        <span>🖨️</span>
+                                        <span>Print</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={handleShareWhatsApp}
+                                        className="flex items-center gap-1.5 px-3 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                                        title="Share summary via WhatsApp"
+                                    >
+                                        <span>💬</span>
+                                        <span>WhatsApp</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Main Ledger Display */}
+                    {selectedParty ? (
+                        <div className="space-y-4">
+                            {/* KPI Cards: Total Invoiced (Debit) • Total Received (Credit) • Closing Balance */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                TOTAL BILLED / DEBITS (INCL. GST)
+                                            </div>
+                                            <div className="text-2xl font-black text-blue-900 mt-1">
+                                                ₹ {totalDebit.toLocaleString('en-IN')}
+                                            </div>
+                                        </div>
+                                        <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl text-xl">
+                                            📑
+                                        </div>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                        Complete Invoices generated for company
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                TOTAL PAYMENTS RECEIVED (CREDITS)
+                                            </div>
+                                            <div className="text-2xl font-black text-emerald-700 mt-1">
+                                                ₹ {totalCredit.toLocaleString('en-IN')}
+                                            </div>
+                                        </div>
+                                        <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xl">
+                                            💵
+                                        </div>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                        Cash, Bank Transfers & Manual Receipts
+                                    </div>
+                                </div>
+
+                                <div className={`bg-white rounded-2xl border p-4 shadow-xs ${closingBalance > 0 ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                                OUTSTANDING NET BALANCE
+                                            </div>
+                                            <div className={`text-2xl font-black mt-1 ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                                ₹ {Math.abs(closingBalance).toLocaleString('en-IN')}
+                                                <span className="text-xs font-bold ml-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-300">
+                                                    {closingBalance > 0 ? 'DR (To Pay)' : closingBalance < 0 ? 'CR (Advance)' : 'CLEARED'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className={`p-2.5 rounded-xl text-xl ${closingBalance > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                            ⚖️
+                                        </div>
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
+                                        {closingBalance > 0 ? 'Receivable from client' : 'Advance balance from client'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Elegant On-Screen Ledger Sheet */}
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
+                                {/* Statement Header Card */}
+                                <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap justify-between items-center gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
+                                                {selectedParty}
+                                            </h3>
+                                            <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
+                                                Party Ledger
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                                            {partyDetails?.address || 'No registered address'} {partyDetails?.city ? `• ${partyDetails.city}` : ''}
+                                            {partyDetails?.gst ? ` • GSTIN: ${partyDetails.gst}` : ''}
+                                        </p>
+                                    </div>
+
+                                    {/* Search Filter input */}
+                                    <div className="w-full sm:w-64">
+                                        <input
+                                            type="text"
+                                            placeholder="Search by Inv No, LR, desc..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 shadow-inner"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Statement Table */}
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-xs text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                                <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
+                                                <th className="px-3.5 py-3 border-r border-slate-700 w-28">Ref / Inv No</th>
+                                                <th className="px-4 py-3 border-r border-slate-700">Particulars / Description</th>
+                                                <th className="px-3 py-3 border-r border-slate-700 w-28">Type</th>
+                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Debit (₹)</th>
+                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Credit (₹)</th>
+                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-32">Balance (₹)</th>
+                                                <th className="px-3 py-3 text-center w-20">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-200">
+                                            {balance.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={8} className="text-center py-12 text-slate-400">
+                                                        <div className="text-3xl mb-2">📭</div>
+                                                        <div className="font-bold text-sm">No transactions found for this party.</div>
+                                                        <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter an opening balance or payment.</div>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                balance.map((tx, idx) => (
+                                                    <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
+                                                        {/* Date */}
+                                                        <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap align-top border-r border-slate-200">
+                                                            {tx.date}
+                                                        </td>
+
+                                                        {/* Ref / Inv No */}
+                                                        <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap align-top border-r border-slate-200">
+                                                            {tx.voucherNo || '--'}
+                                                        </td>
+
+                                                        {/* Particulars */}
+                                                        <td className="px-4 py-2.5 text-slate-800 align-top border-r border-slate-200">
+                                                            <div className="font-bold leading-snug">
+                                                                {tx.particulars}
+                                                            </div>
+                                                            {tx.gstInfo && (
+                                                                <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+                                                                    {tx.gstInfo}
+                                                                </div>
+                                                            )}
+                                                        </td>
+
+                                                        {/* Type */}
+                                                        <td className="px-3 py-2.5 align-top border-r border-slate-200 whitespace-nowrap">
+                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                                                tx.source === 'Invoice'
+                                                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                                                    : tx.source === 'Payment'
+                                                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                                                    : 'bg-purple-100 text-purple-800 border border-purple-200'
+                                                            }`}>
+                                                                {tx.type}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* Debit (Dr) */}
+                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-red-600 align-top border-r border-slate-200">
+                                                            {tx.debit > 0 ? `₹ ${tx.debit.toLocaleString('en-IN')}` : '--'}
+                                                        </td>
+
+                                                        {/* Credit (Cr) */}
+                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-emerald-700 align-top border-r border-slate-200">
+                                                            {tx.credit > 0 ? `₹ ${tx.credit.toLocaleString('en-IN')}` : '--'}
+                                                        </td>
+
+                                                        {/* Running Balance */}
+                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
+                                                            ₹ {Math.abs(tx.balance).toLocaleString('en-IN')}
+                                                            <span className={`text-[9.5px] font-bold ml-1 ${tx.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                                {tx.balance >= 0 ? 'DR' : 'CR'}
+                                                            </span>
+                                                        </td>
+
+                                                        {/* Actions */}
+                                                        <td className="px-3 py-2.5 text-center align-top whitespace-nowrap">
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setEditingRow({
+                                                                        dbId: tx.dbId,
+                                                                        isInvoice: tx.isInvoice,
+                                                                        voucherNo: tx.voucherNo,
+                                                                        date: tx.date,
+                                                                        particulars: tx.particulars,
+                                                                        debit: tx.debit,
+                                                                        credit: tx.credit,
+                                                                        payment_mode: tx.payment_mode
+                                                                    })}
+                                                                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
+                                                                    title="Edit this line"
+                                                                >
+                                                                    ✏️
+                                                                </button>
+                                                                {tx.isManual && tx.dbId && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => handleDeleteRow(tx)}
+                                                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors cursor-pointer"
+                                                                        title="Delete this manual line"
+                                                                    >
+                                                                        🗑️
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+
+                                        {/* Footer Total Bar */}
+                                        <tfoot>
+                                            <tr className="bg-slate-100 border-t-2 border-slate-800 font-black text-slate-900 text-xs">
+                                                <td colSpan={4} className="px-4 py-3 text-right uppercase tracking-wider">
+                                                    TOTAL STATEMENTS SUMMARY:
+                                                </td>
+                                                <td className="px-3.5 py-3 text-right font-mono text-red-600 font-black">
+                                                    ₹ {totalDebit.toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-black">
+                                                    ₹ {totalCredit.toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900">
+                                                    ₹ {Math.abs(closingBalance).toLocaleString('en-IN')} {closingBalance >= 0 ? 'DR' : 'CR'}
+                                                </td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Empty state when no party is chosen */
+                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-16 text-center text-slate-400">
+                            <div className="text-5xl mb-4">📒</div>
+                            <div className="font-black text-slate-800 text-lg">Select a Party to view Company Ledger</div>
+                            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                                Choose any company or customer from the dropdown above. Their complete generated invoices with total amount including GST, payments, and running balance will load instantly.
+                            </p>
+                        </div>
+                    )}
+                </>
             )}
 
             {/* ══ MODAL: ADD MANUAL LINE TO LEDGER ══ */}

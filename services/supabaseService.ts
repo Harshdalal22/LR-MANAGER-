@@ -1304,46 +1304,96 @@ export const deleteRegisterEntry = async (id: string) => {
     if (error) throw error;
 };
 
-// --- Ledger Statements (PDF Storage) ---
+// --- Ledger Statements (PDF Storage & Persistence) ---
 
-export const saveLedgerStatement = async (statement: Omit<LedgerStatement, 'id' | 'created_at' | 'file_url'>, fileBlob: Blob) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("No authenticated user");
+export const saveLedgerStatement = async (statement: Omit<LedgerStatement, 'id' | 'created_at' | 'file_url'>, fileBlob?: Blob): Promise<LedgerStatement> => {
+    const finalUserId = await getEffectiveUserId();
+    let publicUrl = '';
 
-    // 1. Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('statements')
-        .upload(statement.file_path, fileBlob, { upsert: true });
+    // 1. Upload to Supabase storage if fileBlob is provided
+    if (fileBlob) {
+        try {
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('statements')
+                .upload(statement.file_path, fileBlob, { upsert: true });
 
-    if (uploadError) throw uploadError;
+            if (!uploadError) {
+                const { data: pubData } = supabase.storage.from('statements').getPublicUrl(statement.file_path);
+                publicUrl = pubData?.publicUrl || '';
+            }
+        } catch (storageErr) {
+            console.warn("Storage upload failed, proceeding with DB save:", storageErr);
+        }
+    }
 
-    // 2. Get public URL
-    const { data: { publicUrl } } = supabase.storage.from('statements').getPublicUrl(statement.file_path);
+    // 2. Save metadata to database
+    try {
+        const { data, error } = await supabase.from('ledger_statements').insert([{
+            ...statement,
+            admin_id: statement.admin_id || finalUserId || 'admin',
+            file_url: publicUrl || undefined
+        }]).select().single();
 
-    // 3. Save to database
-    const { data, error } = await supabase.from('ledger_statements').insert([{
-        ...statement,
-        file_url: publicUrl
-    }]).select().single();
+        if (!error && data) {
+            return data;
+        }
+    } catch (dbErr) {
+        console.warn("DB save for ledger_statement failed, fallback to local:", dbErr);
+    }
 
-    if (error) throw error;
-    return data;
+    // 3. Fallback: Always store locally in localStorage
+    const localStatements: LedgerStatement[] = JSON.parse(localStorage.getItem('local_ledger_statements') || '[]');
+    const newEntry: LedgerStatement = {
+        id: `local-${Date.now()}`,
+        admin_id: statement.admin_id || finalUserId || 'admin',
+        party_name: statement.party_name,
+        from_date: statement.from_date,
+        to_date: statement.to_date,
+        file_path: statement.file_path,
+        file_url: publicUrl || undefined,
+        created_at: new Date().toISOString()
+    };
+    localStatements.unshift(newEntry);
+    localStorage.setItem('local_ledger_statements', JSON.stringify(localStatements.slice(0, 50)));
+    return newEntry;
 };
 
 export const getLedgerStatements = async (): Promise<LedgerStatement[]> => {
-    const { data, error } = await supabase.from('ledger_statements').select('*').order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    const localStatements: LedgerStatement[] = JSON.parse(localStorage.getItem('local_ledger_statements') || '[]');
+    try {
+        const { data, error } = await supabase.from('ledger_statements').select('*').order('created_at', { ascending: false });
+        if (!error && data) {
+            const seen = new Set(data.map((d: any) => d.id));
+            const merged = [...data, ...localStatements.filter(l => !seen.has(l.id))];
+            return merged;
+        }
+    } catch (e) {
+        console.warn("Could not fetch remote ledger statements, using local:", e);
+    }
+    return localStatements;
 };
 
-export const deleteLedgerStatement = async (id: string, filePath: string) => {
-    // 1. Delete from storage
-    const { error: storageError } = await supabase.storage.from('statements').remove([filePath]);
-    if (storageError) console.error("Storage delete error:", storageError);
+export const deleteLedgerStatement = async (id: string, filePath?: string) => {
+    // 1. Delete from storage if filePath exists
+    if (filePath) {
+        try {
+            await supabase.storage.from('statements').remove([filePath]);
+        } catch (storageError) {
+            console.warn("Storage delete error:", storageError);
+        }
+    }
 
     // 2. Delete from database
-    const { error } = await supabase.from('ledger_statements').delete().eq('id', id);
-    if (error) throw error;
+    try {
+        await supabase.from('ledger_statements').delete().eq('id', id);
+    } catch (dbError) {
+        console.warn("DB delete error:", dbError);
+    }
+
+    // 3. Delete from localStorage
+    const localStatements: LedgerStatement[] = JSON.parse(localStorage.getItem('local_ledger_statements') || '[]');
+    const updated = localStatements.filter(l => l.id !== id);
+    localStorage.setItem('local_ledger_statements', JSON.stringify(updated));
 };
 
 // --- Payment Receipts (Accounting) ---

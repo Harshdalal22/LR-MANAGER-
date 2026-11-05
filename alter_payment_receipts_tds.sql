@@ -4,3 +4,4 @@ ALTER TABLE public.payment_receipts ADD COLUMN IF NOT EXISTS total_amount NUMERI
 
 -- Notify PostgREST to reload schema cache
 NOTIFY pgrst, 'reload config';
+

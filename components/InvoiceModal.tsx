@@ -85,7 +85,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
 
     const formattedBillDate = billDate ? formatDateDDMMYYYY(billDate) : '';
 
-    const numCols = showFromColumn ? 11 : 10;
+    const numCols = 11;
     const emptyRowCount = Math.max(0, 14 - invoiceRows.length);
 
     return (
@@ -106,31 +106,28 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
             </div>
 
             {/* Company Info Banner */}
-            <div className="flex justify-between items-center pb-2 border-b-2 border-black">
-                <div className="w-1/4 flex justify-start">
+            <div className="flex justify-between items-center pb-2 border-b-2 border-black gap-2">
+                <div className="w-24 flex-shrink-0 flex justify-start items-center">
                     {companyDetails.logoUrl ? (
-                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-16 w-auto object-contain" />
+                        <img src={companyDetails.logoUrl} alt="Company Logo" className="h-14 max-w-[90px] object-contain" />
                     ) : (
-                        <div className="h-14 w-28 border border-gray-400 bg-gray-50 flex items-center justify-center text-[10px] text-gray-400 font-semibold uppercase">
+                        <div className="h-12 w-20 border border-gray-400 bg-gray-50 flex items-center justify-center text-[9px] text-gray-400 font-semibold uppercase">
                             No Logo
                         </div>
                     )}
                 </div>
-                <div className="w-2/4 text-center text-black">
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-red-600 tracking-wide uppercase">
+                <div className="flex-1 text-center text-black min-w-0 px-2">
+                    <h1 className="text-xl sm:text-[22px] font-black text-red-600 tracking-normal uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                         {companyDetails.name || 'SSK CARGO SERVICES PRIVATE LIMITED'}
                     </h1>
-                    <p className="font-bold text-xs text-gray-800">
-                        {companyDetails.tagline || '(Fleet Owner & Contractor)'}
-                    </p>
-                    <p className="text-[11px] mt-0.5 text-gray-800">{companyDetails.address}</p>
-                    <p className="text-[11px] text-gray-800">
-                        {companyDetails.email && `Mail-${companyDetails.email}`}
-                        {companyDetails.contact && companyDetails.contact.length > 0 && `, Contact- ${companyDetails.contact.join(', ')}`}
-                    </p>
+                    {companyDetails.address && (
+                        <p className="text-[11px] mt-1 text-gray-800 font-medium whitespace-pre-line leading-tight">
+                            {companyDetails.address}
+                        </p>
+                    )}
                 </div>
-                <div className="w-1/4 text-right font-bold text-xs text-black">
-                    {/* Right spacer */}
+                <div className="w-24 flex-shrink-0">
+                    {/* Right spacer to keep center text perfectly centered */}
                 </div>
             </div>
 
@@ -165,17 +162,15 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                     <tr>
                         <th className="border border-gray-600 p-1 w-[5%] uppercase">SR. NO</th>
                         <th className="border border-gray-600 p-1 w-[9%] uppercase">Date</th>
-                        <th className="border border-gray-600 p-1 w-[13%] uppercase">VEHICLE NO.</th>
+                        <th className="border border-gray-600 p-1 w-[12%] uppercase">VEHICLE NO.</th>
                         <th className="border border-gray-600 p-1 w-[9%] uppercase">LR NUMBER</th>
-                        <th className="border border-gray-600 p-1 w-[13%] uppercase">GATE PASS NO</th>
-                        {showFromColumn && (
-                            <th className="border border-gray-600 p-1 w-[9%] uppercase">FROM</th>
-                        )}
+                        <th className="border border-gray-600 p-1 w-[11%] uppercase">GATE PASS NO</th>
+                        <th className="border border-gray-600 p-1 w-[10%] uppercase">FROM</th>
                         <th className="border border-gray-600 p-1 w-[10%] uppercase">TO</th>
                         <th className="border border-gray-600 p-1 w-[10%] uppercase">FREIGHT</th>
-                        <th className="border border-gray-600 p-1 w-[9%] uppercase">EXTRA POINT</th>
-                        <th className="border border-gray-600 p-1 w-[9%] uppercase">DETENTION</th>
-                        <th className="border border-gray-600 p-1 w-[11%] uppercase bg-[#fed7aa]/70">TOTAL FREIGHT</th>
+                        <th className="border border-gray-600 p-1 w-[8%] uppercase">EXTRA POINT</th>
+                        <th className="border border-gray-600 p-1 w-[8%] uppercase">DETENTION</th>
+                        <th className="border border-gray-600 p-1 w-[8%] uppercase bg-[#fed7aa]/70">TOTAL FREIGHT</th>
                     </tr>
                 </thead>
                 <tbody className="text-[11px]">
@@ -207,11 +202,19 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                                     />
                                 )}
                             </td>
-                            {showFromColumn && (
-                                <td className="border border-gray-600 p-0.5 text-left truncate">
-                                    {row.fromPlace}
-                                </td>
-                            )}
+                            <td className="border border-gray-600 p-0 text-left">
+                                {isExporting ? (
+                                    <span className="px-1 font-medium">{row.fromPlace}</span>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={row.fromPlace}
+                                        onChange={(e) => onRowChange(row.lrNo, 'fromPlace', e.target.value)}
+                                        placeholder="From"
+                                        className="w-full text-left bg-transparent border-0 border-b border-transparent hover:border-gray-400 focus:border-blue-500 focus:bg-amber-50 outline-none text-[11px] py-0.5 px-1 font-medium"
+                                    />
+                                )}
+                            </td>
                             <td className="border border-gray-600 p-0 text-left">
                                 {isExporting ? (
                                     <span className="px-1 font-medium">{row.toPlace}</span>
@@ -279,40 +282,45 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                     {/* Empty placeholder rows to fill A4 format nicely */}
                     {Array.from({ length: emptyRowCount }).map((_, i) => (
                         <tr key={`empty-${i}`} style={{ height: '22px' }}>
-                            {Array.from({ length: numCols }).map((_, j) => (
+                            {Array.from({ length: 11 }).map((_, j) => (
                                 <td key={j} className="border border-gray-600"></td>
                             ))}
                         </tr>
                     ))}
 
-                    {/* Table NOTE Row — just above TOTAL, merged across From/To/Freight columns */}
-                    <tr className="border-t border-gray-500">
-                        <td colSpan={showFromColumn ? 7 : 6} className="border border-gray-600 p-0 text-left">
-                            <div className="flex items-center gap-1 px-1 py-0.5">
+                    {/* Table NOTE Row — just above TOTAL, merged under FROM (Col 6), TO (Col 7), FREIGHT (Col 8) */}
+                    <tr className="border-t border-gray-500" style={{ height: '24px' }}>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        {/* Merged under FROM, TO, FREIGHT */}
+                        <td colSpan={3} className="border border-gray-600 p-0 text-left bg-yellow-50/40">
+                            <div className="flex items-center gap-1 px-1.5 py-0.5">
                                 <span className="font-bold text-[10px] text-gray-700 whitespace-nowrap">NOTE:</span>
                                 {isExporting ? (
-                                    <span className="text-[10px] text-gray-800 italic px-1">{tableNote || ''}</span>
+                                    <span className="text-[10px] text-gray-800 italic px-1 font-semibold">{tableNote || ''}</span>
                                 ) : (
                                     <input
                                         type="text"
                                         value={tableNote}
                                         onChange={(e) => onTableNoteChange(e.target.value)}
-                                        placeholder="Yahan table note likhein (e.g. inclusive of loading/unloading)..."
-                                        title="Table ke andar note likhein"
-                                        className="w-full text-[10px] text-gray-800 bg-yellow-50/60 hover:bg-yellow-50 focus:bg-white border-0 border-b border-dashed border-gray-300 focus:border-blue-500 outline-none py-0.5 px-0.5 font-sans"
+                                        placeholder="Note under From, To & Freight..."
+                                        title="Type note under From, To, Freight"
+                                        className="w-full text-[10px] text-gray-800 bg-transparent border-0 border-b border-dashed border-gray-300 focus:border-blue-500 outline-none py-0.5 px-0.5 font-sans font-medium"
                                     />
                                 )}
                             </div>
                         </td>
-                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
-                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
-                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
-                        <td className="border border-gray-600 p-0.5 text-right font-extrabold bg-amber-50/30"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5"></td>
+                        <td className="border border-gray-600 p-0.5 bg-amber-50/30"></td>
                     </tr>
 
                     {/* Table TOTAL Row */}
                     <tr className="bg-[#fed7aa]/50 font-bold text-black border-t-2 border-gray-700">
-                        <td colSpan={showFromColumn ? 7 : 6} className="border border-gray-600 p-1 text-center tracking-wider text-xs font-extrabold">
+                        <td colSpan={7} className="border border-gray-600 p-1 text-center tracking-wider text-xs font-extrabold">
                             TOTAL
                         </td>
                         <td className="border border-gray-600 p-1 text-right text-[11px] font-bold">
@@ -334,7 +342,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                 <tfoot className="text-black font-bold text-xs">
                     <tr>
                         {/* Left Side: Bank Details, PAN, In Words, Note */}
-                        <td colSpan={showFromColumn ? 6 : 5} className="border border-gray-600 p-2 align-top text-xs">
+                        <td colSpan={6} className="border border-gray-600 p-2 align-top text-xs">
                             <div className="space-y-0.5 text-[11px]">
                                 <p><span className="font-bold">PAN NUMBER : </span>{companyDetails.pan || 'N/A'}</p>
                                 <p><span className="font-bold">GST NUMBER : </span>{companyDetails.gstn || 'N/A'}</p>
@@ -377,7 +385,7 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                         </td>
 
                         {/* Right Side: Tax Calculations & Signatory */}
-                        <td colSpan={showFromColumn ? 5 : 5} className="border border-gray-600 p-0 align-top">
+                        <td colSpan={5} className="border border-gray-600 p-0 align-top">
                             <table className="w-full text-xs font-bold border-collapse">
                                 <tbody>
                                     <tr className="border-b border-gray-600">
@@ -453,7 +461,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
     const [taxType, setTaxType] = useState<'intra' | 'inter'>('intra');
     const [showGst, setShowGst] = useState(true);
-    const [showFromColumn, setShowFromColumn] = useState(false);
+    const [showFromColumn, setShowFromColumn] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -489,12 +497,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 billDate: bDate,
                 taxType: tType,
                 showGst: sGst,
-                showFromColumn: sFrom,
+                showFromColumn: true,
                 note: currentNote,
                 tableNote: currentTableNote,
                 rows: rows.reduce((acc, r) => {
                     acc[r.lrNo] = {
                         gatePassNo: r.gatePassNo,
+                        fromPlace: r.fromPlace,
                         freight: r.freight,
                         extraPoint: r.extraPoint,
                         detention: r.detention,
@@ -621,7 +630,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         // Resolve Tax Type & Toggles
         if (savedCustom?.taxType) setTaxType(savedCustom.taxType);
         if (savedCustom?.showGst !== undefined) setShowGst(savedCustom.showGst);
-        if (savedCustom?.showFromColumn !== undefined) setShowFromColumn(savedCustom.showFromColumn);
+        setShowFromColumn(true); // Permanent FROM column
 
         // Populate rows with saved or initial fields
         const initialRows: InvoiceRowItem[] = sorted.map(lr => {
@@ -647,11 +656,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 ? savedRow.toPlace 
                 : (lr.toPlace || '');
 
+            const from = savedRow?.fromPlace !== undefined
+                ? savedRow.fromPlace
+                : (lr.fromPlace || '');
+
             return {
                 lrNo: lr.lrNo,
                 date: lr.date,
                 truckNo: lr.truckNo,
-                fromPlace: lr.fromPlace || '',
+                fromPlace: from,
                 toPlace: to,
                 gatePassNo: gp,
                 freight: fr,
@@ -895,23 +908,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             >
                                 <span className={`inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform duration-200 ${
                                     showGst ? 'translate-x-5' : 'translate-x-0.5'
-                                }`} />
-                            </button>
-                        </div>
-
-                        {/* From Column Toggle — compulsory visible */}
-                        <div className="flex flex-col items-center border-l pl-2">
-                            <label className="block text-[11px] font-bold text-blue-700 mb-0.5">'From' Col</label>
-                            <button
-                                type="button"
-                                onClick={handleFromColumnToggle}
-                                title={showFromColumn ? "Hide 'From' Column" : "Show 'From' Column"}
-                                className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors duration-200 ${
-                                    showFromColumn ? 'bg-blue-600' : 'bg-gray-300'
-                                }`}
-                            >
-                                <span className={`inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform duration-200 ${
-                                    showFromColumn ? 'translate-x-5' : 'translate-x-0.5'
                                 }`} />
                             </button>
                         </div>

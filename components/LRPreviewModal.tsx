@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { LorryReceipt, CompanyDetails } from '../types';
-import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon, PhoneIcon } from './icons';
+import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon } from './icons';
 
 interface LRPreviewModalProps {
     isOpen: boolean;
@@ -909,9 +909,6 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [paperSize, setPaperSize] = useState<'a4' | 'a5' | 'letter' | 'legal'>('a4');
     const [singlePageFit, setSinglePageFit] = useState<boolean>(true);
     const [multiCopyMode, setMultiCopyMode] = useState<'single' | '3-copies' | '4-copies'>('single');
-    const [showShareModal, setShowShareModal] = useState<boolean>(false);
-    const [customPhone, setCustomPhone] = useState<string>('');
-    const [customEmail, setCustomEmail] = useState<string>('');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
     // GST Liability State (Defaults to 18% GST)
@@ -1106,7 +1103,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         }
     };
 
-    // Dynamic Print Trigger with Paper Size & Orientation
+    // Dynamic Print Trigger — A4 full-page fit, no overflow, no blank space
     const handlePrint = () => {
         let styleEl = document.getElementById('dynamic-print-style') as HTMLStyleElement;
         if (!styleEl) {
@@ -1114,24 +1111,49 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             styleEl.id = 'dynamic-print-style';
             document.head.appendChild(styleEl);
         }
-        const margin = singlePageFit ? '3mm 3mm' : '5mm 4mm';
+        // Always use 3mm margin for maximum print area coverage
         styleEl.innerHTML = `
             @media print {
+                /* Hide everything except the print root */
+                body > *:not(#print-root) { display: none !important; }
+                body { margin: 0 !important; padding: 0 !important; background: white !important; }
+
                 @page {
                     size: ${paperSize.toUpperCase()} ${printOrientation};
-                    margin: ${margin};
+                    margin: 3mm;
                 }
+
                 #print-root {
-                    width: 100%;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                }
-                .printable-area {
-                    ${singlePageFit ? 'max-height: 98vh !important; page-break-inside: avoid !important;' : ''}
+                    display: block !important;
                     width: 100% !important;
-                    max-width: ${printOrientation === 'landscape' ? '1040px' : paperSize === 'a5' ? '580px' : '760px'} !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
+
+                .print-page-wrapper {
+                    display: block !important;
+                    width: 100% !important;
+                    page-break-after: always;
+                    break-after: page;
+                }
+
+                .printable-area {
+                    /* Scale to fill the whole A4 page */
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    min-width: 0 !important;
+                    margin: 0 auto !important;
+                    padding: 2mm !important;
+                    box-sizing: border-box !important;
+                    page-break-inside: avoid !important;
+                    transform-origin: top left;
+                    /* Scale down wide bilty to fit A4 */
+                    ${printOrientation === 'portrait'
+                        ? 'transform: scale(0.72) !important; transform-origin: top center !important;'
+                        : 'transform: scale(0.90) !important; transform-origin: top center !important;'
+                    }
+                }
+
                 .page-break {
                     page-break-after: always !important;
                     break-after: page !important;
@@ -1375,23 +1397,21 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             title="WhatsApp: tries PDF attachment then text fallback"
                         >
                             <WhatsAppIcon className="w-4 h-4" />
-                            <span>WhatsApp + PDF</span>
+                            <span>WhatsApp</span>
                         </button>
 
-                        {/* Share Hub Button */}
+                        {/* Close / Back Button */}
                         <button
-                            onClick={() => setShowShareModal(true)}
-                            className="flex items-center bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95"
-                            title="Share on WhatsApp, Email & SMS Hub"
-                        >
-                            <span>🚀</span>
-                            <span className="ml-1">Share Hub</span>
-                        </button>
-
-                        {/* Close Modal */}
-                        <button
-                            onClick={onClose}
+                            onClick={() => {
+                                if (window.history.length > 1) {
+                                    onClose();
+                                    window.history.back();
+                                } else {
+                                    onClose();
+                                }
+                            }}
                             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors"
+                            title="Close preview"
                         >
                             <XIcon className="w-5 h-5" />
                         </button>
@@ -1576,203 +1596,6 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                 </div>
             </div>
 
-            {/* MULTI-CHANNEL SHARE HUB MODAL */}
-            {showShareModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 animate-fadeIn">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 animate-scaleUp">
-                        {/* Share Modal Header */}
-                        <div className="bg-gradient-to-r from-emerald-600 to-teal-700 text-white p-4 flex justify-between items-center">
-                            <div className="flex items-center gap-2.5">
-                                <span className="p-2 rounded-xl bg-white/20 text-white font-black text-lg">🚀</span>
-                                <div>
-                                    <h3 className="font-black text-base">Direct Share Hub</h3>
-                                    <p className="text-xs text-emerald-100">Send LR details instantly via WhatsApp, Email or SMS</p>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setShowShareModal(false)}
-                                className="p-1 rounded-lg hover:bg-white/20 text-white transition-colors"
-                            >
-                                <XIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* Share Modal Body */}
-                        <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
-                            {/* WhatsApp Fast Share Section */}
-                            <div className="space-y-2">
-                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                                    <WhatsAppIcon className="w-4 h-4 text-emerald-600" />
-                                    1-Click WhatsApp Direct Share
-                                </span>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    {/* Consignor */}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleShareWhatsAppTo(consignorContact, lr.consignor?.name || 'Consignor')}
-                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
-                                    >
-                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">📦 Consignor</div>
-                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignor?.name || 'Sender'}</div>
-                                        <div className="text-[10px] text-slate-500 font-mono">{consignorContact || 'Click to send'}</div>
-                                    </button>
-
-                                    {/* Consignee */}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleShareWhatsAppTo(consigneeContact, lr.consignee?.name || 'Consignee')}
-                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
-                                    >
-                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">🏢 Consignee</div>
-                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignee?.name || 'Receiver'}</div>
-                                        <div className="text-[10px] text-slate-500 font-mono">{consigneeContact || 'Click to send'}</div>
-                                    </button>
-
-                                    {/* Driver */}
-                                    <button
-                                        type="button"
-                                        onClick={() => handleShareWhatsAppTo(driverContact, lr.driverName || 'Driver')}
-                                        className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-left transition-all group"
-                                    >
-                                        <div className="text-[10px] font-bold text-emerald-700 uppercase">🚚 Driver / Truck</div>
-                                        <div className="font-black text-xs text-slate-900 truncate">{lr.driverName || lr.truckNo || 'Driver'}</div>
-                                        <div className="text-[10px] text-slate-500 font-mono">{driverContact || 'Click to send'}</div>
-                                    </button>
-                                </div>
-
-                                {/* Custom WhatsApp Number */}
-                                <div className="mt-2 flex gap-2">
-                                    <div className="relative flex-1">
-                                        <input
-                                            type="tel"
-                                            placeholder="Enter 10-digit mobile number"
-                                            value={customPhone}
-                                            onChange={(e) => setCustomPhone(e.target.value)}
-                                            className="w-full p-2 pl-7 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500"
-                                        />
-                                        <PhoneIcon className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-3" />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (!customPhone) {
-                                                toast.error('Please enter a phone number');
-                                                return;
-                                            }
-                                            handleShareWhatsAppTo(customPhone, customPhone);
-                                        }}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm"
-                                    >
-                                        Send WA
-                                    </button>
-                                </div>
-                            </div>
-
-                            <hr className="border-slate-200" />
-
-                            {/* Email Direct Share Section */}
-                            <div className="space-y-2">
-                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                                    <EmailIcon className="w-4 h-4 text-blue-600" />
-                                    Direct Email Dispatch
-                                </span>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleShareEmailTo(lr.consignor?.contact || '', lr.consignor?.name || 'Consignor')}
-                                        className="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-left transition-all"
-                                    >
-                                        <div className="text-[10px] font-bold text-blue-700">✉️ Consignor Email</div>
-                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignor?.name || 'Sender'}</div>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => handleShareEmailTo(lr.consignee?.contact || '', lr.consignee?.name || 'Consignee')}
-                                        className="p-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl text-left transition-all"
-                                    >
-                                        <div className="text-[10px] font-bold text-blue-700">✉️ Consignee Email</div>
-                                        <div className="font-black text-xs text-slate-900 truncate">{lr.consignee?.name || 'Receiver'}</div>
-                                    </button>
-                                </div>
-
-                                <div className="flex gap-2">
-                                    <input
-                                        type="email"
-                                        placeholder="Enter customer email address"
-                                        value={customEmail}
-                                        onChange={(e) => setCustomEmail(e.target.value)}
-                                        className="flex-1 p-2 border border-slate-300 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (!customEmail) {
-                                                toast.error('Please enter an email address');
-                                                return;
-                                            }
-                                            handleShareEmailTo(customEmail, 'Valued Customer');
-                                        }}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm"
-                                    >
-                                        Send Email
-                                    </button>
-                                </div>
-                            </div>
-
-                            <hr className="border-slate-200" />
-
-                            {/* Additional Tools Section */}
-                            <div className="space-y-2">
-                                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                                    Additional Export & Sharing Options
-                                </span>
-
-                                <div className="grid grid-cols-3 gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={handleCopySummary}
-                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
-                                    >
-                                        <span className="text-base block">📋</span>
-                                        <span className="font-bold text-xs text-slate-800">Copy Text</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={handleDownloadImage}
-                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
-                                    >
-                                        <span className="text-base block">🖼️</span>
-                                        <span className="font-bold text-xs text-slate-800">Save PNG</span>
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => handleSendSMS(consigneeContact || consignorContact || '')}
-                                        className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-center transition-all"
-                                    >
-                                        <span className="text-base block">💬</span>
-                                        <span className="font-bold text-xs text-slate-800">SMS / Text</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Share Modal Footer */}
-                        <div className="bg-slate-50 p-3 border-t border-slate-200 flex justify-end">
-                            <button
-                                onClick={() => setShowShareModal(false)}
-                                className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl"
-                            >
-                                Done
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

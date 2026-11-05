@@ -124,10 +124,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'w-[1040px] max-w-full p-3 text-[9px]' 
+        ? 'w-[1040px] max-w-full p-3 text-[9px] min-h-[680px] flex flex-col justify-between' 
         : paperSize === 'a5' 
             ? 'w-[580px] max-w-full p-2 text-[8px]' 
-            : 'w-[794px] max-w-full p-4 text-[9.5px]';
+            : 'w-[794px] max-w-full p-5 text-[9.5px] min-h-[1050px] flex flex-col justify-between';
 
     const detectedLiability = (() => {
         if (gstLiability) return gstLiability;
@@ -404,6 +404,26 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         )}
 
                         {/* Summary Total Row */}
+                        {(() => {
+                            const minRows = isLandscape ? 1 : 5;
+                            const currentCount = lr.items && lr.items.length > 0 ? lr.items.length : 1;
+                            const emptyRowsCount = Math.max(0, minRows - currentCount);
+                            return Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
+                                <tr key={`empty-${emptyIdx}`} className="hover:bg-slate-50">
+                                    <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-200 align-top">
+                                        {currentCount + emptyIdx + 1}
+                                    </td>
+                                    <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1 border-r border-slate-200 align-top font-bold text-slate-300">&nbsp;</td>
+                                    <td className="p-1 text-center font-mono text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1 text-right font-bold text-slate-300 align-top">&nbsp;</td>
+                                </tr>
+                            ));
+                        })()}
+
+                        {/* Summary Total Row */}
                         <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-800 text-[8.5px]">
                             <td className="p-1 text-center border-r border-slate-300">•</td>
                             <td className="p-1 text-center font-black border-r border-slate-300">
@@ -460,20 +480,20 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                     {/* 3 Signatures Area (Exact as reference image) */}
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-300 text-center text-[7.5px]">
-                        <div className="flex flex-col justify-end h-12">
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
                             <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
                             <span className="font-bold text-slate-800">Consignor / Loader Sign</span>
                         </div>
-                        <div className="flex flex-col justify-end h-12">
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
                             <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
                             <span className="font-bold text-slate-800">Driver Sign / Thumb Impression</span>
                         </div>
-                        <div className="flex flex-col justify-end h-12 items-center">
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'} items-center`}>
                             {companyDetails.signatureImageUrl ? (
                                 <img
                                     src={companyDetails.signatureImageUrl}
                                     alt="Sign"
-                                    className="h-8 w-auto object-contain mb-0.5"
+                                    className={`${isLandscape ? 'h-8' : 'h-12'} w-auto object-contain mb-0.5`}
                                 />
                             ) : (
                                 <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
@@ -902,6 +922,7 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
     const [copyType, setCopyType] = useState<string>(lr.copyType || 'CONSIGNOR COPY');
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
     const [showAmounts, setShowAmounts] = useState(true);
+    const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
     const [isExporting, setIsExporting] = useState<boolean>(false);
 
     // Text Summary Generator for Instant Sharing
@@ -974,10 +995,10 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
     // Helper to generate a configured jsPDF instance with the bilty captured on a single page
     const generateBiltyPdfDoc = async (targetEl: HTMLElement): Promise<{ pdf: jsPDF; filename: string }> => {
-        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.pdf`;
+        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}_${orientation}.pdf`;
 
         const pdf = new jsPDF({
-            orientation: 'portrait',
+            orientation: orientation,
             unit: 'mm',
             format: 'a4',
             compress: true
@@ -1051,15 +1072,16 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             styleEl.id = 'dynamic-print-style';
             document.head.appendChild(styleEl);
         }
+        const printHeight = orientation === 'landscape' ? '198mm' : '287mm';
         styleEl.innerHTML = `
             @media print {
                 @page {
-                    size: A4 portrait;
+                    size: A4 ${orientation};
                     margin: 4mm;
                 }
                 html, body {
                     width: 100% !important;
-                    height: auto !important;
+                    height: 100% !important;
                     margin: 0 !important;
                     padding: 0 !important;
                     background: #ffffff !important;
@@ -1100,13 +1122,18 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                     width: 100% !important;
                     max-width: 100% !important;
                     min-width: 100% !important;
+                    height: ${printHeight} !important;
+                    min-height: ${printHeight} !important;
                     box-sizing: border-box !important;
                     margin: 0 auto !important;
-                    padding: 3mm 4mm !important;
+                    padding: 4mm 5mm !important;
                     border: 2px solid #0f172a !important;
                     box-shadow: none !important;
                     transform: none !important;
                     zoom: 1 !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: space-between !important;
                     page-break-inside: avoid !important;
                     break-inside: avoid !important;
                 }
@@ -1223,7 +1250,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             showCompanyDetails={showCompanyDetails}
                             showAmounts={showAmounts}
                             copyType={copyType}
-                            orientation="portrait"
+                            orientation={orientation}
                             paperSize="a4"
                             singlePageFit={true}
                         />
@@ -1264,6 +1291,36 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             <option value="TRANSPORTER COPY">Transporter Copy</option>
                             <option value="DRIVER COPY">Driver Copy</option>
                         </select>
+
+                        {/* Page Orientation Selector (Portrait / Landscape) */}
+                        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-300 shadow-inner">
+                            <button
+                                type="button"
+                                onClick={() => setOrientation('portrait')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                    orientation === 'portrait'
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title="Portrait View (Vertical A4 Full Page)"
+                            >
+                                <span>📄</span>
+                                <span>Portrait</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setOrientation('landscape')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+                                    orientation === 'landscape'
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title="Landscape View (Wide A4 Full Page)"
+                            >
+                                <span>📜</span>
+                                <span>Landscape</span>
+                            </button>
+                        </div>
 
                         {/* Amounts Toggle */}
                         <label className="flex items-center space-x-1.5 bg-white px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer shadow-sm">
@@ -1350,7 +1407,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             showCompanyDetails={showCompanyDetails}
                             showAmounts={showAmounts}
                             copyType={copyType}
-                            orientation="portrait"
+                            orientation={orientation}
                             paperSize="a4"
                             singlePageFit={true}
                         />

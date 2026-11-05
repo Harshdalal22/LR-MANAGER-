@@ -28,123 +28,13 @@ const SpiralBookIcon: React.FC<{ className?: string }> = ({ className = "w-7 h-7
     </svg>
 );
 
-const TruckIllustration: React.FC<{ className?: string }> = ({ className = "w-56 sm:w-64" }) => (
-    <div className={`relative flex flex-col items-center select-none ${className}`}>
-        <svg viewBox="0 0 280 180" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto drop-shadow-2xl">
-            {/* Ground Shadow */}
-            <ellipse cx="140" cy="162" rx="115" ry="9" fill="#0f172a" fillOpacity="0.25" />
-            
-            {/* Road Dash */}
-            <path d="M20 162H260" stroke="#cbd5e1" strokeWidth="2.5" strokeDasharray="16 12" strokeLinecap="round" />
-
-            {/* Main Cargo Container (Orange Box) */}
-            <g id="cargo-container">
-                {/* Back box shadow/depth */}
-                <path d="M52 38H165V136H52V38Z" fill="#D95D0F" rx="5" />
-                <path d="M54 36H163C165.2 36 167 37.8 167 40V134C167 136.2 165.2 138 163 138H54C51.8 138 50 136.2 50 134V40C50 37.8 51.8 36 54 36Z" fill="#F97316" />
-                
-                {/* Container Top Highlight */}
-                <path d="M52 38C52 36.9 52.9 36 54 36H163C164.1 36 165 36.9 165 38V44H52V38Z" fill="#FB923C" />
-                
-                {/* Container Corrugated Ridges */}
-                <path d="M66 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M78 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M90 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M102 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M114 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M126 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M138 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M150 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-                <path d="M162 44V130" stroke="#C2410C" strokeWidth="3" strokeLinecap="round" />
-
-                {/* Corner Reinforcement Rivets */}
-                <circle cx="56" cy="42" r="1.5" fill="#FFF" fillOpacity="0.6" />
-                <circle cx="161" cy="42" r="1.5" fill="#FFF" fillOpacity="0.6" />
-                <circle cx="56" cy="132" r="1.5" fill="#FFF" fillOpacity="0.6" />
-                <circle cx="161" cy="132" r="1.5" fill="#FFF" fillOpacity="0.6" />
-            </g>
-
-            {/* Truck Chassis / Base */}
-            <path d="M48 134H222V142H48V134Z" fill="#334155" />
-            {/* Fuel Tank / Battery Box */}
-            <rect x="76" y="137" width="28" height="9" rx="2" fill="#64748B" />
-            <rect x="110" y="138" width="18" height="8" rx="1.5" fill="#475569" />
-
-            {/* Truck Cab */}
-            <g id="truck-cab">
-                {/* Cab Main Body */}
-                <path d="M167 56H206C212.5 56 218 60.5 220.5 66.5L232.5 98C234.5 103 235 107.5 235 113V135C235 137.2 233.2 139 231 139H167V56Z" fill="#EA580C" />
-                <path d="M168 58H205C210.5 58 215.5 61.8 217.8 67L229.2 97C231 101.5 231.5 105.5 231.5 110.5V135H168V58Z" fill="#FB923C" />
-                
-                {/* Cab Roof Deflector / Sun visor */}
-                <path d="M164 54H208C213 54 217 56 220 59L170 59L164 54Z" fill="#D97706" />
-
-                {/* Windshield */}
-                <path d="M174 64H204C207.5 64 210.5 66.5 211.8 70L221 95C221.8 97.2 220.2 99.5 217.8 99.5H174V64Z" fill="#38BDF8" />
-                {/* Glass Glare */}
-                <path d="M178 68H188L183 95H176L178 68Z" fill="#FFFFFF" fillOpacity="0.45" />
-
-                {/* Side Window */}
-                <rect x="174" y="65" width="20" height="28" rx="2" fill="#0284C7" fillOpacity="0.3" />
-                <line x1="194" y1="65" x2="194" y2="99" stroke="#EA580C" strokeWidth="2" />
-
-                {/* Door Line */}
-                <path d="M171 63V132H206V100" stroke="#C2410C" strokeWidth="1.8" strokeLinecap="round" />
-                {/* Door Handle */}
-                <rect x="175" y="105" width="8" height="2.5" rx="1" fill="#1E293B" />
-
-                {/* Side Mirror */}
-                <rect x="214" y="76" width="3" height="15" rx="1.5" fill="#1E293B" />
-                <rect x="216" y="78" width="5" height="11" rx="1.5" fill="#334155" />
-                <rect x="218" y="79" width="2" height="9" rx="0.5" fill="#94A3B8" />
-
-                {/* Front Grille */}
-                <rect x="222" y="110" width="11" height="16" rx="2" fill="#1E293B" />
-                <line x1="223" y1="114" x2="231" y2="114" stroke="#64748B" strokeWidth="1.2" />
-                <line x1="223" y1="118" x2="231" y2="118" stroke="#64748B" strokeWidth="1.2" />
-                <line x1="223" y1="122" x2="231" y2="122" stroke="#64748B" strokeWidth="1.2" />
-
-                {/* Headlights */}
-                <rect x="224" y="127" width="8" height="5" rx="1.5" fill="#FEF08A" />
-                <rect x="225" y="128" width="6" height="3" rx="1" fill="#FFFFFF" />
-
-                {/* Front Bumper */}
-                <path d="M218 132H236C237.5 132 238.5 133.5 238 135L236 141C235.5 142 234.5 142.5 233.5 142.5H218V132Z" fill="#1E293B" />
-                <rect x="222" y="135" width="12" height="4" rx="1" fill="#F8FAFC" />
-            </g>
-
-            {/* Rear Wheels */}
-            <g id="rear-wheels">
-                {/* Left Rear Wheel */}
-                <circle cx="78" cy="144" r="17" fill="#0F172A" />
-                <circle cx="78" cy="144" r="14" fill="#1E293B" />
-                <circle cx="78" cy="144" r="9" fill="#94A3B8" />
-                <circle cx="78" cy="144" r="5" fill="#475569" />
-                <circle cx="78" cy="144" r="2" fill="#E2E8F0" />
-                {/* Rim Spokes */}
-                <circle cx="78" cy="138" r="1" fill="#0F172A" />
-                <circle cx="84" cy="144" r="1" fill="#0F172A" />
-                <circle cx="78" cy="150" r="1" fill="#0F172A" />
-                <circle cx="72" cy="144" r="1" fill="#0F172A" />
-
-                {/* Dual wheel hint */}
-                <path d="M60 144C60 137 62 133 64 130V158C62 155 60 151 60 144Z" fill="#0F172A" />
-            </g>
-
-            {/* Front Wheel */}
-            <g id="front-wheel">
-                <circle cx="198" cy="144" r="17" fill="#0F172A" />
-                <circle cx="198" cy="144" r="14" fill="#1E293B" />
-                <circle cx="198" cy="144" r="9" fill="#CBD5E1" />
-                <circle cx="198" cy="144" r="5" fill="#475569" />
-                <circle cx="198" cy="144" r="2" fill="#F8FAFC" />
-                {/* Rim Bolts */}
-                <circle cx="198" cy="138" r="1" fill="#0F172A" />
-                <circle cx="204" cy="144" r="1" fill="#0F172A" />
-                <circle cx="198" cy="150" r="1" fill="#0F172A" />
-                <circle cx="192" cy="144" r="1" fill="#0F172A" />
-            </g>
-        </svg>
+const TruckIllustration: React.FC<{ className?: string }> = ({ className = "w-64 sm:w-72" }) => (
+    <div className={`relative flex flex-col items-center justify-center select-none ${className}`}>
+        <img 
+            src="/truck_illustration.png" 
+            alt="BiltyBook Logistics" 
+            className="w-full h-auto max-h-52 object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.35)] transition-transform duration-300 hover:scale-105" 
+        />
     </div>
 );
 
@@ -153,70 +43,11 @@ const DesktopHeroGraphic: React.FC = () => (
     <div className="relative w-full max-w-md mx-auto my-6 flex flex-col items-center">
         {/* Soft radial glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-        
-        <svg viewBox="0 0 340 220" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-auto drop-shadow-2xl">
-            {/* Background Mountains */}
-            <path d="M10 160L85 85C95 75 110 75 120 85L165 130L215 70C225 60 240 60 250 70L330 160H10Z" fill="#1e293b" fillOpacity="0.4" />
-            <path d="M50 160L125 95C132 88 144 88 152 95L185 125L235 75C243 67 257 67 265 75L340 160H50Z" fill="#334155" fillOpacity="0.3" />
-
-            {/* Cargo Boxes stack behind truck */}
-            <rect x="75" y="80" width="30" height="28" rx="2" fill="#1e3a5f" />
-            <rect x="75" y="80" width="30" height="28" rx="2" stroke="#3b82f6" strokeWidth="0.8" strokeOpacity="0.4" />
-            <line x1="90" y1="80" x2="90" y2="108" stroke="#3b82f6" strokeWidth="0.8" strokeOpacity="0.3" />
-            
-            <rect x="90" y="95" width="28" height="26" rx="2" fill="#ea580c" />
-            <line x1="104" y1="95" x2="104" y2="121" stroke="#fed7aa" strokeWidth="1" strokeOpacity="0.5" />
-            
-            <rect x="68" y="102" width="28" height="26" rx="2" fill="#0369a1" />
-
-            {/* Road */}
-            <path d="M0 160C80 156 260 156 340 160L330 185H10L0 160Z" fill="#0f172a" fillOpacity="0.8" />
-            <path d="M20 172H320" stroke="#fbbf24" strokeWidth="2" strokeDasharray="16 10" strokeLinecap="round" />
-
-            {/* Roadside marker poles */}
-            <rect x="35" y="145" width="4" height="15" rx="1" fill="#475569" />
-            <rect x="33" y="140" width="8" height="7" rx="1" fill="#f97316" />
-            <rect x="310" y="145" width="4" height="15" rx="1" fill="#475569" />
-            <rect x="308" y="140" width="8" height="7" rx="1" fill="#f97316" />
-
-            {/* Moving Truck scaled */}
-            <g transform="translate(42, 10) scale(0.95)">
-                {/* Truck Cargo Box */}
-                <rect x="52" y="38" width="112" height="98" rx="4" fill="#F97316" />
-                <path d="M52 38H164V46H52V38Z" fill="#FB923C" />
-                <path d="M68 46V130" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="M84 46V130" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="M100 46V130" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="M116 46V130" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="M132 46V130" stroke="#C2410C" strokeWidth="2.5" />
-                <path d="M148 46V130" stroke="#C2410C" strokeWidth="2.5" />
-
-                {/* Chassis */}
-                <rect x="48" y="134" width="170" height="8" rx="1" fill="#334155" />
-                <rect x="80" y="137" width="24" height="8" rx="1" fill="#64748B" />
-
-                {/* Cab */}
-                <path d="M164 58H202C208 58 213 62 215 68L225 96C227 101 228 106 228 111V134C228 136 226 138 224 138H164V58Z" fill="#EA580C" />
-                <path d="M165 60H201C206 60 211 63.5 213 69L223 96C225 100 226 104 226 108V134H165V60Z" fill="#FB923C" />
-                {/* Windshield */}
-                <path d="M170 65H199C203 65 206 68 207 72L215 94C216 96 214 98 212 98H170V65Z" fill="#7DD3FC" />
-                <path d="M174 68H182L178 94H172L174 68Z" fill="#FFFFFF" fillOpacity="0.45" />
-
-                {/* Handle & Lights */}
-                <rect x="172" y="106" width="7" height="2" rx="1" fill="#1E293B" />
-                <rect x="220" y="123" width="7" height="5" rx="1" fill="#FEF08A" />
-                <rect x="214" y="130" width="16" height="7" rx="1.5" fill="#1E293B" />
-
-                {/* Wheels */}
-                <circle cx="76" cy="144" r="16" fill="#0F172A" />
-                <circle cx="76" cy="144" r="9" fill="#94A3B8" />
-                <circle cx="76" cy="144" r="4" fill="#334155" />
-
-                <circle cx="194" cy="144" r="16" fill="#0F172A" />
-                <circle cx="194" cy="144" r="9" fill="#94A3B8" />
-                <circle cx="194" cy="144" r="4" fill="#334155" />
-            </g>
-        </svg>
+        <img 
+            src="/truck_illustration.png" 
+            alt="BiltyBook Logistics" 
+            className="relative z-10 w-full max-w-sm max-h-64 object-contain drop-shadow-[0_20px_35px_rgba(0,0,0,0.5)] transition-transform duration-300 hover:scale-105" 
+        />
     </div>
 );
 

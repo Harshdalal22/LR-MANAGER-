@@ -517,6 +517,12 @@ export const getLorryReceipts = async (limit?: number): Promise<LorryReceipt[]> 
             distanceKm: Number(item.distanceKm ?? charges.distanceKm ?? 0),
             estimatedDuration: item.estimatedDuration ?? charges.estimatedDuration ?? '',
             distanceSource: item.distanceSource ?? charges.distanceSource ?? '',
+            gatePassNo: item.gatePassNo ?? charges.gatePassNo ?? item.poNo ?? '',
+            extraPoint: Number(item.extraPoint ?? charges.extraPoint ?? charges.otherCharge ?? 0),
+            detention: Number(item.detention ?? charges.detention ?? 0),
+            invoiceNote: item.invoiceNote ?? charges.invoiceNote ?? '',
+            freightBillNo: charges.freightBillNo || (item.is_invoice_generated ? item.invoiceNo : '') || '',
+            freightBillDate: charges.freightBillDate || (item.is_invoice_generated ? item.invoiceDate : null) || null,
         };
     });
 };
@@ -656,16 +662,55 @@ export const updateLorryReceiptStatus = async (lrNo: string, status: LRStatus) =
     if (error) throw error;
 };
 
-export const updateLorryReceiptInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
+export const updateLorryReceiptInvoiceDetails = async (
+    lrNos: string[], 
+    invoiceNo: string, 
+    invoiceDate: string,
+    rowDetails?: { lrNo: string; gatePassNo?: string; extraPoint?: number; detention?: number; freight?: number }[],
+    invoiceNote?: string
+) => {
+    // Mark as invoice generated in DB
     const { error } = await withTimeout(supabase
         .from('lorry_receipts')
         .update({
-            invoiceNo,
-            invoiceDate: invoiceDate || null, // Ensure empty string becomes null
-            is_invoice_generated: true // Must be snake_case based on DB fix script
+            is_invoice_generated: true
         })
         .in('lrNo', lrNos));
     if (error) throw error;
+
+    for (const lrNo of lrNos) {
+        try {
+            const { data: currentLR } = await supabase
+                .from('lorry_receipts')
+                .select('charges, poNo, freight, invoiceNo')
+                .eq('lrNo', lrNo)
+                .single();
+
+            const r = rowDetails?.find(item => item.lrNo === lrNo);
+
+            const updatedCharges = {
+                ...(currentLR?.charges || {}),
+                freightBillNo: invoiceNo,
+                freightBillDate: invoiceDate || null,
+                extraPoint: r !== undefined ? Number(r.extraPoint || 0) : Number(currentLR?.charges?.extraPoint || 0),
+                detention: r !== undefined ? Number(r.detention || 0) : Number(currentLR?.charges?.detention || 0),
+                otherCharge: r !== undefined ? Number(r.extraPoint || 0) : Number(currentLR?.charges?.otherCharge || 0),
+                gatePassNo: r?.gatePassNo ?? currentLR?.charges?.gatePassNo ?? '',
+                invoiceNote: invoiceNote ?? currentLR?.charges?.invoiceNote ?? ''
+            };
+
+            await supabase
+                .from('lorry_receipts')
+                .update({
+                    charges: updatedCharges,
+                    freight: r !== undefined ? Number(r.freight || 0) : (currentLR?.freight || 0),
+                    poNo: r?.gatePassNo || currentLR?.poNo || ''
+                })
+                .eq('lrNo', lrNo);
+        } catch (err) {
+            console.warn(`Could not update extra charges for LR ${lrNo}:`, err);
+        }
+    }
 }
 
 // Remove LRs from an invoice (un-invoice them)

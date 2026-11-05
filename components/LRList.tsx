@@ -21,7 +21,7 @@ interface LRListProps {
     onUpdateStatus: (lrNo: string, status: LRStatus) => void;
     onOpenPODUploader: (lr: LorryReceipt) => void;
     onViewPOD: (podPath: string) => void;
-    onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
+    onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string, rowDetails?: any[], invoiceNote?: string) => Promise<void>;
     isReadOnly?: boolean;
     initialViewMode?: 'lrs' | 'vouchers';
     savedParties?: SavedParty[];

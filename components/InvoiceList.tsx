@@ -21,7 +21,7 @@ interface InvoiceListProps {
     lorryReceipts: LorryReceipt[];
     companyDetails: CompanyDetails;
     onBack: () => void;
-    onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string) => Promise<void>;
+    onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string, rowDetails?: any[], invoiceNote?: string) => Promise<void>;
     onRemoveLRsFromInvoice?: (lrNos: string[]) => Promise<void>;
 }
 
@@ -60,16 +60,17 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
     const generatedInvoices = useMemo(() => {
         const groups: { [key: string]: LorryReceipt[] } = {};
         lorryReceipts.forEach(lr => {
-            if (lr.isInvoiceGenerated && lr.invoiceNo) {
-                if (!groups[lr.invoiceNo]) groups[lr.invoiceNo] = [];
-                groups[lr.invoiceNo].push(lr);
+            const billNo = lr.freightBillNo || lr.charges?.freightBillNo;
+            if (lr.isInvoiceGenerated && billNo) {
+                if (!groups[billNo]) groups[billNo] = [];
+                groups[billNo].push(lr);
             }
         });
 
         return Object.keys(groups).map(invoiceNo => {
             const lrs = groups[invoiceNo];
             const firstLR = lrs[0];
-            const date = firstLR.invoiceDate || firstLR.date;
+            const date = firstLR.freightBillDate || firstLR.charges?.freightBillDate || firstLR.date;
             const customer = firstLR.billingTo?.name || firstLR.consignor.name;
             const totalAmount = lrs.reduce((sum, lr) => {
                 const charges = Object.values(lr.charges || {}).reduce((a: number, b: any) => {
@@ -610,22 +611,23 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                                 </td>
                                                 <td className="px-6 py-4 text-right font-semibold">₹{inv.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                                 <td className="px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        {/* View / Print */}
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {/* Edit / Print Bill */}
                                                         <button
                                                             onClick={() => setSelectedInvoice({ invoiceNo: inv.invoiceNo, lrs: inv.lrs })}
-                                                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 rounded-full transition-colors"
-                                                            title="View / Print Invoice"
+                                                            className="inline-flex items-center gap-1.5 text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm border border-blue-200"
+                                                            title="Edit bill details (Gate Pass, Detention, Extra Point) & Print"
                                                         >
-                                                            <InvoiceIcon className="w-5 h-5" />
+                                                            <EditIcon className="w-3.5 h-3.5" />
+                                                            <span>Edit / Print</span>
                                                         </button>
-                                                        {/* Edit */}
+                                                        {/* Manage LRs */}
                                                         <button
                                                             onClick={() => handleStartEdit({ invoiceNo: inv.invoiceNo, lrs: inv.lrs })}
-                                                            className="text-amber-600 hover:text-amber-800 hover:bg-amber-50 p-2 rounded-full transition-colors"
-                                                            title="Edit Invoice (Add/Remove LRs, Change No./Date)"
+                                                            className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all"
+                                                            title="Add or remove LRs from this invoice"
                                                         >
-                                                            <EditIcon className="w-5 h-5" />
+                                                            <span>Manage LRs</span>
                                                         </button>
                                                     </div>
                                                 </td>
@@ -647,8 +649,8 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                     lorryReceipts={selectedInvoice.lrs}
                     allLorryReceipts={lorryReceipts}
                     companyDetails={companyDetails}
-                    onSaveInvoiceDetails={onUpdateInvoiceDetails ? async (lrNos, invNo, invDate) => {
-                        await onUpdateInvoiceDetails(lrNos, invNo, invDate);
+                    onSaveInvoiceDetails={onUpdateInvoiceDetails ? async (lrNos, invNo, invDate, rowDetails, note) => {
+                        await onUpdateInvoiceDetails(lrNos, invNo, invDate, rowDetails, note);
                         setSelectedInvoice(null);
                     } : undefined}
                 />
@@ -662,9 +664,9 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                     lorryReceipts={lorryReceipts.filter(lr => selectedLRs.has(lr.lrNo))}
                     allLorryReceipts={lorryReceipts}
                     companyDetails={companyDetails}
-                    onSaveInvoiceDetails={async (lrNos, invNo, invDate) => {
+                    onSaveInvoiceDetails={async (lrNos, invNo, invDate, rowDetails, note) => {
                         if (onUpdateInvoiceDetails) {
-                            await onUpdateInvoiceDetails(lrNos, invNo, invDate);
+                            await onUpdateInvoiceDetails(lrNos, invNo, invDate, rowDetails, note);
                             closeWizard();
                         }
                         setShowGenerationModal(false);

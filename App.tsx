@@ -567,11 +567,43 @@ const App: React.FC = () => {
         }
     };
 
-    const handleUpdateInvoiceDetails = async (lrNos: string[], invoiceNo: string, invoiceDate: string) => {
+    const handleUpdateInvoiceDetails = async (
+        lrNos: string[], 
+        invoiceNo: string, 
+        invoiceDate: string,
+        rowDetails?: { lrNo: string; gatePassNo?: string; extraPoint?: number; detention?: number; freight?: number }[],
+        invoiceNote?: string
+    ) => {
         const toastId = toast.loading('Updating Invoice details...');
         try {
-            await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate);
-            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { ...lr, invoiceNo, invoiceDate, isInvoiceGenerated: true } : lr));
+            await updateLorryReceiptInvoiceDetails(lrNos, invoiceNo, invoiceDate, rowDetails, invoiceNote);
+            setLorryReceipts(prev => prev.map(lr => {
+                if (lrNos.includes(lr.lrNo)) {
+                    const row = rowDetails?.find(r => r.lrNo === lr.lrNo);
+                    const updatedCharges = {
+                        ...(lr.charges || {}),
+                        extraPoint: row !== undefined ? Number(row.extraPoint || 0) : lr.charges?.extraPoint,
+                        detention: row !== undefined ? Number(row.detention || 0) : lr.charges?.detention,
+                        otherCharge: row !== undefined ? Number(row.extraPoint || 0) : lr.charges?.otherCharge,
+                        gatePassNo: row !== undefined ? (row.gatePassNo || '') : lr.charges?.gatePassNo,
+                        invoiceNote: invoiceNote !== undefined ? invoiceNote : lr.charges?.invoiceNote
+                    };
+                    return { 
+                        ...lr, 
+                        freightBillNo: invoiceNo,
+                        freightBillDate: invoiceDate,
+                        isInvoiceGenerated: true,
+                        freight: row !== undefined ? Number(row.freight || 0) : lr.freight,
+                        poNo: row?.gatePassNo || lr.poNo,
+                        charges: updatedCharges,
+                        gatePassNo: row?.gatePassNo || lr.gatePassNo,
+                        extraPoint: row !== undefined ? Number(row.extraPoint || 0) : lr.extraPoint,
+                        detention: row !== undefined ? Number(row.detention || 0) : lr.detention,
+                        invoiceNote: invoiceNote ?? lr.invoiceNote
+                    };
+                }
+                return lr;
+            }));
             toast.success('Invoice details updated', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);
@@ -583,7 +615,12 @@ const App: React.FC = () => {
         const toastId = toast.loading('Removing LRs from invoice...');
         try {
             await clearLRInvoiceDetails(lrNos);
-            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { ...lr, invoiceNo: '', invoiceDate: null, isInvoiceGenerated: false } : lr));
+            setLorryReceipts(prev => prev.map(lr => lrNos.includes(lr.lrNo) ? { 
+                ...lr, 
+                freightBillNo: '', 
+                freightBillDate: null, 
+                isInvoiceGenerated: false 
+            } : lr));
             toast.success('LRs removed from invoice', { id: toastId });
         } catch (error) {
             toast.dismiss(toastId);

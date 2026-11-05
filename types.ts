@@ -36,6 +36,10 @@ export interface DetailedCharges {
     riskCharge: number;
     tollTax?: number;
     advancePaid?: number;
+    extraPoint?: number;
+    detention?: number;
+    gatePassNo?: string;
+    invoiceNote?: string;
     [key: string]: any;
 }
 
@@ -91,6 +95,8 @@ export interface LorryReceipt {
     user_id?: string;
     // Fix: Added missing property to satisfy TypeScript in service functions
     isInvoiceGenerated?: boolean;
+    freightBillNo?: string;
+    freightBillDate?: string | null;
 
     // Modern GST BiltyBook extended fields
     driverName?: string;
@@ -109,6 +115,25 @@ export interface LorryReceipt {
     distanceKm?: number;
     estimatedDuration?: string;
     distanceSource?: 'OSRM' | 'CorridorMatrix' | 'Haversine' | 'Manual';
+
+    // Invoice custom fields
+    gatePassNo?: string;
+    extraPoint?: number;
+    detention?: number;
+    invoiceNote?: string;
+}
+
+export interface InvoiceRowItem {
+    lrNo: string;
+    date: string;
+    truckNo: string;
+    fromPlace: string;
+    toPlace: string;
+    gatePassNo: string;
+    freight: number;
+    extraPoint: number;
+    detention: number;
+    total: number;
 }
 
 export interface CompanyDetails {

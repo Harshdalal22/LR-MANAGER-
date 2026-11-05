@@ -4,6 +4,8 @@ import { DownloadIcon, XIcon, SaveIcon } from './icons';
 import { toWords } from '../utils/numberToWords';
 import { getNextSequence } from '../utils/sequenceUtils';
 import { toast } from 'react-hot-toast';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface InvoiceModalProps {
     isOpen: boolean;
@@ -20,8 +22,6 @@ interface InvoiceModalProps {
     ) => Promise<void>;
 }
 
-declare const html2pdf: any;
-
 interface InvoiceContentProps {
     invoiceRows: InvoiceRowItem[];
     onRowChange: (lrNo: string, field: keyof InvoiceRowItem, value: any) => void;
@@ -34,6 +34,8 @@ interface InvoiceContentProps {
     showFromColumn: boolean;
     note: string;
     onNoteChange: (val: string) => void;
+    tableNote: string;
+    onTableNoteChange: (val: string) => void;
     isExporting: boolean;
 }
 
@@ -63,6 +65,8 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
     showFromColumn,
     note,
     onNoteChange,
+    tableNote,
+    onTableNoteChange,
     isExporting
 }, ref) => {
     // Calculations
@@ -281,6 +285,31 @@ const InvoiceContent = forwardRef<HTMLDivElement, InvoiceContentProps>(({
                         </tr>
                     ))}
 
+                    {/* Table NOTE Row — just above TOTAL, merged across From/To/Freight columns */}
+                    <tr className="border-t border-gray-500">
+                        <td colSpan={showFromColumn ? 7 : 6} className="border border-gray-600 p-0 text-left">
+                            <div className="flex items-center gap-1 px-1 py-0.5">
+                                <span className="font-bold text-[10px] text-gray-700 whitespace-nowrap">NOTE:</span>
+                                {isExporting ? (
+                                    <span className="text-[10px] text-gray-800 italic px-1">{tableNote || ''}</span>
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={tableNote}
+                                        onChange={(e) => onTableNoteChange(e.target.value)}
+                                        placeholder="Yahan table note likhein (e.g. inclusive of loading/unloading)..."
+                                        title="Table ke andar note likhein"
+                                        className="w-full text-[10px] text-gray-800 bg-yellow-50/60 hover:bg-yellow-50 focus:bg-white border-0 border-b border-dashed border-gray-300 focus:border-blue-500 outline-none py-0.5 px-0.5 font-sans"
+                                    />
+                                )}
+                            </div>
+                        </td>
+                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
+                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
+                        <td className="border border-gray-600 p-0.5 text-right text-[11px] font-bold"></td>
+                        <td className="border border-gray-600 p-0.5 text-right font-extrabold bg-amber-50/30"></td>
+                    </tr>
+
                     {/* Table TOTAL Row */}
                     <tr className="bg-[#fed7aa]/50 font-bold text-black border-t-2 border-gray-700">
                         <td colSpan={showFromColumn ? 7 : 6} className="border border-gray-600 p-1 text-center tracking-wider text-xs font-extrabold">
@@ -431,6 +460,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     // Note state
     const [note, setNote] = useState<string>('');
+    // Table-level note (above TOTAL row, in merged From/To/Freight cells)
+    const [tableNote, setTableNote] = useState<string>('');
 
     // State for individual LR rows
     const [invoiceRows, setInvoiceRows] = useState<InvoiceRowItem[]>([]);
@@ -448,6 +479,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         sGst: boolean, 
         sFrom: boolean, 
         currentNote: string, 
+        currentTableNote: string,
         rows: InvoiceRowItem[]
     ) => {
         if (!bNo) return;
@@ -459,6 +491,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 showGst: sGst,
                 showFromColumn: sFrom,
                 note: currentNote,
+                tableNote: currentTableNote,
                 rows: rows.reduce((acc, r) => {
                     acc[r.lrNo] = {
                         gatePassNo: r.gatePassNo,
@@ -574,6 +607,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         }
         setNote(resolvedNote);
 
+        // Resolve Table Note
+        setTableNote(savedCustom?.tableNote || '');
+
         // Resolve Date
         if (savedCustom?.billDate) {
             setBillDate(savedCustom.billDate);
@@ -645,73 +681,108 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         });
 
         setInvoiceRows(updated);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, updated);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, updated);
         triggerDebouncedAutoSave(updated, note, billNo, billDate);
     };
 
     const handleNoteChange = (newNote: string) => {
         setNote(newNote);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, newNote, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, newNote, tableNote, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, newNote, billNo, billDate);
+    };
+
+    const handleTableNoteChange = (newTableNote: string) => {
+        setTableNote(newTableNote);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, newTableNote, invoiceRows);
     };
 
     const handleBillNoChange = (newNo: string) => {
         setBillNo(newNo);
-        persistToLocalStorage(newNo, billDate, taxType, showGst, showFromColumn, note, invoiceRows);
+        persistToLocalStorage(newNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, note, newNo, billDate);
     };
 
     const handleBillDateChange = (newDate: string) => {
         setBillDate(newDate);
-        persistToLocalStorage(billNo, newDate, taxType, showGst, showFromColumn, note, invoiceRows);
+        persistToLocalStorage(billNo, newDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
         triggerDebouncedAutoSave(invoiceRows, note, billNo, newDate);
     };
 
     const handleTaxTypeChange = (newType: 'intra' | 'inter') => {
         setTaxType(newType);
-        persistToLocalStorage(billNo, billDate, newType, showGst, showFromColumn, note, invoiceRows);
+        persistToLocalStorage(billNo, billDate, newType, showGst, showFromColumn, note, tableNote, invoiceRows);
     };
 
     const handleGstToggle = () => {
         const next = !showGst;
         setShowGst(next);
-        persistToLocalStorage(billNo, billDate, taxType, next, showFromColumn, note, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, next, showFromColumn, note, tableNote, invoiceRows);
     };
 
     const handleFromColumnToggle = () => {
         const next = !showFromColumn;
         setShowFromColumn(next);
-        persistToLocalStorage(billNo, billDate, taxType, showGst, next, note, invoiceRows);
+        persistToLocalStorage(billNo, billDate, taxType, showGst, next, note, tableNote, invoiceRows);
     };
 
     const billedTo: Partial<PartyDetails> = lorryReceipts.length > 0 
         ? (lorryReceipts[0].billingTo?.name ? lorryReceipts[0].billingTo : lorryReceipts[0].consignor) 
         : { name: 'N/A', address: 'N/A', gst: 'N/A' };
 
-    const handleDownloadPDF = () => {
+    const handleDownloadPDF = async () => {
         setIsExporting(true);
-        setTimeout(() => {
-            const element = previewRef.current;
-            if (!element) {
-                setIsExporting(false);
-                return;
-            }
-            
-            const opt = {
-                margin:       4, 
-                filename:     `Invoice-${billNo}-${billedTo.name?.split(' ')[0] || 'Bill'}.pdf`,
-                image:        { type: 'jpeg', quality: 1.0 },
-                html2canvas:  { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-
-            const worker = html2pdf().from(element).set(opt).save();
-            if (worker && typeof worker.then === 'function') {
-                worker.then(() => setIsExporting(false)).catch(() => setIsExporting(false));
+        await new Promise(r => setTimeout(r, 250)); // let render update with isExporting=true
+        const element = previewRef.current;
+        if (!element) {
+            setIsExporting(false);
+            return;
+        }
+        try {
+            // Try html2pdf (CDN) first if available
+            if (typeof (window as any).html2pdf !== 'undefined') {
+                const opt = {
+                    margin: 4,
+                    filename: `Invoice-${billNo}-${billedTo.name?.split(' ')[0] || 'Bill'}.pdf`,
+                    image: { type: 'jpeg', quality: 1.0 },
+                    html2canvas: { scale: 2, useCORS: true, letterRendering: true, scrollX: 0, scrollY: 0 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                await (window as any).html2pdf().from(element).set(opt).save();
             } else {
-                setTimeout(() => setIsExporting(false), 1500);
+                // Fallback: bundled jsPDF + html2canvas (always available)
+                const canvas = await html2canvas(element, { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 });
+                const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+                const pageW = pdf.internal.pageSize.getWidth();
+                const pageH = pdf.internal.pageSize.getHeight();
+                const margin = 4;
+                const usableW = pageW - margin * 2;
+                const imgH = (canvas.height * usableW) / canvas.width;
+                let yPos = margin;
+                let remaining = imgH;
+                let srcY = 0;
+                while (remaining > 0) {
+                    const sliceH = Math.min(remaining, pageH - margin * 2);
+                    const sliceCanvas = document.createElement('canvas');
+                    sliceCanvas.width = canvas.width;
+                    sliceCanvas.height = Math.round((sliceH / usableW) * canvas.width);
+                    const ctx = sliceCanvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(canvas, 0, Math.round(srcY), canvas.width, sliceCanvas.height, 0, 0, canvas.width, sliceCanvas.height);
+                    }
+                    if (srcY > 0) { pdf.addPage(); yPos = margin; }
+                    pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 1.0), 'JPEG', margin, yPos, usableW, sliceH);
+                    srcY += sliceCanvas.height;
+                    remaining -= sliceH;
+                }
+                pdf.save(`Invoice-${billNo}-${billedTo.name?.split(' ')[0] || 'Bill'}.pdf`);
             }
-        }, 200);
+            toast.success('PDF downloaded!');
+        } catch (err) {
+            console.error('PDF generation error:', err);
+            toast.error('PDF download failed. Try again.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const handleSaveOnly = async () => {
@@ -719,7 +790,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         setIsSaving(true);
         try {
             const lrNos = invoiceRows.map(r => r.lrNo);
-            persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, invoiceRows);
+            persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
             await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
             setSaveStatus('saved');
             toast.success(`Invoice ${billNo} saved successfully!`);
@@ -735,7 +806,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             setIsSaving(true);
             try {
                 const lrNos = invoiceRows.map(r => r.lrNo);
-                persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, invoiceRows);
+                persistToLocalStorage(billNo, billDate, taxType, showGst, showFromColumn, note, tableNote, invoiceRows);
                 await onSaveInvoiceDetails(lrNos, billNo, billDate, invoiceRows, note);
                 setSaveStatus('saved');
                 toast.success('Invoice saved & downloading PDF!');
@@ -780,14 +851,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     </div>
 
                     {/* Quick Config Controls */}
-                    <div className="flex items-center gap-3 bg-white p-2 rounded-lg border shadow-sm flex-wrap text-xs">
+                    <div className="flex items-center gap-2 bg-white p-2 rounded-lg border shadow-sm flex-wrap text-xs">
                         <div>
                             <label className="block text-[11px] font-semibold text-gray-600">Invoice No.</label>
                             <input 
                                 type="text"
                                 value={billNo}
                                 onChange={(e) => handleBillNoChange(e.target.value)}
-                                className="p-1 border rounded text-xs w-36 font-mono font-bold"
+                                className="p-1 border rounded text-xs w-28 font-mono font-bold"
                             />
                         </div>
                         <div>
@@ -796,7 +867,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                 type="date"
                                 value={billDate}
                                 onChange={(e) => handleBillDateChange(e.target.value)}
-                                className="p-1 border rounded text-xs"
+                                className="p-1 border rounded text-xs w-32"
                             />
                         </div>
                         <div>
@@ -804,43 +875,43 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                             <select
                                 value={taxType}
                                 onChange={(e) => handleTaxTypeChange(e.target.value as 'intra' | 'inter')}
-                                className="p-1 border rounded text-xs"
+                                className="p-1 border rounded text-xs w-28"
                                 disabled={!showGst}
                             >
-                                <option value="intra">CGST &amp; SGST (18%)</option>
+                                <option value="intra">CGST &amp; SGST</option>
                                 <option value="inter">IGST (18%)</option>
                             </select>
                         </div>
 
                         {/* GST Toggle */}
-                        <div className="flex flex-col items-center border-l pl-3">
+                        <div className="flex flex-col items-center border-l pl-2">
                             <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">GST</label>
                             <button
                                 type="button"
                                 onClick={handleGstToggle}
-                                className={`relative inline-flex items-center w-10 h-5 rounded-full transition-colors duration-200 ${
+                                className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors duration-200 ${
                                     showGst ? 'bg-green-500' : 'bg-gray-300'
                                 }`}
                             >
-                                <span className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${
-                                    showGst ? 'translate-x-5' : 'translate-x-1'
+                                <span className={`inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform duration-200 ${
+                                    showGst ? 'translate-x-5' : 'translate-x-0.5'
                                 }`} />
                             </button>
                         </div>
 
-                        {/* From Column Toggle */}
-                        <div className="flex flex-col items-center border-l pl-3">
-                            <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">'From' Col</label>
+                        {/* From Column Toggle — compulsory visible */}
+                        <div className="flex flex-col items-center border-l pl-2">
+                            <label className="block text-[11px] font-bold text-blue-700 mb-0.5">'From' Col</label>
                             <button
                                 type="button"
                                 onClick={handleFromColumnToggle}
                                 title={showFromColumn ? "Hide 'From' Column" : "Show 'From' Column"}
-                                className={`relative inline-flex items-center w-10 h-5 rounded-full transition-colors duration-200 ${
+                                className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors duration-200 ${
                                     showFromColumn ? 'bg-blue-600' : 'bg-gray-300'
                                 }`}
                             >
-                                <span className={`inline-block w-4 h-4 bg-white rounded-full shadow transform transition-transform duration-200 ${
-                                    showFromColumn ? 'translate-x-5' : 'translate-x-1'
+                                <span className={`inline-block w-3.5 h-3.5 bg-white rounded-full shadow transform transition-transform duration-200 ${
+                                    showFromColumn ? 'translate-x-5' : 'translate-x-0.5'
                                 }`} />
                             </button>
                         </div>
@@ -856,17 +927,17 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                                 title="Save changes to database"
                             >
                                 <SaveIcon className="w-4 h-4 mr-1"/>
-                                {isSaving ? 'Saving...' : 'Save Changes'}
+                                {isSaving ? 'Saving...' : 'Save'}
                             </button>
                         )}
                         <button 
                             onClick={handleSaveAndDownload} 
                             disabled={isSaving || isExporting}
-                            className="flex items-center bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-xs font-semibold shadow-sm transition-colors"
+                            className="flex items-center bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700 text-xs font-semibold shadow-sm transition-colors disabled:bg-gray-400"
                             title="Save all changes and download PDF"
                         >
                             <DownloadIcon className="w-4 h-4 mr-1"/>
-                            {isExporting ? 'Generating PDF...' : 'Download PDF'}
+                            {isExporting ? 'Generating...' : 'Download PDF'}
                         </button>
                         <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-200">
                             <XIcon className="w-5 h-5"/>
@@ -897,6 +968,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         showFromColumn={showFromColumn}
                         note={note}
                         onNoteChange={handleNoteChange}
+                        tableNote={tableNote}
+                        onTableNoteChange={handleTableNoteChange}
                         isExporting={isExporting}
                     />
                 </div>

@@ -592,7 +592,17 @@ const LedgerTab = ({
         }
     };
 
-    // ── High Quality PDF Generator with ZERO Word Overlapping ──
+    // Date display helper (DD/MM/YYYY) matching Statement of Accounts format
+    const formatDisplayDate = (d?: string) => {
+        if (!d) return '';
+        const parts = d.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+            return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        }
+        return d;
+    };
+
+    // ── High Quality PDF Generator matching "Statement of Accounts" Exactly ──
     const generateLedgerDoc = async () => {
         if (!selectedParty) throw new Error('Please select a party first');
 
@@ -609,150 +619,204 @@ const LedgerTab = ({
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 14;
-        let curY = margin;
 
-        // 1. Company Header
+        // 1. Company Header (Top-Left)
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.setTextColor(15, 23, 42); // slate-900
-        doc.text((companyDetails.name || 'SSK CARGO SERVICES PVT LTD').toUpperCase(), margin, curY);
-        curY += 6;
+        doc.setFontSize(13);
+        doc.setTextColor(20, 20, 20);
+        doc.text((companyDetails.name || 'SSK INDIA LOGISTICS').toUpperCase(), margin, 18);
 
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105); // slate-600
-        if (companyDetails.address) {
-            const splitAddress = doc.splitTextToSize(companyDetails.address, pageWidth - (margin * 2));
-            doc.text(splitAddress, margin, curY);
-            curY += (splitAddress.length * 4);
-        }
-
-        const metaLine = [
-            companyDetails.gstn ? `GSTIN: ${companyDetails.gstn}` : '',
-            companyDetails.pan ? `PAN: ${companyDetails.pan}` : '',
-            (companyDetails.contact || []).length > 0 ? `Phone: ${companyDetails.contact.join(', ')}` : '',
-            companyDetails.email ? `Email: ${companyDetails.email}` : ''
-        ].filter(Boolean).join('  •  ');
-
-        if (metaLine) {
-            doc.text(metaLine, margin, curY);
-            curY += 4.5;
-        }
-
-        // Divider Line
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineWidth(0.4);
-        doc.line(margin, curY, pageWidth - margin, curY);
-        curY += 5;
-
-        // 2. Title & Party Details Box
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 138); // blue-900
-        doc.text('STATEMENT OF ACCOUNT / PARTY LEDGER', margin, curY);
-        curY += 5;
-
-        const partyAddr = partyDetails?.address || partyDetails?.city || '';
-        const partyGst = partyDetails?.gst || '';
-
-        // Two-Column Party Box
-        const cardY = curY;
-        const cardHeight = 22;
-        doc.setFillColor(248, 250, 252);
-        doc.setDrawColor(226, 232, 240);
-        doc.roundedRect(margin, cardY, pageWidth - (margin * 2), cardHeight, 1.5, 1.5, 'FD');
-
-        // Left side
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(15, 23, 42);
-        doc.text(`Party: ${selectedParty}`, margin + 4, cardY + 5.5);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(71, 85, 105);
-        if (partyAddr) {
-            doc.text(partyAddr, margin + 4, cardY + 10, { maxWidth: 95 });
-        }
-        if (partyGst) {
-            doc.text(`GSTIN: ${partyGst}`, margin + 4, cardY + 15);
-        }
-
-        // Right side
-        const rightX = pageWidth - margin - 4;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Period: ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}`, rightX, cardY + 5.5, { align: 'right' });
-        doc.text(`Generated On: ${today()}`, rightX, cardY + 10, { align: 'right' });
+        doc.setTextColor(70, 70, 70);
+        let compY = 22.5;
+        if (companyDetails.address) {
+            const splitAddress = doc.splitTextToSize(companyDetails.address, 75);
+            doc.text(splitAddress, margin, compY);
+            compY += (splitAddress.length * 3.8);
+        }
+        if (companyDetails.gstn) {
+            doc.text(`GSTIN ${companyDetails.gstn}`, margin, compY);
+            compY += 3.8;
+        }
+
+        // 2. Party Box "To" (Below Company Header on Left)
+        const toY = Math.max(compY + 3, 34);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(80, 80, 80);
+        doc.text('To', margin, toY);
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(closingBalance > 0 ? 220 : 22, closingBalance > 0 ? 38 : 101, closingBalance > 0 ? 38 : 52);
-        doc.text(`Closing Balance: Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR (To Pay)' : 'CR (Advance)'}`, rightX, cardY + 16.5, { align: 'right' });
+        doc.setFontSize(9.5);
+        doc.setTextColor(20, 20, 20);
+        const partySplit = doc.splitTextToSize(selectedParty, 75);
+        doc.text(partySplit, margin, toY + 4.5);
+        let partyNextY = toY + 4.5 + (partySplit.length * 4);
 
-        curY = cardY + cardHeight + 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(70, 70, 70);
+        if (partyDetails?.gst) {
+            doc.text(`GSTIN ${partyDetails.gst}`, margin, partyNextY);
+            partyNextY += 3.8;
+        }
+        if (partyDetails?.address) {
+            const addrSplit = doc.splitTextToSize(partyDetails.address, 75);
+            doc.text(addrSplit, margin, partyNextY);
+            partyNextY += (addrSplit.length * 3.5);
+        }
 
-        // 3. Table Rows with strict autoTable column bounds (No word overlaying!)
-        const tableData = balance.map(t => [
-            t.date,
-            t.voucherNo || '--',
-            t.particulars + (t.gstInfo ? `\n${t.gstInfo}` : ''),
-            t.type,
-            t.debit > 0 ? `Rs. ${t.debit.toLocaleString('en-IN')}` : '--',
-            t.credit > 0 ? `Rs. ${t.credit.toLocaleString('en-IN')}` : '--',
-            `Rs. ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}`
-        ]);
+        // 3. Statement of Accounts Title & Period (Top Center / Right)
+        const rightEdge = pageWidth - margin;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(15);
+        doc.setTextColor(20, 20, 20);
+        doc.text('Statement of Accounts', rightEdge, 22, { align: 'right' });
+
+        // Divider underline below title
+        doc.setDrawColor(40, 40, 40);
+        doc.setLineWidth(0.35);
+        doc.line(rightEdge - 72, 25, rightEdge, 25);
+
+        // Period Date Range
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.setTextColor(60, 60, 60);
+        const periodStr = `${formatDisplayDate(fromDate) || '01/04/2025'} To ${formatDisplayDate(toDate) || formatDisplayDate(today())}`;
+        doc.text(periodStr, rightEdge, 29.5, { align: 'right' });
+
+        // 4. Account Summary Box (Top Right, matching exact template)
+        const boxX = rightEdge - 72;
+        const boxY = 34;
+        const boxW = 72;
+        const boxH = 31;
+
+        // Box border & header background
+        doc.setFillColor(242, 242, 242);
+        doc.setDrawColor(220, 220, 220);
+        doc.setLineWidth(0.2);
+        doc.rect(boxX, boxY, boxW, boxH, 'D');
+        doc.rect(boxX, boxY, boxW, 6.5, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(30, 30, 30);
+        doc.text('Account Summary', boxX + 3, boxY + 4.5);
+
+        // Account Summary Rows
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(60, 60, 60);
+
+        // Row 1: Opening Balance
+        doc.text('Opening Balance', boxX + 3, boxY + 11.5);
+        doc.text(`Rs. 0.00`, rightEdge - 3, boxY + 11.5, { align: 'right' });
+
+        // Row 2: Invoiced Amount
+        doc.text('Invoiced Amount', boxX + 3, boxY + 16.5);
+        doc.text(`Rs. ${totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightEdge - 3, boxY + 16.5, { align: 'right' });
+
+        // Row 3: Amount Received
+        doc.text('Amount Received', boxX + 3, boxY + 21.5);
+        doc.text(`Rs. ${totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, rightEdge - 3, boxY + 21.5, { align: 'right' });
+
+        // Divider in summary
+        doc.setDrawColor(220, 220, 220);
+        doc.line(boxX, boxY + 23.5, rightEdge, boxY + 23.5);
+
+        // Row 4: Balance Due (Bold)
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(closingBalance > 0 ? 30 : 20, 30, 30);
+        doc.text('Balance Due', boxX + 3, boxY + 28);
+        const formattedBalDue = (closingBalance < 0 ? '-' : '') + Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        doc.text(`Rs. ${formattedBalDue}`, rightEdge - 3, boxY + 28, { align: 'right' });
+
+        // 5. Table Rows matching exact PDF structure: Date | Transactions | Details | Amount | Payments | Balance
+        const tableStartY = Math.max(partyNextY + 5, boxY + boxH + 6);
+
+        const tableData = balance.map(t => {
+            const isInv = t.source === 'Invoice';
+            const isPay = t.source === 'Payment';
+            const txType = isInv ? 'Invoice' : isPay ? 'Payment Received' : (t.type || 'Manual Entry');
+
+            let detailStr = t.particulars || '';
+            if (isInv && t.voucherNo) {
+                detailStr = `INV-${t.voucherNo.replace(/^INV-?/i, '')} - due on ${formatDisplayDate(t.date)}\n${t.particulars}`;
+            } else if (isPay && t.voucherNo && t.voucherNo !== '--') {
+                detailStr = `${t.voucherNo}\n${t.particulars}`;
+            }
+            if (t.gstInfo) {
+                detailStr += `\n${t.gstInfo}`;
+            }
+
+            const amtStr = t.debit > 0
+                ? t.debit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : '';
+            const payStr = t.credit > 0
+                ? t.credit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : '';
+            const balStr = (t.balance < 0 ? '-' : '') + Math.abs(t.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            return [
+                formatDisplayDate(t.date),
+                txType,
+                detailStr,
+                amtStr,
+                payStr,
+                balStr
+            ];
+        });
 
         autoTable(doc, {
-            startY: curY,
-            head: [['Date', 'Ref / Inv No', 'Particulars / Description', 'Type', 'Debit (Dr)', 'Credit (Cr)', 'Balance']],
+            startY: tableStartY,
+            head: [['Date', 'Transactions', 'Details', 'Amount', 'Payments', 'Balance']],
             body: tableData,
             theme: 'grid',
             styles: {
                 fontSize: 7.5,
-                cellPadding: 2,
-                textColor: [30, 41, 59],
-                lineColor: [226, 232, 240],
+                cellPadding: 2.5,
+                textColor: [30, 30, 30],
+                lineColor: [235, 235, 235],
                 lineWidth: 0.15,
                 overflow: 'linebreak'
             },
             headStyles: {
-                fillColor: [15, 23, 42],
+                fillColor: [45, 45, 45], // Dark charcoal header exactly as in sample
                 textColor: [255, 255, 255],
                 fontStyle: 'bold',
-                fontSize: 8
+                fontSize: 8,
+                cellPadding: 3
             },
             alternateRowStyles: {
-                fillColor: [248, 250, 252]
+                fillColor: [250, 250, 250]
             },
             columnStyles: {
-                0: { cellWidth: 20 },
-                1: { cellWidth: 22, fontStyle: 'bold' },
+                0: { cellWidth: 22 },
+                1: { cellWidth: 25 },
                 2: { cellWidth: 'auto', minCellWidth: 50 },
-                3: { cellWidth: 22 },
-                4: { cellWidth: 24, halign: 'right', textColor: [220, 38, 38] },
-                5: { cellWidth: 24, halign: 'right', textColor: [22, 101, 52] },
-                6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }
+                3: { cellWidth: 26, halign: 'right' }, // Amount (Invoice)
+                4: { cellWidth: 26, halign: 'right' }, // Payments
+                5: { cellWidth: 28, halign: 'right' }  // Balance
             },
             foot: [[
-                'TOTAL', '', 'Total Invoiced / Received', '',
-                `Rs. ${totalDebit.toLocaleString('en-IN')}`,
-                `Rs. ${totalCredit.toLocaleString('en-IN')}`,
-                `Rs. ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}`
+                '', '', '', '', 'Balance Due',
+                `Rs. ${(closingBalance < 0 ? '-' : '') + Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             ]],
             footStyles: {
-                fillColor: [241, 245, 249],
-                textColor: [15, 23, 42],
+                fillColor: [255, 255, 255],
+                textColor: [20, 20, 20],
                 fontStyle: 'bold',
-                fontSize: 8
+                fontSize: 8.5,
+                halign: 'right',
+                lineColor: [255, 255, 255]
             },
             didDrawPage: (data) => {
                 const pageNo = doc.internal.getNumberOfPages();
                 doc.setFontSize(7);
-                doc.setTextColor(148, 163, 184);
+                doc.setTextColor(140, 140, 140);
                 doc.text(
-                    `Page ${pageNo} • System Generated Statement • ${companyDetails.name || 'BiltyBook'}`,
+                    `Page ${pageNo} • Statement of Accounts • ${companyDetails.name || 'SSK INDIA LOGISTICS'}`,
                     pageWidth / 2,
                     pageHeight - 6,
                     { align: 'center' }
@@ -761,7 +825,7 @@ const LedgerTab = ({
         });
 
         const cleanParty = selectedParty.replace(/[^a-zA-Z0-9]/g, '_');
-        const filename = `Ledger_${cleanParty}_${today()}.pdf`;
+        const filename = `Statement_of_Accounts_${cleanParty}_${today()}.pdf`;
         return { doc, filename };
     };
 
@@ -859,79 +923,124 @@ const LedgerTab = ({
         }
     };
 
-    // ── Direct Browser Print ──
+    // ── Direct Browser Print (matching Statement of Accounts exactly) ──
     const handlePrint = () => {
         const win = window.open('', '_blank');
         if (!win) return;
+        const balDueFormatted = (closingBalance < 0 ? '-' : '') + Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         win.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>Ledger - ${selectedParty}</title>
+                <title>Statement of Accounts - ${selectedParty}</title>
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 11px; padding: 20px; color: #0f172a; margin: 0; }
-                    .header { border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
-                    .company-name { font-size: 18px; font-weight: 900; text-transform: uppercase; }
-                    .company-info { font-size: 9px; color: #475569; margin-top: 2px; }
-                    .statement-title { font-size: 14px; font-weight: 800; color: #1e3a8a; margin: 10px 0 6px 0; }
-                    .meta-box { border: 1px solid #cbd5e1; background: #f8fafc; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; display: flex; justify-content: space-between; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-                    th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
-                    th { background: #0f172a; color: #ffffff; font-size: 9px; text-transform: uppercase; font-weight: 800; }
-                    .dr { color: #dc2626; font-weight: 700; text-align: right; }
-                    .cr { color: #16a34a; font-weight: 700; text-align: right; }
-                    .bal { font-weight: 800; text-align: right; }
-                    .footer-row th { background: #f1f5f9; color: #0f172a; font-size: 10px; font-weight: 900; }
-                    .subtext { font-size: 8px; color: #64748b; margin-top: 2px; }
+                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 11px; padding: 24px; color: #1e293b; margin: 0; }
+                    .header-container { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+                    .left-col { flex: 1; max-width: 50%; }
+                    .company-name { font-size: 18px; font-weight: 900; text-transform: uppercase; color: #0f172a; margin-bottom: 4px; }
+                    .company-meta { font-size: 10px; color: #64748b; line-height: 1.4; margin-bottom: 12px; }
+                    .to-box { font-size: 11px; color: #334155; }
+                    .to-label { font-size: 10px; color: #64748b; }
+                    .party-title { font-size: 14px; font-weight: 800; color: #0f172a; margin: 2px 0; }
+                    .right-col { width: 280px; text-align: right; }
+                    .statement-title { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 4px; }
+                    .period-line { font-size: 11px; color: #475569; border-top: 1px solid #0f172a; padding-top: 4px; margin-bottom: 12px; }
+                    .summary-card { border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; text-align: left; background: #fff; }
+                    .summary-header { background: #f1f5f9; padding: 6px 10px; font-weight: 800; font-size: 11px; color: #0f172a; border-bottom: 1px solid #cbd5e1; }
+                    .summary-row { display: flex; justify-content: space-between; padding: 5px 10px; font-size: 10.5px; color: #334155; }
+                    .summary-row.total { border-top: 1px solid #cbd5e1; font-weight: 800; color: #0f172a; background: #fafafa; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+                    th, td { border: 1px solid #e2e8f0; padding: 8px 10px; text-align: left; }
+                    th { background: #2d2d2d; color: #ffffff; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+                    .num-col { text-align: right; font-family: monospace; font-size: 11px; font-weight: 600; }
+                    .footer-due { text-align: right; font-size: 12px; font-weight: 900; padding: 12px 10px; }
+                    @media print {
+                        body { padding: 0; }
+                        button { display: none; }
+                    }
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="company-name">${companyDetails.name || 'TRANSPORT COMPANY'}</div>
-                    <div class="company-info">${companyDetails.address || ''} • GSTIN: ${companyDetails.gstn || '--'} • Phone: ${(companyDetails.contact || []).join(', ')}</div>
-                </div>
-                <div class="statement-title">PARTY LEDGER STATEMENT</div>
-                <div class="meta-box">
-                    <div>
-                        <strong>Account of:</strong> ${selectedParty}<br/>
-                        ${partyDetails?.address ? `Address: ${partyDetails.address}<br/>` : ''}
-                        ${partyDetails?.gst ? `GSTIN: ${partyDetails.gst}` : ''}
+                <div class="header-container">
+                    <div class="left-col">
+                        <div class="company-name">${companyDetails.name || 'SSK INDIA LOGISTICS'}</div>
+                        <div class="company-meta">
+                            ${companyDetails.address || 'Delhi, India'}<br/>
+                            GSTIN ${companyDetails.gstn || '--'}
+                        </div>
+                        <div class="to-box">
+                            <div class="to-label">To</div>
+                            <div class="party-title">${selectedParty}</div>
+                            ${partyDetails?.gst ? `<div>GSTIN ${partyDetails.gst}</div>` : ''}
+                            ${partyDetails?.address ? `<div>${partyDetails.address}</div>` : ''}
+                        </div>
                     </div>
-                    <div style="text-align: right;">
-                        <strong>Period:</strong> ${fromDate || 'Beginning'} to ${toDate || 'Till Date'}<br/>
-                        <strong>Generated:</strong> ${today()}<br/>
-                        <strong style="color: ${closingBalance > 0 ? '#dc2626' : '#16a34a'};">Closing Balance: ₹ ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance > 0 ? 'DR' : 'CR'}</strong>
+                    <div class="right-col">
+                        <div class="statement-title">Statement of Accounts</div>
+                        <div class="period-line">${formatDisplayDate(fromDate) || '01/04/2025'} To ${formatDisplayDate(toDate) || formatDisplayDate(today())}</div>
+                        <div class="summary-card">
+                            <div class="summary-header">Account Summary</div>
+                            <div class="summary-row">
+                                <span>Opening Balance</span>
+                                <span>₹ 0.00</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Invoiced Amount</span>
+                                <span>₹ ${totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>Amount Received</span>
+                                <span>₹ ${totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span>Balance Due</span>
+                                <span>₹ ${balDueFormatted}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 12%;">Date</th>
-                            <th style="width: 14%;">Ref / Inv No</th>
-                            <th style="width: 40%;">Particulars</th>
-                            <th style="width: 12%; text-align: right;">Debit (₹)</th>
-                            <th style="width: 12%; text-align: right;">Credit (₹)</th>
-                            <th style="width: 14%; text-align: right;">Balance (₹)</th>
+                            <th style="width: 14%;">Date</th>
+                            <th style="width: 18%;">Transactions</th>
+                            <th style="width: 32%;">Details</th>
+                            <th style="width: 12%; text-align: right;">Amount</th>
+                            <th style="width: 12%; text-align: right;">Payments</th>
+                            <th style="width: 12%; text-align: right;">Balance</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${balance.map(t => `
-                            <tr>
-                                <td>${t.date}</td>
-                                <td><strong>${t.voucherNo || '--'}</strong></td>
-                                <td>${t.particulars}${t.gstInfo ? `<div class="subtext">${t.gstInfo}</div>` : ''}</td>
-                                <td class="dr">${t.debit > 0 ? t.debit.toLocaleString('en-IN') : '--'}</td>
-                                <td class="cr">${t.credit > 0 ? t.credit.toLocaleString('en-IN') : '--'}</td>
-                                <td class="bal">₹ ${Math.abs(t.balance).toLocaleString('en-IN')} ${t.balance >= 0 ? 'DR' : 'CR'}</td>
-                            </tr>
-                        `).join('')}
+                        ${balance.map(t => {
+                            const isInv = t.source === 'Invoice';
+                            const isPay = t.source === 'Payment';
+                            const txType = isInv ? 'Invoice' : isPay ? 'Payment Received' : (t.type || 'Manual Entry');
+                            let detailStr = t.particulars || '';
+                            if (isInv && t.voucherNo) {
+                                detailStr = `<strong>INV-${t.voucherNo.replace(/^INV-?/i, '')}</strong> - due on ${formatDisplayDate(t.date)}${t.particulars ? `<div style="font-size: 9.5px; color: #64748b;">${t.particulars}</div>` : ''}`;
+                            } else if (isPay && t.voucherNo && t.voucherNo !== '--') {
+                                detailStr = `<strong>${t.voucherNo}</strong>${t.particulars ? `<div style="font-size: 9.5px; color: #64748b;">${t.particulars}</div>` : ''}`;
+                            }
+                            const amtStr = t.debit > 0 ? t.debit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                            const payStr = t.credit > 0 ? t.credit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+                            const balStr = (t.balance < 0 ? '-' : '') + Math.abs(t.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            return `
+                                <tr>
+                                    <td>${formatDisplayDate(t.date)}</td>
+                                    <td><strong>${txType}</strong></td>
+                                    <td>${detailStr}</td>
+                                    <td class="num-col">${amtStr}</td>
+                                    <td class="num-col">${payStr}</td>
+                                    <td class="num-col">${balStr}</td>
+                                </tr>
+                            `;
+                        }).join('')}
                     </tbody>
                     <tfoot>
-                        <tr class="footer-row">
-                            <th colspan="3">Total</th>
-                            <th class="dr">₹ ${totalDebit.toLocaleString('en-IN')}</th>
-                            <th class="cr">₹ ${totalCredit.toLocaleString('en-IN')}</th>
-                            <th class="bal">₹ ${Math.abs(closingBalance).toLocaleString('en-IN')} ${closingBalance >= 0 ? 'DR' : 'CR'}</th>
+                        <tr>
+                            <td colspan="5" class="footer-due">Balance Due</td>
+                            <td class="num-col" style="font-size: 12px; font-weight: 900;">₹ ${balDueFormatted}</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -1268,234 +1377,214 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         </div>
                     </div>
 
-                    {/* Main Ledger Display */}
+                    {/* Main Ledger Display (Matching Statement of Accounts Layout) */}
                     {selectedParty ? (
                         <div className="space-y-4">
-                            {/* KPI Cards: Total Invoiced (Debit) • Total Received (Credit) • Closing Balance */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                TOTAL BILLED / DEBITS (INCL. GST)
-                                            </div>
-                                            <div className="text-2xl font-black text-blue-900 mt-1">
-                                                ₹ {totalDebit.toLocaleString('en-IN')}
-                                            </div>
-                                        </div>
-                                        <div className="p-2.5 bg-blue-50 text-blue-700 rounded-xl text-xl">
-                                            📑
-                                        </div>
+                            {/* Top Statement Header & Account Summary Card */}
+                            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-wrap justify-between items-start gap-5">
+                                {/* Left: Party Details */}
+                                <div className="space-y-1">
+                                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        TO (CLIENT / PARTY)
                                     </div>
-                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                        Complete Invoices generated for company
-                                    </div>
+                                    <h3 className="text-xl font-black text-slate-900 tracking-tight">
+                                        {selectedParty}
+                                    </h3>
+                                    {partyDetails?.gst && (
+                                        <div className="text-xs font-mono font-bold text-slate-700">
+                                            GSTIN: <span className="text-blue-700">{partyDetails.gst}</span>
+                                        </div>
+                                    )}
+                                    {partyDetails?.address && (
+                                        <div className="text-xs text-slate-500 max-w-md">
+                                            {partyDetails.address}
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                TOTAL PAYMENTS RECEIVED (CREDITS)
-                                            </div>
-                                            <div className="text-2xl font-black text-emerald-700 mt-1">
-                                                ₹ {totalCredit.toLocaleString('en-IN')}
-                                            </div>
-                                        </div>
-                                        <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl text-xl">
-                                            💵
+                                {/* Center / Right: Statement of Accounts Title + Account Summary */}
+                                <div className="flex flex-col items-end gap-2.5 w-full sm:w-auto">
+                                    <div className="text-right">
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                            Statement of Accounts
+                                        </h2>
+                                        <div className="text-xs text-slate-500 font-medium border-t border-slate-300 pt-1 mt-0.5">
+                                            {formatDisplayDate(fromDate) || '01/04/2025'} To {formatDisplayDate(toDate) || formatDisplayDate(today())}
                                         </div>
                                     </div>
-                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                        Cash, Bank Transfers & Manual Receipts
-                                    </div>
-                                </div>
 
-                                <div className={`bg-white rounded-2xl border p-4 shadow-xs ${closingBalance > 0 ? 'border-red-200 bg-red-50/20' : 'border-emerald-200 bg-emerald-50/20'}`}>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                                                OUTSTANDING NET BALANCE
+                                    {/* Account Summary Box */}
+                                    <div className="w-full sm:w-72 bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-xs text-xs">
+                                        <div className="bg-slate-200/80 px-3 py-1.5 font-bold text-slate-800 text-[11px]">
+                                            Account Summary
+                                        </div>
+                                        <div className="p-3 space-y-1.5">
+                                            <div className="flex justify-between text-slate-600">
+                                                <span>Opening Balance</span>
+                                                <span className="font-mono font-bold">₹ 0.00</span>
                                             </div>
-                                            <div className={`text-2xl font-black mt-1 ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
-                                                ₹ {Math.abs(closingBalance).toLocaleString('en-IN')}
-                                                <span className="text-xs font-bold ml-1.5 px-2 py-0.5 rounded-full bg-white border border-slate-300">
-                                                    {closingBalance > 0 ? 'DR (To Pay)' : closingBalance < 0 ? 'CR (Advance)' : 'CLEARED'}
+                                            <div className="flex justify-between text-slate-600">
+                                                <span>Invoiced Amount</span>
+                                                <span className="font-mono font-bold text-slate-900">
+                                                    ₹ {totalDebit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-slate-600">
+                                                <span>Amount Received</span>
+                                                <span className="font-mono font-bold text-emerald-700">
+                                                    ₹ {totalCredit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between border-t border-slate-200 pt-1.5 font-black text-slate-900">
+                                                <span>Balance Due</span>
+                                                <span className={`font-mono text-sm ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                                    ₹ {(closingBalance < 0 ? '-' : '') + Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
                                         </div>
-                                        <div className={`p-2.5 rounded-xl text-xl ${closingBalance > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                            ⚖️
-                                        </div>
-                                    </div>
-                                    <div className="text-[10px] text-slate-400 font-medium mt-1">
-                                        {closingBalance > 0 ? 'Receivable from client' : 'Advance balance from client'}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Elegant On-Screen Ledger Sheet */}
+                            {/* Search Filter Bar */}
+                            <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-xs">
+                                <span className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                                    <span>🔍</span> Search Statement:
+                                </span>
+                                <input
+                                    type="text"
+                                    placeholder="Search by Invoice No, Ref, description..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full sm:w-80 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 shadow-inner"
+                                />
+                            </div>
+
+                            {/* Statement Table matching exact PDF format */}
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-md overflow-hidden">
-                                {/* Statement Header Card */}
-                                <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap justify-between items-center gap-4">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">
-                                                {selectedParty}
-                                            </h3>
-                                            <span className="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">
-                                                Party Ledger
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-slate-500 font-medium mt-0.5">
-                                            {partyDetails?.address || 'No registered address'} {partyDetails?.city ? `• ${partyDetails.city}` : ''}
-                                            {partyDetails?.gst ? ` • GSTIN: ${partyDetails.gst}` : ''}
-                                        </p>
-                                    </div>
-
-                                    {/* Search Filter input */}
-                                    <div className="w-full sm:w-64">
-                                        <input
-                                            type="text"
-                                            placeholder="Search by Inv No, LR, desc..."
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-blue-500 shadow-inner"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Statement Table */}
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-xs text-left border-collapse">
                                         <thead>
-                                            <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
-                                                <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
-                                                <th className="px-3.5 py-3 border-r border-slate-700 w-28">Ref / Inv No</th>
-                                                <th className="px-4 py-3 border-r border-slate-700">Particulars / Description</th>
-                                                <th className="px-3 py-3 border-r border-slate-700 w-28">Type</th>
-                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Debit (₹)</th>
-                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-28">Credit (₹)</th>
-                                                <th className="px-3.5 py-3 border-r border-slate-700 text-right w-32">Balance (₹)</th>
+                                            <tr className="bg-[#2d2d2d] text-white text-[11px] font-bold tracking-wide">
+                                                <th className="px-4 py-3 border-r border-neutral-700 w-28">Date</th>
+                                                <th className="px-4 py-3 border-r border-neutral-700 w-36">Transactions</th>
+                                                <th className="px-4 py-3 border-r border-neutral-700">Details</th>
+                                                <th className="px-4 py-3 border-r border-neutral-700 text-right w-32">Amount (₹)</th>
+                                                <th className="px-4 py-3 border-r border-neutral-700 text-right w-32">Payments (₹)</th>
+                                                <th className="px-4 py-3 border-r border-neutral-700 text-right w-32">Balance (₹)</th>
                                                 <th className="px-3 py-3 text-center w-20">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-200">
                                             {balance.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={8} className="text-center py-12 text-slate-400">
+                                                    <td colSpan={7} className="text-center py-12 text-slate-400">
                                                         <div className="text-3xl mb-2">📭</div>
                                                         <div className="font-bold text-sm">No transactions found for this party.</div>
-                                                        <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter an opening balance or payment.</div>
+                                                        <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter transactions.</div>
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                balance.map((tx, idx) => (
-                                                    <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
-                                                        {/* Date */}
-                                                        <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap align-top border-r border-slate-200">
-                                                            {tx.date}
-                                                        </td>
+                                                balance.map((tx, idx) => {
+                                                    const isInv = tx.source === 'Invoice';
+                                                    const isPay = tx.source === 'Payment';
+                                                    const txType = isInv ? 'Invoice' : isPay ? 'Payment Received' : (tx.type || 'Manual Entry');
 
-                                                        {/* Ref / Inv No */}
-                                                        <td className="px-3.5 py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap align-top border-r border-slate-200">
-                                                            {tx.voucherNo || '--'}
-                                                        </td>
+                                                    return (
+                                                        <tr key={tx.id || idx} className="hover:bg-slate-50 transition-colors">
+                                                            {/* Date */}
+                                                            <td className="px-4 py-3 text-slate-700 whitespace-nowrap align-top border-r border-slate-200 font-medium">
+                                                                {formatDisplayDate(tx.date)}
+                                                            </td>
 
-                                                        {/* Particulars */}
-                                                        <td className="px-4 py-2.5 text-slate-800 align-top border-r border-slate-200">
-                                                            <div className="font-bold leading-snug">
-                                                                {tx.particulars}
-                                                            </div>
-                                                            {tx.gstInfo && (
-                                                                <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
-                                                                    {tx.gstInfo}
+                                                            {/* Transactions */}
+                                                            <td className="px-4 py-3 text-slate-900 whitespace-nowrap align-top border-r border-slate-200 font-bold">
+                                                                {txType}
+                                                            </td>
+
+                                                            {/* Details */}
+                                                            <td className="px-4 py-3 text-slate-800 align-top border-r border-slate-200">
+                                                                {isInv && tx.voucherNo && (
+                                                                    <div className="font-bold text-slate-900">
+                                                                        INV-{tx.voucherNo.replace(/^INV-?/i, '')} - due on {formatDisplayDate(tx.date)}
+                                                                    </div>
+                                                                )}
+                                                                {isPay && tx.voucherNo && tx.voucherNo !== '--' && (
+                                                                    <div className="font-mono font-bold text-slate-800">
+                                                                        {tx.voucherNo}
+                                                                    </div>
+                                                                )}
+                                                                <div className="text-[11px] text-slate-600 mt-0.5">
+                                                                    {tx.particulars}
                                                                 </div>
-                                                            )}
-                                                        </td>
+                                                                {tx.gstInfo && (
+                                                                    <div className="text-[10px] text-emerald-700 font-medium mt-0.5">
+                                                                        {tx.gstInfo}
+                                                                    </div>
+                                                                )}
+                                                            </td>
 
-                                                        {/* Type */}
-                                                        <td className="px-3 py-2.5 align-top border-r border-slate-200 whitespace-nowrap">
-                                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                                                                tx.source === 'Invoice'
-                                                                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                                                    : tx.source === 'Payment'
-                                                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                                                    : 'bg-purple-100 text-purple-800 border border-purple-200'
-                                                            }`}>
-                                                                {tx.type}
-                                                            </span>
-                                                        </td>
+                                                            {/* Amount (Invoice / Debit) */}
+                                                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
+                                                                {tx.debit > 0 ? tx.debit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
+                                                            </td>
 
-                                                        {/* Debit (Dr) */}
-                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-red-600 align-top border-r border-slate-200">
-                                                            {tx.debit > 0 ? `₹ ${tx.debit.toLocaleString('en-IN')}` : '--'}
-                                                        </td>
+                                                            {/* Payments (Payment Received / Credit) */}
+                                                            <td className="px-4 py-3 text-right font-mono font-bold text-emerald-700 align-top border-r border-slate-200 whitespace-nowrap">
+                                                                {tx.credit > 0 ? tx.credit.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : ''}
+                                                            </td>
 
-                                                        {/* Credit (Cr) */}
-                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-emerald-700 align-top border-r border-slate-200">
-                                                            {tx.credit > 0 ? `₹ ${tx.credit.toLocaleString('en-IN')}` : '--'}
-                                                        </td>
+                                                            {/* Balance */}
+                                                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
+                                                                {(tx.balance < 0 ? '-' : '') + Math.abs(tx.balance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </td>
 
-                                                        {/* Running Balance */}
-                                                        <td className="px-3.5 py-2.5 text-right font-mono font-black text-slate-900 align-top border-r border-slate-200 whitespace-nowrap">
-                                                            ₹ {Math.abs(tx.balance).toLocaleString('en-IN')}
-                                                            <span className={`text-[9.5px] font-bold ml-1 ${tx.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>
-                                                                {tx.balance >= 0 ? 'DR' : 'CR'}
-                                                            </span>
-                                                        </td>
-
-                                                        {/* Actions */}
-                                                        <td className="px-3 py-2.5 text-center align-top whitespace-nowrap">
-                                                            <div className="flex items-center justify-center gap-1.5">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setEditingRow({
-                                                                        dbId: tx.dbId,
-                                                                        isInvoice: tx.isInvoice,
-                                                                        voucherNo: tx.voucherNo,
-                                                                        date: tx.date,
-                                                                        particulars: tx.particulars,
-                                                                        debit: tx.debit,
-                                                                        credit: tx.credit,
-                                                                        payment_mode: tx.payment_mode
-                                                                    })}
-                                                                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
-                                                                    title="Edit this line"
-                                                                >
-                                                                    ✏️
-                                                                </button>
-                                                                {tx.isManual && tx.dbId && (
+                                                            {/* Actions */}
+                                                            <td className="px-3 py-3 text-center align-top whitespace-nowrap">
+                                                                <div className="flex items-center justify-center gap-1.5">
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => handleDeleteRow(tx)}
-                                                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors cursor-pointer"
-                                                                        title="Delete this manual line"
+                                                                        onClick={() => setEditingRow({
+                                                                            dbId: tx.dbId,
+                                                                            isInvoice: tx.isInvoice,
+                                                                            voucherNo: tx.voucherNo,
+                                                                            date: tx.date,
+                                                                            particulars: tx.particulars,
+                                                                            debit: tx.debit,
+                                                                            credit: tx.credit,
+                                                                            payment_mode: tx.payment_mode
+                                                                        })}
+                                                                        className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
+                                                                        title="Edit this line"
                                                                     >
-                                                                        🗑️
+                                                                        ✏️
                                                                     </button>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                                    {tx.isManual && tx.dbId && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleDeleteRow(tx)}
+                                                                            className="p-1 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-md transition-colors cursor-pointer"
+                                                                            title="Delete this manual line"
+                                                                        >
+                                                                            🗑️
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             )}
                                         </tbody>
 
                                         {/* Footer Total Bar */}
                                         <tfoot>
-                                            <tr className="bg-slate-100 border-t-2 border-slate-800 font-black text-slate-900 text-xs">
-                                                <td colSpan={4} className="px-4 py-3 text-right uppercase tracking-wider">
-                                                    TOTAL STATEMENTS SUMMARY:
+                                            <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
+                                                <td colSpan={5} className="px-4 py-3 text-right font-black uppercase tracking-wider">
+                                                    Balance Due:
                                                 </td>
-                                                <td className="px-3.5 py-3 text-right font-mono text-red-600 font-black">
-                                                    ₹ {totalDebit.toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="px-3.5 py-3 text-right font-mono text-emerald-700 font-black">
-                                                    ₹ {totalCredit.toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="px-3.5 py-3 text-right font-mono font-black text-slate-900">
-                                                    ₹ {Math.abs(closingBalance).toLocaleString('en-IN')} {closingBalance >= 0 ? 'DR' : 'CR'}
+                                                <td className={`px-4 py-3 text-right font-mono font-black text-sm whitespace-nowrap ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                                    ₹ {(closingBalance < 0 ? '-' : '') + Math.abs(closingBalance).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </td>
                                                 <td></td>
                                             </tr>

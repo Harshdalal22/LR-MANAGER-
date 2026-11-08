@@ -540,7 +540,7 @@ export const getRecentLorryReceiptsForAI = async (limit: number): Promise<LorryR
 export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> => {
     const effectiveUserId = await getEffectiveUserId();
 
-    // Destructure to separate frontend-only fields
+    // Destructure to separate frontend-only & extended fields
     const {
         isInvoiceGenerated,
         createdBy,
@@ -560,6 +560,12 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         distanceKm,
         estimatedDuration,
         distanceSource,
+        gatePassNo,
+        extraPoint,
+        detention,
+        invoiceNote,
+        freightBillNo,
+        freightBillDate,
         ...rest
     } = lr;
 
@@ -596,13 +602,63 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         distanceKm: Number(distanceKm) || 0,
         estimatedDuration: estimatedDuration || '',
         distanceSource: distanceSource || 'OSRM',
+        gatePassNo: gatePassNo ?? sanitizedRest.charges?.gatePassNo ?? '',
+        extraPoint: Number(extraPoint ?? sanitizedRest.charges?.extraPoint ?? 0),
+        detention: Number(detention ?? sanitizedRest.charges?.detention ?? 0),
+        invoiceNote: invoiceNote ?? sanitizedRest.charges?.invoiceNote ?? '',
+        freightBillNo: freightBillNo || sanitizedRest.charges?.freightBillNo || '',
+        freightBillDate: freightBillDate || sanitizedRest.charges?.freightBillDate || null,
     };
 
-    const payload = {
-        ...sanitizedRest,
+    // Whitelist only valid DB table columns to prevent PGRST204 (Column not found) errors
+    const VALID_DB_COLUMNS = new Set([
+        'id',
+        'lrType',
+        'truckNo',
+        'lrNo',
+        'date',
+        'fromPlace',
+        'toPlace',
+        'invoiceNo',
+        'invoiceAmount',
+        'invoiceDate',
+        'poNo',
+        'poDate',
+        'ewayBillNo',
+        'ewayBillDate',
+        'ewayExDate',
+        'addressOfDelivery',
+        'chargedWeight',
+        'billingTo',
+        'gstPaidBy',
+        'consignor',
+        'consignee',
+        'items',
+        'weight',
+        'actualWeightMT',
+        'freight',
+        'charges',
+        'rate',
+        'rateOn',
+        'remark',
+        'status',
+        'status_updated_at',
+        'pod_path',
+        'user_id',
+        'is_invoice_generated'
+    ]);
+
+    const payload: Record<string, any> = {
         user_id: effectiveUserId,
         is_invoice_generated: !!isInvoiceGenerated
     };
+
+    // Filter payload strictly to valid DB columns
+    Object.keys(sanitizedRest).forEach(key => {
+        if (VALID_DB_COLUMNS.has(key)) {
+            payload[key] = sanitizedRest[key];
+        }
+    });
 
     // Retry up to 2 times with exponential backoff — handles cold-start & transient errors
     // Reduced from 3 attempts x 15s to 2 attempts x 8s to prevent 45s spinner hang
@@ -646,6 +702,12 @@ export const saveLorryReceipt = async (lr: LorryReceipt): Promise<LorryReceipt> 
         distanceKm: Number(data.distanceKm ?? charges.distanceKm ?? distanceKm ?? 0),
         estimatedDuration: data.estimatedDuration ?? charges.estimatedDuration ?? estimatedDuration ?? '',
         distanceSource: data.distanceSource ?? charges.distanceSource ?? distanceSource ?? '',
+        gatePassNo: data.gatePassNo ?? charges.gatePassNo ?? gatePassNo ?? '',
+        extraPoint: Number(data.extraPoint ?? charges.extraPoint ?? extraPoint ?? 0),
+        detention: Number(data.detention ?? charges.detention ?? detention ?? 0),
+        invoiceNote: data.invoiceNote ?? charges.invoiceNote ?? invoiceNote ?? '',
+        freightBillNo: charges.freightBillNo || (data.is_invoice_generated ? data.invoiceNo : '') || freightBillNo || '',
+        freightBillDate: charges.freightBillDate || (data.is_invoice_generated ? data.invoiceDate : null) || freightBillDate || null,
     };
 };
 

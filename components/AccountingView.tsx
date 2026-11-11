@@ -14,6 +14,7 @@ import {
     FuelPriceResponse, FuelType
 } from '../services/fuelPriceService';
 import { toast } from 'react-hot-toast';
+import { openWhatsAppDirect } from '../utils/whatsapp';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface AccountingViewProps {
@@ -1056,8 +1057,6 @@ const LedgerTab = ({
     const handleShareWhatsApp = () => {
         if (!selectedParty) return;
         const partyPhone = (partyDetails as any)?.contact || (partyDetails as any)?.phone || '';
-        const cleanPhone = partyPhone.replace(/[^0-9]/g, '');
-        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
 
         const summaryText = `📊 *ACCOUNT STATEMENT / LEDGER*
 🏢 Client: *${selectedParty}*
@@ -1070,11 +1069,7 @@ const LedgerTab = ({
 ━━━━━━━━━━━━━━━━━━━━
 ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
-        const url = phoneWithCountry
-            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodeURIComponent(summaryText)}`
-            : `https://api.whatsapp.com/send?text=${encodeURIComponent(summaryText)}`;
-
-        window.open(url, '_blank');
+        openWhatsAppDirect(summaryText, partyPhone);
         toast.success('Opening WhatsApp Share...');
     };
 

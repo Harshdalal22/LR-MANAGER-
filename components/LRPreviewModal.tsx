@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { LorryReceipt, CompanyDetails } from '../types';
 import { DownloadIcon, WhatsAppIcon, EmailIcon, XIcon, SaveIcon, PrintIcon } from './icons';
+import { openWhatsAppDirect } from '../utils/whatsapp';
 
 interface LRPreviewModalProps {
     isOpen: boolean;
@@ -957,40 +958,11 @@ Carrier: *${companyDetails.name || 'Speedway Logistics'}*
 ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
     };
 
-    // 1-Click Direct WhatsApp Share (tries to attach PDF via Web Share API)
-    const handleDirectWhatsApp = async (targetPhone?: string) => {
+    // 1-Click Direct WhatsApp Share - immediately opens WhatsApp with full Bilty text
+    const handleDirectWhatsApp = (targetPhone?: string) => {
         const summary = generateBiltyText();
-        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
-
-        // Try Web Share API with PDF first (works on mobile / some desktops)
-        if (element && navigator.share && navigator.canShare) {
-            try {
-                const { pdf, filename } = await generateBiltyPdfDoc(element);
-                const pdfBlob = pdf.output('blob');
-                const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
-                if (navigator.canShare({ files: [pdfFile] })) {
-                    await navigator.share({
-                        files: [pdfFile],
-                        title: `LR ${lr.lrNo}`,
-                        text: summary
-                    });
-                    toast.success('PDF shared via system share sheet!');
-                    return;
-                }
-            } catch (e: any) {
-                if (e.name === 'AbortError') return; // user cancelled
-            }
-        }
-
-        // Fallback: open WhatsApp with text message
-        const cleanPhone = (targetPhone || '').replace(/[^0-9]/g, '');
-        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-        const encodedText = encodeURIComponent(summary);
-        const url = phoneWithCountry
-            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedText}`
-            : `https://api.whatsapp.com/send?text=${encodedText}`;
-        window.open(url, '_blank');
-        toast.success('Opening WhatsApp Direct Share...');
+        openWhatsAppDirect(summary, targetPhone);
+        toast.success('Opening WhatsApp...');
     };
 
     // Helper to generate a configured jsPDF instance with the bilty captured on a single page
@@ -1176,35 +1148,9 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
     };
 
     // WhatsApp Direct Send
-    const handleShareWhatsAppTo = async (targetPhone: string, targetName: string) => {
-        const cleanPhone = targetPhone.replace(/[^0-9]/g, '');
-        const phoneWithCountry = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    const handleShareWhatsAppTo = (targetPhone: string, targetName: string) => {
         const summary = generateBiltyText();
-        const encodedText = encodeURIComponent(summary);
-
-        const element = previewRef.current || document.querySelector('.printable-area') as HTMLElement;
-        if (navigator.share && navigator.canShare && element) {
-            try {
-                const { pdf, filename } = await generateBiltyPdfDoc(element);
-                const pdfBlob = pdf.output('blob');
-                const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
-                if (navigator.canShare({ files: [pdfFile] })) {
-                    await navigator.share({
-                        files: [pdfFile],
-                        title: `LR ${lr.lrNo}`,
-                        text: `Lorry Receipt ${lr.lrNo} - ${companyDetails.name}\n${summary}`
-                    });
-                    return;
-                }
-            } catch (e: any) {
-                if (e.name === 'AbortError') return;
-            }
-        }
-
-        const url = phoneWithCountry
-            ? `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedText}`
-            : `https://api.whatsapp.com/send?text=${encodedText}`;
-        window.open(url, '_blank');
+        openWhatsAppDirect(summary, targetPhone);
         toast.success(`Opening WhatsApp for ${targetName}...`);
     };
 
@@ -1368,11 +1314,11 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         {/* Direct 1-Click WhatsApp Button */}
                         <button
                             type="button"
-                            onClick={async () => {
+                            onClick={() => {
                                 const targetPhone = consigneeContact || consignorContact || driverContact || '';
-                                await handleDirectWhatsApp(targetPhone);
+                                handleDirectWhatsApp(targetPhone);
                             }}
-                            className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5"
+                            className="flex items-center bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl font-bold text-xs shadow-md transition-all active:scale-95 gap-1.5 cursor-pointer"
                             title="Share via WhatsApp"
                         >
                             <WhatsAppIcon className="w-4 h-4" />

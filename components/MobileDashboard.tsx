@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LorryReceipt, View } from '../types';
+import { formatLRWhatsAppText, openWhatsAppDirect } from '../utils/whatsapp';
 
 interface MobileDashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -776,8 +777,13 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                                                 </button>
                                                 <button 
                                                     type="button"
-                                                    onClick={() => showToast(`Sharing LR #${lr.lrNo} on WhatsApp...`)} 
-                                                    className="p-1.5 text-emerald-600 font-bold text-xs"
+                                                    onClick={() => {
+                                                        const targetPhone = lr.consignee?.contact || lr.consignor?.contact || lr.driverContact || (lr.charges as any)?.driverContact || '';
+                                                        const text = formatLRWhatsAppText(lr, companyDetails);
+                                                        openWhatsAppDirect(text, targetPhone);
+                                                        showToast(`Opening WhatsApp for LR #${lr.lrNo}...`);
+                                                    }} 
+                                                    className="p-1.5 text-emerald-600 font-bold text-xs hover:text-emerald-700 active:scale-95 transition-transform"
                                                 >
                                                     WhatsApp
                                                 </button>

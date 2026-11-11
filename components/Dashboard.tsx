@@ -3,6 +3,7 @@ import { LorryReceipt, LRStatus, View } from '../types';
 import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIcon, CheckCircleIcon, ClockIcon, XIcon, UploadIcon, DashboardIcon, InvoiceIcon, DocumentTextIcon, ArrowLeftIcon, CogIcon, ExclamationTriangleIcon, PhoneIcon } from './icons';
 import { Language, t } from '../utils/translations';
 import { BiltyBook3D, LogisticsTruck3D, RunningTruckLoader } from './BookTruckAnimation';
+import { MobileDashboard } from './MobileDashboard';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -943,7 +944,28 @@ const Dashboard: React.FC<DashboardProps> = ({
         });
 
         return (
-            <div className="min-h-screen bg-[#080d1a] text-slate-100 flex flex-col lg:flex-row antialiased font-sans select-none">
+            <>
+                {/* Mobile View (< lg) */}
+                <div className="block lg:hidden min-h-screen bg-slate-900">
+                    <MobileDashboard
+                        lorryReceipts={lorryReceipts}
+                        savedParties={savedParties}
+                        savedTrucks={savedTrucks}
+                        companyDetails={companyDetails}
+                        currentRole={currentRole}
+                        onAddNew={onAddNew}
+                        onViewList={onViewList}
+                        onEditLR={onEditLR}
+                        setCurrentView={setCurrentView}
+                        onOpenSettings={onOpenSettings}
+                        onOpenAdminPanel={onOpenAdminPanel}
+                        onSignOut={onSignOut}
+                        isHi={isHi}
+                    />
+                </div>
+
+                {/* Desktop View (lg and up) */}
+                <div className="hidden lg:flex min-h-screen bg-[#080d1a] text-slate-100 flex-row antialiased font-sans select-none">
                 
                 {/* ════════════════════════════════════════════════════════════════
                     1. LEFT SIDEBAR (Desktop only - lg and up)
@@ -2010,7 +2032,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         fullScreen={true}
                     />
                 )}
-            </div>
+                </div>
+            </>
         );
     }
 

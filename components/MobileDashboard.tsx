@@ -818,6 +818,32 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                             </button>
                         </div>
 
+                        {/* 3D Realistic Showcase Truck Card */}
+                        <div 
+                            onClick={() => setCurrentView('garage')}
+                            className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-4 text-white shadow-lg relative overflow-hidden cursor-pointer group"
+                        >
+                            <div className="flex items-center justify-between mb-1">
+                                <span className="bg-orange-500 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wider">
+                                    Fleet Studio
+                                </span>
+                                <span className="text-xs text-slate-300 flex items-center gap-1 group-hover:text-white transition-colors">
+                                    Full Garage →
+                                </span>
+                            </div>
+                            <div className="relative py-2 flex items-center justify-center">
+                                <img 
+                                    src="/garage_truck.png" 
+                                    alt="Garage Truck" 
+                                    className="max-h-32 w-auto object-contain filter drop-shadow-[0_12px_20px_rgba(0,0,0,0.6)] transform group-hover:scale-105 transition-transform duration-300" 
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-700/60">
+                                <span className="font-bold text-slate-200">Heavy Commercial Delivery Vehicle</span>
+                                <span className="text-emerald-400 font-mono font-bold text-[11px]">● Studio Ready</span>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
                                 <span className="text-[11px] text-slate-500">Active Trucks</span>

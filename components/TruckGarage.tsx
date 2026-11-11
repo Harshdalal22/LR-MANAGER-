@@ -125,163 +125,43 @@ const TruckStudioGraphic: React.FC<{
     isHonking?: boolean;
 }> = ({ make = 'Tata Motors', color = '#1e3a8a', lightsOn = true, isHonking = false }) => {
     return (
-        <div className="relative w-full max-w-lg mx-auto h-52 sm:h-64 flex items-center justify-center select-none">
-            {/* Studio Floor Radial Light & Shadow */}
-            <div className="absolute inset-0 bg-gradient-radial from-slate-200/60 via-slate-100/20 to-transparent pointer-events-none rounded-full blur-2xl" />
+        <div className="relative w-full max-w-2xl mx-auto h-56 sm:h-72 flex items-center justify-center select-none overflow-visible">
+            {/* Studio Floor Radial Light & Dynamic Halo */}
+            <div className="absolute inset-0 bg-gradient-radial from-slate-200/70 via-slate-100/30 to-transparent pointer-events-none rounded-full blur-2xl" />
             
+            {/* Dynamic Ambient Color Halo under the truck */}
+            <div 
+                className="absolute inset-x-8 bottom-3 h-24 rounded-full blur-3xl opacity-35 transition-colors duration-500 pointer-events-none"
+                style={{ backgroundColor: color }}
+            />
+
             {/* Contact Floor Shadow Under Wheels */}
-            <div className="absolute bottom-4 w-4/5 h-6 bg-gradient-to-t from-black/40 via-black/20 to-transparent rounded-[100%] blur-md transform scale-y-75" />
+            <div className="absolute bottom-2 sm:bottom-4 w-5/6 h-8 bg-gradient-to-t from-black/60 via-black/30 to-transparent rounded-[100%] blur-lg transform scale-y-75" />
 
-            {/* Truck SVG Model */}
-            <svg viewBox="0 0 540 240" className="w-full h-full drop-shadow-2xl overflow-visible transition-transform duration-300">
-                <defs>
-                    <linearGradient id="cabinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-                        <stop offset="30%" stopColor={color} />
-                        <stop offset="100%" stopColor="#0f172a" />
-                    </linearGradient>
-                    <linearGradient id="bodyMetal" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#334155" />
-                        <stop offset="50%" stopColor="#64748b" />
-                        <stop offset="100%" stopColor="#1e293b" />
-                    </linearGradient>
-                    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#7dd3fc" stopOpacity="0.8" />
-                        <stop offset="50%" stopColor="#0284c7" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="#0369a1" stopOpacity="0.9" />
-                    </linearGradient>
-                    <linearGradient id="chromeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#f8fafc" />
-                        <stop offset="50%" stopColor="#cbd5e1" />
-                        <stop offset="100%" stopColor="#64748b" />
-                    </linearGradient>
-                    <radialGradient id="headlightGlow" cx="0%" cy="50%" r="80%">
-                        <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
-                        <stop offset="40%" stopColor="#facc15" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#facc15" stopOpacity="0" />
-                    </radialGradient>
-                    <filter id="shadow3d" x="-10%" y="-10%" width="120%" height="130%">
-                        <feDropShadow dx="0" dy="8" stdDeviation="6" floodOpacity="0.25" />
-                    </filter>
-                </defs>
+            {/* Realistic Delivery Box Truck from Studio Mockup */}
+            <div className={`relative w-full flex items-center justify-center transition-all duration-300 ${isHonking ? 'scale-105 animate-bounce' : 'hover:scale-[1.02]'}`}>
+                <img 
+                    src="/garage_truck.png" 
+                    alt={`${make} Commercial Delivery Truck - Truck Garage`} 
+                    className="w-full max-h-56 sm:max-h-68 object-contain filter drop-shadow-[0_20px_35px_rgba(0,0,0,0.4)]" 
+                />
 
-                {/* --- 1. REAR CARGO CONTAINER BODY --- */}
-                <g filter="url(#shadow3d)">
-                    {/* Main Container Box */}
-                    <rect x="40" y="45" width="280" height="130" rx="6" fill="#1e293b" stroke="#334155" strokeWidth="2" />
-                    {/* Container Ribs Texture */}
-                    {[70, 100, 130, 160, 190, 220, 250, 280].map(x => (
-                        <g key={x}>
-                            <line x1={x} y1="46" x2={x} y2="174" stroke="#475569" strokeWidth="2.5" />
-                            <line x1={x + 1} y1="46" x2={x + 1} y2="174" stroke="#0f172a" strokeWidth="1.5" />
-                        </g>
-                    ))}
-                    {/* Container Top Corner Castings */}
-                    <rect x="40" y="45" width="12" height="12" fill="url(#chromeGrad)" />
-                    <rect x="308" y="45" width="12" height="12" fill="url(#chromeGrad)" />
-                    
-                    {/* Container Brand Label */}
-                    <rect x="60" y="60" width="130" height="26" rx="4" fill="rgba(15, 23, 42, 0.75)" stroke="rgba(255, 255, 255, 0.15)" />
-                    <text x="70" y="77" fill="#38bdf8" fontSize="11" fontWeight="900" fontFamily="sans-serif" letterSpacing="1.5">
-                        BILTY EXPRESS
-                    </text>
-                    <text x="70" y="110" fill="#94a3b8" fontSize="9" fontWeight="bold" fontFamily="monospace">
-                        ALL INDIA PERMIT • GPS TRACKED
-                    </text>
-                </g>
+                {/* Interactive Headlight Beam when lightsOn is true */}
+                {lightsOn && (
+                    <div 
+                        className="absolute right-[-2%] bottom-[20%] w-48 sm:w-80 h-24 bg-gradient-to-r from-amber-300/40 via-yellow-200/20 to-transparent pointer-events-none blur-sm transform -rotate-2"
+                        style={{ clipPath: 'polygon(0% 45%, 100% 0%, 100% 100%, 0% 55%)' }}
+                    />
+                )}
 
-                {/* --- 2. TRUCK CHASSIS & UNDERCARRIAGE --- */}
-                <rect x="30" y="170" width="460" height="12" rx="2" fill="#0f172a" />
-                {/* Diesel Fuel Tank (Silver Cylindrical) */}
-                <rect x="180" y="160" width="65" height="22" rx="5" fill="url(#chromeGrad)" stroke="#475569" strokeWidth="1" />
-                <line x1="200" y1="160" x2="200" y2="182" stroke="#334155" strokeWidth="2" />
-                <line x1="225" y1="160" x2="225" y2="182" stroke="#334155" strokeWidth="2" />
-                {/* Tool Box */}
-                <rect x="120" y="162" width="40" height="18" rx="2" fill="#1e293b" stroke="#334155" strokeWidth="1" />
+                {/* Honk Sound Effect Icon Animation */}
+                {isHonking && (
+                    <div className="absolute -top-3 right-1/4 bg-amber-500 text-white font-black text-xs px-3 py-1 rounded-full shadow-xl animate-pulse">
+                        POPOOO!! 📢
+                    </div>
+                )}
+            </div>
 
-                {/* --- 3. CABIN (FRONT TRACTOR UNIT) --- */}
-                <g filter="url(#shadow3d)">
-                    {/* Aerodynamic Roof Fairing / Deflector */}
-                    <path d="M 320,45 L 340,30 L 410,30 L 420,45 Z" fill={color} opacity="0.9" />
-                    
-                    {/* Main Cabin Body Shell */}
-                    <path d="M 320,45 L 420,45 Q 445,45 455,70 L 475,130 Q 480,145 480,165 L 480,180 L 320,180 Z" 
-                          fill="url(#cabinGrad)" stroke="#0f172a" strokeWidth="2" />
-
-                    {/* Windshield Glass */}
-                    <path d="M 365,55 L 425,55 Q 440,55 448,75 L 460,115 L 365,115 Z" 
-                          fill="url(#glassGrad)" stroke="#0284c7" strokeWidth="1.5" />
-                    {/* Glass Reflection Glare */}
-                    <path d="M 375,60 L 415,60 L 390,110 L 375,110 Z" fill="#ffffff" opacity="0.35" />
-                    
-                    {/* Side Door Window */}
-                    <path d="M 330,60 L 360,60 L 360,115 L 330,115 Z" fill="url(#glassGrad)" stroke="#0369a1" />
-                    <rect x="332" y="125" width="12" height="4" rx="1" fill="url(#chromeGrad)" />
-
-                    {/* Cabin Front Chrome Grille */}
-                    <path d="M 462,125 L 478,125 L 477,165 L 458,165 Z" fill="#0f172a" />
-                    <line x1="462" y1="133" x2="477" y2="133" stroke="url(#chromeGrad)" strokeWidth="2.5" />
-                    <line x1="460" y1="141" x2="477" y2="141" stroke="url(#chromeGrad)" strokeWidth="2.5" />
-                    <line x1="458" y1="149" x2="477" y2="149" stroke="url(#chromeGrad)" strokeWidth="2.5" />
-                    <line x1="458" y1="157" x2="476" y2="157" stroke="url(#chromeGrad)" strokeWidth="2.5" />
-
-                    {/* Brand Badge on Grille */}
-                    <circle cx="469" cy="141" r="5" fill="#f8fafc" stroke="#0f172a" strokeWidth="1" />
-                    <text x="466.5" y="143.5" fontSize="6" fontWeight="bold" fill="#0f172a">T</text>
-
-                    {/* Heavy Duty Steel Bumper */}
-                    <path d="M 450,170 L 490,170 Q 495,170 495,178 L 495,188 L 445,188 Z" fill="url(#chromeGrad)" stroke="#334155" strokeWidth="1.5" />
-
-                    {/* Headlight Housing & Beam */}
-                    <rect x="472" y="160" width="14" height="9" rx="2" fill={lightsOn ? '#fef08a' : '#94a3b8'} stroke="#475569" strokeWidth="1" />
-                    {lightsOn && (
-                        <>
-                            {/* Headlight Glow */}
-                            <circle cx="482" cy="164" r="10" fill="url(#headlightGlow)" opacity="0.8" />
-                            {/* Forward Light Beam */}
-                            <polygon points="486,160 550,135 550,210 486,172" fill="url(#headlightGlow)" opacity="0.45" />
-                        </>
-                    )}
-
-                    {/* Rear View Mirrors */}
-                    <rect x="368" y="70" width="4" height="20" rx="1" fill="#0f172a" />
-                    <path d="M 370,72 L 378,72 L 378,88 L 370,88 Z" fill="url(#chromeGrad)" stroke="#0f172a" />
-
-                    {/* Roof Air Horn */}
-                    <path d="M 390,38 L 415,35 L 418,40 L 390,40 Z" fill="url(#chromeGrad)" />
-                    {isHonking && (
-                        <g>
-                            <circle cx="430" cy="38" r="8" fill="none" stroke="#f59e0b" strokeWidth="2" opacity="0.8" className="animate-ping" />
-                            <text x="430" y="25" fill="#f59e0b" fontSize="12" fontWeight="black">PEEP!</text>
-                        </g>
-                    )}
-                </g>
-
-                {/* --- 4. WHEELS (ALLOY RIMS WITH TREAD) --- */}
-                {/* Rear Dual Wheels (Axle 1, Axle 2, Axle 3) & Front Steer Wheel */}
-                {[
-                    { cx: 80, cy: 182, r: 24 },
-                    { cx: 135, cy: 182, r: 24 },
-                    { cx: 275, cy: 182, r: 24 },
-                    { cx: 435, cy: 182, r: 24 }
-                ].map((w, idx) => (
-                    <g key={idx} filter="url(#shadow3d)">
-                        {/* Outer Black Rubber Tire with Tread */}
-                        <circle cx={w.cx} cy={w.cy} r={w.r} fill="#090d16" stroke="#1e293b" strokeWidth="4" />
-                        {/* Wheel Rim / Alloy Metal */}
-                        <circle cx={w.cx} cy={w.cy} r={w.r - 7} fill="url(#chromeGrad)" stroke="#475569" strokeWidth="1.5" />
-                        {/* Wheel Hub Center */}
-                        <circle cx={w.cx} cy={w.cy} r={6} fill="#0f172a" stroke="#cbd5e1" strokeWidth="1.5" />
-                        {/* Lug Nuts */}
-                        {[0, 60, 120, 180, 240, 300].map(deg => {
-                            const rad = (deg * Math.PI) / 180;
-                            const nx = w.cx + 10 * Math.cos(rad);
-                            const ny = w.cy + 10 * Math.sin(rad);
-                            return <circle key={deg} cx={nx} cy={ny} r="1.5" fill="#334155" />;
-                        })}
-                    </g>
-                ))}
-            </svg>
         </div>
     );
 };

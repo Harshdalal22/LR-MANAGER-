@@ -23,6 +23,8 @@ interface InvoiceListProps {
     onBack: () => void;
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string, rowDetails?: any[], invoiceNote?: string) => Promise<void>;
     onRemoveLRsFromInvoice?: (lrNos: string[]) => Promise<void>;
+    initialAction?: string;
+    onActionChange?: (action?: string) => void;
 }
 
 const InvoiceList: React.FC<InvoiceListProps> = ({
@@ -31,13 +33,19 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
     onBack,
     onUpdateInvoiceDetails,
     onRemoveLRsFromInvoice,
+    initialAction,
+    onActionChange,
 }) => {
     // ── Main list state ──
     const [searchTerm, setSearchTerm] = useState('');
     const [sortOption, setSortOption] = useState<'number-asc' | 'number-desc' | 'date-asc' | 'date-desc'>('number-asc');
 
     // ── New Invoice Wizard state ──
-    const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [isWizardOpen, setIsWizardOpen] = useState(initialAction === 'wizard');
+
+    React.useEffect(() => {
+        setIsWizardOpen(initialAction === 'wizard');
+    }, [initialAction]);
     const [selectedPartyName, setSelectedPartyName] = useState('');
     const [selectedLRs, setSelectedLRs] = useState<Set<string>>(new Set());
     const [showAllLRs, setShowAllLRs] = useState(false);
@@ -142,7 +150,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
 
     const handleStartGeneration = () => { if (selectedLRs.size > 0) setShowGenerationModal(true); };
 
-    const closeWizard = () => { setIsWizardOpen(false); setSelectedPartyName(''); setSelectedLRs(new Set()); setShowAllLRs(false); };
+    const closeWizard = () => { setIsWizardOpen(false); setSelectedPartyName(''); setSelectedLRs(new Set()); setShowAllLRs(false); onActionChange?.(undefined); };
 
     // ── Handlers: Edit Invoice ──
     const handleStartEdit = (inv: { invoiceNo: string; lrs: LorryReceipt[] }) => {
@@ -221,7 +229,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                     </div>
                     {!isWizardOpen && !editingInvoice && (
                         <button
-                            onClick={() => setIsWizardOpen(true)}
+                            onClick={() => { setIsWizardOpen(true); onActionChange?.('wizard'); }}
                             className="flex items-center gap-2 bg-ssk-blue text-white px-4 py-2 rounded-lg hover:bg-blue-800 transition-colors shadow-md font-bold"
                         >
                             <PlusIcon className="w-5 h-5" />

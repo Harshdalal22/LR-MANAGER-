@@ -14,6 +14,7 @@ interface DataManagementProps {
     onBack: () => void;
     currentRole?: string;
     initialTab?: Tab;
+    onTabChange?: (tab: Tab) => void;
     companyDetails?: CompanyDetails;
     onUpdateDetails?: (details: CompanyDetails) => Promise<boolean>;
     onUploadAsset?: (file: File, assetType: 'logo' | 'signature') => Promise<string | null>;
@@ -21,8 +22,14 @@ interface DataManagementProps {
 
 type Tab = 'vehicle-hiring' | 'booking-register' | 'customer-details' | 'vehicle-fleet' | 'register-entries' | 'brand-settings';
 
-const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab, companyDetails, onUpdateDetails, onUploadAsset }) => {
+const DataManagement: React.FC<DataManagementProps> = ({ onBack, currentRole, initialTab, onTabChange, companyDetails, onUpdateDetails, onUploadAsset }) => {
     const [activeTab, setActiveTab] = useState<Tab>(initialTab || (currentRole === 'Operator' ? 'customer-details' : 'vehicle-hiring'));
+
+    useEffect(() => {
+        if (initialTab && initialTab !== activeTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -1992,7 +1999,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                 }).map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as Tab)}
+                        onClick={() => { const nextTab = tab.id as Tab; setActiveTab(nextTab); onTabChange?.(nextTab); }}
                         className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition-colors border-b-2 ${activeTab === tab.id
                             ? 'bg-white border-blue-600 text-blue-700 shadow-sm'
                             : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-white/50'

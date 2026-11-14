@@ -60,35 +60,7 @@ import {
     LRStatus
 } from './types';
 
-const VALID_VIEWS: View[] = [
-    'dashboard',
-    'list',
-    'form',
-    'vehicle-hiring',
-    'booking-register',
-    'data-management',
-    'parties',
-    'trucks',
-    'invoices',
-    'vouchers',
-    'gps-panel',
-    'register-manager',
-    'reports',
-    'accounting',
-    'garage'
-];
-
-const getViewFromHash = (): View => {
-    try {
-        const rawHash = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim();
-        if (VALID_VIEWS.includes(rawHash as View)) {
-            return rawHash as View;
-        }
-    } catch {
-        // fallback
-    }
-    return 'dashboard';
-};
+import { VALID_VIEWS, parseRoute, buildRouteHash } from './utils/navigation';
 import {
     getLorryReceipts,
     saveLorryReceipt,
@@ -176,8 +148,16 @@ const App: React.FC = () => {
             return defaultCompanyDetails;
         }
     });
-    const [currentView, setCurrentView] = useState<View>(() => getViewFromHash());
-    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
+    const initialRoute = parseRoute();
+    const [currentView, setCurrentView] = useState<View>(initialRoute.view);
+    const [routeParams, setRouteParams] = useState<Record<string, string>>(initialRoute.params);
+    const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(() => {
+        if (initialRoute.view === 'dashboard' && initialRoute.params.section) {
+            const sec = initialRoute.params.section as 'lr' | 'data' | 'emergency';
+            return ['lr', 'data', 'emergency'].includes(sec) ? sec : null;
+        }
+        return null;
+    });
     const [viewHistory, setViewHistory] = useState<View[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDataLoading, setIsDataLoading] = useState(false);
@@ -261,8 +241,21 @@ const App: React.FC = () => {
         }
     };
 
-    const navigateTo = (view: View, replace = false) => {
+    const navigateTo = (view: View, params?: Record<string, string | null | undefined> | boolean, replace = false) => {
         if (!VALID_VIEWS.includes(view)) return;
+
+        // Support backward compatibility if 2nd arg is boolean replace
+        let paramObj: Record<string, string> = {};
+        let shouldReplace = replace;
+        if (typeof params === 'boolean') {
+            shouldReplace = params;
+        } else if (params) {
+            Object.entries(params).forEach(([k, v]) => {
+                if (v !== undefined && v !== null && v !== '') {
+                    paramObj[k] = String(v);
+                }
+            });
+        }
 
         // RBAC access guard
         const isManager = currentRole === 'Manager';
@@ -275,40 +268,52 @@ const App: React.FC = () => {
             return;
         }
 
-        const targetHash = `#${view}`;
+        const targetHash = buildRouteHash(view, paramObj);
         if (window.location.hash !== targetHash) {
-            if (replace) {
-                window.history.replaceState({ view }, '', targetHash);
+            if (shouldReplace) {
+                window.history.replaceState({ view, params: paramObj }, '', targetHash);
             } else {
-                window.history.pushState({ view }, '', targetHash);
+                window.history.pushState({ view, params: paramObj }, '', targetHash);
             }
-        } else if (replace) {
-            window.history.replaceState({ view }, '', targetHash);
+        } else if (shouldReplace) {
+            window.history.replaceState({ view, params: paramObj }, '', targetHash);
         }
 
         setViewHistory(prev => [...prev, currentView]);
         setCurrentView(view);
+        setRouteParams(paramObj);
+
+        if (view === 'dashboard') {
+            const sec = paramObj.section as 'lr' | 'data' | 'emergency' | undefined;
+            setDashboardSection(sec && ['lr', 'data', 'emergency'].includes(sec) ? sec : null);
+        }
+    };
+
+    const handleSetDashboardSection = (sec: 'lr' | 'data' | 'emergency' | null) => {
+        setDashboardSection(sec);
+        navigateTo('dashboard', sec ? { section: sec } : {});
     };
 
     const navigateBack = () => {
         // If there's previous browser history in this session, trigger browser back
-        if (window.history.state && window.history.state.view && window.history.state.view !== 'dashboard') {
+        if (window.history.length > 1) {
             window.history.back();
         } else if (viewHistory.length > 0) {
             const prev = viewHistory[viewHistory.length - 1];
             setViewHistory(h => h.slice(0, -1));
-            navigateTo(prev || 'dashboard', true);
+            navigateTo(prev || 'dashboard', {}, true);
         } else {
-            navigateTo('dashboard', true);
+            navigateTo('dashboard', {}, true);
         }
     };
 
     // ── Listen to browser Back and Forward navigation (Chrome popstate) ──
     useEffect(() => {
         const handlePopState = (event: PopStateEvent) => {
+            const parsed = parseRoute();
             const stateView = event.state?.view;
-            const hashView = getViewFromHash();
-            const targetView: View = (VALID_VIEWS.includes(stateView) ? stateView : hashView) as View;
+            const targetView: View = (VALID_VIEWS.includes(stateView) ? stateView : parsed.view) as View;
+            const params: Record<string, string> = event.state?.params || parsed.params || {};
 
             const isManager = currentRole === 'Manager';
             const isOperator = currentRole === 'Operator';
@@ -317,26 +322,62 @@ const App: React.FC = () => {
             if ((isManager && companyDetails.rbacEnabled && restrictedViewsManager.includes(targetView)) ||
                 (isOperator && restrictedViewsOperator.includes(targetView))) {
                 setCurrentView('dashboard');
-                window.history.replaceState({ view: 'dashboard' }, '', '#dashboard');
+                setDashboardSection(null);
+                setRouteParams({});
+                window.history.replaceState({ view: 'dashboard', params: {} }, '', '#dashboard');
                 return;
             }
 
+            if (targetView === 'dashboard') {
+                const sec = params.section as 'lr' | 'data' | 'emergency' | undefined;
+                setDashboardSection(sec && ['lr', 'data', 'emergency'].includes(sec) ? sec : null);
+            }
+
+            if (targetView === 'form' && params.edit) {
+                const found = lorryReceipts.find(l => l.lrNo === params.edit);
+                if (found) setEditingLR(found);
+            } else if (targetView === 'form' && !params.edit) {
+                setEditingLR(null);
+            }
+
+            if (params.modal === 'settings') {
+                setIsSettingsModalOpen(true);
+            } else {
+                setIsSettingsModalOpen(false);
+            }
+
+            if (params.modal === 'admin') {
+                setIsAdminPanelOpen(true);
+            } else {
+                setIsAdminPanelOpen(false);
+            }
+
             setCurrentView(targetView);
+            setRouteParams(params);
         };
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [currentRole, companyDetails.rbacEnabled]);
+    }, [currentRole, companyDetails.rbacEnabled, lorryReceipts]);
 
     // ── Keep active URL hash synced with active session ──
     useEffect(() => {
         if (session && !isLoading) {
             const activeView = VALID_VIEWS.includes(currentView) ? currentView : 'dashboard';
-            if (window.location.hash !== `#${activeView}`) {
-                window.history.replaceState({ view: activeView }, '', `#${activeView}`);
+            const activeParams = { ...routeParams };
+            if (activeView === 'dashboard') {
+                if (dashboardSection) {
+                    activeParams.section = dashboardSection;
+                } else {
+                    delete activeParams.section;
+                }
+            }
+            const expectedHash = buildRouteHash(activeView, activeParams);
+            if (window.location.hash !== expectedHash) {
+                window.history.replaceState({ view: activeView, params: activeParams }, '', expectedHash);
             }
         }
-    }, [session, isLoading, currentView]);
+    }, [session, isLoading, currentView, dashboardSection, routeParams]);
 
     useEffect(() => {
         // Dynamic favicon
@@ -810,7 +851,7 @@ const App: React.FC = () => {
         const lr = lorryReceipts.find(l => l.lrNo === lrNo);
         if (lr) {
             setEditingLR(lr);
-            navigateTo('form');
+            navigateTo('form', { edit: lrNo });
         }
     };
 
@@ -916,6 +957,30 @@ const App: React.FC = () => {
         }
     };
 
+    const handleOpenAdminPanel = () => {
+        setIsAdminPanelOpen(true);
+        navigateTo(currentView, { ...routeParams, modal: 'admin' });
+    };
+
+    const handleCloseAdminPanel = () => {
+        setIsAdminPanelOpen(false);
+        if (routeParams.modal === 'admin') {
+            navigateBack();
+        }
+    };
+
+    const handleOpenSettings = () => {
+        setIsSettingsModalOpen(true);
+        navigateTo(currentView, { ...routeParams, modal: 'settings' });
+    };
+
+    const handleCloseSettings = () => {
+        setIsSettingsModalOpen(false);
+        if (routeParams.modal === 'settings') {
+            navigateBack();
+        }
+    };
+
     const renderContent = () => {
         // RBAC Restriction logic
         const isManager = companyDetails.rbacEnabled && currentRole === 'Manager';
@@ -955,14 +1020,14 @@ const App: React.FC = () => {
                 return (
                     <Dashboard
                         lorryReceipts={operatorLRs}
-                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form', { action: 'new' }); }}
                         onViewList={() => navigateTo('list')}
                         onViewVouchers={() => navigateTo('vouchers')}
                         onEditLR={handleEditLR}
-                        setCurrentView={navigateTo}
+                        setCurrentView={(v) => navigateTo(v)}
                         language={language}
                         activeSection={dashboardSection}
-                        setActiveSection={setDashboardSection}
+                        setActiveSection={handleSetDashboardSection}
                         currentRole={currentRole}
                         rbacEnabled={companyDetails.rbacEnabled}
                         managerRequests={managerRequests}
@@ -973,8 +1038,8 @@ const App: React.FC = () => {
                         companyDetails={companyDetails}
                         userEmail={session?.user?.email}
                         onSignOut={handleSignOut}
-                        onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
-                        onOpenSettings={() => setIsSettingsModalOpen(true)}
+                        onOpenAdminPanel={handleOpenAdminPanel}
+                        onOpenSettings={handleOpenSettings}
                     />
                 );
             case 'list':
@@ -983,7 +1048,7 @@ const App: React.FC = () => {
                         lorryReceipts={operatorLRs}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
-                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form', { action: 'new' }); }}
                         companyDetails={companyDetails}
                         onBackToDashboard={navigateBack}
                         onUpdateStatus={handleUpdateLRStatus}
@@ -997,7 +1062,8 @@ const App: React.FC = () => {
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         language={language}
                         isReadOnly={isManager || isOperator}
-                        initialViewMode="lrs"
+                        initialViewMode={(routeParams.mode as any) || 'lrs'}
+                        onViewModeChange={(mode) => navigateTo('list', { mode })}
                         savedParties={savedParties}
                     />
                 );
@@ -1007,7 +1073,7 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
-                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form', { action: 'new' }); }}
                         companyDetails={companyDetails}
                         onBackToDashboard={navigateBack}
                         onUpdateStatus={handleUpdateLRStatus}
@@ -1022,6 +1088,7 @@ const App: React.FC = () => {
                         language={language}
                         isReadOnly={isManager}
                         initialViewMode="vouchers"
+                        onViewModeChange={(mode) => navigateTo(mode === 'lrs' ? 'list' : 'vouchers')}
                         savedParties={savedParties}
                     />
                 );
@@ -1041,9 +1108,9 @@ const App: React.FC = () => {
             case 'vehicle-hiring':
                 return <VehicleHiring onBack={navigateBack} lorryReceipts={lorryReceipts} />;
             case 'booking-register':
-                return <DataManagement onBack={navigateBack} currentRole={currentRole} initialTab="register-entries" companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
+                return <DataManagement onBack={navigateBack} currentRole={currentRole} initialTab={(routeParams.tab as any) || 'register-entries'} onTabChange={(tab) => navigateTo('booking-register', { tab })} companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
             case 'data-management':
-                return <DataManagement onBack={navigateBack} currentRole={currentRole} companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
+                return <DataManagement onBack={navigateBack} currentRole={currentRole} initialTab={routeParams.tab as any} onTabChange={(tab) => navigateTo('data-management', { tab })} companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
             case 'parties':
                 return (
                     <PartyManagement
@@ -1076,8 +1143,8 @@ const App: React.FC = () => {
                             setSavedTrucks(prev => prev.filter(x => x.id !== id));
                         }}
                         onBack={navigateBack}
-                        onNavigateToExpenses={() => {
-                            navigateTo('accounting');
+                        onNavigateToExpenses={(truckNo) => {
+                            navigateTo('accounting', { tab: 'expenses', truck: truckNo });
                         }}
                     />
                 );
@@ -1087,6 +1154,8 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
                         onBack={navigateBack}
+                        initialAction={routeParams.action}
+                        onActionChange={(action) => navigateTo('invoices', action ? { action } : {})}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         onRemoveLRsFromInvoice={handleClearLRInvoiceDetails}
                     />
@@ -1097,6 +1166,8 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
                         onBack={navigateBack}
+                        initialTab={routeParams.tab as any || 'month'}
+                        onTabChange={(tab) => navigateTo('reports', { tab })}
                         language={language}
                     />
                 );
@@ -1107,6 +1178,8 @@ const App: React.FC = () => {
                         companyDetails={companyDetails}
                         savedParties={savedParties}
                         savedTrucks={savedTrucks}
+                        initialTab={routeParams.tab as any || 'overview'}
+                        onTabChange={(tab) => navigateTo('accounting', { tab })}
                         onBack={navigateBack}
                         onOpenGarage={() => {
                             navigateTo('garage');
@@ -1232,7 +1305,7 @@ const App: React.FC = () => {
                         <AdminPanel3D
                             isOpen={isAdminPanelOpen}
                             isSuperAdmin={isSuperAdmin}
-                            onClose={() => setIsAdminPanelOpen(false)}
+                            onClose={handleCloseAdminPanel}
                             onSwitchToAppMode={() => setSuperAdminViewMode('user_app')}
                             companyDetails={companyDetails}
                             onUpdateDetails={handleUpdateDetails}
@@ -1247,7 +1320,7 @@ const App: React.FC = () => {
                     {isSettingsModalOpen && (
                         <SettingsModal
                             isOpen={isSettingsModalOpen}
-                            onClose={() => setIsSettingsModalOpen(false)}
+                            onClose={handleCloseSettings}
                             companyDetails={companyDetails}
                             onUpdateDetails={handleUpdateDetails}
                             onUploadAsset={handleUploadAsset}
@@ -1291,7 +1364,7 @@ const App: React.FC = () => {
                 onForgotPasskey={handleForgotPasskeyTrigger}
                 settingsTrigger={headerSettingsTrigger}
                 isOperator={currentRole === 'Operator'}
-                onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
+                onOpenAdminPanel={handleOpenAdminPanel}
             />
             <main className="max-w-[1680px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 md:py-6">
                 <Suspense fallback={
@@ -1390,7 +1463,7 @@ const App: React.FC = () => {
                     <div className="fixed inset-0 z-50 overflow-auto bg-gray-900">
                         <AdminPanel3D
                             isOpen={isAdminPanelOpen}
-                            onClose={() => setIsAdminPanelOpen(false)}
+                            onClose={handleCloseAdminPanel}
                             companyDetails={companyDetails}
                             onUpdateDetails={handleUpdateDetails}
                             onUploadAsset={handleUploadAsset}
@@ -1408,7 +1481,7 @@ const App: React.FC = () => {
                 <Suspense fallback={null}>
                     <SettingsModal
                         isOpen={isSettingsModalOpen}
-                        onClose={() => setIsSettingsModalOpen(false)}
+                        onClose={handleCloseSettings}
                         companyDetails={companyDetails}
                         onUpdateDetails={handleUpdateDetails}
                         onUploadAsset={handleUploadAsset}

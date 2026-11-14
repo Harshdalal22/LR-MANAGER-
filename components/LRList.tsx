@@ -24,6 +24,7 @@ interface LRListProps {
     onUpdateInvoiceDetails?: (lrNos: string[], invoiceNo: string, invoiceDate: string, rowDetails?: any[], invoiceNote?: string) => Promise<void>;
     isReadOnly?: boolean;
     initialViewMode?: 'lrs' | 'vouchers';
+    onViewModeChange?: (mode: 'lrs' | 'vouchers') => void;
     savedParties?: SavedParty[];
 }
 
@@ -49,6 +50,7 @@ const LRList: React.FC<LRListProps> = ({
     language,
     isReadOnly = false,
     initialViewMode = 'lrs',
+    onViewModeChange,
     savedParties = []
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
@@ -277,14 +279,14 @@ const LRList: React.FC<LRListProps> = ({
             {/* Top Level Tabs */}
             <div className="flex border-b border-gray-200 mb-6">
                 <button
-                    onClick={() => setViewMode('lrs')}
+                    onClick={() => { setViewMode('lrs'); onViewModeChange?.('lrs'); }}
                     className={`py-3 px-6 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${viewMode === 'lrs' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <DocumentTextIcon className="w-5 h-5" />
                     Lorry Receipts
                 </button>
                 <button
-                    onClick={() => setViewMode('vouchers')}
+                    onClick={() => { setViewMode('vouchers'); onViewModeChange?.('vouchers'); }}
                     className={`py-3 px-6 font-bold text-lg border-b-4 transition-colors flex items-center gap-2 ${viewMode === 'vouchers' ? 'border-red-600 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                 >
                     <InvoiceIcon className="w-5 h-5" />

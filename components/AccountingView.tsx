@@ -24,6 +24,8 @@ interface AccountingViewProps {
     savedTrucks?: SavedTruck[];
     onBack: () => void;
     onOpenGarage?: (truckNo?: string) => void;
+    initialTab?: AccTab;
+    onTabChange?: (tab: AccTab) => void;
 }
 
 type AccTab = 'overview' | 'truck-pnl' | 'gst' | 'ledger' | 'invoices' | 'payments' | 'expenses' | 'reports';
@@ -5082,9 +5084,17 @@ const AccountingView: React.FC<AccountingViewProps> = ({
     savedParties, 
     savedTrucks = [],
     onBack,
-    onOpenGarage
+    onOpenGarage,
+    initialTab,
+    onTabChange
 }) => {
-    const [activeTab, setActiveTab] = useState<AccTab>('overview');
+    const [activeTab, setActiveTab] = useState<AccTab>(initialTab || 'overview');
+
+    useEffect(() => {
+        if (initialTab && initialTab !== activeTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
     const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [payments, setPayments] = useState<PaymentReceipt[]>([]);
@@ -5158,7 +5168,7 @@ const AccountingView: React.FC<AccountingViewProps> = ({
                     {/* Tabs */}
                     <div className="flex gap-1 -mb-px overflow-x-auto scrollbar-hide">
                         {TABS.map(tab => (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                            <button key={tab.id} onClick={() => { setActiveTab(tab.id); onTabChange?.(tab.id); }}
                                 className={`flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap cursor-pointer ${activeTab === tab.id
                                     ? 'border-blue-600 text-blue-700 bg-blue-50/50'
                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>

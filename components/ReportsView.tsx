@@ -8,6 +8,8 @@ interface ReportsViewProps {
     companyDetails: CompanyDetails;
     onBack: () => void;
     language?: Language;
+    initialTab?: 'month' | 'week' | 'date';
+    onTabChange?: (tab: 'month' | 'week' | 'date') => void;
 }
 
 interface PeriodStat {
@@ -29,7 +31,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     lorryReceipts,
     companyDetails,
     onBack,
-    language = 'en'
+    language = 'en',
+    initialTab,
+    onTabChange
 }) => {
     const isHi = language === 'hi';
 
@@ -48,7 +52,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
     }, [lorryReceipts, currentYear]);
 
     const [selectedYear, setSelectedYear] = useState<number | 'ALL'>(currentYear);
-    const [activeTab, setActiveTab] = useState<'month' | 'week' | 'date'>('month');
+    const [activeTab, setActiveTab] = useState<'month' | 'week' | 'date'>(initialTab || 'month');
+
+    React.useEffect(() => {
+        if (initialTab && initialTab !== activeTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedPeriodLrs, setSelectedPeriodLrs] = useState<{ title: string; lrs: LorryReceipt[] } | null>(null);
 
@@ -393,7 +403,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                 {/* Granularity Tabs (Month-wise, Week-wise, Date-wise) */}
                 <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-1 overflow-x-auto">
                     <button
-                        onClick={() => setActiveTab('month')}
+                        onClick={() => { setActiveTab('month'); onTabChange?.('month'); }}
                         className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                             activeTab === 'month'
                                 ? 'bg-white text-blue-600 shadow-sm scale-100'
@@ -403,7 +413,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                         📅 {isHi ? 'महीने अनुसार' : 'Month-wise'}
                     </button>
                     <button
-                        onClick={() => setActiveTab('week')}
+                        onClick={() => { setActiveTab('week'); onTabChange?.('week'); }}
                         className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                             activeTab === 'week'
                                 ? 'bg-white text-blue-600 shadow-sm scale-100'
@@ -413,7 +423,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                         📆 {isHi ? 'सप्ताह अनुसार' : 'Week-wise'}
                     </button>
                     <button
-                        onClick={() => setActiveTab('date')}
+                        onClick={() => { setActiveTab('date'); onTabChange?.('date'); }}
                         className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
                             activeTab === 'date'
                                 ? 'bg-white text-blue-600 shadow-sm scale-100'

@@ -1366,7 +1366,7 @@ const App: React.FC = () => {
                 isOperator={currentRole === 'Operator'}
                 onOpenAdminPanel={handleOpenAdminPanel}
             />
-            <main className="max-w-[1680px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 md:py-6">
+            <main className="max-w-[1680px] w-full mx-auto px-3 sm:px-6 lg:px-8 xl:px-10 py-4 md:py-6 pb-[calc(env(safe-area-inset-bottom,0px)+2rem)]">
                 <Suspense fallback={
                     <div className="flex flex-col items-center justify-center min-h-[40vh] py-16">
                         <RunningTruckLoader 

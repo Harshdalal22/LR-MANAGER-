@@ -155,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({
 
 
     return (
-        <header className="bg-slate-100/90 backdrop-blur-md text-slate-800 border-b border-slate-200 shadow-xs sticky top-0 z-30 transition-all">
+        <header className="bg-slate-100/90 backdrop-blur-md text-slate-800 border-b border-slate-200 shadow-xs sticky top-0 z-30 transition-all pt-[calc(env(safe-area-inset-top,0px)+0.25rem)]">
             <div className="container mx-auto px-3 sm:px-6 py-2.5 flex flex-row justify-between items-center gap-2 sm:gap-4">
                 {/* Brand Logo & Name */}
                 <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">

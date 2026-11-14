@@ -161,12 +161,12 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     };
 
     return (
-        <div className={`w-full min-h-screen bg-slate-100 text-slate-800 antialiased font-sans selection:bg-blue-500 selection:text-white pb-24 ${isFrameMode ? 'max-w-[430px] mx-auto my-5 rounded-[40px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35),0_0_0_12px_#1e293b] h-[90vh] overflow-y-auto' : 'max-w-md mx-auto shadow-2xl relative flex flex-col'}`}>
+        <div className={`w-full min-h-screen bg-slate-100 text-slate-800 antialiased font-sans selection:bg-blue-500 selection:text-white pb-[calc(env(safe-area-inset-bottom,0px)+6rem)] ${isFrameMode ? 'max-w-[430px] mx-auto my-5 rounded-[40px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.35),0_0_0_12px_#1e293b] h-[90vh] overflow-y-auto' : 'w-full max-w-full sm:max-w-xl mx-auto shadow-2xl relative flex flex-col'}`}>
 
             {/* ========================================================================= */}
             {/* HEADER (Sticky top dark header with Avatar, Search, Notifications, Settings) */}
             {/* ========================================================================= */}
-            <header className="sticky top-0 z-40 bg-slate-900 text-white px-5 pt-4 pb-4 rounded-b-2xl shadow-lg">
+            <header className="sticky top-0 z-40 bg-slate-900 text-white px-4 sm:px-6 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)] pb-4 rounded-b-2xl sm:rounded-b-3xl shadow-lg border-b border-slate-800/80">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                         {/* Avatar */}
@@ -1356,7 +1356,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
             {/* ========================================================================= */}
             {/* BOTTOM NAVIGATION BAR (Mobile Native Style) */}
             {/* ========================================================================= */}
-            <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 py-2 z-40 flex justify-between items-center shadow-lg">
+            <nav className="fixed bottom-0 left-0 right-0 w-full max-w-full sm:max-w-xl mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-4 sm:px-6 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.6rem)] z-40 flex justify-between items-center shadow-lg">
                 {/* 1. Dashboard */}
                 <button 
                     type="button"
@@ -1423,7 +1423,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     onClick={() => setIsQuickCreateOpen(false)}
                 >
                     <div 
-                        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 animate-slideUp"
+                        className="w-full max-w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] shadow-2xl space-y-4 animate-slideUp"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between border-b border-slate-100 pb-3">

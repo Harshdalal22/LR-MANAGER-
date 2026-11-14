@@ -948,7 +948,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         return (
             <>
                 {/* Mobile View (< lg) */}
-                <div className="block lg:hidden min-h-screen bg-slate-900">
+                <div className="block lg:hidden min-h-screen w-full bg-slate-100">
                     <MobileDashboard
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}

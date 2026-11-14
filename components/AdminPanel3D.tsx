@@ -1052,7 +1052,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
     const handleExportFullDatabaseJSON = () => {
         const fullBackup = {
             exportTimestamp: new Date().toISOString(),
-            app: 'SSK Bilty Book / LR Manager',
+            app: 'Bilty Book Transport System',
             companyDetails,
             stats,
             accounts: operators.map((o) => ({ id: o.operator_id, email: o.email, role: o.role, created_at: o.created_at })),

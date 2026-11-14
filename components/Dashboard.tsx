@@ -4,6 +4,8 @@ import { CurrencyRupeeIcon, TruckIcon, UsersIcon, ListIcon, CreateIcon, PencilIc
 import { Language, t } from '../utils/translations';
 import { BiltyBook3D, LogisticsTruck3D, RunningTruckLoader } from './BookTruckAnimation';
 import { MobileDashboard } from './MobileDashboard';
+import { LadyWelcomeBanner } from './LadyWelcomeBanner';
+import { playLadyWelcome } from '../utils/welcomeVoice';
 
 interface DashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -1196,6 +1198,17 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                         {/* Right: Notification Bell + User Profile */}
                         <div className="flex items-center gap-3 ml-auto">
+                            {/* Lady Welcome Voice Button */}
+                            <button
+                                type="button"
+                                onClick={() => playLadyWelcome({ force: true, language: isHi ? 'hi' : 'en' })}
+                                className="relative cursor-pointer p-2 rounded-xl text-pink-300 hover:text-white bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 border border-pink-500/30 hover:border-pink-400 transition-all active:scale-95 flex items-center gap-1.5"
+                                title="Hear Lady Welcome to Bilty Book"
+                            >
+                                <span className="text-base">👩‍💼</span>
+                                <span className="text-xs font-bold hidden xl:inline">Lady Welcome</span>
+                            </button>
+
                             {/* Notification Bell */}
                             <div className="relative cursor-pointer p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1323,6 +1336,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {/* ── SCROLLABLE DASHBOARD BODY ── */}
                     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] w-full mx-auto">
                         
+                        {/* 0. Lady Welcome Voice Banner */}
+                        <LadyWelcomeBanner isHi={isHi} />
+
                         {/* ════════════════════════════════════════════════════════
                             3. HERO BANNER SECTION (Manage Transport Smarter)
                         ════════════════════════════════════════════════════════ */}

@@ -4,6 +4,7 @@ import { XIcon, SpinnerIcon, UploadIcon } from './icons';
 import { Language } from '../utils/translations';
 import { toast } from 'react-hot-toast';
 import { getTomTomApiKey, saveTomTomApiKey, testTomTomConnection } from '../services/tomtomService';
+import { playLadyWelcome, getVoiceGreetingEnabled, setVoiceGreetingEnabled } from '../utils/welcomeVoice';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -34,6 +35,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     const [isUploadingSignature, setIsUploadingSignature] = useState(false);
     const [showAdminKey, setShowAdminKey] = useState(false);
     const [showManagerKey, setShowManagerKey] = useState(false);
+    const [voiceGreetingEnabled, setVoiceGreetingState] = useState(getVoiceGreetingEnabled());
 
     // TomTom API key state
     const [tomtomKey, setTomtomKey] = useState('');
@@ -334,6 +336,50 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     placeholder="Delhi, Mumbai, Ahmedabad, Jaipur, Kolkata"
                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-slate-800 text-sm focus:outline-none focus:border-blue-600"
                                 />
+                            </div>
+
+                            {/* Lady Welcome Voice Settings */}
+                            <div className="p-4 rounded-2xl bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-indigo-500/10 border border-pink-200">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-500 flex items-center justify-center text-white text-lg shadow-sm">
+                                            👩‍💼
+                                        </div>
+                                        <div>
+                                            <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                                                {isHi ? 'लेडी वेलकम वॉइस (ऐप ओपन पर स्वागत)' : 'Lady Welcome Voice Greeting'}
+                                            </h4>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                {isHi ? 'ऐप खुलने पर "Welcome to Bilty Book" ऑडियो अभिवादन' : 'Plays "Welcome to Bilty Book" when opening the app'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => playLadyWelcome({ force: true, language: isHi ? 'hi' : 'en' })}
+                                            className="px-3 py-1.5 rounded-xl bg-pink-600 hover:bg-pink-700 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                                        >
+                                            <span>🔊</span>
+                                            <span>{isHi ? 'टेस्ट वॉइस' : 'Test Voice'}</span>
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = !voiceGreetingEnabled;
+                                                setVoiceGreetingState(next);
+                                                setVoiceGreetingEnabled(next);
+                                                toast.success(next ? 'Voice greeting enabled' : 'Voice greeting muted');
+                                            }}
+                                            className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${voiceGreetingEnabled ? 'bg-pink-500' : 'bg-slate-300'}`}
+                                            title="Toggle Voice Greeting"
+                                        >
+                                            <span className={`w-5 h-5 rounded-full bg-white shadow-md absolute top-0.5 transition-transform ${voiceGreetingEnabled ? 'left-6' : 'left-0.5'}`} />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

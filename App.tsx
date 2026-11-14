@@ -9,6 +9,7 @@ import LRList from './components/LRList';
 import LRForm from './components/LRForm';
 import AdBanner from './components/AdBanner';
 import { RunningTruckLoader } from './components/BookTruckAnimation';
+import { playLadyWelcome } from './utils/welcomeVoice';
 
 // Helper to auto-recover when a new deployment creates new chunk hashes
 function lazyRetry<T extends React.ComponentType<any>>(
@@ -266,6 +267,7 @@ const App: React.FC = () => {
                     // ✅ FIX 1: Clear loading immediately — don't wait for role check
                     clearTimeout(loadingTimeout);
                     setIsLoading(false);
+                    playLadyWelcome({ language });
 
                     // Role check runs in background after UI is already unblocked
                     if (currentSession.user?.email !== 'gps@ssk.com') {

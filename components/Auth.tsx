@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { 
     signUp, 
@@ -10,6 +10,8 @@ import {
     applySession 
 } from '../services/supabaseService';
 import { RunningTruckLoader } from './BookTruckAnimation';
+import { playLadyWelcome } from '../utils/welcomeVoice';
+import { LadyWelcomeBanner } from './LadyWelcomeBanner';
 
 // --- Vector Icons ---
 const SpiralBookIcon: React.FC<{ className?: string }> = ({ className = "w-7 h-7" }) => (
@@ -130,6 +132,10 @@ const Auth: React.FC = () => {
     const [signingIn, setSigningIn] = useState(false);
     const [waitingForApproval, setWaitingForApproval] = useState(false);
     const [companyAdminEmail, setCompanyAdminEmail] = useState('');
+
+    useEffect(() => {
+        playLadyWelcome();
+    }, []);
 
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -389,6 +395,11 @@ const Auth: React.FC = () => {
                             <div className="my-2 sm:my-3">
                                 <TruckIllustration className="w-52 sm:w-60" />
                             </div>
+                        </div>
+
+                        {/* Lady Welcome Voice Greeting Pill */}
+                        <div className="w-full max-w-sm mx-auto mb-3 flex justify-center">
+                            <LadyWelcomeBanner compact={true} className="bg-white/95 text-slate-800 shadow-md border-pink-300" />
                         </div>
 
                         {/* ================================================================= */}

@@ -647,7 +647,7 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                         </button>
 
                         {/* Trucks Carousel List */}
-                        {filteredTrucks.map(truck => {
+                        {filteredTrucks.map((truck, idx) => {
                             const isSelected = truck.truckNo === activeTruck.truckNo;
                             const hasAlert = fleetAlerts.some(a => a.truckNo === truck.truckNo);
 
@@ -667,7 +667,10 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                                     )}
 
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xl">🚛</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-xl">🚛</span>
+                                            <span className="text-[10px] font-black text-slate-500">#{idx + 1}</span>
+                                        </div>
                                         <span className="text-[9px] font-bold text-slate-400 uppercase truncate max-w-[80px]">
                                             {truck.make || 'Tata'}
                                         </span>
@@ -1080,10 +1083,11 @@ export const TruckGarage: React.FC<TruckGarageProps> = ({
                         <div className="space-y-2 pt-2 border-t border-slate-100">
                             <div className="text-xs font-black uppercase tracking-wider text-slate-500">Recent Trips (LRs)</div>
                             <div className="divide-y divide-slate-100">
-                                {truckFinancials.recentLRs.map(lr => (
+                                {truckFinancials.recentLRs.map((lr, idx) => (
                                     <div key={lr.lrNo} className="py-2.5 flex items-center justify-between text-xs sm:text-sm">
                                         <div>
                                             <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-black flex items-center justify-center shrink-0 border border-slate-200">#{idx + 1}</span>
                                                 <span className="font-bold text-blue-700">LR #{lr.lrNo}</span>
                                                 <span className="text-slate-400 mx-1">•</span>
                                                 <span className="text-slate-700 font-semibold">{lr.fromPlace} → {lr.toPlace}</span>

@@ -1962,6 +1962,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                         <tr>
+                                            <th className="px-4 py-3.5 text-center w-10">#</th>
                                             <th className="px-5 py-3.5">Account Email & ID</th>
                                             <th className="px-5 py-3.5">Role</th>
                                             <th className="px-5 py-3.5">Created Date</th>
@@ -1972,12 +1973,12 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <tbody className="divide-y divide-white/5">
                                         {filteredUserAccounts.length === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="text-center py-12 text-slate-400 text-sm">
+                                                <td colSpan={6} className="text-center py-12 text-slate-400 text-sm">
                                                     No user accounts found matching "{userSearchQuery}".
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredUserAccounts.map((u) => {
+                                            filteredUserAccounts.map((u, idx) => {
                                                 const isCurrent = u.id === currentUser?.id;
                                                 const isSelected = selectedAccountFilter === u.id;
                                                 const isSuper = u.email === 'admin@ssk.com' || u.role === 'Super Admin';
@@ -1995,6 +1996,9 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                                             toast.success(`Viewing data for ${u.email}`);
                                                         }}
                                                     >
+                                                        <td className="px-4 py-4 text-center font-bold text-slate-500 text-xs">
+                                                            {idx + 1}
+                                                        </td>
                                                         <td className="px-5 py-4">
                                                             <div className="flex items-center gap-3">
                                                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-xs shadow-md ${
@@ -2158,6 +2162,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                         <tr>
+                                            <th className="px-3 py-3.5 text-center w-10">#</th>
                                             <th className="px-4 py-3.5">LR No</th>
                                             <th className="px-4 py-3.5">Date</th>
                                             <th className="px-4 py-3.5">Truck No</th>
@@ -2171,13 +2176,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <tbody className="divide-y divide-white/5">
                                         {filteredLRs.length === 0 ? (
                                             <tr>
-                                                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                                                <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                                                     No Lorry Receipts found matching current criteria.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredLRs.map((lr) => (
+                                            filteredLRs.map((lr, idx) => (
                                                 <tr key={lr.lrNo} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-3 py-3 text-center font-bold text-slate-500 text-xs">
+                                                        {idx + 1}
+                                                    </td>
                                                     <td className="px-4 py-3 font-mono font-bold text-white">
                                                         <div>#{lr.lrNo}</div>
                                                         {selectedAccountFilter === 'ALL' && (
@@ -2283,6 +2291,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                         <tr>
+                                            <th className="px-3 py-3.5 text-center w-10">#</th>
                                             <th className="px-4 py-3.5">Truck No</th>
                                             <th className="px-4 py-3.5">Make & Model</th>
                                             <th className="px-4 py-3.5">Type & Capacity</th>
@@ -2295,13 +2304,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <tbody className="divide-y divide-white/5">
                                         {filteredTrucks.length === 0 ? (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                                                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                                                     No trucks registered in Garage.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredTrucks.map((truck) => (
+                                            filteredTrucks.map((truck, idx) => (
                                                 <tr key={truck.truckNo} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-3 py-3 text-center font-bold text-slate-500 text-xs">
+                                                        {idx + 1}
+                                                    </td>
                                                     <td className="px-4 py-3 font-mono font-black text-amber-300 text-sm">
                                                         <div>{truck.truckNo}</div>
                                                         {selectedAccountFilter === 'ALL' && (
@@ -2387,6 +2399,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                         <tr>
+                                            <th className="px-3 py-3.5 text-center w-10">#</th>
                                             <th className="px-4 py-3.5">Party Name</th>
                                             <th className="px-4 py-3.5">Type</th>
                                             <th className="px-4 py-3.5">City & Address</th>
@@ -2398,13 +2411,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <tbody className="divide-y divide-white/5">
                                         {filteredParties.length === 0 ? (
                                             <tr>
-                                                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                                                     No parties found.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredParties.map((p) => (
+                                            filteredParties.map((p, idx) => (
                                                 <tr key={p.id || p.name} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-3 py-3 text-center font-bold text-slate-500 text-xs">
+                                                        {idx + 1}
+                                                    </td>
                                                     <td className="px-4 py-3 font-bold text-white">
                                                         <div>{p.name}</div>
                                                         {selectedAccountFilter === 'ALL' && (
@@ -2486,6 +2502,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                 <table className="w-full text-left text-xs">
                                     <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                         <tr>
+                                            <th className="px-3 py-3.5 text-center w-10">#</th>
                                             <th className="px-4 py-3.5">Voucher No</th>
                                             <th className="px-4 py-3.5">Date</th>
                                             <th className="px-4 py-3.5">Party / Beneficiary</th>
@@ -2498,13 +2515,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <tbody className="divide-y divide-white/5">
                                         {filteredVouchers.length === 0 ? (
                                             <tr>
-                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                                                <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                                                     No vouchers recorded.
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredVouchers.map((v) => (
+                                            filteredVouchers.map((v, idx) => (
                                                 <tr key={v.id || v.voucher_no} className="hover:bg-white/5 transition-colors">
+                                                    <td className="px-3 py-3 text-center font-bold text-slate-500 text-xs">
+                                                        {idx + 1}
+                                                    </td>
                                                     <td className="px-4 py-3 font-mono font-bold text-rose-300">
                                                         <div>#{v.voucher_no}</div>
                                                         {selectedAccountFilter === 'ALL' && (
@@ -2651,6 +2671,7 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                     <table className="w-full text-left text-xs">
                                         <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider text-[10px]">
                                             <tr>
+                                                <th className="px-3 py-3.5 text-center w-10">#</th>
                                                 <th className="px-4 py-3.5">Date</th>
                                                 <th className="px-4 py-3.5">Party</th>
                                                 <th className="px-4 py-3.5">Description</th>
@@ -2663,13 +2684,16 @@ const AdminPanel3D: React.FC<AdminPanel3DProps> = ({
                                         <tbody className="divide-y divide-white/5">
                                             {allLedgerEntries.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="px-6 py-8 text-center text-slate-400">
+                                                    <td colSpan={8} className="px-6 py-8 text-center text-slate-400">
                                                         No ledger entries recorded.
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                allLedgerEntries.map((e) => (
+                                                allLedgerEntries.map((e, idx) => (
                                                     <tr key={e.id} className="hover:bg-white/5">
+                                                        <td className="px-3 py-3 text-center font-bold text-slate-500 text-xs">
+                                                            {idx + 1}
+                                                        </td>
                                                         <td className="px-4 py-3 text-slate-400">{e.date}</td>
                                                         <td className="px-4 py-3 font-bold text-white">{e.party_name || '-'}</td>
                                                         <td className="px-4 py-3 text-slate-300">{e.description}</td>

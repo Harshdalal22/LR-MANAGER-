@@ -264,6 +264,7 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                 <table className="w-full text-left">
                                     <thead>
                                         <tr className="bg-slate-50/80 text-slate-500 text-[11px] font-black uppercase tracking-widest border-b border-slate-100">
+                                            <th className="px-4 py-4 text-center w-12">#</th>
                                             <th className="px-6 py-4">Date</th>
                                             <th className="px-6 py-4">Invoice No</th>
                                             <th className="px-6 py-4">Customer</th>
@@ -275,12 +276,13 @@ const GPSPanel: React.FC<GPSPanelProps> = ({ companyDetails, onSignOut, onUpdate
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {isLoading ? (
-                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-medium italic">Loading records...</td></tr>
+                                            <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400 font-medium italic">Loading records...</td></tr>
                                         ) : invoices.length === 0 ? (
-                                            <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-medium italic">No invoices found. Create your first one above.</td></tr>
+                                            <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400 font-medium italic">No invoices found. Create your first one above.</td></tr>
                                         ) : (
-                                            invoices.map((inv) => (
+                                            invoices.map((inv, idx) => (
                                                 <tr key={inv.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                    <td className="px-4 py-4 text-center font-bold text-slate-400 text-xs">{idx + 1}</td>
                                                     <td className="px-6 py-4 text-sm font-semibold text-slate-600">{new Date(inv.date).toLocaleDateString('en-GB')}</td>
                                                     <td className="px-6 py-4 font-black text-ssk-blue">{inv.invoiceNo}</td>
                                                     <td className="px-6 py-4">

@@ -280,6 +280,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-amber-100 text-amber-900 text-[10px] uppercase font-bold sticky top-0">
                                         <tr>
+                                            <th className="p-3 text-center w-10">#</th>
                                             <th className="p-3">LR No.</th>
                                             <th className="p-3">Date</th>
                                             <th className="p-3">Truck</th>
@@ -289,11 +290,12 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {editingInvoice.lrs.map(lr => (
+                                        {editingInvoice.lrs.map((lr, index) => (
                                             <tr
                                                 key={lr.lrNo}
                                                 className={`transition-colors ${removingLrNos.has(lr.lrNo) ? 'bg-red-50 opacity-60' : 'hover:bg-amber-50'}`}
                                             >
+                                                <td className="p-3 text-center text-xs font-bold text-gray-500">{index + 1}</td>
                                                 <td className="p-3 font-bold text-blue-700">{lr.lrNo}</td>
                                                 <td className="p-3">{new Date(lr.date).toLocaleDateString('en-GB')}</td>
                                                 <td className="p-3 font-mono text-xs">{lr.truckNo}</td>
@@ -356,6 +358,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                         <thead className="bg-green-50 text-green-900 text-[10px] uppercase font-bold sticky top-0">
                                             <tr>
                                                 <th className="p-3 w-10">Add</th>
+                                                <th className="p-3 text-center w-10">#</th>
                                                 <th className="p-3">LR No.</th>
                                                 <th className="p-3">Date</th>
                                                 <th className="p-3">Truck</th>
@@ -367,12 +370,12 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                         <tbody className="divide-y">
                                             {availableLRsToAdd.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="p-6 text-center text-gray-400 italic text-xs">
+                                                    <td colSpan={8} className="p-6 text-center text-gray-400 italic text-xs">
                                                         Is party ke aur LR nahi hain.
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                availableLRsToAdd.map(lr => (
+                                                availableLRsToAdd.map((lr, index) => (
                                                     <tr
                                                         key={lr.lrNo}
                                                         className={`cursor-pointer transition-colors ${addingLrNos.has(lr.lrNo) ? 'bg-green-50' : 'hover:bg-green-50'}`}
@@ -385,6 +388,9 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                                                 onChange={() => {}}
                                                                 className="w-4 h-4 text-green-600 rounded"
                                                             />
+                                                        </td>
+                                                        <td className="p-3 text-center text-xs font-bold text-gray-500">
+                                                            {index + 1}
                                                         </td>
                                                         <td className="p-3 font-bold text-blue-700">
                                                             {lr.lrNo}
@@ -490,6 +496,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                         <thead className="bg-blue-100 text-blue-800 text-[10px] uppercase font-bold sticky top-0">
                                             <tr>
                                                 <th className="p-3 w-10">Select</th>
+                                                <th className="p-3 text-center w-10">#</th>
                                                 <th className="p-3">LR No</th>
                                                 <th className="p-3">Date</th>
                                                 <th className="p-3">Truck</th>
@@ -500,14 +507,14 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                         <tbody className="divide-y">
                                             {pendingLRsForParty.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={6} className="p-8 text-center text-gray-400 italic">
+                                                    <td colSpan={7} className="p-8 text-center text-gray-400 italic">
                                                         {selectedPartyName
                                                             ? (showAllLRs ? 'Is party ke liye koi LR nahi mili.' : "Koi pending LR nahi. 'Already Invoiced LRs bhi dikhao' check karein.")
                                                             : 'Pehle party select karein.'}
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                pendingLRsForParty.map(lr => (
+                                                pendingLRsForParty.map((lr, index) => (
                                                     <tr
                                                         key={lr.lrNo}
                                                         className={`hover:bg-blue-50 cursor-pointer ${selectedLRs.has(lr.lrNo) ? 'bg-blue-50' : ''}`}
@@ -515,6 +522,9 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                                     >
                                                         <td className="p-3 text-center">
                                                             <input type="checkbox" checked={selectedLRs.has(lr.lrNo)} onChange={() => {}} className="w-4 h-4 text-blue-600 rounded" />
+                                                        </td>
+                                                        <td className="p-3 text-center text-xs font-bold text-gray-500">
+                                                            {index + 1}
                                                         </td>
                                                         <td className="p-3 font-bold">
                                                             {lr.lrNo}
@@ -585,6 +595,7 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                             <table className="w-full text-sm text-left text-gray-700">
                                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                                     <tr>
+                                        <th className="px-4 py-3 text-center w-12">#</th>
                                         <th className="px-6 py-3">Invoice No</th>
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3">Customer</th>
@@ -596,13 +607,14 @@ const InvoiceList: React.FC<InvoiceListProps> = ({
                                 <tbody>
                                     {filteredInvoices.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-10 text-center text-gray-500">
+                                            <td colSpan={7} className="px-6 py-10 text-center text-gray-500">
                                                 No invoices found. Generate one using the wizard above.
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredInvoices.map(inv => (
+                                        filteredInvoices.map((inv, index) => (
                                             <tr key={inv.invoiceNo} className="border-b hover:bg-gray-50 transition-colors">
+                                                <td className="px-4 py-4 text-center font-bold text-gray-500 text-xs">{index + 1}</td>
                                                 <td className="px-6 py-4 font-medium text-blue-600">{inv.invoiceNo}</td>
                                                 <td className="px-6 py-4">{new Date(inv.date).toLocaleDateString('en-GB')}</td>
                                                 <td className="px-6 py-4 font-medium">{inv.customer}</td>

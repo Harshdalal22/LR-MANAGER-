@@ -182,10 +182,13 @@ const PartyManagement: React.FC<PartyManagementProps> = ({ savedParties, onSave,
                     </div>
 
                     <div className="space-y-3">
-                        {filteredParties.map(party => (
+                        {filteredParties.map((party, index) => (
                             <div key={party.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow flex justify-between items-start">
                                 <div>
                                     <div className="flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-black flex items-center justify-center shrink-0 border border-slate-200">
+                                            #{index + 1}
+                                        </span>
                                         <h4 className="font-bold text-gray-800 text-lg">{party.name}</h4>
                                         <span className={`text-xs px-2 py-0.5 rounded-full ${party.type === 'Both' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                             {party.type}

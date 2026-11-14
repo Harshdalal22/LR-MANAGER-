@@ -491,6 +491,7 @@ const LRList: React.FC<LRListProps> = ({
                                     />
                                 </th>
                             )}
+                            <th className="px-3 py-3 text-center w-12 text-xs font-bold text-gray-500">#</th>
                             <th className="px-4 py-3">{t[language].lrNoDate}</th>
                             <th className="px-4 py-3">{t[language].consignor}</th>
                             <th className="px-4 py-3">{t[language].consignee}</th>
@@ -504,12 +505,12 @@ const LRList: React.FC<LRListProps> = ({
                     <tbody>
                         {filteredLRs.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="px-6 py-10 text-center text-gray-500">
+                                <td colSpan={10} className="px-6 py-10 text-center text-gray-500">
                                     No Lorry Receipts found matching your criteria.
                                 </td>
                             </tr>
                         ) : (
-                            filteredLRs.map((lr) => (
+                            filteredLRs.map((lr, index) => (
                                 <tr key={lr.lrNo} className={`border-b hover:bg-gray-50 transition-colors ${selectedLRs.has(lr.lrNo) ? 'bg-blue-50/50' : ''}`}>
                                     {!isReadOnly && (
                                         <td className="p-4">
@@ -521,6 +522,9 @@ const LRList: React.FC<LRListProps> = ({
                                             />
                                         </td>
                                     )}
+                                    <td className="px-3 py-3 text-center font-bold text-gray-500 text-xs">
+                                        {index + 1}
+                                    </td>
                                     <td className="px-4 py-3">
                                         <div className="font-bold text-gray-900">{lr.lrNo}</div>
                                         <div className="text-xs text-gray-500">{new Date(lr.date).toLocaleDateString('en-GB')}</div>
@@ -653,6 +657,7 @@ const LRList: React.FC<LRListProps> = ({
                     <table className="w-full text-sm text-left text-gray-500">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b">
                             <tr>
+                                <th className="px-4 py-4 font-semibold text-center w-12">#</th>
                                 <th className="px-6 py-4 font-semibold">Date</th>
                                 <th className="px-6 py-4 font-semibold">Voucher No</th>
                                 <th className="px-6 py-4 font-semibold">Party Name</th>
@@ -665,11 +670,11 @@ const LRList: React.FC<LRListProps> = ({
                         <tbody>
                             {isLoadingVouchers ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading vouchers...</td>
+                                    <td colSpan={8} className="px-6 py-8 text-center text-gray-500">Loading vouchers...</td>
                                 </tr>
                             ) : vouchers.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center">
+                                    <td colSpan={8} className="px-6 py-12 text-center">
                                         <div className="flex flex-col items-center justify-center text-gray-500">
                                             <InvoiceIcon className="w-12 h-12 text-gray-300 mb-3" />
                                             <p className="text-lg font-medium">No Vouchers Found</p>
@@ -678,8 +683,9 @@ const LRList: React.FC<LRListProps> = ({
                                     </td>
                                 </tr>
                             ) : (
-                                vouchers.map((voucher) => (
+                                vouchers.map((voucher, index) => (
                                     <tr key={voucher.id} className="border-b hover:bg-gray-50 transition-colors bg-white">
+                                        <td className="px-4 py-4 text-center font-bold text-gray-500 text-xs">{index + 1}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">{new Date(voucher.date).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 font-bold text-gray-900 font-mono">{voucher.voucher_no}</td>
                                         <td className="px-6 py-4">

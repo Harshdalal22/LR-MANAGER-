@@ -703,6 +703,7 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
                                             className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                         />
                                     </th>
+                                    <th className="px-3 py-3 text-center w-12 font-bold text-gray-600">#</th>
                                     <th className="px-4 py-3">Date</th>
                                     <th className="px-4 py-3">GR No</th>
                                     <th className="px-4 py-3">Lorry No</th>
@@ -715,11 +716,11 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
                             </thead>
                             <tbody>
                                 {isLoading ? (
-                                    <tr><td colSpan={9} className="p-8 text-center">Loading...</td></tr>
+                                    <tr><td colSpan={10} className="p-8 text-center">Loading...</td></tr>
                                 ) : filteredRecords.length === 0 ? (
-                                    <tr><td colSpan={9} className="p-8 text-center text-gray-500">No records found.</td></tr>
+                                    <tr><td colSpan={10} className="p-8 text-center text-gray-500">No records found.</td></tr>
                                 ) : (
-                                    filteredRecords.map(r => (
+                                    filteredRecords.map((r, index) => (
                                         <tr key={r.id} className="border-b hover:bg-gray-50">
                                             <td className="px-4 py-3">
                                                 <input
@@ -728,6 +729,9 @@ const VehicleHiring: React.FC<VehicleHiringProps> = ({ onBack, lorryReceipts = [
                                                     onChange={(e) => handleSelectRow(r.id, e.target.checked)}
                                                     className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                                 />
+                                            </td>
+                                            <td className="px-3 py-3 text-center font-bold text-gray-500 text-xs">
+                                                {index + 1}
                                             </td>
                                             <td className="px-4 py-3">{new Date(r.date).toLocaleDateString('en-GB')}</td>
                                             <td className="px-4 py-3 font-medium text-blue-600">{r.grNo}</td>

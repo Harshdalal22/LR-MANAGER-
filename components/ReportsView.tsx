@@ -656,6 +656,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black uppercase tracking-wider text-slate-600">
+                                <th className="py-3.5 px-3 text-center w-12 text-slate-500 font-black">#</th>
                                 <th className="py-3.5 px-4 sm:px-6">{isHi ? 'अवधि / समय' : 'Period'}</th>
                                 <th className="py-3.5 px-4 text-center">{isHi ? 'कुल LRs' : 'Total LRs'}</th>
                                 <th className="py-3.5 px-4 text-center">{isHi ? 'इनवॉइस जनरेट' : 'Invoices Generated'}</th>
@@ -670,17 +671,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                         <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
                             {activeList.length === 0 ? (
                                 <tr>
-                                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                                    <td colSpan={10} className="py-12 text-center text-slate-400">
                                         {isHi ? 'कोई रिकॉर्ड नहीं मिला' : 'No records found for the selected period'}
                                     </td>
                                 </tr>
                             ) : (
-                                activeList.map((item) => (
+                                activeList.map((item, idx) => (
                                     <tr 
                                         key={item.key}
                                         onClick={() => item.totalLRs > 0 && setSelectedPeriodLrs({ title: `${item.label} ${item.subLabel || ''}`, lrs: item.lrs })}
                                         className={`hover:bg-blue-50/40 transition-colors ${item.totalLRs > 0 ? 'cursor-pointer' : 'opacity-60'}`}
                                     >
+                                        {/* Row Index */}
+                                        <td className="py-3.5 px-3 text-center font-bold text-slate-400 text-xs">
+                                            {idx + 1}
+                                        </td>
                                         {/* Period Name */}
                                         <td className="py-3.5 px-4 sm:px-6">
                                             <div className="font-bold text-slate-900">{item.label}</div>
@@ -759,7 +764,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({
                         {activeList.length > 0 && (
                             <tfoot className="bg-slate-900 text-white font-black text-xs">
                                 <tr>
-                                    <td className="py-4 px-4 sm:px-6 uppercase tracking-wider">
+                                    <td colSpan={2} className="py-4 px-4 sm:px-6 uppercase tracking-wider">
                                         {isHi ? 'कुल योग (TOTAL)' : 'Grand Total'}
                                     </td>
                                     <td className="py-4 px-4 text-center text-sm text-cyan-300">
@@ -818,12 +823,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({
 
                         {/* List */}
                         <div className="overflow-y-auto p-4 sm:p-6 space-y-3 flex-1">
-                            {selectedPeriodLrs.lrs.map(lr => {
+                            {selectedPeriodLrs.lrs.map((lr, idx) => {
                                 const billed = hasInvoice(lr);
                                 return (
                                     <div key={lr.lrNo} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                                         <div>
                                             <div className="flex items-center gap-2">
+                                                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-black flex items-center justify-center shrink-0">#{idx + 1}</span>
                                                 <span className="text-sm font-black text-slate-900">LR #{lr.lrNo}</span>
                                                 <span className="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded">
                                                     {lr.truckNo || 'No Truck'}

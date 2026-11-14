@@ -2324,6 +2324,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <table className="w-full text-left text-xs sm:text-sm">
                                 <thead>
                                     <tr className="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                                        <th className="pb-3.5 w-10 text-center">#</th>
                                         <th className="pb-3.5">{isHi ? 'LR नंबर' : 'LR NO'}</th>
                                         <th className="pb-3.5">{isHi ? 'दिनांक' : 'DATE'}</th>
                                         <th className="pb-3.5">{isHi ? 'ट्रक' : 'TRUCK'}</th>
@@ -2333,8 +2334,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {recentLRs.length > 0 ? (
-                                        recentLRs.map((lr) => (
+                                        recentLRs.map((lr, idx) => (
                                             <tr key={lr.lrNo} className="hover:bg-slate-50/80 transition-colors">
+                                                <td className="py-3.5 lg:py-4 text-center font-bold text-slate-400 text-xs">
+                                                    {idx + 1}
+                                                </td>
                                                 <td className="py-3.5 lg:py-4 font-black text-blue-600 font-mono text-xs sm:text-sm lg:text-base">
                                                     {lr.lrNo}
                                                 </td>
@@ -2365,7 +2369,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                                            <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
                                                 {isHi ? 'अभी तक कोई लॉरी रसीद नहीं बनी है। शुरू करने के लिए "+ नई LR" पर क्लिक करें!' : 'No Lorry Receipts created yet. Click "+ New LR" to start!'}
                                             </td>
                                         </tr>

@@ -1154,6 +1154,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         <table className="w-full text-xs text-left border-collapse">
                             <thead>
                                 <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                    <th className="px-3 py-3 border-r border-slate-700 text-center w-10">#</th>
                                     <th className="px-4 py-3 border-r border-slate-700">Saved Date</th>
                                     <th className="px-4 py-3 border-r border-slate-700">Company / Party</th>
                                     <th className="px-3.5 py-3 border-r border-slate-700">Statement Period</th>
@@ -1167,14 +1168,14 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             <tbody className="divide-y divide-slate-200">
                                 {loadingSaved ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-12 text-slate-400">
+                                        <td colSpan={9} className="text-center py-12 text-slate-400">
                                             <div className="animate-spin text-2xl mb-2">⏳</div>
                                             <div className="font-bold text-xs">Loading saved ledgers...</div>
                                         </td>
                                     </tr>
                                 ) : filteredSavedStatements.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="text-center py-16 text-slate-400">
+                                        <td colSpan={9} className="text-center py-16 text-slate-400">
                                             <div className="text-4xl mb-3">📭</div>
                                             <div className="font-black text-slate-700 text-sm">No Saved Ledgers Found</div>
                                             <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -1183,8 +1184,11 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredSavedStatements.map((st) => (
+                                    filteredSavedStatements.map((st, idx) => (
                                         <tr key={st.id} className="hover:bg-blue-50/40 transition-colors">
+                                            <td className="px-3 py-3 text-center font-bold text-slate-500 border-r border-slate-200">
+                                                {idx + 1}
+                                            </td>
                                             <td className="px-4 py-3 font-mono font-bold text-slate-600 whitespace-nowrap align-middle border-r border-slate-200">
                                                 {st.statement_date || '--'}
                                             </td>
@@ -1461,6 +1465,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                     <table className="w-full text-xs text-left border-collapse">
                                         <thead>
                                             <tr className="bg-[#2d2d2d] text-white text-[11px] font-bold tracking-wide">
+                                                <th className="px-3 py-3 border-r border-neutral-700 text-center w-10">#</th>
                                                 <th className="px-4 py-3 border-r border-neutral-700 w-28">Date</th>
                                                 <th className="px-4 py-3 border-r border-neutral-700 w-36">Transactions</th>
                                                 <th className="px-4 py-3 border-r border-neutral-700">Details</th>
@@ -1473,7 +1478,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                         <tbody className="divide-y divide-slate-200">
                                             {balance.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="text-center py-12 text-slate-400">
+                                                    <td colSpan={8} className="text-center py-12 text-slate-400">
                                                         <div className="text-3xl mb-2">📭</div>
                                                         <div className="font-bold text-sm">No transactions found for this party.</div>
                                                         <div className="text-xs mt-1">Generate an invoice from Invoices tab or click <strong>+ Add Line</strong> above to enter transactions.</div>
@@ -1487,6 +1492,10 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
                                                     return (
                                                         <tr key={tx.id || idx} className="hover:bg-slate-50 transition-colors">
+                                                            {/* Row Index */}
+                                                            <td className="px-3 py-3 text-center font-bold text-slate-500 border-r border-slate-200">
+                                                                {idx + 1}
+                                                            </td>
                                                             {/* Date */}
                                                             <td className="px-4 py-3 text-slate-700 whitespace-nowrap align-top border-r border-slate-200 font-medium">
                                                                 {formatDisplayDate(tx.date)}
@@ -1575,7 +1584,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                                         {/* Footer Total Bar */}
                                         <tfoot>
                                             <tr className="bg-slate-50 border-t-2 border-slate-300 font-bold text-slate-900 text-xs">
-                                                <td colSpan={5} className="px-4 py-3 text-right font-black uppercase tracking-wider">
+                                                <td colSpan={6} className="px-4 py-3 text-right font-black uppercase tracking-wider">
                                                     Balance Due:
                                                 </td>
                                                 <td className={`px-4 py-3 text-right font-mono font-black text-sm whitespace-nowrap ${closingBalance > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
@@ -1900,16 +1909,17 @@ const InvoicesTab = ({ lorryReceipts, payments }: { lorryReceipts: LorryReceipt[
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50">
-                                {['Invoice No', 'Party', 'Date', 'Days', 'LRs', 'Total Freight', 'Received', 'Outstanding', 'Status'].map(h => (
+                                {['#', 'Invoice No', 'Party', 'Date', 'Days', 'LRs', 'Total Freight', 'Received', 'Outstanding', 'Status'].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase whitespace-nowrap">{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={9} className="text-center py-12 text-gray-400">No invoices found</td></tr>
-                            ) : filtered.map(inv => (
+                                <tr><td colSpan={10} className="text-center py-12 text-gray-400">No invoices found</td></tr>
+                            ) : filtered.map((inv, idx) => (
                                 <tr key={inv.invoiceNo} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-4 py-3 text-center font-bold text-gray-500 text-xs">{idx + 1}</td>
                                     <td className="px-4 py-3 font-bold text-blue-700">{inv.invoiceNo}</td>
                                     <td className="px-4 py-3 text-gray-700 font-medium">{inv.party}</td>
                                     <td className="px-4 py-3 text-gray-600">{inv.date}</td>
@@ -1931,7 +1941,7 @@ const InvoicesTab = ({ lorryReceipts, payments }: { lorryReceipts: LorryReceipt[
                         {filtered.length > 0 && (
                             <tfoot>
                                 <tr className="bg-gray-50 border-t-2 border-gray-200">
-                                    <td colSpan={5} className="px-4 py-3 font-black text-gray-700">TOTAL ({filtered.length} invoices)</td>
+                                    <td colSpan={6} className="px-4 py-3 font-black text-gray-700">TOTAL ({filtered.length} invoices)</td>
                                     <td className="px-4 py-3 font-black text-gray-800">{fmt(filtered.reduce((s, i) => s + i.totalFreight, 0))}</td>
                                     <td className="px-4 py-3 font-black text-green-700">{fmt(filtered.reduce((s, i) => s + i.received, 0))}</td>
                                     <td className="px-4 py-3 font-black text-red-700">{fmt(filtered.reduce((s, i) => s + i.outstanding, 0))}</td>
@@ -2272,6 +2282,7 @@ const PaymentsTab = ({ payments, lorryReceipts, onRefresh }: {
                     <table className="w-full text-xs text-left border-collapse">
                         <thead>
                             <tr className="bg-[#0b192c] text-white text-[10px] uppercase font-bold tracking-wider">
+                                <th className="px-3 py-3 border-r border-slate-700 text-center w-10">#</th>
                                 <th className="px-3.5 py-3 border-r border-slate-700 w-24">Date</th>
                                 <th className="px-3.5 py-3 border-r border-slate-700 w-28">Receipt No</th>
                                 <th className="px-4 py-3 border-r border-slate-700">Party Name</th>
@@ -2287,19 +2298,23 @@ const PaymentsTab = ({ payments, lorryReceipts, onRefresh }: {
                         <tbody className="divide-y divide-slate-200">
                             {payments.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="text-center py-14 text-slate-400">
+                                    <td colSpan={11} className="text-center py-14 text-slate-400">
                                         <div className="text-3xl mb-2">💵</div>
                                         <div className="font-bold text-sm">No payment receipts recorded yet.</div>
                                         <div className="text-xs mt-1">Click <strong>+ Record Payment</strong> above to add customer payments with TDS and gross settlement.</div>
                                     </td>
                                 </tr>
-                            ) : payments.map(p => {
+                            ) : payments.map((p, idx) => {
                                 const netAmt = Number(p.amount) || 0;
                                 const tdsAmt = Number(p.tds_amount) || 0;
                                 const totAmt = Number(p.total_amount) || (netAmt + tdsAmt);
 
                                 return (
                                     <tr key={p.id} className="hover:bg-blue-50/40 transition-colors">
+                                        {/* Row Index */}
+                                        <td className="px-3 py-2.5 text-center font-bold text-slate-500 border-r border-slate-200">
+                                            {idx + 1}
+                                        </td>
                                         {/* Date */}
                                         <td className="px-3.5 py-2.5 font-medium text-slate-600 whitespace-nowrap border-r border-slate-200">
                                             {p.date}
@@ -3699,6 +3714,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                 <table className="w-full text-xs text-left">
                                     <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[10px] tracking-wider sticky top-0 border-b border-gray-200">
                                         <tr>
+                                            <th className="p-3 text-center w-10">#</th>
                                             <th className="p-3">Truck Number</th>
                                             <th className="p-3 text-center">Trips (LRs)</th>
                                             <th className="p-3 text-right">Total Distance</th>
@@ -3710,8 +3726,9 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                     <tbody className="divide-y divide-gray-100">
                                         {truckPetrolSummary
                                             .filter(t => !autoLRSearch || t.truckNo.toLowerCase().includes(autoLRSearch.toLowerCase()))
-                                            .map(t => (
+                                            .map((t, idx) => (
                                                 <tr key={t.truckNo} className="hover:bg-amber-50/50 transition">
+                                                    <td className="p-3 text-center font-bold text-slate-500">{idx + 1}</td>
                                                     <td className="p-3 font-mono font-black text-slate-900 text-xs flex items-center gap-1.5">
                                                         <span>🚛</span>
                                                         <span>{t.truckNo}</span>
@@ -3741,6 +3758,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                 <table className="w-full text-xs text-left">
                                     <thead className="bg-slate-50 text-slate-700 font-black uppercase text-[10px] tracking-wider sticky top-0 border-b border-gray-200">
                                         <tr>
+                                            <th className="p-3 text-center w-10">#</th>
                                             <th className="p-3">LR # & Date</th>
                                             <th className="p-3">Truck</th>
                                             <th className="p-3">Route (Origin ➔ Destination)</th>
@@ -3761,12 +3779,13 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                                                     (lr.toPlace && lr.toPlace.toLowerCase().includes(q))
                                                 );
                                             })
-                                            .map(lr => {
+                                            .map((lr, idx) => {
                                                 const dist = lr.distanceKm && lr.distanceKm > 0 ? lr.distanceKm : getResolvedDistance(lr.fromPlace, lr.toPlace).distanceKm;
                                                 const litres = Math.round((dist / (petrolMileageInput || 6.0)) * 10) / 10;
                                                 const cost = Math.round(litres * (petrolRateInput || 94.77));
                                                 return (
                                                     <tr key={lr.lrNo} className="hover:bg-amber-50/50 transition">
+                                                        <td className="p-3 text-center font-bold text-slate-500">{idx + 1}</td>
                                                         <td className="p-3">
                                                             <div className="font-mono font-black text-slate-900">LR #{lr.lrNo}</div>
                                                             <div className="text-[10px] text-slate-400">{lr.date}</div>
@@ -3981,14 +4000,14 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50">
-                                {['Date', 'Truck / Vehicle', 'Expense / Description', 'Vendor / Paid To', 'Mode', 'Amount', ''].map(h => (
+                                {['#', 'Date', 'Truck / Vehicle', 'Expense / Description', 'Vendor / Paid To', 'Mode', 'Amount', ''].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filtered.length === 0 ? (
-                                <tr><td colSpan={7} className="text-center py-12 text-gray-400">No expenses recorded</td></tr>
+                                <tr><td colSpan={8} className="text-center py-12 text-gray-400">No expenses recorded</td></tr>
                             ) : filtered.map((v, i) => {
                                 const truckMatch = v.description?.match(/\[Truck:\s*([^\]]+)\]/);
                                 const truckNo = truckMatch ? truckMatch[1] : (v.party_name && (v.party_name.startsWith('HR') || v.party_name.startsWith('DL') || v.party_name.match(/^[A-Z]{2}\s*\d/)) ? v.party_name : null);
@@ -4004,6 +4023,7 @@ const ExpensesTab = ({ vouchers, lorryReceipts, savedTrucks, onRefresh }: {
 
                                 return (
                                     <tr key={v.id || i} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-4 py-3 text-center font-bold text-gray-500 text-xs">{i + 1}</td>
                                         <td className="px-4 py-3 font-medium text-gray-600 whitespace-nowrap">{v.date}</td>
                                         <td className="px-4 py-3 whitespace-nowrap">
                                             {truckNo ? (
@@ -4211,13 +4231,14 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead><tr className="bg-gray-50">
-                                {['Date', 'Type', 'Description', 'Debit', 'Credit'].map(h => (
+                                {['#', 'Date', 'Type', 'Description', 'Debit', 'Credit'].map(h => (
                                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr></thead>
                             <tbody className="divide-y divide-gray-50">
                                 {dayBook.map((e, i) => (
                                     <tr key={i} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 text-center font-bold text-gray-500 text-xs">{i + 1}</td>
                                         <td className="px-4 py-3 text-gray-600">{e.date}</td>
                                         <td className="px-4 py-3"><Badge color={e.type === 'LR Invoice' ? 'bg-blue-100 text-blue-700' : e.type === 'Payment Received' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>{e.type}</Badge></td>
                                         <td className="px-4 py-3 text-gray-700">{e.desc}</td>
@@ -4228,7 +4249,7 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
                             </tbody>
                             <tfoot>
                                 <tr className="bg-gray-50 border-t-2">
-                                    <td colSpan={3} className="px-4 py-3 font-black">TOTAL</td>
+                                    <td colSpan={4} className="px-4 py-3 font-black">TOTAL</td>
                                     <td className="px-4 py-3 font-black text-red-700">{fmt(dayBook.reduce((s, e) => s + e.debit, 0))}</td>
                                     <td className="px-4 py-3 font-black text-green-700">{fmt(dayBook.reduce((s, e) => s + e.credit, 0))}</td>
                                 </tr>
@@ -4247,15 +4268,16 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
                     </div>
                     <table className="w-full text-sm">
                         <thead><tr className="bg-gray-50">
-                            {['Party', 'Total Invoiced', 'Received', 'Outstanding'].map(h => (
+                            {['#', 'Party', 'Total Invoiced', 'Received', 'Outstanding'].map(h => (
                                 <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                             ))}
                         </tr></thead>
                         <tbody className="divide-y divide-gray-50">
                             {outstandingByParty.length === 0 ? (
-                                <tr><td colSpan={4} className="text-center py-10 text-gray-400 font-bold text-green-600">🎉 All invoices paid!</td></tr>
-                            ) : outstandingByParty.map(r => (
+                                <tr><td colSpan={5} className="text-center py-10 text-gray-400 font-bold text-green-600">🎉 All invoices paid!</td></tr>
+                            ) : outstandingByParty.map((r, i) => (
                                 <tr key={r.party} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-center font-bold text-gray-500 text-xs">{i + 1}</td>
                                     <td className="px-4 py-3 font-bold text-gray-800">{r.party}</td>
                                     <td className="px-4 py-3 font-semibold text-gray-700">{fmt(r.debit)}</td>
                                     <td className="px-4 py-3 font-semibold text-green-600">{fmt(r.credit)}</td>
@@ -4288,17 +4310,18 @@ const ReportsTab = ({ lorryReceipts, vouchers, payments }: {
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead><tr className="bg-gray-50">
-                                {['Invoice No', 'LR No', 'Date', 'Party', 'Taxable', 'CGST (9%)', 'SGST (9%)', 'Total (18%)'].map(h => (
+                                {['#', 'Invoice No', 'LR No', 'Date', 'Party', 'Taxable', 'CGST (9%)', 'SGST (9%)', 'Total (18%)'].map(h => (
                                     <th key={h} className="px-3 py-2 text-left text-xs font-bold text-gray-500 uppercase">{h}</th>
                                 ))}
                             </tr></thead>
                             <tbody className="divide-y divide-gray-50">
-                                {filteredLRs.map(lr => {
+                                {filteredLRs.map((lr, i) => {
                                     const taxable = lr.freight || 0;
                                     const cgst = (taxable * 9) / 100;
                                     const sgst = (taxable * 9) / 100;
                                     return (
                                         <tr key={lr.lrNo} className="hover:bg-gray-50">
+                                            <td className="px-3 py-2 text-center font-bold text-gray-500 text-xs">{i + 1}</td>
                                             <td className="px-3 py-2 font-bold text-blue-700">{lr.invoiceNo}</td>
                                             <td className="px-3 py-2 text-gray-600">{lr.lrNo}</td>
                                             <td className="px-3 py-2 text-gray-600">{lr.date}</td>
@@ -4975,6 +4998,7 @@ const GSTCenterTab = ({
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-gray-50/80 border-b border-gray-100">
+                                <th className="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase w-12">#</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Invoice No</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Date</th>
                                 <th className="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Party Name</th>
@@ -4990,13 +5014,14 @@ const GSTCenterTab = ({
                         <tbody className="divide-y divide-gray-100">
                             {filteredRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={10} className="text-center py-12 text-gray-400 font-semibold">
+                                    <td colSpan={11} className="text-center py-12 text-gray-400 font-semibold">
                                         No invoices found for the selected period.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredRows.map(r => (
+                                filteredRows.map((r, i) => (
                                     <tr key={r.invoiceNo + r.lrNo} className="hover:bg-gray-50 transition">
+                                        <td className="px-4 py-3 text-center font-bold text-gray-500 text-xs">{i + 1}</td>
                                         <td className="px-4 py-3 font-mono font-bold text-blue-700">
                                             {r.invoiceNo}
                                         </td>

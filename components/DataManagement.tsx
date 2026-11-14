@@ -1168,6 +1168,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             }}
                                         />
                                     </th>
+                                    <th className="px-3 py-3 border-r w-10 text-center font-bold">#</th>
                                     <th className="px-3 py-3 border-r text-center w-16">Actions</th>
                                     <th className="px-3 py-3 border-r">Date</th>
                                     <th className="px-3 py-3 border-r">GR Number</th>
@@ -1184,8 +1185,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             </thead>
                             <tbody>
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={13} className="p-8 text-center text-gray-500 italic">No hiring records found matching your filters.</td></tr>
-                                ) : filtered.map(r => (
+                                    <tr><td colSpan={14} className="p-8 text-center text-gray-500 italic">No hiring records found matching your filters.</td></tr>
+                                ) : filtered.map((r, index) => (
                                     <tr key={r.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedHiringIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
                                         <td className="px-3 py-2 border-r text-center">
                                             <input 
@@ -1199,6 +1200,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                     );
                                                 }}
                                             />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center font-bold text-gray-500">
+                                            {index + 1}
                                         </td>
                                         <td className="px-3 py-2 border-r text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-1">
@@ -1333,6 +1337,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             }}
                                         />
                                     </th>
+                                    <th className="px-3 py-3 border-r w-10 text-center font-bold">#</th>
                                     <th className="px-3 py-3 border-r text-center w-16">Actions</th>
                                     <th className="px-3 py-3 border-r">Date</th>
                                     <th className="px-3 py-3 border-r">Party Name</th>
@@ -1347,8 +1352,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             </thead>
                             <tbody>
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={11} className="p-8 text-center text-gray-500 italic">No bookings found matching your filters.</td></tr>
-                                ) : filtered.map(r => (
+                                    <tr><td colSpan={12} className="p-8 text-center text-gray-500 italic">No bookings found matching your filters.</td></tr>
+                                ) : filtered.map((r, index) => (
                                     <tr key={r.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedBookingIds.includes(r.id!) ? 'bg-blue-50/70' : ''}`}>
                                         <td className="px-3 py-2 border-r text-center">
                                             <input 
@@ -1362,6 +1367,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                     );
                                                 }}
                                             />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center font-bold text-gray-500">
+                                            {index + 1}
                                         </td>
                                         <td className="px-3 py-2 border-r text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-1">
@@ -1497,6 +1505,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             }}
                                         />
                                     </th>
+                                    <th className="px-3 py-3 border-r w-10 text-center font-bold">#</th>
                                     <th className="px-3 py-3 border-r text-center w-16">Actions</th>
                                     <th className="px-3 py-3 border-r">Party Name</th>
                                     <th className="px-3 py-3 border-r">Type</th>
@@ -1509,8 +1518,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             </thead>
                             <tbody>
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={9} className="p-8 text-center text-gray-500 italic">No customer/party records found matching your filters.</td></tr>
-                                ) : filtered.map(p => (
+                                    <tr><td colSpan={10} className="p-8 text-center text-gray-500 italic">No customer/party records found matching your filters.</td></tr>
+                                ) : filtered.map((p, index) => (
                                     <tr key={p.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedPartyIds.includes(p.id!) ? 'bg-blue-50/70' : ''}`}>
                                         <td className="px-3 py-2 border-r text-center">
                                             <input 
@@ -1524,6 +1533,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                     );
                                                 }}
                                             />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center font-bold text-gray-500">
+                                            {index + 1}
                                         </td>
                                         <td className="px-3 py-2 border-r text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-1">
@@ -1640,6 +1652,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                             }}
                                         />
                                     </th>
+                                    <th className="px-3 py-3 border-r w-10 text-center font-bold">#</th>
                                     <th className="px-3 py-3 border-r text-center w-16">Actions</th>
                                     <th className="px-3 py-3 border-r">Truck / Vehicle No</th>
                                     <th className="px-3 py-3 border-r">Owner Name</th>
@@ -1648,8 +1661,8 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                             </thead>
                             <tbody>
                                 {filtered.length === 0 ? (
-                                    <tr><td colSpan={5} className="p-8 text-center text-gray-500 italic">No trucks found matching your filters.</td></tr>
-                                ) : filtered.map(t => (
+                                    <tr><td colSpan={6} className="p-8 text-center text-gray-500 italic">No trucks found matching your filters.</td></tr>
+                                ) : filtered.map((t, index) => (
                                     <tr key={t.id} className={`bg-white border-b hover:bg-blue-50/40 transition-colors ${selectedTruckIds.includes(t.id!) ? 'bg-blue-50/70' : ''}`}>
                                         <td className="px-3 py-2 border-r text-center">
                                             <input 
@@ -1663,6 +1676,9 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                     );
                                                 }}
                                             />
+                                        </td>
+                                        <td className="px-3 py-2 border-r text-center font-bold text-gray-500">
+                                            {index + 1}
                                         </td>
                                         <td className="px-3 py-2 border-r text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-1">
@@ -1802,6 +1818,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                     }}
                                                 />
                                             </th>
+                                            <th className="px-3 py-3 border-r border-blue-600 text-center w-10">#</th>
                                             <th className="px-3 py-3 border-r border-blue-600 sticky left-[40px] bg-blue-700 z-10">Actions</th>
                                             <th className="px-3 py-3 border-r border-blue-600">Month</th>
                                             <th className="px-3 py-3 border-r border-blue-600">Date</th>
@@ -1837,7 +1854,7 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                     <tbody>
                                         {filtered.length === 0 ? (
                                             <tr>
-                                                <td colSpan={31} className="p-8 text-center text-gray-500 italic">
+                                                <td colSpan={32} className="p-8 text-center text-gray-500 italic">
                                                     No records found matching filters.
                                                 </td>
                                             </tr>
@@ -1851,12 +1868,13 @@ FOR DELETE TO authenticated USING (bucket_id = 'pods');
                                                         onChange={() => {
                                                             if (!r.id) return;
                                                             setSelectedRegisterIds(prev => 
-                                                                prev.includes(r.id!) 
-                                                                    ? prev.filter(id => id !== r.id) 
-                                                                    : [...prev, r.id!]
+                                                                prev.includes(r.id!) ? prev.filter(id => id !== r.id) : [...prev, r.id!]
                                                             );
                                                         }}
                                                     />
+                                                </td>
+                                                <td className="px-3 py-2 border-r text-center font-bold text-gray-500">
+                                                    {idx + 1}
                                                 </td>
                                                 <td className="px-3 py-2 border-r text-center sticky left-[40px] bg-inherit z-10">
                                                     <div className="flex items-center justify-center gap-1">

@@ -59,6 +59,36 @@ import {
     View,
     LRStatus
 } from './types';
+
+const VALID_VIEWS: View[] = [
+    'dashboard',
+    'list',
+    'form',
+    'vehicle-hiring',
+    'booking-register',
+    'data-management',
+    'parties',
+    'trucks',
+    'invoices',
+    'vouchers',
+    'gps-panel',
+    'register-manager',
+    'reports',
+    'accounting',
+    'garage'
+];
+
+const getViewFromHash = (): View => {
+    try {
+        const rawHash = window.location.hash.replace(/^#\/?/, '').split('?')[0].trim();
+        if (VALID_VIEWS.includes(rawHash as View)) {
+            return rawHash as View;
+        }
+    } catch {
+        // fallback
+    }
+    return 'dashboard';
+};
 import {
     getLorryReceipts,
     saveLorryReceipt,
@@ -146,7 +176,7 @@ const App: React.FC = () => {
             return defaultCompanyDetails;
         }
     });
-    const [currentView, setCurrentView] = useState<View>('dashboard');
+    const [currentView, setCurrentView] = useState<View>(() => getViewFromHash());
     const [dashboardSection, setDashboardSection] = useState<'lr' | 'data' | 'emergency' | null>(null);
     const [viewHistory, setViewHistory] = useState<View[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -231,13 +261,82 @@ const App: React.FC = () => {
         }
     };
 
-    const navigateTo = (view: View) => {
+    const navigateTo = (view: View, replace = false) => {
+        if (!VALID_VIEWS.includes(view)) return;
+
+        // RBAC access guard
+        const isManager = currentRole === 'Manager';
+        const isOperator = currentRole === 'Operator';
+        const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+        const restrictedViewsOperator: View[] = ['vehicle-hiring', 'invoices', 'vouchers'];
+        if ((isManager && companyDetails.rbacEnabled && restrictedViewsManager.includes(view)) ||
+            (isOperator && restrictedViewsOperator.includes(view))) {
+            toast.error("Access Restricted: You don't have permission to access this screen.");
+            return;
+        }
+
+        const targetHash = `#${view}`;
+        if (window.location.hash !== targetHash) {
+            if (replace) {
+                window.history.replaceState({ view }, '', targetHash);
+            } else {
+                window.history.pushState({ view }, '', targetHash);
+            }
+        } else if (replace) {
+            window.history.replaceState({ view }, '', targetHash);
+        }
+
         setViewHistory(prev => [...prev, currentView]);
         setCurrentView(view);
-        if (view === 'dashboard') {
-            // keep section
+    };
+
+    const navigateBack = () => {
+        // If there's previous browser history in this session, trigger browser back
+        if (window.history.state && window.history.state.view && window.history.state.view !== 'dashboard') {
+            window.history.back();
+        } else if (viewHistory.length > 0) {
+            const prev = viewHistory[viewHistory.length - 1];
+            setViewHistory(h => h.slice(0, -1));
+            navigateTo(prev || 'dashboard', true);
+        } else {
+            navigateTo('dashboard', true);
         }
     };
+
+    // ── Listen to browser Back and Forward navigation (Chrome popstate) ──
+    useEffect(() => {
+        const handlePopState = (event: PopStateEvent) => {
+            const stateView = event.state?.view;
+            const hashView = getViewFromHash();
+            const targetView: View = (VALID_VIEWS.includes(stateView) ? stateView : hashView) as View;
+
+            const isManager = currentRole === 'Manager';
+            const isOperator = currentRole === 'Operator';
+            const restrictedViewsManager: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
+            const restrictedViewsOperator: View[] = ['vehicle-hiring', 'invoices', 'vouchers'];
+            if ((isManager && companyDetails.rbacEnabled && restrictedViewsManager.includes(targetView)) ||
+                (isOperator && restrictedViewsOperator.includes(targetView))) {
+                setCurrentView('dashboard');
+                window.history.replaceState({ view: 'dashboard' }, '', '#dashboard');
+                return;
+            }
+
+            setCurrentView(targetView);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [currentRole, companyDetails.rbacEnabled]);
+
+    // ── Keep active URL hash synced with active session ──
+    useEffect(() => {
+        if (session && !isLoading) {
+            const activeView = VALID_VIEWS.includes(currentView) ? currentView : 'dashboard';
+            if (window.location.hash !== `#${activeView}`) {
+                window.history.replaceState({ view: activeView }, '', `#${activeView}`);
+            }
+        }
+    }, [session, isLoading, currentView]);
 
     useEffect(() => {
         // Dynamic favicon
@@ -702,13 +801,16 @@ const App: React.FC = () => {
         }
 
         toast.success('Signed out successfully.', { id: toastId });
+        try {
+            window.history.replaceState(null, '', window.location.pathname);
+        } catch {}
     };
 
     const handleEditLR = (lrNo: string) => {
         const lr = lorryReceipts.find(l => l.lrNo === lrNo);
         if (lr) {
             setEditingLR(lr);
-            setCurrentView('form');
+            navigateTo('form');
         }
     };
 
@@ -736,7 +838,7 @@ const App: React.FC = () => {
         // 'list' is now accessible to managers, so excluded from restricted
         const restrictedViews: View[] = ['vehicle-hiring', 'booking-register', 'data-management', 'invoices'];
         if (role === 'Manager' && companyDetails.rbacEnabled && restrictedViews.includes(currentView)) {
-            setCurrentView('dashboard');
+            navigateTo('dashboard', true);
         }
         return true;
     };
@@ -839,7 +941,7 @@ const App: React.FC = () => {
                     <h2 className="text-2xl font-black text-gray-800 mb-2">Access Restricted</h2>
                     <p className="text-gray-500 mb-8 font-medium">You do not have permission to access this module. Please switch to Admin mode if you have the passkey.</p>
                     <button
-                        onClick={() => setCurrentView('dashboard')}
+                        onClick={() => navigateTo('dashboard', true)}
                         className="w-full py-4 bg-ssk-blue text-white rounded-2xl font-bold shadow-lg shadow-blue-200 active:scale-95 transition-transform"
                     >
                         Back to Dashboard
@@ -853,11 +955,11 @@ const App: React.FC = () => {
                 return (
                     <Dashboard
                         lorryReceipts={operatorLRs}
-                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
-                        onViewList={() => setCurrentView('list')}
-                        onViewVouchers={() => setCurrentView('vouchers')}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
+                        onViewList={() => navigateTo('list')}
+                        onViewVouchers={() => navigateTo('vouchers')}
                         onEditLR={handleEditLR}
-                        setCurrentView={setCurrentView}
+                        setCurrentView={navigateTo}
                         language={language}
                         activeSection={dashboardSection}
                         setActiveSection={setDashboardSection}
@@ -881,9 +983,9 @@ const App: React.FC = () => {
                         lorryReceipts={operatorLRs}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
-                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
                         companyDetails={companyDetails}
-                        onBackToDashboard={() => setCurrentView('dashboard')}
+                        onBackToDashboard={navigateBack}
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
                         onViewPOD={async (path) => {
@@ -905,9 +1007,9 @@ const App: React.FC = () => {
                         lorryReceipts={lorryReceipts}
                         onEdit={handleEditLR}
                         onDelete={handleDeleteLR}
-                        onAddNew={() => { setEditingLR(null); setCurrentView('form'); }}
+                        onAddNew={() => { setEditingLR(null); navigateTo('form'); }}
                         companyDetails={companyDetails}
-                        onBackToDashboard={() => setCurrentView('dashboard')}
+                        onBackToDashboard={navigateBack}
                         onUpdateStatus={handleUpdateLRStatus}
                         onOpenPODUploader={(lr) => setUploadingPODFor(lr)}
                         onViewPOD={async (path) => {
@@ -928,7 +1030,7 @@ const App: React.FC = () => {
                     <LRForm
                         onSave={handleSaveLR}
                         existingLR={editingLR}
-                        onCancel={() => { setEditingLR(null); setCurrentView('dashboard'); }}
+                        onCancel={() => { setEditingLR(null); navigateBack(); }}
                         companyDetails={companyDetails}
                         lorryReceipts={lorryReceipts}
                         savedParties={savedParties}
@@ -937,11 +1039,11 @@ const App: React.FC = () => {
                     />
                 );
             case 'vehicle-hiring':
-                return <VehicleHiring onBack={() => setCurrentView('dashboard')} lorryReceipts={lorryReceipts} />;
+                return <VehicleHiring onBack={navigateBack} lorryReceipts={lorryReceipts} />;
             case 'booking-register':
-                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} initialTab="register-entries" companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
+                return <DataManagement onBack={navigateBack} currentRole={currentRole} initialTab="register-entries" companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
             case 'data-management':
-                return <DataManagement onBack={() => setCurrentView('dashboard')} currentRole={currentRole} companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
+                return <DataManagement onBack={navigateBack} currentRole={currentRole} companyDetails={companyDetails} onUpdateDetails={handleUpdateDetails} onUploadAsset={handleUploadAsset} />;
             case 'parties':
                 return (
                     <PartyManagement
@@ -955,7 +1057,7 @@ const App: React.FC = () => {
                             await deleteSavedParty(id);
                             setSavedParties(prev => prev.filter(x => x.id !== id));
                         }}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={navigateBack}
                     />
                 );
             case 'trucks':
@@ -973,9 +1075,9 @@ const App: React.FC = () => {
                             await deleteSavedTruck(id, truckNo);
                             setSavedTrucks(prev => prev.filter(x => x.id !== id));
                         }}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={navigateBack}
                         onNavigateToExpenses={() => {
-                            setCurrentView('accounting');
+                            navigateTo('accounting');
                         }}
                     />
                 );
@@ -984,7 +1086,7 @@ const App: React.FC = () => {
                     <InvoiceList
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={navigateBack}
                         onUpdateInvoiceDetails={handleUpdateInvoiceDetails}
                         onRemoveLRsFromInvoice={handleClearLRInvoiceDetails}
                     />
@@ -994,7 +1096,7 @@ const App: React.FC = () => {
                     <ReportsView
                         lorryReceipts={lorryReceipts}
                         companyDetails={companyDetails}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={navigateBack}
                         language={language}
                     />
                 );
@@ -1005,9 +1107,9 @@ const App: React.FC = () => {
                         companyDetails={companyDetails}
                         savedParties={savedParties}
                         savedTrucks={savedTrucks}
-                        onBack={() => setCurrentView('dashboard')}
+                        onBack={navigateBack}
                         onOpenGarage={() => {
-                            setCurrentView('garage');
+                            navigateTo('garage');
                         }}
                     />
                 );

@@ -39,6 +39,8 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     const [lrFilter, setLrFilter] = useState<'all' | 'in_transit' | 'pod_pending' | 'delivered'>('all');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [isFrameMode, setIsFrameMode] = useState(false);
+    const [isQuickCreateOpen, setIsQuickCreateOpen] = useState(false);
+    const [accountSubTab, setAccountSubTab] = useState<'overview' | 'unbilled' | 'invoices'>('overview');
 
     const showToast = (msg: string) => {
         setToastMessage(msg);
@@ -70,6 +72,24 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     const totalFreight = useMemo(() => 
         lorryReceipts.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0),
         [lorryReceipts]
+    );
+
+    // Unbilled & Invoiced LR sets for Billing
+    const unbilledLRs = useMemo(() => 
+        lorryReceipts.filter(lr => !lr.isInvoiceGenerated && lr.status !== 'Cancelled'),
+        [lorryReceipts]
+    );
+    const invoicedLRs = useMemo(() => 
+        lorryReceipts.filter(lr => lr.isInvoiceGenerated),
+        [lorryReceipts]
+    );
+    const unbilledFreight = useMemo(() => 
+        unbilledLRs.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0),
+        [unbilledLRs]
+    );
+    const invoicedFreight = useMemo(() => 
+        invoicedLRs.reduce((sum, lr) => sum + (Number(lr.freight) || 0), 0),
+        [invoicedLRs]
     );
 
     // Today's Date formatted
@@ -451,9 +471,36 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                                     </div>
                                 </div>
                                 <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap gap-1.5">
-                                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-medium">Ledger</span>
-                                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-medium">Freight Bill</span>
-                                    <span className="px-2 py-0.5 rounded-md bg-white/15 text-[10px] font-medium">GST Summary</span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setCurrentView('invoices'); }}
+                                        className="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold flex items-center gap-1 active:scale-95 transition cursor-pointer"
+                                    >
+                                        <span>📄</span>
+                                        <span>+ Create Invoice</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setCurrentView('accounting'); }}
+                                        className="px-2.5 py-1 rounded-lg bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold flex items-center gap-1 active:scale-95 transition cursor-pointer"
+                                    >
+                                        <span>💳</span>
+                                        <span>Payments</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setCurrentView('accounting'); }}
+                                        className="px-2 py-0.5 rounded-md bg-white/10 text-white/90 text-[10px] font-medium hover:bg-white/20 transition cursor-pointer"
+                                    >
+                                        Party Ledger
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); setCurrentView('accounting'); }}
+                                        className="px-2 py-0.5 rounded-md bg-white/10 text-white/90 text-[10px] font-medium hover:bg-white/20 transition cursor-pointer"
+                                    >
+                                        GST Summary
+                                    </button>
                                 </div>
                             </div>
 
@@ -500,6 +547,22 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                                 <span className="text-[11px] text-blue-600 font-medium">Swipe for more</span>
                             </div>
                             <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+                                <button 
+                                    type="button"
+                                    onClick={() => setCurrentView('invoices')} 
+                                    className="flex-none bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-sm flex items-center space-x-1.5 transition active:scale-95 cursor-pointer ring-1 ring-indigo-400/30"
+                                >
+                                    <span className="font-bold">📄+</span>
+                                    <span>Create Invoice</span>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setCurrentView('accounting')} 
+                                    className="flex-none bg-emerald-600 text-white hover:bg-emerald-700 text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-sm flex items-center space-x-1.5 transition active:scale-95 cursor-pointer"
+                                >
+                                    <span>💳</span>
+                                    <span>Record Payment</span>
+                                </button>
                                 <button 
                                     type="button"
                                     onClick={onAddNew} 
@@ -891,54 +954,286 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     </div>
                 )}
 
-                {/* -------------------- TAB 4: ACCOUNTS TAB -------------------- */}
+                {/* -------------------- TAB 4: ACCOUNTS & INVOICING TAB -------------------- */}
                 {activeTab === 'accounts' && (
                     <div className="space-y-4 animate-fadeIn">
-                        <div className="flex items-center justify-between">
+                        {/* Header & Quick Action Buttons */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                             <div>
-                                <h2 className="text-lg font-bold text-slate-800">Accounts & Billing</h2>
-                                <p className="text-xs text-slate-500">Invoices, Ledgers & Expenses</p>
+                                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                    <span>Accounts & Invoicing</span>
+                                    <span className="text-[10px] bg-indigo-100 text-indigo-800 font-extrabold px-2 py-0.5 rounded-full">
+                                        GST Ready
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-slate-500">
+                                    {invoicedLRs.length} Billed Invoices • {unbilledLRs.length} Unbilled LRs
+                                </p>
                             </div>
-                            <button 
-                                type="button"
-                                onClick={() => setCurrentView('accounting')}
-                                className="bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-xl flex items-center space-x-1.5 shadow-md cursor-pointer"
-                            >
-                                <span className="font-bold">+</span>
-                                <span>New Invoice</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setCurrentView('invoices')}
+                                    className="flex-1 sm:flex-none bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-indigo-600/30 active:scale-95 transition cursor-pointer"
+                                >
+                                    <span className="text-sm font-black">+</span>
+                                    <span>Create Invoice</span>
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => setCurrentView('accounting')}
+                                    className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-emerald-600/20 active:scale-95 transition cursor-pointer"
+                                >
+                                    <span>💳</span>
+                                    <span>Record Payment</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-4 rounded-2xl shadow-lg space-y-3">
-                            <span className="text-xs text-indigo-300 font-medium">Financial Summary (FY 2026-27)</span>
-                            <div className="flex justify-between items-end">
-                                <div>
-                                    <span className="text-[10px] text-slate-400 block uppercase">Total Billed</span>
-                                    <span className="text-2xl font-black">{formatINR(totalFreight)}</span>
+                        {/* Financial Overview Card */}
+                        <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-5 rounded-3xl shadow-xl relative overflow-hidden space-y-3 border border-indigo-900/60">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                                    <span>📊</span>
+                                    <span>Billing & Revenue Summary</span>
+                                </span>
+                                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-indigo-200">
+                                    FY 2026-27
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pt-1">
+                                <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                                    <span className="text-[10px] text-slate-400 block uppercase font-medium">Total Freight Billed</span>
+                                    <span className="text-xl font-black text-white mt-0.5 block">{formatINR(totalFreight)}</span>
+                                    <span className="text-[10px] text-emerald-400 font-semibold mt-1 block">● {totalLRs} LRs in System</span>
                                 </div>
-                                <div className="text-right">
-                                    <span className="text-[10px] text-slate-400 block uppercase">Pending Received</span>
-                                    <span className="text-lg font-bold text-amber-400">₹ 24.50 Lakh</span>
+                                <div className="bg-white/5 p-3 rounded-2xl border border-white/10">
+                                    <span className="text-[10px] text-amber-300 block uppercase font-medium">Unbilled LRs Ready</span>
+                                    <span className="text-xl font-black text-amber-400 mt-0.5 block">{formatINR(unbilledFreight)}</span>
+                                    <span className="text-[10px] text-amber-300/80 font-semibold mt-1 block">● {unbilledLRs.length} LRs to Bill</span>
                                 </div>
                             </div>
+
+                            {/* Direct Prompt to Generate Invoice if unbilled LRs exist */}
+                            {unbilledLRs.length > 0 && (
+                                <div className="pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentView('invoices')}
+                                        className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-between shadow-md active:scale-98 transition cursor-pointer"
+                                    >
+                                        <span className="flex items-center gap-1.5">
+                                            <span>⚡</span>
+                                            <span>Bill {unbilledLRs.length} Unbilled LRs into GST Invoices</span>
+                                        </span>
+                                        <span className="font-mono text-[11px] bg-white/20 px-2 py-0.5 rounded-md">
+                                            Open Wizard ➔
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setCurrentView('accounting')}
-                                className="p-3 bg-white rounded-xl border border-slate-200 text-left font-bold text-xs hover:border-indigo-400 transition"
-                            >
-                                📘 Party Ledgers ➔
-                            </button>
-                            <button
-                                type="button"
+                        {/* 4 Core Financial Modules (Grid) */}
+                        <div className="grid grid-cols-2 gap-2.5">
+                            {/* 1. Tax Invoices */}
+                            <div
                                 onClick={() => setCurrentView('invoices')}
-                                className="p-3 bg-white rounded-xl border border-slate-200 text-left font-bold text-xs hover:border-indigo-400 transition"
+                                className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-indigo-400 hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
                             >
-                                📄 Tax Invoices ➔
+                                <div>
+                                    <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition-transform">
+                                        📄
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-xs">Create & View Invoices</h4>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                        Multi-LR GST tax bills, printable invoices
+                                    </p>
+                                </div>
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-indigo-600 font-bold">
+                                    <span>New Invoice ➔</span>
+                                </div>
+                            </div>
+
+                            {/* 2. Payments & Receipts */}
+                            <div
+                                onClick={() => setCurrentView('accounting')}
+                                className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-emerald-400 hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition-transform">
+                                        💳
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-xs">Record Payments</h4>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                        Party payment receipts, advance, NEFT & cash
+                                    </p>
+                                </div>
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-emerald-600 font-bold">
+                                    <span>Payments ➔</span>
+                                </div>
+                            </div>
+
+                            {/* 3. Party Ledgers */}
+                            <div
+                                onClick={() => setCurrentView('accounting')}
+                                className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-blue-400 hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition-transform">
+                                        📘
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-xs">Party Ledgers</h4>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                        Debit/Credit bahi-khata & WhatsApp statement
+                                    </p>
+                                </div>
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-blue-600 font-bold">
+                                    <span>Open Ledger ➔</span>
+                                </div>
+                            </div>
+
+                            {/* 4. Expense Vouchers */}
+                            <div
+                                onClick={() => setCurrentView('accounting')}
+                                className="p-3.5 bg-white rounded-2xl border border-slate-200/90 shadow-xs hover:border-amber-400 hover:shadow-md transition cursor-pointer group flex flex-col justify-between"
+                            >
+                                <div>
+                                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg mb-2 group-hover:scale-110 transition-transform">
+                                        ⛽
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-xs">Expense Vouchers</h4>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">
+                                        Driver kharcha, fuel diesel & toll expenses
+                                    </p>
+                                </div>
+                                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-amber-600 font-bold">
+                                    <span>Expenses ➔</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Interactive Sub-tab Selector */}
+                        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs font-bold">
+                            <button
+                                type="button"
+                                onClick={() => setAccountSubTab('overview')}
+                                className={`flex-1 py-1.5 rounded-xl transition ${accountSubTab === 'overview' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                All Operations
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAccountSubTab('unbilled')}
+                                className={`flex-1 py-1.5 rounded-xl transition ${accountSubTab === 'unbilled' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                Ready to Bill ({unbilledLRs.length})
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAccountSubTab('invoices')}
+                                className={`flex-1 py-1.5 rounded-xl transition ${accountSubTab === 'invoices' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                            >
+                                Invoiced ({invoicedLRs.length})
                             </button>
                         </div>
+
+                        {/* Subtab Content: Unbilled LRs list with 1-click Invoice Action */}
+                        {accountSubTab === 'unbilled' && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between px-1">
+                                    <span className="text-xs font-bold text-slate-700">LRs Pending Invoice Generation</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentView('invoices')}
+                                        className="text-xs font-bold text-indigo-600 hover:underline"
+                                    >
+                                        Bulk Bill in Wizard ➔
+                                    </button>
+                                </div>
+
+                                {unbilledLRs.length > 0 ? (
+                                    unbilledLRs.slice(0, 5).map(lr => (
+                                        <div key={lr.lrNo} className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono font-bold text-xs text-slate-800">LR #{lr.lrNo}</span>
+                                                    <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-medium">
+                                                        {lr.date || 'Recent'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 truncate max-w-[190px] mt-0.5">
+                                                    {lr.consignor?.name || 'Party'} ➔ {lr.toPlace || 'Destination'}
+                                                </p>
+                                                <span className="text-xs font-black text-indigo-700 block mt-0.5">
+                                                    ₹ {Number(lr.freight || 0).toLocaleString('en-IN')}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentView('invoices')}
+                                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1.5 rounded-xl border border-indigo-200 shrink-0 active:scale-95 transition cursor-pointer"
+                                            >
+                                                + Bill Now
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="bg-white p-6 rounded-2xl text-center text-xs text-slate-400">
+                                        All LRs have been invoiced! 🎉
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Subtab Content: Invoiced LRs */}
+                        {accountSubTab === 'invoices' && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between px-1">
+                                    <span className="text-xs font-bold text-slate-700">Generated Invoices</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCurrentView('invoices')}
+                                        className="text-xs font-bold text-indigo-600 hover:underline"
+                                    >
+                                        View All in Tax Invoices ➔
+                                    </button>
+                                </div>
+
+                                {invoicedLRs.length > 0 ? (
+                                    invoicedLRs.slice(0, 5).map(lr => (
+                                        <div key={lr.lrNo} className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="font-mono font-bold text-xs text-slate-800">LR #{lr.lrNo}</span>
+                                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md font-bold">
+                                                        Bill: {lr.billNo || 'INVOICED'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500 truncate max-w-[190px] mt-0.5">
+                                                    {lr.consignor?.name || 'Party'} • Inv Date: {lr.invoiceDate || lr.date || '-'}
+                                                </p>
+                                                <span className="text-xs font-black text-slate-800 block mt-0.5">
+                                                    ₹ {Number(lr.freight || 0).toLocaleString('en-IN')}
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentView('invoices')}
+                                                className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-xl shrink-0 active:scale-95 transition cursor-pointer"
+                                            >
+                                                View Bill
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="bg-white p-6 rounded-2xl text-center text-xs text-slate-400">
+                                        No invoices generated yet. Use the Create Invoice button above to bill your LRs!
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1048,12 +1343,12 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     <span className="text-[10px]">LRs</span>
                 </button>
 
-                {/* 3. Floating Action Center Button (Create New LR) */}
+                {/* 3. Floating Action Center Button (Quick Create Modal) */}
                 <button 
                     type="button"
-                    onClick={onAddNew} 
-                    className="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/40 flex items-center justify-center text-lg active:scale-95 transition cursor-pointer"
-                    title="Create New LR"
+                    onClick={() => setIsQuickCreateOpen(true)} 
+                    className="w-12 h-12 -mt-6 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-600/40 flex items-center justify-center text-lg active:scale-95 transition cursor-pointer ring-4 ring-white"
+                    title="Quick Create (LR, Invoice, Payment, Party)"
                 >
                     <span className="text-2xl font-bold leading-none">+</span>
                 </button>
@@ -1070,11 +1365,11 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     <span className="text-[10px]">Garage</span>
                 </button>
 
-                {/* 5. Accounts */}
+                {/* 5. Accounts & Invoicing */}
                 <button 
                     type="button"
                     onClick={() => setActiveTab('accounts')} 
-                    className={`flex flex-col items-center transition ${activeTab === 'accounts' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
+                    className={`flex flex-col items-center transition ${activeTab === 'accounts' ? 'text-indigo-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'}`}
                 >
                     <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1082,6 +1377,98 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     <span className="text-[10px]">Accounts</span>
                 </button>
             </nav>
+
+            {/* Quick Create Bottom Sheet Modal */}
+            {isQuickCreateOpen && (
+                <div 
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn"
+                    onClick={() => setIsQuickCreateOpen(false)}
+                >
+                    <div 
+                        className="w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4 animate-slideUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-xl">⚡</span>
+                                <div>
+                                    <h3 className="font-black text-slate-800 text-sm sm:text-base">Quick Create & Actions</h3>
+                                    <p className="text-[11px] text-slate-400">Choose what you want to create</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsQuickCreateOpen(false)}
+                                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 font-bold flex items-center justify-center hover:bg-slate-200 transition cursor-pointer"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* 1. Create LR */}
+                            <button
+                                type="button"
+                                onClick={() => { setIsQuickCreateOpen(false); onAddNew(); }}
+                                className="p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200/80 text-left hover:bg-blue-100 transition active:scale-95 flex flex-col justify-between h-28 cursor-pointer group"
+                            >
+                                <span className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:scale-105 transition-transform">
+                                    🚚
+                                </span>
+                                <div>
+                                    <span className="font-black text-blue-950 text-xs block">+ New LR / Bilty</span>
+                                    <span className="text-[10px] text-blue-700 font-medium">Create consignment note</span>
+                                </div>
+                            </button>
+
+                            {/* 2. Create Invoice */}
+                            <button
+                                type="button"
+                                onClick={() => { setIsQuickCreateOpen(false); setCurrentView('invoices'); }}
+                                className="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200/80 text-left hover:bg-indigo-100 transition active:scale-95 flex flex-col justify-between h-28 cursor-pointer group"
+                            >
+                                <span className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:scale-105 transition-transform">
+                                    📄
+                                </span>
+                                <div>
+                                    <span className="font-black text-indigo-950 text-xs block">+ Create Invoice</span>
+                                    <span className="text-[10px] text-indigo-700 font-medium">Generate GST bills from LRs</span>
+                                </div>
+                            </button>
+
+                            {/* 3. Record Payment */}
+                            <button
+                                type="button"
+                                onClick={() => { setIsQuickCreateOpen(false); setCurrentView('accounting'); }}
+                                className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-left hover:bg-emerald-100 transition active:scale-95 flex flex-col justify-between h-28 cursor-pointer group"
+                            >
+                                <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:scale-105 transition-transform">
+                                    💳
+                                </span>
+                                <div>
+                                    <span className="font-black text-emerald-950 text-xs block">Record Payment</span>
+                                    <span className="text-[10px] text-emerald-700 font-medium">Receipts, Cheque & Cash</span>
+                                </div>
+                            </button>
+
+                            {/* 4. Add Party */}
+                            <button
+                                type="button"
+                                onClick={() => { setIsQuickCreateOpen(false); setCurrentView('parties'); }}
+                                className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-left hover:bg-amber-100 transition active:scale-95 flex flex-col justify-between h-28 cursor-pointer group"
+                            >
+                                <span className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center text-lg shadow-sm group-hover:scale-105 transition-transform">
+                                    👤+
+                                </span>
+                                <div>
+                                    <span className="font-black text-amber-950 text-xs block">+ Add Party</span>
+                                    <span className="text-[10px] text-amber-700 font-medium">Consignor or Consignee</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Notification Toast */}
             {toastMessage && (

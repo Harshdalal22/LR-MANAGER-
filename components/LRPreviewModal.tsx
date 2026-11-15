@@ -125,10 +125,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'w-[1040px] max-w-full p-3 text-[9px] min-h-[680px] flex flex-col justify-between' 
+        ? 'w-[1040px] max-w-full p-4 text-[9.5px] min-h-[680px] flex flex-col justify-between' 
         : paperSize === 'a5' 
-            ? 'w-[580px] max-w-full p-2 text-[8px]' 
-            : 'w-[794px] max-w-full p-5 text-[9.5px] min-h-[1050px] flex flex-col justify-between';
+            ? 'w-[580px] max-w-full p-2.5 text-[8.5px]' 
+            : 'w-[794px] max-w-full p-5 text-[10px] min-h-[1050px] flex flex-col justify-between';
 
     const detectedLiability = (() => {
         if (gstLiability) return gstLiability;
@@ -138,7 +138,9 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
         if (p.includes('12')) return 'FCM_12';
         if (p.includes('exempt')) return 'EXEMPTED';
         return 'RCM';
-    })();    return (
+    })();
+
+    return (
         <div
             ref={ref}
             className={`printable-area bg-white text-slate-900 font-sans mx-auto border-2 border-slate-900 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
@@ -146,79 +148,79 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             {/* Top Company Header & LR Document Details */}
             <div className="flex flex-row justify-between items-start border-b-2 border-slate-900 pb-2 gap-3">
                 <div className="flex-1">
-                    <div className="flex items-start gap-2.5">
+                    <div className="flex items-start gap-3">
                         {companyDetails.logoUrl && (
                             <img
                                 src={companyDetails.logoUrl}
                                 alt="Logo"
-                                className="h-12 w-auto max-w-[70px] object-contain mt-0.5"
+                                className="h-14 w-auto max-w-[80px] object-contain mt-0.5"
                             />
                         )}
                         <div>
-                            <h1 className="font-black text-[#0b192c] text-[21px] uppercase tracking-tight leading-tight">
+                            <h1 className="font-black text-[#0b192c] text-[23px] uppercase tracking-tight leading-tight">
                                 {companyDetails.name || ''}
                             </h1>
-                            <p className="text-[9.5px] font-semibold text-slate-600">
+                            <p className="text-[10px] font-bold text-slate-700">
                                 {companyDetails.tagline || ''}
                             </p>
                         </div>
                     </div>
 
-                    <div className="mt-1.5 space-y-0.5 text-[8.5px] text-slate-700">
-                        <p className="leading-tight font-medium">
-                            {companyDetails.address && <><span className="font-bold text-slate-900">Regd Off:</span> {companyDetails.address}</>}
+                    <div className="mt-1.5 space-y-0.5 text-[9.5px] text-slate-800">
+                        <p className="leading-snug font-semibold text-slate-900">
+                            {companyDetails.address && <><span className="font-black text-slate-950">Regd Off:</span> {companyDetails.address}</>}
                             {companyDetails.jurisdictionCity ? ` • Sub to ${companyDetails.jurisdictionCity} Jurisdiction` : ''}
                         </p>
                         {showCompanyDetails && companyDetails.gstn && (
-                            <p className="font-semibold text-slate-800">
-                                <span className="font-bold text-slate-900">GSTIN:</span> <span className="font-mono font-bold text-slate-900">{companyDetails.gstn}</span>
-                                {companyDetails.pan && <> • <span className="font-bold text-slate-900">PAN:</span> <span className="font-mono font-bold text-slate-900">{companyDetails.pan}</span></>}
-                                <> • <span className="font-bold text-slate-900">State Code:</span> <span className="font-mono font-bold text-slate-900">{getStateCodeFromGst(companyDetails.gstn) || '--'}</span></>
+                            <p className="font-bold text-slate-900">
+                                <span className="font-black text-slate-950">GSTIN:</span> <span className="font-mono font-black text-slate-950">{companyDetails.gstn}</span>
+                                {companyDetails.pan && <> • <span className="font-black text-slate-950">PAN:</span> <span className="font-mono font-black text-slate-950">{companyDetails.pan}</span></>}
+                                <> • <span className="font-black text-slate-950">State Code:</span> <span className="font-mono font-black text-slate-950">{getStateCodeFromGst(companyDetails.gstn) || '--'}</span></>
                             </p>
                         )}
-                        <p className="text-slate-600">
-                            {companyDetails.email && <><span className="font-bold text-slate-800">Email:</span> <span className="font-medium text-slate-800">{companyDetails.email}</span></>}
+                        <p className="text-slate-800 font-bold">
+                            {companyDetails.email && <><span className="font-black text-slate-950">Email:</span> <span className="font-bold text-slate-900">{companyDetails.email}</span></>}
                             {companyDetails.contact && companyDetails.contact.length > 0 && (
-                                <> • <span className="font-bold text-slate-800">Helpline:</span> <span className="font-medium text-slate-800">{companyDetails.contact.join(', ')}</span></>
+                                <> • <span className="font-black text-slate-950">Helpline:</span> <span className="font-bold text-slate-900">{companyDetails.contact.join(', ')}</span></>
                             )}
                         </p>
                     </div>
                 </div>
 
                 {/* Right: Modern Exact Doc Details Box */}
-                <div className="w-[270px] bg-slate-50 border border-slate-300 rounded-xs overflow-hidden flex flex-col justify-between">
-                    <div className="bg-[#0b192c] text-white py-1 px-2 text-center">
-                        <span className="font-black text-[11px] uppercase tracking-wider block">
+                <div className="w-[280px] bg-slate-50 border-2 border-slate-900 rounded-xs overflow-hidden flex flex-col justify-between">
+                    <div className="bg-[#0b192c] text-white py-1.5 px-2 text-center">
+                        <span className="font-black text-[12px] uppercase tracking-wider block">
                             CONSIGNMENT NOTE / LR
                         </span>
                     </div>
                     
-                    <div className="bg-slate-100/90 py-0.5 px-2 text-center border-b border-slate-200">
-                        <span className="font-extrabold text-[8.5px] text-blue-900 uppercase tracking-widest">
+                    <div className="bg-slate-100 py-1 px-2 text-center border-b border-slate-300">
+                        <span className="font-black text-[9.5px] text-blue-900 uppercase tracking-widest">
                             {activeCopy}
                         </span>
                     </div>
 
-                    <div className="p-2 space-y-1 text-[8.5px]">
+                    <div className="p-2 space-y-1 text-[9.5px]">
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">LR / Bilty No:</span>
-                            <span className="font-mono font-black text-[11px] text-blue-800">
+                            <span className="text-slate-700 font-bold">LR / Bilty No:</span>
+                            <span className="font-mono font-black text-[12.5px] text-blue-900">
                                 {lr.lrNo || '--'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">LR Date:</span>
-                            <span className="font-bold text-slate-900">{formatDisplayDate(lr.date)}</span>
+                            <span className="text-slate-700 font-bold">LR Date:</span>
+                            <span className="font-black text-slate-950">{formatDisplayDate(lr.date)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">E-Way Bill No:</span>
-                            <span className="font-mono font-bold text-slate-900">
+                            <span className="text-slate-700 font-bold">E-Way Bill No:</span>
+                            <span className="font-mono font-black text-slate-950">
                                 {lr.ewayBillNo || '--'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
-                            <span className="text-slate-600 font-semibold">EWB Valid Upto:</span>
-                            <span className="font-bold text-slate-900">
+                            <span className="text-slate-700 font-bold">EWB Valid Upto:</span>
+                            <span className="font-black text-slate-950">
                                 {lr.ewayExDate ? formatDisplayDate(lr.ewayExDate) : (lr.ewayBillDate ? formatDisplayDate(lr.ewayBillDate) : '--')}
                             </span>
                         </div>
@@ -227,25 +229,25 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             </div>
 
             {/* Dark Navy Route & Vehicle Ribbon */}
-            <div className="bg-[#0b192c] text-white flex justify-between items-center px-3 py-1.5 my-1.5 rounded-xs">
+            <div className="bg-[#0b192c] text-white flex justify-between items-center px-3.5 py-2 my-2 rounded-xs border border-slate-800">
                 {/* Left: Origin -> Destination */}
                 <div className="flex items-center gap-3">
                     <div>
-                        <span className="text-slate-400 font-semibold text-[7.5px] uppercase tracking-wider block">
+                        <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
                             SOURCE • ORIGIN
                         </span>
-                        <span className="font-black text-[11px] uppercase tracking-wide text-white">
+                        <span className="font-black text-[13px] uppercase tracking-wide text-white">
                             {lr.fromPlace || '--'}
                         </span>
                     </div>
                     
-                    <span className="text-cyan-400 font-bold text-sm px-1">➔</span>
+                    <span className="text-cyan-300 font-black text-base px-1.5">➔</span>
 
                     <div>
-                        <span className="text-slate-400 font-semibold text-[7.5px] uppercase tracking-wider block">
+                        <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
                             DESTINATION • DELIVERY POINT
                         </span>
-                        <span className="font-black text-[11px] uppercase tracking-wide text-white">
+                        <span className="font-black text-[13px] uppercase tracking-wide text-white">
                             {lr.toPlace || '--'}
                         </span>
                     </div>
@@ -253,76 +255,76 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                 {/* Right: Vehicle & Driver Details */}
                 <div className="text-right">
-                    <span className="text-slate-400 font-semibold text-[7.5px] uppercase tracking-wider block">
+                    <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
                         VEHICLE & DRIVER DETAILS
                     </span>
-                    <span className="font-mono font-black text-[10px] text-white uppercase block">
+                    <span className="font-mono font-black text-[11.5px] text-white uppercase block">
                         {lr.truckNo || '--'} {vehicleType ? `• ${vehicleType}` : ''}
                     </span>
-                    <span className="text-slate-300 text-[8px] font-medium block">
+                    <span className="text-slate-200 text-[9px] font-bold block">
                         Driver: {driverName || '--'} {driverContact ? `(+91 ${driverContact.replace(/[^0-9]/g, '')})` : ''}
                     </span>
                 </div>
             </div>
 
             {/* Two-Column Party Box: Consignor & Consignee */}
-            <div className="grid grid-cols-2 gap-2 my-1.5">
+            <div className="grid grid-cols-2 gap-2.5 my-2">
                 {/* Consignor Details */}
-                <div className="border border-slate-300 rounded-xs p-2 bg-slate-50/40">
+                <div className="border-2 border-slate-300 rounded-xs p-2.5 bg-slate-50/50">
                     <div className="flex items-center gap-1 mb-1">
-                        <span className="text-[9px]">📦</span>
-                        <span className="font-extrabold text-[8.5px] text-slate-800 uppercase tracking-wider">
+                        <span className="text-[10px]">📦</span>
+                        <span className="font-black text-[9px] text-slate-800 uppercase tracking-wider">
                             CONSIGNOR (BILLED & DISPATCHED FROM)
                         </span>
                     </div>
-                    <h3 className="font-black text-[10.5px] text-slate-900 uppercase leading-tight">
+                    <h3 className="font-black text-[12px] text-slate-950 uppercase leading-snug">
                         {lr.consignor?.name || '--'}
                     </h3>
-                    <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
+                    <p className="text-[9.5px] text-slate-800 leading-snug mt-0.5 font-bold">
                         {lr.consignor?.address || '--'}
                         {lr.consignor?.city && !lr.consignor?.address?.includes(lr.consignor.city) ? `, ${lr.consignor.city}` : ''}
                     </p>
-                    <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
+                    <div className="mt-1.5 pt-1.5 border-t border-slate-300 text-[9px] space-y-0.5 font-bold">
                         <p>
-                            <span className="font-bold text-slate-700">GSTIN:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consignorGst || '--'}</span>
-                            {' • '}<span className="font-bold text-slate-700">State Code:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consignorStateCode || '--'}</span>
+                            <span className="font-black text-slate-900">GSTIN:</span>{' '}
+                            <span className="font-mono font-black text-slate-950">{consignorGst || '--'}</span>
+                            {' • '}<span className="font-black text-slate-900">State Code:</span>{' '}
+                            <span className="font-mono font-black text-slate-950">{consignorStateCode || '--'}</span>
                         </p>
                         <p>
-                            <span className="font-bold text-slate-700">Contact:</span>{' '}
-                            <span className="text-slate-800 font-medium">{lr.consignor?.contact || '--'}</span>
-                            {lr.invoiceNo && <> • <span className="font-bold text-slate-700">Inv No:</span> <span className="font-mono font-bold text-slate-900">{lr.invoiceNo}</span></>}
+                            <span className="font-black text-slate-900">Contact:</span>{' '}
+                            <span className="text-slate-900 font-bold">{lr.consignor?.contact || '--'}</span>
+                            {lr.invoiceNo && <> • <span className="font-black text-slate-900">Inv No:</span> <span className="font-mono font-black text-slate-950">{lr.invoiceNo}</span></>}
                         </p>
                     </div>
                 </div>
 
                 {/* Consignee Details */}
-                <div className="border border-slate-300 rounded-xs p-2 bg-slate-50/40">
+                <div className="border-2 border-slate-300 rounded-xs p-2.5 bg-slate-50/50">
                     <div className="flex items-center gap-1 mb-1">
-                        <span className="text-[9px]">🏭</span>
-                        <span className="font-extrabold text-[8.5px] text-slate-800 uppercase tracking-wider">
+                        <span className="text-[10px]">🏭</span>
+                        <span className="font-black text-[9px] text-slate-800 uppercase tracking-wider">
                             CONSIGNEE (SHIP & DELIVERY TO)
                         </span>
                     </div>
-                    <h3 className="font-black text-[10.5px] text-slate-900 uppercase leading-tight">
+                    <h3 className="font-black text-[12px] text-slate-950 uppercase leading-snug">
                         {lr.consignee?.name || '--'}
                     </h3>
-                    <p className="text-[8.5px] text-slate-700 leading-tight mt-0.5 font-medium">
+                    <p className="text-[9.5px] text-slate-800 leading-snug mt-0.5 font-bold">
                         {lr.consignee?.address || '--'}
                         {lr.consignee?.city && !lr.consignee?.address?.includes(lr.consignee.city) ? `, ${lr.consignee.city}` : ''}
                     </p>
-                    <div className="mt-1 pt-1 border-t border-slate-200 text-[8px] space-y-0.5">
+                    <div className="mt-1.5 pt-1.5 border-t border-slate-300 text-[9px] space-y-0.5 font-bold">
                         <p>
-                            <span className="font-bold text-slate-700">GSTIN:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consigneeGst || '--'}</span>
-                            {' • '}<span className="font-bold text-slate-700">State Code:</span>{' '}
-                            <span className="font-mono font-bold text-slate-900">{consigneeStateCode || '--'}</span>
+                            <span className="font-black text-slate-900">GSTIN:</span>{' '}
+                            <span className="font-mono font-black text-slate-950">{consigneeGst || '--'}</span>
+                            {' • '}<span className="font-black text-slate-900">State Code:</span>{' '}
+                            <span className="font-mono font-black text-slate-950">{consigneeStateCode || '--'}</span>
                         </p>
                         <p>
-                            <span className="font-bold text-slate-700">Contact:</span>{' '}
-                            <span className="text-slate-800 font-medium">{lr.consignee?.contact || '--'}</span>
-                            {lr.poNo && <> • <span className="font-bold text-slate-700">PO No:</span> <span className="font-mono font-bold text-slate-900">{lr.poNo}</span></>}
+                            <span className="font-black text-slate-900">Contact:</span>{' '}
+                            <span className="text-slate-900 font-bold">{lr.consignee?.contact || '--'}</span>
+                            {lr.poNo && <> • <span className="font-black text-slate-900">PO No:</span> <span className="font-mono font-black text-slate-950">{lr.poNo}</span></>}
                         </p>
                     </div>
                 </div>
@@ -330,14 +332,14 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
             {/* Separate Billing Party if Applicable */}
             {isBillingPartySeparate && (
-                <div className="border border-amber-300 bg-amber-50/70 rounded-xs p-1.5 my-1 flex justify-between items-center text-[8.5px]">
+                <div className="border-2 border-amber-300 bg-amber-50/70 rounded-xs p-2 my-1.5 flex justify-between items-center text-[9px]">
                     <div>
-                        <span className="font-black text-amber-900 uppercase text-[8px] mr-1">BILLING PARTY (3rd Party):</span>
-                        <span className="font-bold text-slate-900 uppercase">{lr.billingTo.name}</span>
-                        <span className="text-slate-600"> • {lr.billingTo.address}, {lr.billingTo.city}</span>
+                        <span className="font-black text-amber-900 uppercase text-[8.5px] mr-1">BILLING PARTY (3rd Party):</span>
+                        <span className="font-black text-slate-950 uppercase">{lr.billingTo.name}</span>
+                        <span className="text-slate-700 font-bold"> • {lr.billingTo.address}, {lr.billingTo.city}</span>
                     </div>
                     {lr.billingTo.gst && (
-                        <div className="font-mono font-bold text-slate-900">
+                        <div className="font-mono font-black text-slate-950">
                             GSTIN: {lr.billingTo.gst}
                         </div>
                     )}
@@ -345,47 +347,47 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             )}
 
             {/* Goods Description & Packages Itemized Table */}
-            <div className="border border-slate-300 rounded-xs overflow-hidden my-1.5">
-                <table className="w-full text-left border-collapse text-[8.5px]">
+            <div className="border-2 border-slate-900 rounded-xs overflow-hidden my-2">
+                <table className="w-full text-left border-collapse text-[9.5px]">
                     <thead>
-                        <tr className="bg-[#0b192c] text-white text-[8px] uppercase tracking-wider font-bold">
-                            <th className="p-1 text-center w-[5%] border-r border-slate-700">SR.</th>
-                            <th className="p-1 text-center w-[15%] border-r border-slate-700">PACKAGES</th>
-                            <th className="p-1 text-left w-[36%] border-r border-slate-700">DESCRIPTION OF GOODS & PACKING DETAILS</th>
-                            <th className="p-1 text-center w-[12%] border-r border-slate-700">HSN / SAC</th>
-                            <th className="p-1 text-right w-[11%] border-r border-slate-700">ACTUAL WT.</th>
-                            <th className="p-1 text-right w-[11%] border-r border-slate-700">CHARGED WT.</th>
-                            <th className="p-1 text-right w-[10%]">RATE / UNIT</th>
+                        <tr className="bg-[#0b192c] text-white text-[9px] uppercase tracking-wider font-black">
+                            <th className="p-1.5 text-center w-[5%] border-r border-slate-700">SR.</th>
+                            <th className="p-1.5 text-center w-[15%] border-r border-slate-700">PACKAGES</th>
+                            <th className="p-1.5 text-left w-[36%] border-r border-slate-700">DESCRIPTION OF GOODS & PACKING DETAILS</th>
+                            <th className="p-1.5 text-center w-[12%] border-r border-slate-700">HSN / SAC</th>
+                            <th className="p-1.5 text-right w-[11%] border-r border-slate-700">ACTUAL WT.</th>
+                            <th className="p-1.5 text-right w-[11%] border-r border-slate-700">CHARGED WT.</th>
+                            <th className="p-1.5 text-right w-[10%]">RATE / UNIT</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200">
+                    <tbody className="divide-y divide-slate-300">
                         {lr.items && lr.items.length > 0 ? (
                             lr.items.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50">
-                                    <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">{idx + 1}</td>
-                                    <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">
+                                    <td className="p-1.5 text-center font-black text-slate-700 border-r border-slate-300 align-top">{idx + 1}</td>
+                                    <td className="p-1.5 text-center font-black text-slate-950 border-r border-slate-300 align-top">
                                         {item.pcs > 0 ? `${item.pcs} ${item.packingDetails || 'Pkgs'}` : (item.packingDetails ? item.packingDetails : '--')}
                                     </td>
-                                    <td className="p-1 border-r border-slate-200 align-top">
-                                        <div className="font-black text-slate-900 uppercase">{item.description || '--'}</div>
+                                    <td className="p-1.5 border-r border-slate-300 align-top">
+                                        <div className="font-black text-slate-950 uppercase text-[10.5px] leading-snug">{item.description || '--'}</div>
                                         {item.packingDetails && (
-                                            <div className="text-[7.5px] text-slate-500 font-medium">Packing: {item.packingDetails}</div>
+                                            <div className="text-[8px] text-slate-600 font-bold">Packing: {item.packingDetails}</div>
                                         )}
                                     </td>
-                                    <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">
+                                    <td className="p-1.5 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top">
                                         {item.hsn || lr.hsnCode || companyDetails.sacCode || '--'}
                                     </td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">
+                                    <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">
                                         {Number(item.weight) > 0 
                                             ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.weight} Ton` : `${item.weight.toLocaleString('en-IN')} Kg`}` 
                                             : (idx === 0 && Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : '--')}
                                     </td>
-                                    <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">
+                                    <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">
                                         {Number(item.chargedWeight) > 0 
                                             ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.chargedWeight} Ton` : `${item.chargedWeight.toLocaleString('en-IN')} Kg`}` 
                                             : (idx === 0 && Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg` : '--')}
                                     </td>
-                                    <td className="p-1 text-right font-bold text-slate-900 align-top">
+                                    <td className="p-1.5 text-right font-black text-slate-950 align-top">
                                         {showAmounts && (Number(item.rate) > 0 || Number(lr.rate) > 0)
                                             ? `₹ ${Number(item.rate || lr.rate).toFixed(2)} / ${item.unit || (lr.rateOn === 'Ton' ? 'MT' : lr.rateOn) || 'Ton'}`
                                             : '--'}
@@ -394,13 +396,13 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             ))
                         ) : (
                             <tr className="hover:bg-slate-50">
-                                <td className="p-1 text-center font-bold text-slate-600 border-r border-slate-200 align-top">1</td>
-                                <td className="p-1 text-center font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
-                                <td className="p-1 border-r border-slate-200 align-top font-black text-slate-900 uppercase">--</td>
-                                <td className="p-1 text-center font-mono text-slate-800 border-r border-slate-200 align-top">--</td>
-                                <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
-                                <td className="p-1 text-right font-bold text-slate-900 border-r border-slate-200 align-top">--</td>
-                                <td className="p-1 text-right font-bold text-slate-900 align-top">--</td>
+                                <td className="p-1.5 text-center font-black text-slate-700 border-r border-slate-300 align-top">1</td>
+                                <td className="p-1.5 text-center font-black text-slate-950 border-r border-slate-300 align-top">--</td>
+                                <td className="p-1.5 border-r border-slate-300 align-top font-black text-slate-950 uppercase">--</td>
+                                <td className="p-1.5 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top">--</td>
+                                <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">--</td>
+                                <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">--</td>
+                                <td className="p-1.5 text-right font-black text-slate-950 align-top">--</td>
                             </tr>
                         )}
 
@@ -411,60 +413,60 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             const emptyRowsCount = Math.max(0, minRows - currentCount);
                             return Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
                                 <tr key={`empty-${emptyIdx}`} className="hover:bg-slate-50">
-                                    <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-200 align-top">
+                                    <td className="p-1.5 text-center font-bold text-slate-300 border-r border-slate-200 align-top">
                                         {currentCount + emptyIdx + 1}
                                     </td>
-                                    <td className="p-1 text-center font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
-                                    <td className="p-1 border-r border-slate-200 align-top font-bold text-slate-300">&nbsp;</td>
-                                    <td className="p-1 text-center font-mono text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
-                                    <td className="p-1 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
-                                    <td className="p-1 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
-                                    <td className="p-1 text-right font-bold text-slate-300 align-top">&nbsp;</td>
+                                    <td className="p-1.5 text-center font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1.5 border-r border-slate-200 align-top font-bold text-slate-300">&nbsp;</td>
+                                    <td className="p-1.5 text-center font-mono text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1.5 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1.5 text-right font-bold text-slate-300 border-r border-slate-200 align-top">&nbsp;</td>
+                                    <td className="p-1.5 text-right font-bold text-slate-300 align-top">&nbsp;</td>
                                 </tr>
                             ));
                         })()}
 
                         {/* Summary Total Row */}
-                        <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-800 text-[8.5px]">
-                            <td className="p-1 text-center border-r border-slate-300">•</td>
-                            <td className="p-1 text-center font-black border-r border-slate-300">
+                        <tr className="bg-slate-100 font-black text-slate-950 border-t-2 border-slate-900 text-[10px]">
+                            <td className="p-1.5 text-center border-r border-slate-400">•</td>
+                            <td className="p-1.5 text-center font-black border-r border-slate-400">
                                 {totalPcs > 0 ? `${totalPcs} Total` : '--'}
                             </td>
-                            <td className="p-1 font-black border-r border-slate-300">Total Quantities Dispatched (Said to Contain)</td>
-                            <td className="p-1 text-center border-r border-slate-300">--</td>
-                            <td className="p-1 text-right font-black border-r border-slate-300">{totalActualWeight}</td>
-                            <td className="p-1 text-right font-black border-r border-slate-300">{totalChargedWeight}</td>
-                            <td className="p-1 text-right">--</td>
+                            <td className="p-1.5 font-black border-r border-slate-400">Total Quantities Dispatched (Said to Contain)</td>
+                            <td className="p-1.5 text-center border-r border-slate-400">--</td>
+                            <td className="p-1.5 text-right font-black border-r border-slate-400">{totalActualWeight}</td>
+                            <td className="p-1.5 text-right font-black border-r border-slate-400">{totalChargedWeight}</td>
+                            <td className="p-1.5 text-right">--</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
             {/* Bottom Split Section: GST / Statutory & Financial Breakdown */}
-            <div className="grid grid-cols-12 gap-2 my-1.5 items-start">
+            <div className="grid grid-cols-12 gap-2.5 my-1.5 items-start">
                 {/* Left 7 Columns: STATUTORY COMPLIANCE & CONSIGNMENT DETAILS */}
-                <div className="col-span-7 flex flex-col justify-between space-y-1.5">
+                <div className="col-span-7 flex flex-col justify-between space-y-2">
                     <div>
-                        <div className="font-extrabold text-[8.5px] text-[#0b192c] uppercase border-b border-slate-300 pb-0.5">
+                        <div className="font-black text-[9.5px] text-[#0b192c] uppercase border-b-2 border-slate-400 pb-1">
                             STATUTORY & CONSIGNMENT DETAILS
                         </div>
 
                         {/* Declared Value & Insurance */}
-                        <div className="mt-1 text-[8px] space-y-0.5 border border-slate-200 p-1 rounded-xs bg-slate-50/30">
+                        <div className="mt-1.5 text-[9px] space-y-1 border border-slate-300 p-2 rounded-xs bg-slate-50/50">
                             <p>
-                                <span className="font-bold text-slate-800">Declared Value of Goods:</span> <span className="font-bold text-slate-900">{declaredValue}</span>
-                                <> • <span className="font-bold text-slate-800">Transit Risk:</span> <span className="font-medium text-slate-900">{transitRisk}</span></>
+                                <span className="font-black text-slate-900">Declared Value of Goods:</span> <span className="font-black text-slate-950">{declaredValue}</span>
+                                <> • <span className="font-black text-slate-900">Transit Risk:</span> <span className="font-bold text-slate-950">{transitRisk}</span></>
                             </p>
-                            <p className="text-slate-700">
-                                <span className="font-bold text-slate-800">Insurance Policy No:</span> {insurancePolicy}
-                                <> • <span className="font-bold text-slate-800">Insurer:</span> {insuranceCompany}</>
+                            <p className="text-slate-800">
+                                <span className="font-bold text-slate-900">Insurance Policy No:</span> {insurancePolicy}
+                                <> • <span className="font-bold text-slate-900">Insurer:</span> {insuranceCompany}</>
                             </p>
                         </div>
 
                         {/* Terms & Conditions */}
-                        <div className="mt-1 text-[7.5px] text-slate-600 leading-tight">
-                            <span className="font-bold text-slate-800 block">Terms & Conditions:</span>
-                            <ol className="list-decimal list-inside space-y-0.5 mt-0.5">
+                        <div className="mt-1.5 text-[8.5px] text-slate-700 leading-normal">
+                            <span className="font-black text-slate-900 block">Terms & Conditions:</span>
+                            <ol className="list-decimal list-inside space-y-0.5 mt-0.5 font-medium">
                                 <li>The carrier is not responsible for leakage, breakage, or internal damage during transit.</li>
                                 <li>Demurrage charges applicable @ ₹ 1,500/day if unloading delayed beyond 24 hrs.</li>
                                 <li>Original LR & delivery acknowledgement (POD) required for final freight settlement.</li>
@@ -472,22 +474,22 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </div>
 
                         {lr.remark && (
-                            <div className="mt-1 p-1 bg-amber-50 border border-amber-200 text-[7.5px] rounded-xs">
-                                <span className="font-bold text-amber-900">REMARK: </span>
-                                <span className="text-slate-800">{lr.remark}</span>
+                            <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-300 text-[8.5px] rounded-xs">
+                                <span className="font-black text-amber-950">REMARK: </span>
+                                <span className="text-slate-900 font-bold">{lr.remark}</span>
                             </div>
                         )}
                     </div>
 
                     {/* 3 Signatures Area (Exact as reference image) */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-300 text-center text-[7.5px]">
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t-2 border-slate-400 text-center text-[8.5px]">
                         <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
-                            <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
-                            <span className="font-bold text-slate-800">Consignor / Loader Sign</span>
+                            <div className="border-b-2 border-slate-600 mb-1 w-5/6 mx-auto"></div>
+                            <span className="font-black text-slate-900">Consignor / Loader Sign</span>
                         </div>
                         <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
-                            <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
-                            <span className="font-bold text-slate-800">Driver Sign / Thumb Impression</span>
+                            <div className="border-b-2 border-slate-600 mb-1 w-5/6 mx-auto"></div>
+                            <span className="font-black text-slate-900">Driver Sign / Thumb Impression</span>
                         </div>
                         <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'} items-center`}>
                             {companyDetails.signatureImageUrl ? (
@@ -497,62 +499,62 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                                     className={`${isLandscape ? 'h-8' : 'h-12'} w-auto object-contain mb-0.5`}
                                 />
                             ) : (
-                                <div className="border-b border-slate-400 mb-1 w-5/6 mx-auto"></div>
+                                <div className="border-b-2 border-slate-600 mb-1 w-5/6 mx-auto"></div>
                             )}
-                            <span className="font-bold text-slate-900">For {companyDetails.name || ''}</span>
+                            <span className="font-black text-slate-950">For {companyDetails.name || ''}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Right 5 Columns: FINANCIAL CHARGES & NET PAYABLE */}
-                <div className="col-span-5 border border-slate-800 rounded-xs bg-white overflow-hidden shadow-xs">
-                    <div className="flex justify-between items-center p-1.5 bg-slate-100/90 border-b border-slate-300 text-[8.5px]">
-                        <span className="text-slate-600 font-bold uppercase">Freight Basis:</span>
+                <div className="col-span-5 border-2 border-slate-900 rounded-xs bg-white overflow-hidden shadow-xs">
+                    <div className="flex justify-between items-center p-1.5 bg-slate-100 border-b border-slate-300 text-[9.5px]">
+                        <span className="text-slate-700 font-black uppercase">Freight Basis:</span>
                         <span className="font-black text-blue-900 uppercase tracking-wide">
                             {freightBasis}
                         </span>
                     </div>
 
-                    <div className="divide-y divide-slate-200 text-[8.5px]">
-                        <div className="flex justify-between p-1">
-                            <span className="text-slate-700">Basic Freight (Charged Wt):</span>
-                            <span className="font-mono text-slate-900 font-bold">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
+                    <div className="divide-y divide-slate-200 text-[9.5px]">
+                        <div className="flex justify-between p-1.5">
+                            <span className="text-slate-800 font-bold">Basic Freight (Charged Wt):</span>
+                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
                         </div>
-                        <div className="flex justify-between p-1">
-                            <span className="text-slate-700">Loading & Handling Hamali:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
+                        <div className="flex justify-between p-1.5">
+                            <span className="text-slate-800 font-bold">Loading & Handling Hamali:</span>
+                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
                         </div>
-                        <div className="flex justify-between p-1">
-                            <span className="text-slate-700">Door Pickup & Delivery:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
+                        <div className="flex justify-between p-1.5">
+                            <span className="text-slate-800 font-bold">Door Pickup & Delivery:</span>
+                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
                         </div>
-                        <div className="flex justify-between p-1">
-                            <span className="text-slate-700">Statistical & LR Surcharge:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
+                        <div className="flex justify-between p-1.5">
+                            <span className="text-slate-800 font-bold">Statistical & LR Surcharge:</span>
+                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
                         </div>
-                        <div className="flex justify-between p-1">
-                            <span className="text-slate-700">Toll & Green Tax Surcharge:</span>
-                            <span className="font-mono text-slate-800 font-bold">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
+                        <div className="flex justify-between p-1.5">
+                            <span className="text-slate-800 font-bold">Toll & Green Tax Surcharge:</span>
+                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Total Freight Amount Bar */}
-                        <div className="flex justify-between items-center p-1.5 bg-[#0b192c] text-white font-black text-[9.5px]">
+                        <div className="flex justify-between items-center p-2 bg-[#0b192c] text-white font-black text-[10.5px]">
                             <span>TOTAL FREIGHT AMOUNT:</span>
-                            <span className="font-mono text-[10.5px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
+                            <span className="font-mono text-[12px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Advance Paid */}
-                        <div className="flex justify-between p-1 bg-slate-50 text-emerald-800 font-bold">
+                        <div className="flex justify-between p-1.5 bg-slate-50 text-emerald-900 font-black">
                             <span>Advance Paid (by Cash/Online):</span>
                             <span className="font-mono font-black">(-) {showAmounts ? formatINR(advancePaid) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Net Balance To Pay */}
-                        <div className="flex justify-between items-center p-1.5 bg-blue-50/80 text-blue-950 border-t border-blue-200">
-                            <span className="font-black text-[9.5px] uppercase tracking-wide">
+                        <div className="flex justify-between items-center p-2 bg-blue-50 text-blue-950 border-t-2 border-blue-300">
+                            <span className="font-black text-[10.5px] uppercase tracking-wide">
                                 NET BALANCE TO PAY:
                             </span>
-                            <span className="font-mono font-black text-sm text-blue-900">
+                            <span className="font-mono font-black text-base text-blue-900">
                                 {showAmounts ? formatINR(netBalanceToPay) : '₹ 0.00'}
                             </span>
                         </div>
@@ -560,10 +562,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                     {/* Bank & Payment Info Box */}
                     {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
-                        <div className="p-1 bg-slate-50 border-t border-slate-200 text-[7px] space-y-0.2">
-                            <span className="font-bold text-slate-900 block uppercase">Bank RTGS/NEFT Details:</span>
-                            <p className="text-slate-700 font-medium leading-tight">
-                                Bank: <strong className="text-slate-900">{companyDetails.bankDetails.name}</strong> • A/c: <strong className="font-mono text-slate-900">{companyDetails.bankDetails.accountNo}</strong> • IFSC: <strong className="font-mono text-slate-900">{companyDetails.bankDetails.ifscCode}</strong>
+                        <div className="p-1.5 bg-slate-50 border-t border-slate-300 text-[8px] space-y-0.5">
+                            <span className="font-black text-slate-900 block uppercase">Bank RTGS/NEFT Details:</span>
+                            <p className="text-slate-800 font-semibold leading-tight">
+                                Bank: <strong className="text-slate-950 font-black">{companyDetails.bankDetails.name}</strong> • A/c: <strong className="font-mono font-black text-slate-950">{companyDetails.bankDetails.accountNo}</strong> • IFSC: <strong className="font-mono font-black text-slate-950">{companyDetails.bankDetails.ifscCode}</strong>
                             </p>
                         </div>
                     )}
@@ -586,61 +588,64 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
     companyDetails: CompanyDetails;
     showCompanyDetails: boolean;
     showAmounts: boolean;
+    copyType?: string;
     orientation?: 'portrait' | 'landscape';
     paperSize?: 'a4' | 'a5' | 'letter' | 'legal';
     singlePageFit?: boolean;
-}>(({ lr, companyDetails, showCompanyDetails, showAmounts, orientation = 'portrait', paperSize = 'a4', singlePageFit = true }, ref) => {
+    gstLiability?: 'RCM' | 'FCM_18' | 'FCM_12' | 'BOTH_5_18' | 'EXEMPTED';
+}>(({ lr, companyDetails, showCompanyDetails, showAmounts, copyType = 'CONSIGNOR COPY', orientation = 'portrait', paperSize = 'a4', singlePageFit = true }, ref) => {
     const totalCharges = (Object.values(lr.charges || {}) as number[]).reduce((sum: number, charge: number) => sum + (charge || 0), 0);
     const totalToPay = (Number(lr.freight) || 0) + totalCharges;
 
     const isBillingPartySeparate = lr.billingTo && lr.billingTo.name &&
-        (lr.billingTo.name !== lr.consignor.name || lr.billingTo.address !== lr.consignor.address) &&
-        (lr.billingTo.name !== lr.consignee.name || lr.billingTo.address !== lr.consignee.address);
+        (lr.billingTo.name !== lr.consignor?.name || lr.billingTo.address !== lr.consignor?.address) &&
+        (lr.billingTo.name !== lr.consignee?.name || lr.billingTo.address !== lr.consignee?.address);
 
     const formatAmount = (amount: number | undefined) => {
         return showAmounts ? (Number(amount) || 0).toFixed(2) : "0.00";
     };
 
+    const activeCopy = copyType || lr.copyType || 'CONSIGNOR COPY';
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'w-[1020px] p-3' 
+        ? 'w-[1040px] max-w-full p-4 text-[9.5px] min-h-[680px] flex flex-col justify-between' 
         : paperSize === 'a5' 
-            ? 'w-[580px] p-2 text-[8px]' 
-            : 'w-[680px] p-2';
+            ? 'w-[580px] max-w-full p-2.5 text-[8.5px]' 
+            : 'w-[794px] max-w-full p-5 text-[10px] min-h-[1050px] flex flex-col justify-between';
 
     return (
         <div ref={ref} className={`printable-area bg-white text-black font-sans ${containerClass} mx-auto border-2 border-black relative ${singlePageFit ? 'page-avoid-break' : ''}`}>
             {/* Jurisdiction Header */}
             {companyDetails.jurisdictionCity && (
-                <div className="text-[10px] font-bold text-center w-full pb-1 uppercase tracking-wide">
+                <div className="text-[10px] font-black text-center w-full pb-1 uppercase tracking-wider text-slate-900">
                     SUBJECT TO {companyDetails.jurisdictionCity} JURISDICTION
                 </div>
             )}
 
             {/* Dynamic Header */}
-            <div className="flex flex-row justify-between items-stretch pb-2 border-b-4 border-ssk-blue min-h-[100px]">
+            <div className="flex flex-row justify-between items-stretch pb-2 border-b-4 border-ssk-blue min-h-[100px] gap-2">
                 {/* Left: Logo */}
-                <div className="flex-none w-24 flex justify-start items-center">
+                <div className="flex-none w-28 flex justify-start items-center">
                     {companyDetails.logoUrl && (
                         <img src={companyDetails.logoUrl} alt="Company Logo" className="h-20 w-full object-contain object-left" />
                     )}
                 </div>
 
                 {/* Center: Company Details */}
-                <div className="flex-1 px-1 text-center flex flex-col justify-center overflow-hidden">
-                    <h1 className="font-extrabold text-ssk-red text-2xl leading-none tracking-tight whitespace-nowrap">
+                <div className="flex-1 px-2 text-center flex flex-col justify-center overflow-hidden">
+                    <h1 className="font-black text-ssk-red text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap uppercase">
                         {companyDetails.name}
                     </h1>
                     {companyDetails.tagline && (
-                        <p className="text-xs font-bold text-ssk-blue mt-1">{companyDetails.tagline}</p>
+                        <p className="text-xs font-black text-ssk-blue mt-1">{companyDetails.tagline}</p>
                     )}
-                    <p className="text-[10px] sm:text-xs mt-1 text-gray-800 font-semibold whitespace-normal leading-tight">
+                    <p className="text-[10.5px] mt-1 text-slate-900 font-bold whitespace-normal leading-snug">
                         {companyDetails.address}
                     </p>
                     {companyDetails.branchLocations && companyDetails.branchLocations.length > 0 && (
                         <div className="mt-1 pt-1 border-t border-gray-300">
-                            <p className="text-[8px] font-semibold text-gray-600 tracking-tight leading-tight">
-                                <span className="font-bold text-gray-700">BRANCHES: </span>
+                            <p className="text-[8.5px] font-bold text-gray-700 tracking-tight leading-tight">
+                                <span className="font-black text-gray-900">BRANCHES: </span>
                                 {companyDetails.branchLocations.join(' | ')}
                             </p>
                         </div>
@@ -648,17 +653,17 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                 </div>
 
                 {/* Right: Contact & Statutory Details */}
-                <div className="flex-none w-36 text-right flex flex-col justify-center text-[9px] font-bold space-y-0.5 leading-tight">
+                <div className="flex-none w-44 text-right flex flex-col justify-center text-[9.5px] font-black text-slate-900 space-y-0.5 leading-tight">
                     {showCompanyDetails && (
                         <>
                             {companyDetails.contact.map((c, i) => <div key={i}>{c}</div>)}
                             <div>{companyDetails.email}</div>
                             {companyDetails.web && <div>{companyDetails.web}</div>}
                             <div className="pt-1">
-                                <span className="font-bold">PAN:</span> {companyDetails.pan}
+                                <span className="font-black">PAN:</span> {companyDetails.pan}
                             </div>
                             <div>
-                                <span className="font-bold">GSTIN:</span> {companyDetails.gstn}
+                                <span className="font-black">GSTIN:</span> {companyDetails.gstn}
                             </div>
                         </>
                     )}
@@ -666,63 +671,63 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
             </div>
 
             {/* Note */}
-            <div className="text-[8px] text-center my-0.5 font-bold">
+            <div className="text-[8.5px] text-center my-1 font-black uppercase text-slate-800 tracking-wider">
                 AT OWNER'S RISK • INSURANCE / DEMURRAGE CHARGES EXTRA
             </div>
 
             {/* Top Details Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9px] table-fixed">
+            <table className="w-full border-collapse border-2 border-black text-[9.5px] table-fixed">
                 <tbody>
                     <tr className="border-b-2 border-black">
-                        <td className="p-1 border-r-2 border-black font-bold w-1/3">
+                        <td className="p-1.5 border-r-2 border-black font-black w-1/3 text-slate-900">
                             CONSIGNMENT NOTE (LR)
                         </td>
-                        <td className="p-1 border-r-2 border-black w-1/3">
-                            <span className="font-bold">CAUTION:</span> This Consignment will not be detained after delivery.
+                        <td className="p-1.5 border-r-2 border-black w-1/3 text-slate-900 font-bold">
+                            <span className="font-black">CAUTION:</span> This Consignment will not be detained after delivery.
                         </td>
-                        <td className="p-1 w-1/3">
-                            <div className="flex justify-between">
-                                <span className="font-bold">CONSIGNOR COPY</span>
-                                <span>No: <span className="font-bold text-sm text-red-600">{lr.lrNo}</span></span>
+                        <td className="p-1.5 w-1/3">
+                            <div className="flex justify-between items-center">
+                                <span className="font-black text-blue-900 uppercase">{activeCopy}</span>
+                                <span>No: <span className="font-black text-base text-red-600">{lr.lrNo}</span></span>
                             </div>
-                            <div>Date: <span className="font-bold">{formatBiltyDate(lr.date)}</span></div>
+                            <div className="font-bold text-slate-900">Date: <span className="font-black">{formatBiltyDate(lr.date)}</span></div>
                         </td>
                     </tr>
-                    <tr className="border-b-2 border-black">
-                        <td className="p-1 border-r-2 border-black">
-                            <span className="font-bold">Lorry No:</span> <span className="font-bold uppercase text-xs">{lr.truckNo}</span>
+                    <tr className="border-b-2 border-black font-bold">
+                        <td className="p-1.5 border-r-2 border-black">
+                            <span className="font-black text-slate-900">Lorry No:</span> <span className="font-black uppercase text-xs text-slate-950">{lr.truckNo}</span>
                         </td>
-                        <td className="p-1 border-r-2 border-black">
-                            <span className="font-bold">From:</span> <span className="font-bold uppercase">{lr.fromPlace}</span>
+                        <td className="p-1.5 border-r-2 border-black">
+                            <span className="font-black text-slate-900">From:</span> <span className="font-black uppercase text-slate-950">{lr.fromPlace}</span>
                         </td>
-                        <td className="p-1">
-                            <span className="font-bold">To:</span> <span className="font-bold uppercase">{lr.toPlace}</span>
+                        <td className="p-1.5">
+                            <span className="font-black text-slate-900">To:</span> <span className="font-black uppercase text-slate-950">{lr.toPlace}</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
 
             {/* Parties Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
+            <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1 table-fixed">
                 <thead>
                     <tr className="border-b-2 border-black">
-                        <td className="p-1 border-r-2 border-black font-bold w-1/2 bg-gray-100">Consignor Details</td>
-                        <td className="p-1 font-bold w-1/2 bg-gray-100">Consignee Details</td>
+                        <td className="p-1.5 border-r-2 border-black font-black w-1/2 bg-gray-100 uppercase">Consignor Details</td>
+                        <td className="p-1.5 font-black w-1/2 bg-gray-100 uppercase">Consignee Details</td>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
                         <td className="p-2 border-r-2 border-black align-top h-20">
-                            <div className="font-bold text-sm text-black">{lr.consignor.name}</div>
-                            <div>{lr.consignor.address}, {lr.consignor.city}</div>
-                            {lr.consignor.contact && <div>Mob: {lr.consignor.contact}</div>}
-                            <div className="font-bold mt-1">GSTIN: {lr.consignor.gst || 'Unregistered'}</div>
+                            <div className="font-black text-[13px] text-black uppercase">{lr.consignor?.name || '--'}</div>
+                            <div className="font-bold text-slate-800 text-[9.5px] leading-snug mt-0.5">{lr.consignor?.address || '--'}, {lr.consignor?.city}</div>
+                            {lr.consignor?.contact && <div className="font-bold text-slate-900 mt-0.5">Mob: {lr.consignor.contact}</div>}
+                            <div className="font-black text-slate-900 mt-1">GSTIN: {lr.consignor?.gst || 'Unregistered'}</div>
                         </td>
                         <td className="p-2 align-top h-20">
-                            <div className="font-bold text-sm text-black">{lr.consignee.name}</div>
-                            <div>{lr.consignee.address}, {lr.consignee.city}</div>
-                            {lr.consignee.contact && <div>Mob: {lr.consignee.contact}</div>}
-                            <div className="font-bold mt-1">GSTIN: {lr.consignee.gst || 'Unregistered'}</div>
+                            <div className="font-black text-[13px] text-black uppercase">{lr.consignee?.name || '--'}</div>
+                            <div className="font-bold text-slate-800 text-[9.5px] leading-snug mt-0.5">{lr.consignee?.address || '--'}, {lr.consignee?.city}</div>
+                            {lr.consignee?.contact && <div className="font-bold text-slate-900 mt-0.5">Mob: {lr.consignee.contact}</div>}
+                            <div className="font-black text-slate-900 mt-1">GSTIN: {lr.consignee?.gst || 'Unregistered'}</div>
                         </td>
                     </tr>
                 </tbody>
@@ -730,16 +735,16 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
 
             {/* Conditionally rendered Billing To details */}
             {isBillingPartySeparate && (
-                <table className="w-full border-collapse border-2 border-black text-[9px] mt-1 table-fixed">
+                <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1 table-fixed">
                     <thead>
                         <tr>
-                            <td className="p-1 font-bold bg-gray-100">Billing Party</td>
+                            <td className="p-1 font-black bg-gray-100 uppercase">Billing Party</td>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td className="p-2 align-top">
-                                <span className="font-bold text-black">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
+                            <td className="p-2 align-top font-bold text-slate-900">
+                                <span className="font-black text-black uppercase">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
                             </td>
                         </tr>
                     </tbody>
@@ -747,17 +752,17 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
             )}
 
             {/* Main Content Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9px] mt-1">
+            <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1">
                 <thead>
-                    <tr className="font-bold text-center bg-gray-100">
-                        <td className="border-r-2 border-black p-1 w-[8%]">Pkgs</td>
-                        <td className="border-r-2 border-black p-1">Description (Said to Contain)</td>
-                        <td className="border-r-2 border-black p-1 w-[18%]" colSpan={2}>Weight (Kg/MT)</td>
-                        <td className="border-r-2 border-black p-1 w-[25%]" colSpan={2}>Charges</td>
+                    <tr className="font-black text-center bg-gray-100">
+                        <td className="border-r-2 border-black p-1.5 w-[8%]">Pkgs</td>
+                        <td className="border-r-2 border-black p-1.5">Description (Said to Contain)</td>
+                        <td className="border-r-2 border-black p-1.5 w-[18%]" colSpan={2}>Weight (Kg/MT)</td>
+                        <td className="border-r-2 border-black p-1.5 w-[25%]" colSpan={2}>Charges</td>
                     </tr>
-                    <tr className="font-bold text-center border-b-2 border-black text-[8px]">
-                        <td className="border-r-2 border-black">No.</td>
-                        <td className="border-r-2 border-black">Particulars</td>
+                    <tr className="font-black text-center border-b-2 border-black text-[8.5px]">
+                        <td className="border-r-2 border-black p-1">No.</td>
+                        <td className="border-r-2 border-black p-1">Particulars</td>
                         <td className="border-r border-black p-1">Actual</td>
                         <td className="border-r-2 border-black p-1">Charged</td>
                         <td className="border-r-2 border-black p-1 w-[15%]">Particulars</td>
@@ -766,71 +771,74 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                 </thead>
                 <tbody>
                     <tr>
-                        <td className="border-r-2 border-black p-2 text-center h-48 align-top">
-                            {lr.items.map((item, idx) => (
-                                <div key={idx} className="font-bold text-lg mb-2">{item.pcs}</div>
+                        <td className="border-r-2 border-black p-2 text-center h-48 align-top font-black">
+                            {(lr.items || []).map((item, idx) => (
+                                <div key={idx} className="font-black text-lg mb-2">{item.pcs}</div>
                             ))}
-                            {lr.items.length > 1 && (
-                                <div className="border-t border-black mt-2 pt-1 font-bold text-sm">
-                                    Total: {lr.items.reduce((sum, item) => sum + item.pcs, 0)}
+                            {(lr.items || []).length > 1 && (
+                                <div className="border-t-2 border-black mt-2 pt-1 font-black text-sm">
+                                    Total: {(lr.items || []).reduce((sum, item) => sum + (Number(item.pcs) || 0), 0)}
                                 </div>
                             )}
                         </td>
                         <td className="border-r-2 border-black p-2 align-top">
-                            {lr.items.map((item, idx) => (
-                                <div key={idx} className="font-bold text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
+                            {(lr.items || []).map((item, idx) => (
+                                <div key={idx} className="font-black text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
                                     {item.description}
                                 </div>
                             ))}
                         </td>
-                        <td className="border-r border-black p-2 text-center align-top font-bold">
-                            {Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : (Number(lr.weight) > 0 ? `${lr.weight} Kg` : '')}
+                        <td className="border-r border-black p-2 text-center align-top font-black text-slate-900">
+                            {Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : (Number(lr.weight) > 0 ? `${Number(lr.weight).toLocaleString('en-IN')} Kg` : '')}
                         </td>
-                        <td className="border-r-2 border-black p-2 text-center align-top font-bold">
-                            {Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight} Kg` : ''}
+                        <td className="border-r-2 border-black p-2 text-center align-top font-black text-slate-900">
+                            {Number(lr.chargedWeight) > 0 ? `${Number(lr.chargedWeight).toLocaleString('en-IN')} Kg` : ''}
                         </td>
                         <td colSpan={2} className="p-0 align-top">
-                            <div className="flex flex-col h-full text-[9px]">
-                                <div className="flex justify-between border-b border-black p-1">
+                            <div className="flex flex-col h-full text-[9.5px]">
+                                <div className="flex justify-between border-b border-black p-1 font-bold">
                                     <span>Freight</span>
-                                    <span className="font-bold">{formatAmount(lr.freight)}</span>
+                                    <span className="font-black">{formatAmount(lr.freight)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Hamail</span>
-                                    <span>{formatAmount(lr.charges.hamail)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.hamail)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Surcharge</span>
-                                    <span>{formatAmount(lr.charges.surCharge)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.surCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Statistical</span>
-                                    <span>{formatAmount(lr.charges.stCharge)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.stCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Collection</span>
-                                    <span>{formatAmount(lr.charges.collectionCharge)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.collectionCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Door Del.</span>
-                                    <span>{formatAmount(lr.charges.ddCharge)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.ddCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1">
+                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
                                     <span>Other</span>
-                                    <span>{formatAmount(lr.charges.otherCharge)}</span>
+                                    <span className="font-black">{formatAmount(lr.charges?.otherCharge)}</span>
                                 </div>
                             </div>
                         </td>
                     </tr>
-                    <tr className="border-t-2 border-black font-bold">
-                        <td colSpan={4} className="border-r-2 border-black p-1 text-right">Total Payable</td>
-                        <td colSpan={2} className="p-1 text-right font-black text-sm bg-gray-100">{formatAmount(totalToPay)}</td>
+                    <tr className="border-t-2 border-black font-black">
+                        <td colSpan={4} className="border-r-2 border-black p-2 text-right text-[11px] uppercase">Total Payable</td>
+                        <td colSpan={2} className="p-2 text-right font-black text-base bg-gray-100 font-mono">{formatAmount(totalToPay)}</td>
                     </tr>
                     <tr>
-                        <td colSpan={4} className="border-r-2 border-black p-1 align-top text-[8px]">
+                        <td colSpan={4} className="border-r-2 border-black p-2 align-top text-[8.5px]">
                             {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
-                                <div>
-                                    <span className="font-bold">Bank Details:</span> {companyDetails.bankDetails.name}, A/c: {companyDetails.bankDetails.accountNo}, IFSC: {companyDetails.bankDetails.ifscCode}
+                                <div className="space-y-0.5">
+                                    <span className="font-black block uppercase text-slate-900">Bank Details:</span>
+                                    <p className="font-bold text-slate-800">
+                                        {companyDetails.bankDetails.name}, A/c: <span className="font-mono font-black">{companyDetails.bankDetails.accountNo}</span>, IFSC: <span className="font-mono font-black">{companyDetails.bankDetails.ifscCode}</span>
+                                    </p>
                                 </div>
                             )}
                         </td>
@@ -839,7 +847,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                                 {companyDetails.signatureImageUrl && (
                                     <img src={companyDetails.signatureImageUrl} alt="Authorized Signatory" className="h-12 w-auto object-contain mb-1" />
                                 )}
-                                <p className="font-bold text-[8px]">Authorized Signatory</p>
+                                <p className="font-black text-[8.5px] uppercase text-slate-900">Authorized Signatory</p>
                             </div>
                         </td>
                     </tr>
@@ -883,9 +891,11 @@ export const LRContent = forwardRef<HTMLDivElement, {
                 companyDetails={companyDetails}
                 showCompanyDetails={showCompanyDetails}
                 showAmounts={showAmounts}
+                copyType={copyType}
                 orientation={orientation}
                 paperSize={paperSize}
                 singlePageFit={singlePageFit}
+                gstLiability={gstLiability}
             />
         );
     }
@@ -920,6 +930,9 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
 }) => {
     const previewRef = useRef<HTMLDivElement>(null);
     const printRoot = document.getElementById('print-root');
+    const [activeTemplate, setActiveTemplate] = useState<'modern-gst' | 'classic'>(
+        initialTemplateStyle || lr.templateStyle || 'modern-gst'
+    );
     const [copyType, setCopyType] = useState<string>(lr.copyType || 'CONSIGNOR COPY');
     const [showCompanyDetails, setShowCompanyDetails] = useState(true);
     const [showAmounts, setShowAmounts] = useState(true);
@@ -931,13 +944,21 @@ const LRPreviewModal: React.FC<LRPreviewModalProps> = ({
         const pkgs = (lr.items || []).reduce((sum, it) => sum + (Number(it.pcs) || 0), 0);
         const weightStr = Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT (${lr.weight.toLocaleString('en-IN')} Kg)` : `${Number(lr.weight).toLocaleString('en-IN')} Kg`;
         const freightStr = `₹ ${Number(lr.freight || 0).toLocaleString('en-IN')} (${lr.freightBasis || (lr.gstPaidBy === 'Consignor' ? 'PAID' : 'TO PAY')})`;
-        const gstText = gstLiability === 'BOTH_5_18'
+        const detectedGst = (() => {
+            const p = (lr.gstPaidBy || '').toLowerCase();
+            if (p.includes('both') || p.includes('dual') || (p.includes('5') && p.includes('18'))) return 'BOTH_5_18';
+            if (p.includes('18') || p.includes('fcm')) return 'FCM_18';
+            if (p.includes('12')) return 'FCM_12';
+            if (p.includes('exempt')) return 'EXEMPTED';
+            return 'RCM';
+        })();
+        const gstText = detectedGst === 'BOTH_5_18'
             ? 'Dual Compliance (RCM 5% / FCM 18%)'
-            : gstLiability === 'FCM_18'
+            : detectedGst === 'FCM_18'
             ? 'FCM @ 18% (Forward Charge)'
-            : gstLiability === 'FCM_12'
+            : detectedGst === 'FCM_12'
             ? 'FCM @ 12% (Forward Charge)'
-            : gstLiability === 'EXEMPTED'
+            : detectedGst === 'EXEMPTED'
             ? 'Exempted / Non-Taxable'
             : 'RCM @ 5% (Reverse Charge)';
         
@@ -967,7 +988,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
     // Helper to generate a configured jsPDF instance with the bilty captured on a single page
     const generateBiltyPdfDoc = async (targetEl: HTMLElement): Promise<{ pdf: jsPDF; filename: string }> => {
-        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}_${orientation}.pdf`;
+        const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${activeTemplate}_${copyType.replace(/\s+/g, '_')}_${orientation}.pdf`;
 
         const pdf = new jsPDF({
             orientation: orientation,
@@ -1121,7 +1142,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
         setIsExporting(true);
         const toastId = toast.loading('Exporting High-Res Image...');
         try {
-            const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${copyType.replace(/\s+/g, '_')}.png`;
+            const filename = `LR-${(lr.lrNo || 'RECEIPT').replace(/[/\\?%*:|"<>]/g, '_')}_${activeTemplate}_${copyType.replace(/\s+/g, '_')}.png`;
 
             const canvas = await html2canvas(element, {
                 scale: 2.5,
@@ -1190,11 +1211,12 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
             {printRoot && createPortal(
                 <div className="print-copies-container">
                     <div className="print-page-wrapper">
-                        <ModernGSTBiltyContent
+                        <LRContent
                             lr={lr}
                             companyDetails={companyDetails}
                             showCompanyDetails={showCompanyDetails}
                             showAmounts={showAmounts}
+                            templateStyle={activeTemplate}
                             copyType={copyType}
                             orientation={orientation}
                             paperSize="a4"
@@ -1226,6 +1248,36 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
 
                     {/* Action Buttons */}
                     <div className="flex items-center flex-wrap gap-2">
+                        {/* Template Selector: Modern GST vs Classic */}
+                        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-300 shadow-inner">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTemplate('modern-gst')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                    activeTemplate === 'modern-gst'
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title="Modern GST Compliant Template"
+                            >
+                                <span>🎨</span>
+                                <span>Modern GST</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTemplate('classic')}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                    activeTemplate === 'classic'
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title="Classic Standard Template"
+                            >
+                                <span>📋</span>
+                                <span>Classic</span>
+                            </button>
+                        </div>
+
                         {/* Copy Type Selector */}
                         <select
                             value={copyType}
@@ -1282,7 +1334,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                         {/* Save Button */}
                         {!isReadOnly && onSave && (
                             <button
-                                onClick={() => onSave({ ...lr, templateStyle: 'modern-gst', copyType })}
+                                onClick={() => onSave({ ...lr, templateStyle: activeTemplate, copyType })}
                                 className="flex items-center bg-emerald-600 text-white px-3.5 py-2 rounded-xl hover:bg-emerald-700 font-bold text-xs shadow-md transition-colors"
                             >
                                 <SaveIcon className="w-4 h-4 mr-1" />
@@ -1297,7 +1349,7 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             title="Print LR on Full A4 Page"
                         >
                             <PrintIcon className="w-4 h-4" />
-                            <span>Print (Full A4 Page)</span>
+                            <span>Print</span>
                         </button>
 
                         {/* PDF Download Button */}
@@ -1308,7 +1360,19 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                             title="Download 1-Page PDF"
                         >
                             <DownloadIcon className="w-4 h-4" />
-                            <span>Download PDF</span>
+                            <span>PDF</span>
+                        </button>
+
+                        {/* Image PNG Download Button */}
+                        <button
+                            type="button"
+                            onClick={handleDownloadImage}
+                            disabled={isExporting}
+                            className="flex items-center bg-indigo-600 text-white px-3.5 py-2 rounded-xl hover:bg-indigo-700 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50 gap-1.5 cursor-pointer"
+                            title="Download High-Res PNG Image"
+                        >
+                            <span>🖼️</span>
+                            <span>Image</span>
                         </button>
 
                         {/* Direct 1-Click WhatsApp Button */}
@@ -1346,12 +1410,13 @@ ${companyDetails.contact?.[0] ? `Helpline: ${companyDetails.contact[0]}` : ''}`;
                 {/* Preview Sheet Area */}
                 <div className="p-3 sm:p-6 overflow-x-auto flex justify-center bg-slate-200/70 min-h-[650px]">
                     <div className="bg-white shadow-2xl rounded-xs p-1 my-auto">
-                        <ModernGSTBiltyContent
+                        <LRContent
                             ref={previewRef}
                             lr={lr}
                             companyDetails={companyDetails}
                             showCompanyDetails={showCompanyDetails}
                             showAmounts={showAmounts}
+                            templateStyle={activeTemplate}
                             copyType={copyType}
                             orientation={orientation}
                             paperSize="a4"

@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LorryReceipt, View } from '../types';
 import { formatLRWhatsAppText, openWhatsAppDirect } from '../utils/whatsapp';
-import { playLadyWelcome } from '../utils/welcomeVoice';
-import { LadyWelcomeBanner } from './LadyWelcomeBanner';
 
 interface MobileDashboardProps {
     lorryReceipts: LorryReceipt[];
@@ -48,11 +46,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
         setToastMessage(msg);
         setTimeout(() => setToastMessage(null), 3000);
     };
-
-    // Auto-trigger warm Lady Welcome voice greeting on dashboard open
-    useEffect(() => {
-        playLadyWelcome({ language: isHi ? 'hi' : 'en' });
-    }, [isHi]);
 
     // --- Calculated Metrics ---
     const totalLRs = lorryReceipts.length;
@@ -189,16 +182,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                     </div>
 
                     <div className="flex items-center space-x-2">
-                        {/* Lady Welcome Voice Replay Button */}
-                        <button 
-                            type="button"
-                            onClick={() => playLadyWelcome({ force: true, language: isHi ? 'hi' : 'en' })} 
-                            className="p-2 rounded-xl bg-gradient-to-r from-pink-500/20 via-purple-500/20 to-indigo-500/20 border border-pink-500/40 text-pink-300 hover:text-white hover:bg-pink-600/30 transition active:scale-95 flex items-center justify-center cursor-pointer" 
-                            title="Hear Lady Welcome"
-                        >
-                            <span className="text-sm">👩‍💼</span>
-                        </button>
-
                         {/* Frame View Toggle (Desktop helper) */}
                         <button 
                             type="button"
@@ -266,9 +249,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                 {activeTab === 'dashboard' && (
                     <div className="space-y-5 animate-fadeIn">
                         
-                        {/* 0. Lady Welcome Voice Banner */}
-                        <LadyWelcomeBanner isHi={isHi} />
-
                         {/* 1. Promotional Hero Banner Card */}
                         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white shadow-xl border border-indigo-900/40">
                             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-blue-500/20 rounded-full blur-2xl pointer-events-none" />
@@ -1278,24 +1258,6 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
                         </div>
 
                         <div className="bg-white rounded-2xl border border-slate-200/80 divide-y divide-slate-100 text-xs font-medium">
-                            <button 
-                                type="button"
-                                onClick={() => {
-                                    playLadyWelcome({ force: true, language: isHi ? 'hi' : 'en' });
-                                    showToast('Playing Lady Welcome Voice...');
-                                }} 
-                                className="w-full p-3.5 text-left flex items-center justify-between text-slate-700 hover:bg-slate-50 cursor-pointer"
-                            >
-                                <span className="flex items-center space-x-2">
-                                    <span>👩‍💼</span>
-                                    <span>Lady Welcome Voice ("Welcome to Bilty Book")</span>
-                                </span>
-                                <span className="text-pink-600 font-bold flex items-center gap-1">
-                                    <span>🔊</span>
-                                    <span>Play</span>
-                                </span>
-                            </button>
-
                             <button 
                                 type="button"
                                 onClick={() => onOpenSettings ? onOpenSettings() : setCurrentView('data-management')} 

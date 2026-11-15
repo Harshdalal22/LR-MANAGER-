@@ -125,10 +125,10 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'w-[1040px] max-w-full p-4 text-[9.5px] min-h-[680px] flex flex-col justify-between' 
+        ? 'w-[1040px] max-w-full p-4 text-[10px] min-h-[680px] flex flex-col justify-between' 
         : paperSize === 'a5' 
-            ? 'w-[580px] max-w-full p-2.5 text-[8.5px]' 
-            : 'w-[794px] max-w-full p-5 text-[10px] min-h-[1050px] flex flex-col justify-between';
+            ? 'w-[580px] max-w-full p-2.5 text-[9px]' 
+            : 'w-[794px] max-w-full p-5 text-[11px] min-h-[1050px] flex flex-col justify-between';
 
     const detectedLiability = (() => {
         if (gstLiability) return gstLiability;
@@ -146,27 +146,27 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             className={`printable-area bg-white text-slate-900 font-sans mx-auto border-2 border-slate-900 shadow-md ${containerClass} leading-snug relative selection:bg-blue-100 ${singlePageFit ? 'page-avoid-break' : ''}`}
         >
             {/* Top Company Header & LR Document Details */}
-            <div className="flex flex-row justify-between items-start border-b-2 border-slate-900 pb-2 gap-3">
+            <div className="flex flex-row justify-between items-start border-b-2 border-slate-900 pb-2.5 gap-3">
                 <div className="flex-1">
                     <div className="flex items-start gap-3">
                         {companyDetails.logoUrl && (
                             <img
                                 src={companyDetails.logoUrl}
                                 alt="Logo"
-                                className="h-14 w-auto max-w-[80px] object-contain mt-0.5"
+                                className="h-16 w-auto max-w-[85px] object-contain mt-0.5"
                             />
                         )}
                         <div>
-                            <h1 className="font-black text-[#0b192c] text-[23px] uppercase tracking-tight leading-tight">
+                            <h1 className="font-black text-[#0b192c] text-[25px] uppercase tracking-tight leading-tight">
                                 {companyDetails.name || ''}
                             </h1>
-                            <p className="text-[10px] font-bold text-slate-700">
+                            <p className="text-[11px] font-bold text-slate-700">
                                 {companyDetails.tagline || ''}
                             </p>
                         </div>
                     </div>
 
-                    <div className="mt-1.5 space-y-0.5 text-[9.5px] text-slate-800">
+                    <div className="mt-1.5 space-y-0.5 text-[10.5px] text-slate-800">
                         <p className="leading-snug font-semibold text-slate-900">
                             {companyDetails.address && <><span className="font-black text-slate-950">Regd Off:</span> {companyDetails.address}</>}
                             {companyDetails.jurisdictionCity ? ` • Sub to ${companyDetails.jurisdictionCity} Jurisdiction` : ''}
@@ -188,23 +188,23 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                 </div>
 
                 {/* Right: Modern Exact Doc Details Box */}
-                <div className="w-[280px] bg-slate-50 border-2 border-slate-900 rounded-xs overflow-hidden flex flex-col justify-between">
+                <div className="w-[290px] bg-slate-50 border-2 border-slate-900 rounded-xs overflow-hidden flex flex-col justify-between">
                     <div className="bg-[#0b192c] text-white py-1.5 px-2 text-center">
-                        <span className="font-black text-[12px] uppercase tracking-wider block">
+                        <span className="font-black text-[13px] uppercase tracking-wider block">
                             CONSIGNMENT NOTE / LR
                         </span>
                     </div>
                     
                     <div className="bg-slate-100 py-1 px-2 text-center border-b border-slate-300">
-                        <span className="font-black text-[9.5px] text-blue-900 uppercase tracking-widest">
+                        <span className="font-black text-[10.5px] text-blue-900 uppercase tracking-widest">
                             {activeCopy}
                         </span>
                     </div>
 
-                    <div className="p-2 space-y-1 text-[9.5px]">
+                    <div className="p-2.5 space-y-1 text-[10.5px]">
                         <div className="flex justify-between items-center">
                             <span className="text-slate-700 font-bold">LR / Bilty No:</span>
-                            <span className="font-mono font-black text-[12.5px] text-blue-900">
+                            <span className="font-mono font-black text-[14px] text-blue-900">
                                 {lr.lrNo || '--'}
                             </span>
                         </div>
@@ -229,25 +229,25 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             </div>
 
             {/* Dark Navy Route & Vehicle Ribbon */}
-            <div className="bg-[#0b192c] text-white flex justify-between items-center px-3.5 py-2 my-2 rounded-xs border border-slate-800">
+            <div className="bg-[#0b192c] text-white flex justify-between items-center px-4 py-2.5 my-2.5 rounded-xs border border-slate-800">
                 {/* Left: Origin -> Destination */}
                 <div className="flex items-center gap-3">
                     <div>
-                        <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
+                        <span className="text-slate-300 font-bold text-[9px] uppercase tracking-wider block">
                             SOURCE • ORIGIN
                         </span>
-                        <span className="font-black text-[13px] uppercase tracking-wide text-white">
+                        <span className="font-black text-[14.5px] uppercase tracking-wide text-white">
                             {lr.fromPlace || '--'}
                         </span>
                     </div>
                     
-                    <span className="text-cyan-300 font-black text-base px-1.5">➔</span>
+                    <span className="text-cyan-300 font-black text-xl px-2">➔</span>
 
                     <div>
-                        <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
+                        <span className="text-slate-300 font-bold text-[9px] uppercase tracking-wider block">
                             DESTINATION • DELIVERY POINT
                         </span>
-                        <span className="font-black text-[13px] uppercase tracking-wide text-white">
+                        <span className="font-black text-[14.5px] uppercase tracking-wide text-white">
                             {lr.toPlace || '--'}
                         </span>
                     </div>
@@ -255,36 +255,36 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                 {/* Right: Vehicle & Driver Details */}
                 <div className="text-right">
-                    <span className="text-slate-300 font-bold text-[8.5px] uppercase tracking-wider block">
+                    <span className="text-slate-300 font-bold text-[9px] uppercase tracking-wider block">
                         VEHICLE & DRIVER DETAILS
                     </span>
-                    <span className="font-mono font-black text-[11.5px] text-white uppercase block">
+                    <span className="font-mono font-black text-[13px] text-white uppercase block">
                         {lr.truckNo || '--'} {vehicleType ? `• ${vehicleType}` : ''}
                     </span>
-                    <span className="text-slate-200 text-[9px] font-bold block">
+                    <span className="text-slate-200 text-[10px] font-bold block">
                         Driver: {driverName || '--'} {driverContact ? `(+91 ${driverContact.replace(/[^0-9]/g, '')})` : ''}
                     </span>
                 </div>
             </div>
 
             {/* Two-Column Party Box: Consignor & Consignee */}
-            <div className="grid grid-cols-2 gap-2.5 my-2">
+            <div className="grid grid-cols-2 gap-3 my-2.5">
                 {/* Consignor Details */}
-                <div className="border-2 border-slate-300 rounded-xs p-2.5 bg-slate-50/50">
-                    <div className="flex items-center gap-1 mb-1">
-                        <span className="text-[10px]">📦</span>
-                        <span className="font-black text-[9px] text-slate-800 uppercase tracking-wider">
+                <div className="border-2 border-slate-400 rounded-xs p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[11px]">📦</span>
+                        <span className="font-black text-[10px] text-slate-800 uppercase tracking-wider">
                             CONSIGNOR (BILLED & DISPATCHED FROM)
                         </span>
                     </div>
-                    <h3 className="font-black text-[12px] text-slate-950 uppercase leading-snug">
+                    <h3 className="font-black text-[13.5px] text-slate-950 uppercase leading-snug">
                         {lr.consignor?.name || '--'}
                     </h3>
-                    <p className="text-[9.5px] text-slate-800 leading-snug mt-0.5 font-bold">
+                    <p className="text-[11px] text-slate-800 leading-snug mt-1 font-bold">
                         {lr.consignor?.address || '--'}
                         {lr.consignor?.city && !lr.consignor?.address?.includes(lr.consignor.city) ? `, ${lr.consignor.city}` : ''}
                     </p>
-                    <div className="mt-1.5 pt-1.5 border-t border-slate-300 text-[9px] space-y-0.5 font-bold">
+                    <div className="mt-2 pt-2 border-t border-slate-300 text-[10.5px] space-y-0.5 font-bold">
                         <p>
                             <span className="font-black text-slate-900">GSTIN:</span>{' '}
                             <span className="font-mono font-black text-slate-950">{consignorGst || '--'}</span>
@@ -293,28 +293,28 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </p>
                         <p>
                             <span className="font-black text-slate-900">Contact:</span>{' '}
-                            <span className="text-slate-900 font-bold">{lr.consignor?.contact || '--'}</span>
+                            <span className="text-slate-950 font-black">{lr.consignor?.contact || '--'}</span>
                             {lr.invoiceNo && <> • <span className="font-black text-slate-900">Inv No:</span> <span className="font-mono font-black text-slate-950">{lr.invoiceNo}</span></>}
                         </p>
                     </div>
                 </div>
 
                 {/* Consignee Details */}
-                <div className="border-2 border-slate-300 rounded-xs p-2.5 bg-slate-50/50">
-                    <div className="flex items-center gap-1 mb-1">
-                        <span className="text-[10px]">🏭</span>
-                        <span className="font-black text-[9px] text-slate-800 uppercase tracking-wider">
+                <div className="border-2 border-slate-400 rounded-xs p-3 bg-slate-50/50">
+                    <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="text-[11px]">🏭</span>
+                        <span className="font-black text-[10px] text-slate-800 uppercase tracking-wider">
                             CONSIGNEE (SHIP & DELIVERY TO)
                         </span>
                     </div>
-                    <h3 className="font-black text-[12px] text-slate-950 uppercase leading-snug">
+                    <h3 className="font-black text-[13.5px] text-slate-950 uppercase leading-snug">
                         {lr.consignee?.name || '--'}
                     </h3>
-                    <p className="text-[9.5px] text-slate-800 leading-snug mt-0.5 font-bold">
+                    <p className="text-[11px] text-slate-800 leading-snug mt-1 font-bold">
                         {lr.consignee?.address || '--'}
                         {lr.consignee?.city && !lr.consignee?.address?.includes(lr.consignee.city) ? `, ${lr.consignee.city}` : ''}
                     </p>
-                    <div className="mt-1.5 pt-1.5 border-t border-slate-300 text-[9px] space-y-0.5 font-bold">
+                    <div className="mt-2 pt-2 border-t border-slate-300 text-[10.5px] space-y-0.5 font-bold">
                         <p>
                             <span className="font-black text-slate-900">GSTIN:</span>{' '}
                             <span className="font-mono font-black text-slate-950">{consigneeGst || '--'}</span>
@@ -323,7 +323,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </p>
                         <p>
                             <span className="font-black text-slate-900">Contact:</span>{' '}
-                            <span className="text-slate-900 font-bold">{lr.consignee?.contact || '--'}</span>
+                            <span className="text-slate-950 font-black">{lr.consignee?.contact || '--'}</span>
                             {lr.poNo && <> • <span className="font-black text-slate-900">PO No:</span> <span className="font-mono font-black text-slate-950">{lr.poNo}</span></>}
                         </p>
                     </div>
@@ -332,9 +332,9 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
             {/* Separate Billing Party if Applicable */}
             {isBillingPartySeparate && (
-                <div className="border-2 border-amber-300 bg-amber-50/70 rounded-xs p-2 my-1.5 flex justify-between items-center text-[9px]">
+                <div className="border-2 border-amber-300 bg-amber-50/70 rounded-xs p-2.5 my-2 flex justify-between items-center text-[10.5px]">
                     <div>
-                        <span className="font-black text-amber-900 uppercase text-[8.5px] mr-1">BILLING PARTY (3rd Party):</span>
+                        <span className="font-black text-amber-900 uppercase text-[9.5px] mr-1">BILLING PARTY (3rd Party):</span>
                         <span className="font-black text-slate-950 uppercase">{lr.billingTo.name}</span>
                         <span className="text-slate-700 font-bold"> • {lr.billingTo.address}, {lr.billingTo.city}</span>
                     </div>
@@ -347,47 +347,47 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             )}
 
             {/* Goods Description & Packages Itemized Table */}
-            <div className="border-2 border-slate-900 rounded-xs overflow-hidden my-2">
-                <table className="w-full text-left border-collapse text-[9.5px]">
+            <div className="border-2 border-slate-900 rounded-xs overflow-hidden my-2.5">
+                <table className="w-full text-left border-collapse text-[10.5px]">
                     <thead>
-                        <tr className="bg-[#0b192c] text-white text-[9px] uppercase tracking-wider font-black">
-                            <th className="p-1.5 text-center w-[5%] border-r border-slate-700">SR.</th>
-                            <th className="p-1.5 text-center w-[15%] border-r border-slate-700">PACKAGES</th>
-                            <th className="p-1.5 text-left w-[36%] border-r border-slate-700">DESCRIPTION OF GOODS & PACKING DETAILS</th>
-                            <th className="p-1.5 text-center w-[12%] border-r border-slate-700">HSN / SAC</th>
-                            <th className="p-1.5 text-right w-[11%] border-r border-slate-700">ACTUAL WT.</th>
-                            <th className="p-1.5 text-right w-[11%] border-r border-slate-700">CHARGED WT.</th>
-                            <th className="p-1.5 text-right w-[10%]">RATE / UNIT</th>
+                        <tr className="bg-[#0b192c] text-white text-[10px] uppercase tracking-wider font-black">
+                            <th className="p-2 text-center w-[5%] border-r border-slate-700">SR.</th>
+                            <th className="p-2 text-center w-[15%] border-r border-slate-700">PACKAGES</th>
+                            <th className="p-2 text-left w-[36%] border-r border-slate-700">DESCRIPTION OF GOODS & PACKING DETAILS</th>
+                            <th className="p-2 text-center w-[12%] border-r border-slate-700">HSN / SAC</th>
+                            <th className="p-2 text-right w-[11%] border-r border-slate-700">ACTUAL WT.</th>
+                            <th className="p-2 text-right w-[11%] border-r border-slate-700">CHARGED WT.</th>
+                            <th className="p-2 text-right w-[10%]">RATE / UNIT</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-300">
                         {lr.items && lr.items.length > 0 ? (
                             lr.items.map((item, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50">
-                                    <td className="p-1.5 text-center font-black text-slate-700 border-r border-slate-300 align-top">{idx + 1}</td>
-                                    <td className="p-1.5 text-center font-black text-slate-950 border-r border-slate-300 align-top">
+                                    <td className="p-2 text-center font-black text-slate-700 border-r border-slate-300 align-top text-[11px]">{idx + 1}</td>
+                                    <td className="p-2 text-center font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">
                                         {item.pcs > 0 ? `${item.pcs} ${item.packingDetails || 'Pkgs'}` : (item.packingDetails ? item.packingDetails : '--')}
                                     </td>
-                                    <td className="p-1.5 border-r border-slate-300 align-top">
-                                        <div className="font-black text-slate-950 uppercase text-[10.5px] leading-snug">{item.description || '--'}</div>
+                                    <td className="p-2 border-r border-slate-300 align-top">
+                                        <div className="font-black text-slate-950 uppercase text-[12px] leading-snug">{item.description || '--'}</div>
                                         {item.packingDetails && (
-                                            <div className="text-[8px] text-slate-600 font-bold">Packing: {item.packingDetails}</div>
+                                            <div className="text-[9px] text-slate-600 font-bold">Packing: {item.packingDetails}</div>
                                         )}
                                     </td>
-                                    <td className="p-1.5 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top">
+                                    <td className="p-2 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top text-[11px]">
                                         {item.hsn || lr.hsnCode || companyDetails.sacCode || '--'}
                                     </td>
-                                    <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">
+                                    <td className="p-2 text-right font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">
                                         {Number(item.weight) > 0 
                                             ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.weight} Ton` : `${item.weight.toLocaleString('en-IN')} Kg`}` 
                                             : (idx === 0 && Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : '--')}
                                     </td>
-                                    <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">
+                                    <td className="p-2 text-right font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">
                                         {Number(item.chargedWeight) > 0 
                                             ? `${(item.unit || '').toLowerCase() === 'ton' ? `${item.chargedWeight} Ton` : `${item.chargedWeight.toLocaleString('en-IN')} Kg`}` 
                                             : (idx === 0 && Number(lr.chargedWeight) > 0 ? `${lr.chargedWeight.toLocaleString('en-IN')} Kg` : '--')}
                                     </td>
-                                    <td className="p-1.5 text-right font-black text-slate-950 align-top">
+                                    <td className="p-2 text-right font-black text-slate-950 align-top text-[11.5px]">
                                         {showAmounts && (Number(item.rate) > 0 || Number(lr.rate) > 0)
                                             ? `₹ ${Number(item.rate || lr.rate).toFixed(2)} / ${item.unit || (lr.rateOn === 'Ton' ? 'MT' : lr.rateOn) || 'Ton'}`
                                             : '--'}
@@ -396,19 +396,19 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                             ))
                         ) : (
                             <tr className="hover:bg-slate-50">
-                                <td className="p-1.5 text-center font-black text-slate-700 border-r border-slate-300 align-top">1</td>
-                                <td className="p-1.5 text-center font-black text-slate-950 border-r border-slate-300 align-top">--</td>
-                                <td className="p-1.5 border-r border-slate-300 align-top font-black text-slate-950 uppercase">--</td>
-                                <td className="p-1.5 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top">--</td>
-                                <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">--</td>
-                                <td className="p-1.5 text-right font-black text-slate-950 border-r border-slate-300 align-top">--</td>
-                                <td className="p-1.5 text-right font-black text-slate-950 align-top">--</td>
+                                <td className="p-2 text-center font-black text-slate-700 border-r border-slate-300 align-top text-[11px]">1</td>
+                                <td className="p-2 text-center font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">--</td>
+                                <td className="p-2 border-r border-slate-300 align-top font-black text-slate-950 uppercase text-[12px]">--</td>
+                                <td className="p-2 text-center font-mono font-bold text-slate-900 border-r border-slate-300 align-top text-[11px]">--</td>
+                                <td className="p-2 text-right font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">--</td>
+                                <td className="p-2 text-right font-black text-slate-950 border-r border-slate-300 align-top text-[11.5px]">--</td>
+                                <td className="p-2 text-right font-black text-slate-950 align-top text-[11.5px]">--</td>
                             </tr>
                         )}
 
                         {/* Summary Total Row */}
                         {(() => {
-                            const minRows = isLandscape ? 1 : 5;
+                            const minRows = isLandscape ? 1 : 2;
                             const currentCount = lr.items && lr.items.length > 0 ? lr.items.length : 1;
                             const emptyRowsCount = Math.max(0, minRows - currentCount);
                             return Array.from({ length: emptyRowsCount }).map((_, emptyIdx) => (
@@ -427,16 +427,16 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         })()}
 
                         {/* Summary Total Row */}
-                        <tr className="bg-slate-100 font-black text-slate-950 border-t-2 border-slate-900 text-[10px]">
-                            <td className="p-1.5 text-center border-r border-slate-400">•</td>
-                            <td className="p-1.5 text-center font-black border-r border-slate-400">
+                        <tr className="bg-slate-100 font-black text-slate-950 border-t-2 border-slate-900 text-[11px]">
+                            <td className="p-2 text-center border-r border-slate-400">•</td>
+                            <td className="p-2 text-center font-black border-r border-slate-400 text-[11.5px]">
                                 {totalPcs > 0 ? `${totalPcs} Total` : '--'}
                             </td>
-                            <td className="p-1.5 font-black border-r border-slate-400">Total Quantities Dispatched (Said to Contain)</td>
-                            <td className="p-1.5 text-center border-r border-slate-400">--</td>
-                            <td className="p-1.5 text-right font-black border-r border-slate-400">{totalActualWeight}</td>
-                            <td className="p-1.5 text-right font-black border-r border-slate-400">{totalChargedWeight}</td>
-                            <td className="p-1.5 text-right">--</td>
+                            <td className="p-2 font-black border-r border-slate-400">Total Quantities Dispatched (Said to Contain)</td>
+                            <td className="p-2 text-center border-r border-slate-400">--</td>
+                            <td className="p-2 text-right font-black border-r border-slate-400 text-[12px]">{totalActualWeight}</td>
+                            <td className="p-2 text-right font-black border-r border-slate-400 text-[12px]">{totalChargedWeight}</td>
+                            <td className="p-2 text-right">--</td>
                         </tr>
                     </tbody>
                 </table>
@@ -447,12 +447,12 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                 {/* Left 7 Columns: STATUTORY COMPLIANCE & CONSIGNMENT DETAILS */}
                 <div className="col-span-7 flex flex-col justify-between space-y-2">
                     <div>
-                        <div className="font-black text-[9.5px] text-[#0b192c] uppercase border-b-2 border-slate-400 pb-1">
+                        <div className="font-black text-[10.5px] text-[#0b192c] uppercase border-b-2 border-slate-400 pb-1 tracking-wide">
                             STATUTORY & CONSIGNMENT DETAILS
                         </div>
 
                         {/* Declared Value & Insurance */}
-                        <div className="mt-1.5 text-[9px] space-y-1 border border-slate-300 p-2 rounded-xs bg-slate-50/50">
+                        <div className="mt-1.5 text-[10px] space-y-1 border border-slate-300 p-2 rounded-xs bg-slate-50/50">
                             <p>
                                 <span className="font-black text-slate-900">Declared Value of Goods:</span> <span className="font-black text-slate-950">{declaredValue}</span>
                                 <> • <span className="font-black text-slate-900">Transit Risk:</span> <span className="font-bold text-slate-950">{transitRisk}</span></>
@@ -464,9 +464,9 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </div>
 
                         {/* Terms & Conditions */}
-                        <div className="mt-1.5 text-[8.5px] text-slate-700 leading-normal">
+                        <div className="mt-1.5 text-[9.5px] text-slate-700 leading-normal">
                             <span className="font-black text-slate-900 block">Terms & Conditions:</span>
-                            <ol className="list-decimal list-inside space-y-0.5 mt-0.5 font-medium">
+                            <ol className="list-decimal list-inside space-y-0.5 mt-0.5 font-semibold">
                                 <li>The carrier is not responsible for leakage, breakage, or internal damage during transit.</li>
                                 <li>Demurrage charges applicable @ ₹ 1,500/day if unloading delayed beyond 24 hrs.</li>
                                 <li>Original LR & delivery acknowledgement (POD) required for final freight settlement.</li>
@@ -474,24 +474,24 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
                         </div>
 
                         {lr.remark && (
-                            <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-300 text-[8.5px] rounded-xs">
+                            <div className="mt-1.5 p-1.5 bg-amber-50 border border-amber-300 text-[9.5px] rounded-xs">
                                 <span className="font-black text-amber-950">REMARK: </span>
-                                <span className="text-slate-900 font-bold">{lr.remark}</span>
+                                <span className="text-slate-900 font-black">{lr.remark}</span>
                             </div>
                         )}
                     </div>
 
                     {/* 3 Signatures Area (Exact as reference image) */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t-2 border-slate-400 text-center text-[8.5px]">
-                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t-2 border-slate-400 text-center text-[9.5px]">
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-18'}`}>
                             <div className="border-b-2 border-slate-600 mb-1 w-5/6 mx-auto"></div>
                             <span className="font-black text-slate-900">Consignor / Loader Sign</span>
                         </div>
-                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'}`}>
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-18'}`}>
                             <div className="border-b-2 border-slate-600 mb-1 w-5/6 mx-auto"></div>
-                            <span className="font-black text-slate-900">Driver Sign / Thumb Impression</span>
+                            <span className="font-black text-slate-900">Driver Sign / Thumb</span>
                         </div>
-                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-20'} items-center`}>
+                        <div className={`flex flex-col justify-end ${isLandscape ? 'h-12' : 'h-18'} items-center`}>
                             {companyDetails.signatureImageUrl ? (
                                 <img
                                     src={companyDetails.signatureImageUrl}
@@ -508,53 +508,53 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                 {/* Right 5 Columns: FINANCIAL CHARGES & NET PAYABLE */}
                 <div className="col-span-5 border-2 border-slate-900 rounded-xs bg-white overflow-hidden shadow-xs">
-                    <div className="flex justify-between items-center p-1.5 bg-slate-100 border-b border-slate-300 text-[9.5px]">
+                    <div className="flex justify-between items-center p-1.5 bg-slate-100 border-b border-slate-300 text-[10.5px]">
                         <span className="text-slate-700 font-black uppercase">Freight Basis:</span>
                         <span className="font-black text-blue-900 uppercase tracking-wide">
                             {freightBasis}
                         </span>
                     </div>
 
-                    <div className="divide-y divide-slate-200 text-[9.5px]">
+                    <div className="divide-y divide-slate-200 text-[10.5px]">
                         <div className="flex justify-between p-1.5">
                             <span className="text-slate-800 font-bold">Basic Freight (Charged Wt):</span>
-                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-950 font-black text-[11.5px]">{showAmounts ? formatINR(basicFreight) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1.5">
                             <span className="text-slate-800 font-bold">Loading & Handling Hamali:</span>
-                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-950 font-black text-[11.5px]">{showAmounts ? formatINR(hamali) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1.5">
                             <span className="text-slate-800 font-bold">Door Pickup & Delivery:</span>
-                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-950 font-black text-[11.5px]">{showAmounts ? formatINR(doorDelivery) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1.5">
                             <span className="text-slate-800 font-bold">Statistical & LR Surcharge:</span>
-                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-950 font-black text-[11.5px]">{showAmounts ? formatINR(statistical) : '₹ 0.00'}</span>
                         </div>
                         <div className="flex justify-between p-1.5">
                             <span className="text-slate-800 font-bold">Toll & Green Tax Surcharge:</span>
-                            <span className="font-mono text-slate-950 font-black">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
+                            <span className="font-mono text-slate-950 font-black text-[11.5px]">{showAmounts ? formatINR(tollTax) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Total Freight Amount Bar */}
-                        <div className="flex justify-between items-center p-2 bg-[#0b192c] text-white font-black text-[10.5px]">
-                            <span>TOTAL FREIGHT AMOUNT:</span>
-                            <span className="font-mono text-[12px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
+                        <div className="flex justify-between items-center p-2 bg-[#0b192c] text-white font-black text-[11.5px]">
+                            <span className="tracking-wide">TOTAL FREIGHT AMOUNT:</span>
+                            <span className="font-mono text-[13.5px]">{showAmounts ? formatINR(totalFreight) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Advance Paid */}
-                        <div className="flex justify-between p-1.5 bg-slate-50 text-emerald-900 font-black">
+                        <div className="flex justify-between p-1.5 bg-slate-50 text-emerald-900 font-black text-[11px]">
                             <span>Advance Paid (by Cash/Online):</span>
-                            <span className="font-mono font-black">(-) {showAmounts ? formatINR(advancePaid) : '₹ 0.00'}</span>
+                            <span className="font-mono font-black text-[12px]">(-) {showAmounts ? formatINR(advancePaid) : '₹ 0.00'}</span>
                         </div>
 
                         {/* Net Balance To Pay */}
                         <div className="flex justify-between items-center p-2 bg-blue-50 text-blue-950 border-t-2 border-blue-300">
-                            <span className="font-black text-[10.5px] uppercase tracking-wide">
+                            <span className="font-black text-[11.5px] uppercase tracking-wide">
                                 NET BALANCE TO PAY:
                             </span>
-                            <span className="font-mono font-black text-base text-blue-900">
+                            <span className="font-mono font-black text-[17px] text-blue-900">
                                 {showAmounts ? formatINR(netBalanceToPay) : '₹ 0.00'}
                             </span>
                         </div>
@@ -562,7 +562,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
 
                     {/* Bank & Payment Info Box */}
                     {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
-                        <div className="p-1.5 bg-slate-50 border-t border-slate-300 text-[8px] space-y-0.5">
+                        <div className="p-1.5 bg-slate-50 border-t border-slate-300 text-[9px] space-y-0.5">
                             <span className="font-black text-slate-900 block uppercase">Bank RTGS/NEFT Details:</span>
                             <p className="text-slate-800 font-semibold leading-tight">
                                 Bank: <strong className="text-slate-950 font-black">{companyDetails.bankDetails.name}</strong> • A/c: <strong className="font-mono font-black text-slate-950">{companyDetails.bankDetails.accountNo}</strong> • IFSC: <strong className="font-mono font-black text-slate-950">{companyDetails.bankDetails.ifscCode}</strong>
@@ -573,7 +573,7 @@ export const ModernGSTBiltyContent = forwardRef<HTMLDivElement, {
             </div>
 
             {/* Footer Watermark (Exact match to reference) */}
-            <div className="border-t border-slate-300 pt-1 mt-1 text-center text-[7.5px] text-slate-400 font-medium">
+            <div className="border-t border-slate-300 pt-1 mt-1 text-center text-[8.5px] text-slate-400 font-medium">
                 Page 1 of 1 • System Generated GST Compliant Electronic Lorry Receipt (BiltyBook)
             </div>
         </div>
@@ -608,16 +608,16 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
     const activeCopy = copyType || lr.copyType || 'CONSIGNOR COPY';
     const isLandscape = orientation === 'landscape';
     const containerClass = isLandscape 
-        ? 'w-[1040px] max-w-full p-4 text-[9.5px] min-h-[680px] flex flex-col justify-between' 
+        ? 'w-[1040px] max-w-full p-4 text-[10.5px] min-h-[680px] flex flex-col justify-between' 
         : paperSize === 'a5' 
-            ? 'w-[580px] max-w-full p-2.5 text-[8.5px]' 
-            : 'w-[794px] max-w-full p-5 text-[10px] min-h-[1050px] flex flex-col justify-between';
+            ? 'w-[580px] max-w-full p-2.5 text-[9px]' 
+            : 'w-[794px] max-w-full p-5 text-[11px] min-h-[1050px] flex flex-col justify-between';
 
     return (
         <div ref={ref} className={`printable-area bg-white text-black font-sans ${containerClass} mx-auto border-2 border-black relative ${singlePageFit ? 'page-avoid-break' : ''}`}>
             {/* Jurisdiction Header */}
             {companyDetails.jurisdictionCity && (
-                <div className="text-[10px] font-black text-center w-full pb-1 uppercase tracking-wider text-slate-900">
+                <div className="text-[11px] font-black text-center w-full pb-1 uppercase tracking-wider text-slate-900">
                     SUBJECT TO {companyDetails.jurisdictionCity} JURISDICTION
                 </div>
             )}
@@ -633,18 +633,18 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
 
                 {/* Center: Company Details */}
                 <div className="flex-1 px-2 text-center flex flex-col justify-center overflow-hidden">
-                    <h1 className="font-black text-ssk-red text-2xl sm:text-3xl leading-none tracking-tight whitespace-nowrap uppercase">
+                    <h1 className="font-black text-ssk-red text-3xl sm:text-4xl leading-tight tracking-tight uppercase">
                         {companyDetails.name}
                     </h1>
                     {companyDetails.tagline && (
-                        <p className="text-xs font-black text-ssk-blue mt-1">{companyDetails.tagline}</p>
+                        <p className="text-sm font-black text-ssk-blue mt-0.5">{companyDetails.tagline}</p>
                     )}
-                    <p className="text-[10.5px] mt-1 text-slate-900 font-bold whitespace-normal leading-snug">
+                    <p className="text-[11.5px] mt-1 text-slate-900 font-bold whitespace-normal leading-snug">
                         {companyDetails.address}
                     </p>
                     {companyDetails.branchLocations && companyDetails.branchLocations.length > 0 && (
                         <div className="mt-1 pt-1 border-t border-gray-300">
-                            <p className="text-[8.5px] font-bold text-gray-700 tracking-tight leading-tight">
+                            <p className="text-[9.5px] font-bold text-gray-700 tracking-tight leading-tight">
                                 <span className="font-black text-gray-900">BRANCHES: </span>
                                 {companyDetails.branchLocations.join(' | ')}
                             </p>
@@ -653,7 +653,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                 </div>
 
                 {/* Right: Contact & Statutory Details */}
-                <div className="flex-none w-44 text-right flex flex-col justify-center text-[9.5px] font-black text-slate-900 space-y-0.5 leading-tight">
+                <div className="flex-none w-48 text-right flex flex-col justify-center text-[10.5px] font-black text-slate-900 space-y-0.5 leading-tight">
                     {showCompanyDetails && (
                         <>
                             {companyDetails.contact.map((c, i) => <div key={i}>{c}</div>)}
@@ -671,12 +671,12 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
             </div>
 
             {/* Note */}
-            <div className="text-[8.5px] text-center my-1 font-black uppercase text-slate-800 tracking-wider">
+            <div className="text-[9.5px] text-center my-1 font-black uppercase text-slate-800 tracking-wider">
                 AT OWNER'S RISK • INSURANCE / DEMURRAGE CHARGES EXTRA
             </div>
 
             {/* Top Details Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9.5px] table-fixed">
+            <table className="w-full border-collapse border-2 border-black text-[10.5px] table-fixed">
                 <tbody>
                     <tr className="border-b-2 border-black">
                         <td className="p-1.5 border-r-2 border-black font-black w-1/3 text-slate-900">
@@ -688,27 +688,27 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                         <td className="p-1.5 w-1/3">
                             <div className="flex justify-between items-center">
                                 <span className="font-black text-blue-900 uppercase">{activeCopy}</span>
-                                <span>No: <span className="font-black text-base text-red-600">{lr.lrNo}</span></span>
+                                <span>No: <span className="font-black text-lg text-red-600 font-mono">{lr.lrNo}</span></span>
                             </div>
                             <div className="font-bold text-slate-900">Date: <span className="font-black">{formatBiltyDate(lr.date)}</span></div>
                         </td>
                     </tr>
                     <tr className="border-b-2 border-black font-bold">
                         <td className="p-1.5 border-r-2 border-black">
-                            <span className="font-black text-slate-900">Lorry No:</span> <span className="font-black uppercase text-xs text-slate-950">{lr.truckNo}</span>
+                            <span className="font-black text-slate-900">Lorry No:</span> <span className="font-black uppercase text-[12.5px] text-slate-950 font-mono">{lr.truckNo}</span>
                         </td>
                         <td className="p-1.5 border-r-2 border-black">
-                            <span className="font-black text-slate-900">From:</span> <span className="font-black uppercase text-slate-950">{lr.fromPlace}</span>
+                            <span className="font-black text-slate-900">From:</span> <span className="font-black uppercase text-[12px] text-slate-950">{lr.fromPlace}</span>
                         </td>
                         <td className="p-1.5">
-                            <span className="font-black text-slate-900">To:</span> <span className="font-black uppercase text-slate-950">{lr.toPlace}</span>
+                            <span className="font-black text-slate-900">To:</span> <span className="font-black uppercase text-[12px] text-slate-950">{lr.toPlace}</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
 
             {/* Parties Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1 table-fixed">
+            <table className="w-full border-collapse border-2 border-black text-[10.5px] mt-1 table-fixed">
                 <thead>
                     <tr className="border-b-2 border-black">
                         <td className="p-1.5 border-r-2 border-black font-black w-1/2 bg-gray-100 uppercase">Consignor Details</td>
@@ -718,14 +718,14 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                 <tbody>
                     <tr>
                         <td className="p-2 border-r-2 border-black align-top h-20">
-                            <div className="font-black text-[13px] text-black uppercase">{lr.consignor?.name || '--'}</div>
-                            <div className="font-bold text-slate-800 text-[9.5px] leading-snug mt-0.5">{lr.consignor?.address || '--'}, {lr.consignor?.city}</div>
+                            <div className="font-black text-[14.5px] text-black uppercase leading-tight">{lr.consignor?.name || '--'}</div>
+                            <div className="font-bold text-slate-800 text-[11px] leading-snug mt-1">{lr.consignor?.address || '--'}, {lr.consignor?.city}</div>
                             {lr.consignor?.contact && <div className="font-bold text-slate-900 mt-0.5">Mob: {lr.consignor.contact}</div>}
                             <div className="font-black text-slate-900 mt-1">GSTIN: {lr.consignor?.gst || 'Unregistered'}</div>
                         </td>
                         <td className="p-2 align-top h-20">
-                            <div className="font-black text-[13px] text-black uppercase">{lr.consignee?.name || '--'}</div>
-                            <div className="font-bold text-slate-800 text-[9.5px] leading-snug mt-0.5">{lr.consignee?.address || '--'}, {lr.consignee?.city}</div>
+                            <div className="font-black text-[14.5px] text-black uppercase leading-tight">{lr.consignee?.name || '--'}</div>
+                            <div className="font-bold text-slate-800 text-[11px] leading-snug mt-1">{lr.consignee?.address || '--'}, {lr.consignee?.city}</div>
                             {lr.consignee?.contact && <div className="font-bold text-slate-900 mt-0.5">Mob: {lr.consignee.contact}</div>}
                             <div className="font-black text-slate-900 mt-1">GSTIN: {lr.consignee?.gst || 'Unregistered'}</div>
                         </td>
@@ -735,7 +735,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
 
             {/* Conditionally rendered Billing To details */}
             {isBillingPartySeparate && (
-                <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1 table-fixed">
+                <table className="w-full border-collapse border-2 border-black text-[10.5px] mt-1 table-fixed">
                     <thead>
                         <tr>
                             <td className="p-1 font-black bg-gray-100 uppercase">Billing Party</td>
@@ -744,7 +744,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                     <tbody>
                         <tr>
                             <td className="p-2 align-top font-bold text-slate-900">
-                                <span className="font-black text-black uppercase">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
+                                <span className="font-black text-black uppercase text-[12px]">{lr.billingTo.name}</span> - {lr.billingTo.address}, {lr.billingTo.city} {lr.billingTo.gst && `(GST: ${lr.billingTo.gst})`}
                             </td>
                         </tr>
                     </tbody>
@@ -752,7 +752,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
             )}
 
             {/* Main Content Table */}
-            <table className="w-full border-collapse border-2 border-black text-[9.5px] mt-1">
+            <table className="w-full border-collapse border-2 border-black text-[10.5px] mt-1">
                 <thead>
                     <tr className="font-black text-center bg-gray-100">
                         <td className="border-r-2 border-black p-1.5 w-[8%]">Pkgs</td>
@@ -760,7 +760,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                         <td className="border-r-2 border-black p-1.5 w-[18%]" colSpan={2}>Weight (Kg/MT)</td>
                         <td className="border-r-2 border-black p-1.5 w-[25%]" colSpan={2}>Charges</td>
                     </tr>
-                    <tr className="font-black text-center border-b-2 border-black text-[8.5px]">
+                    <tr className="font-black text-center border-b-2 border-black text-[9.5px]">
                         <td className="border-r-2 border-black p-1">No.</td>
                         <td className="border-r-2 border-black p-1">Particulars</td>
                         <td className="border-r border-black p-1">Actual</td>
@@ -773,7 +773,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                     <tr>
                         <td className="border-r-2 border-black p-2 text-center h-48 align-top font-black">
                             {(lr.items || []).map((item, idx) => (
-                                <div key={idx} className="font-black text-lg mb-2">{item.pcs}</div>
+                                <div key={idx} className="font-black text-xl mb-2">{item.pcs}</div>
                             ))}
                             {(lr.items || []).length > 1 && (
                                 <div className="border-t-2 border-black mt-2 pt-1 font-black text-sm">
@@ -783,56 +783,56 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                         </td>
                         <td className="border-r-2 border-black p-2 align-top">
                             {(lr.items || []).map((item, idx) => (
-                                <div key={idx} className="font-black text-black text-sm uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
+                                <div key={idx} className="font-black text-black text-[13.5px] uppercase mb-3 leading-tight min-h-[1.75rem] flex items-center">
                                     {item.description}
                                 </div>
                             ))}
                         </td>
-                        <td className="border-r border-black p-2 text-center align-top font-black text-slate-900">
+                        <td className="border-r border-black p-2 text-center align-top font-black text-slate-900 text-[12px]">
                             {Number(lr.actualWeightMT) > 0 ? `${lr.actualWeightMT} MT` : (Number(lr.weight) > 0 ? `${Number(lr.weight).toLocaleString('en-IN')} Kg` : '')}
                         </td>
-                        <td className="border-r-2 border-black p-2 text-center align-top font-black text-slate-900">
+                        <td className="border-r-2 border-black p-2 text-center align-top font-black text-slate-900 text-[12px]">
                             {Number(lr.chargedWeight) > 0 ? `${Number(lr.chargedWeight).toLocaleString('en-IN')} Kg` : ''}
                         </td>
                         <td colSpan={2} className="p-0 align-top">
-                            <div className="flex flex-col h-full text-[9.5px]">
-                                <div className="flex justify-between border-b border-black p-1 font-bold">
+                            <div className="flex flex-col h-full text-[10.5px]">
+                                <div className="flex justify-between border-b border-black p-1.5 font-bold">
                                     <span>Freight</span>
-                                    <span className="font-black">{formatAmount(lr.freight)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.freight)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Hamail</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.hamail)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.hamail)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Surcharge</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.surCharge)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.surCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Statistical</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.stCharge)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.stCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Collection</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.collectionCharge)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.collectionCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Door Del.</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.ddCharge)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.ddCharge)}</span>
                                 </div>
-                                <div className="flex justify-between border-b border-gray-300 p-1 font-bold">
+                                <div className="flex justify-between border-b border-gray-300 p-1.5 font-bold">
                                     <span>Other</span>
-                                    <span className="font-black">{formatAmount(lr.charges?.otherCharge)}</span>
+                                    <span className="font-black text-[11.5px]">{formatAmount(lr.charges?.otherCharge)}</span>
                                 </div>
                             </div>
                         </td>
                     </tr>
                     <tr className="border-t-2 border-black font-black">
-                        <td colSpan={4} className="border-r-2 border-black p-2 text-right text-[11px] uppercase">Total Payable</td>
-                        <td colSpan={2} className="p-2 text-right font-black text-base bg-gray-100 font-mono">{formatAmount(totalToPay)}</td>
+                        <td colSpan={4} className="border-r-2 border-black p-2 text-right text-[12.5px] uppercase">Total Payable</td>
+                        <td colSpan={2} className="p-2 text-right font-black text-lg bg-gray-100 font-mono">{formatAmount(totalToPay)}</td>
                     </tr>
                     <tr>
-                        <td colSpan={4} className="border-r-2 border-black p-2 align-top text-[8.5px]">
+                        <td colSpan={4} className="border-r-2 border-black p-2 align-top text-[9.5px]">
                             {companyDetails.bankDetails && companyDetails.bankDetails.accountNo && (
                                 <div className="space-y-0.5">
                                     <span className="font-black block uppercase text-slate-900">Bank Details:</span>
@@ -847,7 +847,7 @@ export const ClassicLRContent = forwardRef<HTMLDivElement, {
                                 {companyDetails.signatureImageUrl && (
                                     <img src={companyDetails.signatureImageUrl} alt="Authorized Signatory" className="h-12 w-auto object-contain mb-1" />
                                 )}
-                                <p className="font-black text-[8.5px] uppercase text-slate-900">Authorized Signatory</p>
+                                <p className="font-black text-[9.5px] uppercase text-slate-900">Authorized Signatory</p>
                             </div>
                         </td>
                     </tr>
